@@ -944,8 +944,6 @@ public class POConverters {
       return builder
           .withUserId(userEntity.id())
           .withUserName(userEntity.name())
-          .withExternalId(userEntity.externalId())
-          .withEnabled(userEntity.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -970,8 +968,6 @@ public class POConverters {
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
           .withMetalakeId(oldUserPO.getMetalakeId())
-          .withExternalId(newUser.externalId())
-          .withEnabled(newUser.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1001,8 +997,6 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
-              .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1031,8 +1025,6 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
-              .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {
@@ -1089,7 +1081,6 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
-              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1118,7 +1109,6 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
-              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
 
@@ -1224,7 +1214,6 @@ public class POConverters {
       return builder
           .withGroupId(groupEntity.id())
           .withGroupName(groupEntity.name())
-          .withExternalId(groupEntity.externalId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1248,7 +1237,6 @@ public class POConverters {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
-          .withExternalId(newGroup.externalId())
           .withMetalakeId(oldGroupPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)
@@ -1367,11 +1355,15 @@ public class POConverters {
     }
   }
 
+  /**
+   * Updates a role PO and advances its OCC version.
+   *
+   * @param oldRolePO the role PO carrying the current version
+   * @param newRole the updated role entity
+   * @return a role PO whose current and last versions are advanced
+   */
   public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
-    Long lastVersion = oldRolePO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldRolePO.getCurrentVersion() + 1;
     try {
       return RolePO.builder()
           .withRoleId(oldRolePO.getRoleId())

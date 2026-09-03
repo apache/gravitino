@@ -23,6 +23,7 @@ import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
@@ -30,6 +31,7 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
   @Override
   public String selectIdpUserWithGroups(@Param("username") String username) {
     return "SELECT u.user_name as name, u.password_hash as passwordHash,"
+        + " u.enabled as enabled,"
         + " COALESCE(JSON_AGG(g.group_name), '[]'::json) as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -40,7 +42,7 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name, u.password_hash";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled";
   }
 
   @Override
@@ -55,6 +57,6 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
   protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+    return DatabaseTimeSQL.POSTGRESQL;
   }
 }

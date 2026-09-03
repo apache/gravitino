@@ -19,15 +19,17 @@
 package org.apache.gravitino.lance.service.authorization;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION;
 
 /**
  * Authorization expressions for the Lance REST namespace surface.
  *
- * <p>A Lance namespace identifier addresses a Gravitino catalog at one level and a Gravitino schema
- * at two levels, so every expression here selects the privileges to require with an {@code
- * entityType} guard. The interceptor reports the addressed entity type, and an identifier that
- * resolves to any other type matches no branch and is therefore denied.
+ * <p>A Lance identifier carries its depth rather than its kind: one level addresses a Gravitino
+ * catalog, two a schema, and three a table. Every expression here therefore selects the privileges
+ * to require with an {@code entityType} guard. The interceptor reports the addressed entity type,
+ * and an identifier that resolves to any other type matches no branch and is therefore denied.
  */
 public final class LanceAuthorizationExpressions {
 
@@ -68,6 +70,41 @@ public final class LanceAuthorizationExpressions {
       (entityType == 'CATALOG' && ANY(OWNER, METALAKE, CATALOG)) ||
       (entityType == 'SCHEMA' && (ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG))
       """;
+
+  /**
+   * Authorizes listing the tables of a namespace. The identifier must address a schema, and the
+   * tables the caller may not see are removed from the listing separately.
+   */
+  public static final String LIST_TABLES_AUTHORIZATION_EXPRESSION =
+      "entityType == 'SCHEMA' && (" + LOAD_SCHEMA_AUTHORIZATION_EXPRESSION + ")";
+
+  /**
+   * Authorizes reading a table. The identifier must address a table, so an identifier that resolves
+   * to a catalog or a schema is denied.
+   */
+  public static final String READ_TABLE_AUTHORIZATION_EXPRESSION =
+      "entityType == 'TABLE' && (" + LOAD_TABLE_AUTHORIZATION_EXPRESSION + ")";
+
+  /**
+   * Authorizes a table existence probe. PROBE_TABLE_LIKE is the privilege that means exactly this,
+   * and CREATE_TABLE is included as well because clients commonly check whether a table exists
+   * immediately before creating it.
+   *
+   * <p>The endpoint answers with an empty 200 or a 404, so the only thing this expression grants is
+   * knowledge of whether the table exists. Reading the table itself stays on {@link
+   * #READ_TABLE_AUTHORIZATION_EXPRESSION}.
+   *
+   * <p>The Gravitino core server reaches the same conclusion by a different route: {@code
+   * loadTable} returns the table body, so it keeps PROBE_TABLE_LIKE out of the primary expression
+   * and admits it through {@code allowCheckExistence}, which only lets the request through when the
+   * table is absent. That machinery is specific to the core interception service, and a dedicated
+   * existence endpoint does not need it.
+   */
+  public static final String PROBE_TABLE_AUTHORIZATION_EXPRESSION =
+      "entityType == 'TABLE' && (("
+          + LOAD_TABLE_AUTHORIZATION_EXPRESSION
+          + ") || (ANY_USE_CATALOG && ANY_USE_SCHEMA"
+          + " && (ANY_PROBE_TABLE_LIKE || ANY_CREATE_TABLE)))";
 
   private LanceAuthorizationExpressions() {}
 }

@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -343,16 +344,16 @@ public class FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -360,8 +361,8 @@ public class FilesetMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -381,8 +382,8 @@ public class FilesetMetaBaseSQLProvider {
       @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE fileset_id = #{filesetId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }

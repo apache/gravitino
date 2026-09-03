@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -207,17 +206,15 @@ public class UserMetaService {
   void deleteUserWithVersion(NameIdentifier identifier, UserPO observedUserPO) {
     Long userId = observedUserPO.getUserId();
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteUserMetaByUserId(
-                          userId, observedUserPO.getCurrentVersion()));
-          if (deleted == 0) {
-            throw userWriteFailure(identifier, observedUserPO, UserLookup.NAME);
-          }
-        },
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        UserMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteUserMetaByUserId(
+                                userId, observedUserPO.getCurrentVersion())),
+                () -> userWriteFailure(identifier, observedUserPO, UserLookup.NAME)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
@@ -363,186 +360,6 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
-    UserPO userPO =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
-
-    if (userPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          externalId);
-    }
-    return userPO;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getUserByExternalId")
-  public UserEntity getUserByExternalId(NameIdentifier ident) {
-    AuthorizationUtils.checkUserExternalId(ident);
-    String metalake = ident.namespace().level(0);
-    String externalId = ident.name();
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateUserByExternalId")
-  public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
-      NameIdentifier ident, Function<E, E> updater) throws IOException {
-    AuthorizationUtils.checkUserExternalId(ident);
-    String metalake = ident.namespace().level(0);
-    String externalId = ident.name();
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
-    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
-    Preconditions.checkArgument(
-        Objects.equals(oldEntity.id(), newEntity.id()),
-        "The updated user entity id: %s should be same with the user entity id before: %s",
-        newEntity.id(),
-        oldEntity.id());
-
-    try {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper ->
-                        mapper.updateUserMetaByExternalId(
-                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO));
-            if (updated == 0) {
-              throw userWriteFailure(ident, oldUserPO, UserLookup.EXTERNAL_ID);
-            }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
-      throw re;
-    }
-    return newEntity;
-  }
-
-  private UserPO getUserPOByMetalakeNameAndId(String metalakeName, Long userId) {
-    UserPO userPO =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeNameAndId(metalakeName, userId));
-
-    if (userPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          String.valueOf(userId));
-    }
-    return userPO;
-  }
-
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getUserById")
-  public UserEntity getUserById(String metalake, long userId) {
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO userPO = getUserPOByMetalakeNameAndId(metalake, userId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateUserById")
-  public <E extends Entity & HasIdentifier> UserEntity updateUserById(
-      String metalake, long userId, Function<E, E> updater) throws IOException {
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO oldUserPO = getUserPOByMetalakeNameAndId(metalake, userId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
-    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
-    Preconditions.checkArgument(
-        Objects.equals(oldEntity.id(), newEntity.id()),
-        "The updated user entity id: %s should be same with the user entity id before: %s",
-        newEntity.id(),
-        oldEntity.id());
-
-    try {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper ->
-                        mapper.updateUserMeta(
-                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO));
-            if (updated == 0) {
-              NameIdentifier userIdIdentifier =
-                  AuthorizationUtils.ofUser(metalake, String.valueOf(userId));
-              throw userWriteFailure(userIdIdentifier, oldUserPO, UserLookup.ID);
-            }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
-      throw re;
-    }
-    return newEntity;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteUserById")
-  public boolean deleteUserById(String metalake, long userId) {
-    UserPO userPO;
-    try {
-      userPO = getUserPOByMetalakeNameAndId(metalake, userId);
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
-    NameIdentifier identifier = AuthorizationUtils.ofUser(metalake, userPO.getUserName());
-
-    // Starts false so that any path that does not reach the child cleanup reports "nothing was
-    // deleted here" rather than claiming a delete it did not perform.
-    AtomicBoolean deletedUser = new AtomicBoolean(false);
-    SessionUtils.doMultipleWithCommit(
-        () -> {
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper -> mapper.softDeleteUserMetaByUserId(userId, userPO.getCurrentVersion()));
-          if (deleted == 0) {
-            // The compare-and-set matched no row for one of two reasons. Either the row is already
-            // gone, and a delete that has nothing left to delete is a no-op rather than an error,
-            // or the row is still there under a newer version, which is a genuine conflict.
-            if (getUserPOByIdForUpdate(userId) == null) {
-              return;
-            }
-            throw ExceptionUtils.concurrentModification(Entity.EntityType.USER, identifier);
-          }
-
-          deletedUser.set(true);
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId));
-          SessionUtils.doWithoutCommit(
-              OwnerMetaMapper.class,
-              mapper ->
-                  mapper.softDeleteOwnerRelByOwnerIdAndType(userId, Entity.EntityType.USER.name()));
-        });
-    return deletedUser.get();
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "countUsersByMetalake")
@@ -600,18 +417,16 @@ public class UserMetaService {
    * create for no reason.
    */
   private void lockMetalakeForUserCreate(MetalakePO observedMetalakePO) {
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
-    if (currentMetalakePO == null
-        || !Objects.equals(
-            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          observedMetalakePO.getMetalakeName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   private RuntimeException userWriteFailure(
@@ -620,22 +435,16 @@ public class UserMetaService {
     // The locking read additionally waits for a writer that is still in flight, so a rename or
     // delete that has not committed yet is classified as not-found instead of as a stale-version
     // conflict. The lock is taken on the error path of a transaction that is about to roll back.
-    UserPO currentUserPO = getUserPOByIdForUpdate(observedUserPO.getUserId());
-    boolean missing =
-        currentUserPO == null
-            || !Objects.equals(currentUserPO.getMetalakeId(), observedUserPO.getMetalakeId());
-    if (!missing && lookup == UserLookup.NAME) {
-      missing = !Objects.equals(currentUserPO.getUserName(), observedUserPO.getUserName());
-    } else if (!missing && lookup == UserLookup.EXTERNAL_ID) {
-      missing = !Objects.equals(currentUserPO.getExternalId(), observedUserPO.getExternalId());
-    }
-    if (missing) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.USER, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.USER,
+        () -> getUserPOByIdForUpdate(observedUserPO.getUserId()),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), observedUserPO.getMetalakeId())
+                && (lookup != UserLookup.NAME
+                    || Objects.equals(current.getUserName(), observedUserPO.getUserName()))
+                && (lookup != UserLookup.EXTERNAL_ID));
   }
 
   private UserPO getUserPOByIdForUpdate(long userId) {

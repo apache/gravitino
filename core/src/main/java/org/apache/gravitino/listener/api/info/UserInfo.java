@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.info;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.User;
 
@@ -30,8 +29,6 @@ import org.apache.gravitino.authorization.User;
 public class UserInfo {
   private final Long id;
   private final String name;
-  private final Optional<String> externalId;
-  private final boolean enabled;
   private List<String> roles;
 
   /**
@@ -42,8 +39,6 @@ public class UserInfo {
   public UserInfo(User user) {
     this.id = Preconditions.checkNotNull(user.id(), "user id");
     this.name = user.name();
-    this.externalId = Optional.ofNullable(user.externalId());
-    this.enabled = user.enabled();
     this.roles = user.roles();
   }
 
@@ -63,24 +58,6 @@ public class UserInfo {
    */
   public String name() {
     return name;
-  }
-
-  /**
-   * Returns the external identifier of the user.
-   *
-   * @return the external identifier of the user, or empty if not set
-   */
-  public Optional<String> externalId() {
-    return externalId;
-  }
-
-  /**
-   * Returns whether the user is enabled.
-   *
-   * @return whether the user is enabled
-   */
-  public boolean enabled() {
-    return enabled;
   }
 
   /**

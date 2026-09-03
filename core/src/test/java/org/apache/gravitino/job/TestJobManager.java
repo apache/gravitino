@@ -61,6 +61,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -68,6 +70,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -520,6 +523,59 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobPopulatesResolvedRuntimeJobTemplate() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    ShellJobTemplate templateWithPlaceholder =
+        ShellJobTemplate.builder()
+            .withName("shell_job_with_placeholder")
+            .withComment("A shell job template with a placeholder")
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("{{greeting}}"))
+            .build();
+    JobTemplateEntity jobTemplateEntity =
+        JobTemplateEntity.builder()
+            .withId(new Random().nextLong())
+            .withName(templateWithPlaceholder.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+            .withTemplateContent(
+                JobTemplateEntity.TemplateContent.fromJobTemplate(templateWithPlaceholder))
+            .withComment(templateWithPlaceholder.comment())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    JobEntity jobEntity =
+        jobManager.runJob(
+            metalake, jobTemplateEntity.name(), Collections.singletonMap("greeting", "Hello!"));
+
+    Assertions.assertNotNull(jobEntity.runtimeJobTemplate());
+    ShellJobTemplateDTO runtimeJobTemplateDTO =
+        (ShellJobTemplateDTO)
+            JsonUtils.anyFieldMapper()
+                .readValue(jobEntity.runtimeJobTemplate(), JobTemplateDTO.class);
+
+    // The resolved runtime template must carry the actual value substituted for the placeholder,
+    // not the original template's raw {{greeting}} string.
+    Assertions.assertEquals(Lists.newArrayList("Hello!"), runtimeJobTemplateDTO.arguments());
+    Assertions.assertEquals(jobTemplateEntity.name(), runtimeJobTemplateDTO.name());
+    Assertions.assertEquals(jobTemplateEntity.comment(), runtimeJobTemplateDTO.comment());
+    // createRuntimeJobTemplate() also resolves the executable by fetching it into the job's
+    // staging directory, so it ends up as a local staging-dir path rather than the original
+    // "/bin/echo" - just confirm it was actually resolved to something under that directory.
+    Assertions.assertTrue(
+        runtimeJobTemplateDTO.executable().endsWith("echo"),
+        () -> "Unexpected resolved executable: " + runtimeJobTemplateDTO.executable());
+  }
+
+  @Test
   public void testRunJobSucceedsWhenStagingDirectoryAlreadyExists() throws Exception {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
@@ -693,6 +749,37 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCancelJobPreservesRuntimeJobTemplate() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"shell_job\",\"executable\":\"/bin/echo\"}";
+    JobEntity job =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId(new Random().nextLong() + "")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
+    stubEntityStoreUpdateToApply(job);
+
+    // The runtime job template is fixed at job creation, so cancelling must carry it forward
+    // unchanged rather than dropping it while rebuilding the entity for the CANCELLING status.
+    JobEntity cancelledJob = jobManager.cancelJob(metalake, job.name());
+    Assertions.assertEquals(runtimeJobTemplateJson, cancelledJob.runtimeJobTemplate());
+  }
+
+  @Test
   public void testPullJobStatus() throws IOException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
     BaseMetalake mockMetalake =
@@ -726,6 +813,47 @@ public class TestJobManager {
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, updatedJob.status());
     Assertions.assertNotNull(updatedJob.finishedAt());
     Assertions.assertTrue(updatedJob.finishedAt() > 0);
+  }
+
+  @Test
+  public void testPullJobStatusPreservesRuntimeJobTemplate() throws IOException {
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"shell_job\",\"executable\":\"/bin/echo\"}";
+    JobEntity job =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId(new Random().nextLong() + "")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    // The runtime job template is fixed at job creation, so a status-poll update must carry it
+    // forward unchanged rather than dropping it while rebuilding the entity for the new status.
+    JobEntity updatedJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(runtimeJobTemplateJson, updatedJob.runtimeJobTemplate());
   }
 
   @Test

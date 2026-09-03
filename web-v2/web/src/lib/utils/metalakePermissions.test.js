@@ -17,14 +17,17 @@
  * under the License.
  */
 
-export const normalizeServiceAdmins = serviceAdmins => {
-  if (Array.isArray(serviceAdmins)) {
-    return serviceAdmins
-  }
+import { describe, expect, it } from 'vitest'
+import { canCreateMetalake } from './metalakePermissions'
 
-  if (typeof serviceAdmins === 'string') {
-    return serviceAdmins.split(',')
-  }
-
-  return []
-}
+describe('canCreateMetalake', () => {
+  it.each([
+    ['an authorization-disabled deployment', false, false, true],
+    ['a service admin when authorization is enabled', true, true, true],
+    ['a non-service-admin when authorization is enabled', true, false, false],
+    ['a user while authorization configuration is loading', null, false, false],
+    ['a user before authorization configuration is available', undefined, false, false]
+  ])('returns the expected result for %s', (_, authorizationEnabled, isServiceAdmin, expected) => {
+    expect(canCreateMetalake(authorizationEnabled, isServiceAdmin)).toBe(expected)
+  })
+})

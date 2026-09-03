@@ -180,9 +180,9 @@ filter with properties of the form
 
 `GET /configs` backs the Web UI, so it answers without authentication and always returns
 `gravitino.authenticators`, `gravitino.authorization.enable`, and `gravitino.schema.separator`.
-It adds `gravitino.authorization.serviceAdmins` when authorization is on, and the OAuth client
-settings when `oauth` is among the authenticators. Treat anything you add through
-`visibleConfigs` as public.
+It adds the OAuth client settings when `oauth` is among the authenticators. Treat anything you add
+through `visibleConfigs` as public, and only add properties that a client needs before it can
+authenticate.
 
 Two further groups of `gravitino.server.webserver.*` properties are documented elsewhere, because
 they belong to features rather than to the web server itself. TLS, key stores, trust stores, and

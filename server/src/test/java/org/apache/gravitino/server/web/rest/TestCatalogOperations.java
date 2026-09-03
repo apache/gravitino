@@ -222,6 +222,17 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -489,6 +500,17 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testAlterCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

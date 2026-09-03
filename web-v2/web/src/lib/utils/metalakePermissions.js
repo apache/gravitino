@@ -16,20 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
-public class TestGroupChange {
-
-  @Test
-  void testUpdateExternalId() {
-    GroupChange.UpdateExternalId change =
-        (GroupChange.UpdateExternalId) GroupChange.updateExternalId("ext-1");
-    Assertions.assertEquals("ext-1", change.getNewExternalId());
-    Assertions.assertEquals(GroupChange.updateExternalId("ext-1"), change);
-    Assertions.assertEquals(GroupChange.updateExternalId(null), GroupChange.updateExternalId(null));
-    Assertions.assertNotEquals(GroupChange.updateExternalId("ext-2"), change);
-  }
-}
+export const canCreateMetalake = (authorizationEnabled, isServiceAdmin) =>
+  authorizationEnabled === false || isServiceAdmin === true

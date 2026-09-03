@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.ibatis.annotations.Param;
@@ -65,7 +66,8 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetaByIdAndVersion(Long modelId, Long currentVersion) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + activeModelVersionWhereClause("modelId", "currentVersion");
   }
 
@@ -73,7 +75,8 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -81,7 +84,8 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -90,7 +94,8 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"

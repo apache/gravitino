@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,9 +109,13 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   private ExposedClickHouseTableOperations newOps() {
+    return newOps(null);
+  }
+
+  private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
     ExposedClickHouseTableOperations ops = new ExposedClickHouseTableOperations();
     ops.initialize(
-        null,
+        dataSource,
         new ClickHouseExceptionConverter(),
         new ClickHouseTypeConverter(),
         new ClickHouseColumnDefaultValueConverter(),
@@ -146,7 +151,6 @@ public class TestClickHouseTableOperationsUnit {
     PreparedStatement statement = Mockito.mock(PreparedStatement.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
     Mockito.when(resultSet.next()).thenReturn(true);
-    Mockito.when(resultSet.getString("name")).thenReturn("test_table");
     Mockito.when(resultSet.getString("COMMENT")).thenReturn("");
     Mockito.when(resultSet.getString("ENGINE")).thenReturn(engine);
     Mockito.when(resultSet.getString("engine_full")).thenReturn(engineFull);
@@ -155,6 +159,37 @@ public class TestClickHouseTableOperationsUnit {
     Connection connection = Mockito.mock(Connection.class);
     Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
     return newOps().callGetTableProperties(connection, "test_table");
+  }
+
+  private Connection mockGetIndexesConnection(
+      ResultSet primaryKeyResultSet, ResultSet secondaryIndexResultSet) throws SQLException {
+    PreparedStatement primaryKeyStatement = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryIndexStatement = Mockito.mock(PreparedStatement.class);
+    Mockito.when(primaryKeyStatement.executeQuery()).thenReturn(primaryKeyResultSet);
+    Mockito.when(secondaryIndexStatement.executeQuery()).thenReturn(secondaryIndexResultSet);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStatement)
+        .thenReturn(secondaryIndexStatement);
+    return connection;
+  }
+
+  private void assertInvalidPrimaryKeySequence(int keySequence, boolean wasNull) throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("id");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(keySequence);
+    Mockito.when(primaryKeyResultSet.wasNull()).thenReturn(wasNull);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(false);
+
+    Connection connection = mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> newOps().callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("invalid KEY_SEQ"));
   }
 
   // ---------------------------------------------------------------------------
@@ -187,6 +222,131 @@ public class TestClickHouseTableOperationsUnit {
     Assertions.assertTrue(
         primaryKeySql.contains("db''1"), "database single quote should be doubled");
     Assertions.assertTrue(primaryKeySql.contains("t''1"), "table single quote should be doubled");
+    Assertions.assertTrue(primaryKeySql.contains("ORDER BY PK_NAME, KEY_SEQ"));
+  }
+
+  @Test
+  void testGetIndexesAggregatesCompositePrimaryKeyInSequenceOrder() throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY", "PRIMARY");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("ts", "id");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(2, 1);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(true, false);
+    Mockito.when(secondaryIndexResultSet.getString("name")).thenReturn("idx_value");
+    Mockito.when(secondaryIndexResultSet.getString("type")).thenReturn("minmax");
+    Mockito.when(secondaryIndexResultSet.getString("type_full")).thenReturn("minmax");
+    Mockito.when(secondaryIndexResultSet.getString("expr")).thenReturn("value");
+    Mockito.when(secondaryIndexResultSet.getLong("granularity")).thenReturn(1L);
+
+    List<Index> indexes =
+        newOps()
+            .callGetIndexes(
+                mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet),
+                "db",
+                "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals(Index.IndexType.PRIMARY_KEY, indexes.get(0).type());
+    Assertions.assertEquals("PRIMARY", indexes.get(0).name());
+    Assertions.assertArrayEquals(new String[][] {{"id"}, {"ts"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, indexes.get(1).type());
+    Assertions.assertEquals("idx_value", indexes.get(1).name());
+    Assertions.assertArrayEquals(new String[][] {{"value"}}, indexes.get(1).fieldNames());
+  }
+
+  @Test
+  void testGetIndexesPreservesSingleColumnPrimaryKey() throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("id");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(1);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(false);
+
+    List<Index> indexes =
+        newOps()
+            .callGetIndexes(
+                mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet),
+                "db",
+                "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals(Index.IndexType.PRIMARY_KEY, indexes.get(0).type());
+    Assertions.assertEquals("PRIMARY", indexes.get(0).name());
+    Assertions.assertArrayEquals(new String[][] {{"id"}}, indexes.get(0).fieldNames());
+  }
+
+  @Test
+  void testGetIndexesKeepsDifferentPrimaryKeyNamesSeparate() throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY_A", "PRIMARY_B");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("id", "ts");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(1, 1);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(false);
+
+    List<Index> indexes =
+        newOps()
+            .callGetIndexes(
+                mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet),
+                "db",
+                "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals("PRIMARY_A", indexes.get(0).name());
+    Assertions.assertArrayEquals(new String[][] {{"id"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals("PRIMARY_B", indexes.get(1).name());
+    Assertions.assertArrayEquals(new String[][] {{"ts"}}, indexes.get(1).fieldNames());
+  }
+
+  @Test
+  void testGetIndexesAllowsNonContiguousPositiveKeySequence() throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY", "PRIMARY");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("ts", "id");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(3, 1);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(false);
+
+    List<Index> indexes =
+        newOps()
+            .callGetIndexes(
+                mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet),
+                "db",
+                "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertArrayEquals(new String[][] {{"id"}, {"ts"}}, indexes.get(0).fieldNames());
+  }
+
+  @Test
+  void testGetIndexesRejectsMissingOrNonPositiveKeySequence() throws Exception {
+    assertInvalidPrimaryKeySequence(0, true);
+    assertInvalidPrimaryKeySequence(0, false);
+    assertInvalidPrimaryKeySequence(-1, false);
+  }
+
+  @Test
+  void testGetIndexesRejectsDuplicateKeySequence() throws Exception {
+    ResultSet primaryKeyResultSet = Mockito.mock(ResultSet.class);
+    ResultSet secondaryIndexResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(primaryKeyResultSet.next()).thenReturn(true, true, false);
+    Mockito.when(primaryKeyResultSet.getString("PK_NAME")).thenReturn("PRIMARY", "PRIMARY");
+    Mockito.when(primaryKeyResultSet.getString("COLUMN_NAME")).thenReturn("id", "ts");
+    Mockito.when(primaryKeyResultSet.getInt("KEY_SEQ")).thenReturn(1, 1);
+    Mockito.when(secondaryIndexResultSet.next()).thenReturn(false);
+
+    Connection connection = mockGetIndexesConnection(primaryKeyResultSet, secondaryIndexResultSet);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> newOps().callGetIndexes(connection, "db", "tbl"));
+
+    Assertions.assertTrue(exception.getMessage().contains("duplicate KEY_SEQ 1"));
   }
 
   @Test
@@ -305,6 +465,82 @@ public class TestClickHouseTableOperationsUnit {
 
     Assertions.assertTrue(exception.getMessage().contains("table_name"));
     Assertions.assertTrue(exception.getMessage().contains("db_name"));
+  }
+
+  @Test
+  void testGetTablePropertiesScopesMetadataToCurrentDatabase() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(sqlCaptor.capture())).thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.next()).thenReturn(true);
+    Mockito.when(resultSet.getString("COMMENT")).thenReturn("table comment");
+    Mockito.when(resultSet.getString("ENGINE")).thenReturn(ENGINE.MERGETREE.getValue());
+    Mockito.when(resultSet.getString("engine_full")).thenReturn("MergeTree ORDER BY id");
+
+    ops.callGetTableProperties(connection, "same_name");
+
+    Assertions.assertEquals(
+        "SELECT comment, engine, engine_full FROM system.tables "
+            + "WHERE database = currentDatabase() AND name = ?",
+        sqlCaptor.getValue());
+    Mockito.verify(statement).setString(1, "same_name");
+  }
+
+  @Test
+  void testRenameUsesTrustedClusterMetadata() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old-table", "new table");
+
+    Mockito.verify(mocks.connection).setCatalog("db_name");
+    Mockito.verify(mocks.updateStatement)
+        .executeUpdate("RENAME TABLE `old-table` TO `new table` ON CLUSTER `ck_cluster`");
+  }
+
+  @Test
+  void testRenameDoesNotPromoteUnmarkedDistributedTableToClusterScope() throws Exception {
+    // The Distributed engine contains a cluster name, but only the Gravitino comment marker may
+    // authorize cluster-wide DDL.
+    RenameMocks mocks =
+        renameMocks("external table", "Distributed('ck_cluster', 'db', 'remote', id)");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old_table", "new_table");
+
+    Mockito.verify(mocks.updateStatement).executeUpdate("RENAME TABLE `old_table` TO `new_table`");
+  }
+
+  @Test
+  void testRenameRejectsCorruptedClusterMetadataBeforeMutation() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster= ", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertTrue(exception.getMessage().contains("missing a cluster name"));
+    Mockito.verify(mocks.connection, Mockito.never()).createStatement();
+  }
+
+  @Test
+  void testRenameMapsSqlException() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    SQLException sqlException = new SQLException("rename failed");
+    Mockito.when(mocks.updateStatement.executeUpdate(Mockito.anyString())).thenThrow(sqlException);
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertSame(sqlException, exception.getCause());
   }
 
   // ---------------------------------------------------------------------------
@@ -831,5 +1067,39 @@ public class TestClickHouseTableOperationsUnit {
                 TableChange.setProperty(settingProperty("a"), "2")));
 
     Mockito.verifyNoInteractions(dataSource);
+  }
+
+  private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement metadataStatement = Mockito.mock(PreparedStatement.class);
+    ResultSet metadataResult = Mockito.mock(ResultSet.class);
+    Statement updateStatement = Mockito.mock(Statement.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(metadataStatement);
+    Mockito.when(metadataStatement.executeQuery()).thenReturn(metadataResult);
+    Mockito.when(metadataResult.next()).thenReturn(true);
+    Mockito.when(metadataResult.getString("COMMENT")).thenReturn(storedComment);
+    Mockito.when(metadataResult.getString("ENGINE"))
+        .thenReturn(
+            engineFull.startsWith("Distributed")
+                ? ENGINE.DISTRIBUTED.getValue()
+                : ENGINE.MERGETREE.getValue());
+    Mockito.when(metadataResult.getString("engine_full")).thenReturn(engineFull);
+    Mockito.when(connection.createStatement()).thenReturn(updateStatement);
+    return new RenameMocks(dataSource, connection, updateStatement);
+  }
+
+  private static final class RenameMocks {
+    private final DataSource dataSource;
+    private final Connection connection;
+    private final Statement updateStatement;
+
+    private RenameMocks(DataSource dataSource, Connection connection, Statement updateStatement) {
+      this.dataSource = dataSource;
+      this.connection = connection;
+      this.updateStatement = updateStatement;
+    }
   }
 }

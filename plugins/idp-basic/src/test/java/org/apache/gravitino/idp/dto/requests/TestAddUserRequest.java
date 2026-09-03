@@ -49,6 +49,8 @@ public class TestAddUserRequest {
     Assertions.assertEquals(request1, deserRequest1);
     Assertions.assertNull(deserRequest1.getUser());
     Assertions.assertNull(deserRequest1.getPassword());
+    Assertions.assertNull(deserRequest1.getEnabled());
+    Assertions.assertTrue(deserRequest1.enabledOrDefault());
   }
 
   @Test
