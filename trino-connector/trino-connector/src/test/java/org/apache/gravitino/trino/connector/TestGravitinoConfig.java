@@ -47,6 +47,16 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void testMetalakeIsTrimmed() {
+    GravitinoConfig config =
+        new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "  user_001  "));
+
+    // The system tables filter by metalake name, so a stray space in the catalog properties file
+    // must not make this value stop matching the name the load loop records states under.
+    assertEquals("user_001", config.getMetalake());
+  }
+
+  @Test
   public void testMissingConfig() {
     String gravitinoUrl = "http://127.0.0.1:8000";
     ImmutableMap<String, String> configMap = ImmutableMap.of("gravitino.uri", gravitinoUrl);

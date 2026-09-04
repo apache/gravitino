@@ -497,6 +497,46 @@ public class GravitinoMetalake extends MetalakeDTO
     ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(catalogName);
+      return;
+    }
+
+    List<CatalogUpdateRequest> requests =
+        Arrays.stream(changes)
+            .map(DTOConverters::toCatalogUpdateRequest)
+            .collect(Collectors.toList());
+    CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(requests);
+    updatesRequest.validate();
+
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            updatesRequest,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
   @Override
   public SupportsRoles supportsRoles() {
     return this;

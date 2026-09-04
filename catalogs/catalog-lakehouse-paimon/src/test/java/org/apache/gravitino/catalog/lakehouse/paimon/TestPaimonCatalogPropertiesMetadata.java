@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,7 @@ public class TestPaimonCatalogPropertiesMetadata {
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
+    assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
     // REST bearer token and DLF credentials share the same hidden requirement
     assertTrue(metadata.isHiddenProperty(PaimonConstants.TOKEN));
     assertTrue(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
@@ -48,6 +51,8 @@ public class TestPaimonCatalogPropertiesMetadata {
   void testNonSensitivePropertiesAreNotHidden() {
     assertFalse(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.WAREHOUSE));
     assertFalse(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.URI));
+    assertFalse(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+    assertFalse(metadata.isHiddenProperty(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE));
     // DLF token metadata (provider type, path, loader) is not a credential — stays visible.
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_TOKEN_PROVIDER));
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_TOKEN_PATH));
