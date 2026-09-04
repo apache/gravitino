@@ -84,7 +84,7 @@ final class ClickHouseTableSqlUtils {
   }
 
   static List<String> extractShardingKeyColumns(String shardingKey) {
-    String normalized = normalizeIndexExpression(shardingKey);
+    String normalized = normalizeShardingKeyExpression(shardingKey);
     if (StringUtils.isBlank(normalized)) {
       return Collections.emptyList();
     }
@@ -136,23 +136,10 @@ final class ClickHouseTableSqlUtils {
   }
 
   static String normalizeIndexExpression(String expression) {
-    String trimmed = expression.trim();
-
-    boolean stripped = true;
-    String current = trimmed;
-    while (stripped) {
-      stripped = false;
-      Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(current);
-      if (matcher.matches()) {
-        current = matcher.group(2).trim();
-        stripped = true;
-      }
-    }
+    String current = expression.trim();
 
     if (StringUtils.startsWithIgnoreCase(current, "tuple(") && StringUtils.endsWith(current, ")")) {
       current = current.substring("tuple(".length(), current.length() - 1).trim();
-    } else if (StringUtils.equalsIgnoreCase(current, "tuple()")) {
-      current = "";
     }
 
     return current;
@@ -173,6 +160,22 @@ final class ClickHouseTableSqlUtils {
 
   private static boolean isStrictIdentifier(String identifier) {
     return StringUtils.isNotBlank(identifier) && identifier.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
+  }
+
+  private static String normalizeShardingKeyExpression(String expression) {
+    String current = expression.trim();
+
+    boolean stripped = true;
+    while (stripped) {
+      stripped = false;
+      Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(current);
+      if (matcher.matches()) {
+        current = matcher.group(2).trim();
+        stripped = true;
+      }
+    }
+
+    return normalizeIndexExpression(current);
   }
 
   private static Transform parsePartitionExpression(
