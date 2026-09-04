@@ -357,29 +357,17 @@ public class GravitinoEnv {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Get the internal FunctionDispatcher associated with the Gravitino environment.
    *
    * <p>The internal dispatcher preserves normalization but skips hooks and event emission.
    *
-   * @return The internal FunctionDispatcher instance.
+   * <p>The internal FunctionDispatcher instance.
    */
   public FunctionDispatcher internalFunctionDispatcher() {
     return internalFunctionDispatcher;
   }
 
   /**
-   * Get the Semantic Model dispatcher associated with the Gravitino environment.
-   *
-   * @return The Semantic Model dispatcher.
-   */
-  public SemanticModelDispatcher semanticModelDispatcher() {
-    return semanticModelDispatcher;
-  }
-
-  /**
->>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
    * Get the ViewDispatcher associated with the Gravitino environment.
    *
    * @return The ViewDispatcher instance.
@@ -858,13 +846,7 @@ public class GravitinoEnv {
     this.internalFunctionDispatcher = functionNormalizeDispatcher;
     FunctionEventDispatcher functionEventDispatcher =
         new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
-<<<<<<< HEAD
     this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
-=======
-    this.functionDispatcher =
-        new FunctionHookDispatcher(
-            functionEventDispatcher, this::internalOwnerDispatcher, catalogManager);
->>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
 
     // View operation chain: ViewHookDispatcher -> ViewEventDispatcher -> ViewNormalizeDispatcher
     // -> ViewOperationDispatcher.

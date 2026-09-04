@@ -71,21 +71,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @param idGenerator The IdGenerator instance to be used for view operations.
    */
   public ViewOperationDispatcher(
-<<<<<<< HEAD
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
-=======
-      CatalogManager catalogManager,
-      EntityStore store,
-      IdGenerator idGenerator,
-      SecretManager secretManager) {
     this(
         catalogManager,
         store,
         idGenerator,
-        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
-        secretManager);
->>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher());
   }
 
   /**

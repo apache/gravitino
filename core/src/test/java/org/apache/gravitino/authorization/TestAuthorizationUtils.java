@@ -359,34 +359,6 @@ class TestAuthorizationUtils {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  void testRemovePrivilegesNotifiesEntityNameIdMappingChange() {
-    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
-    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
-    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(catalogManager.loadCatalog(Mockito.any())).thenReturn(baseCatalog);
-
-    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
-    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
-    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
-
-    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
-      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
-
-      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
-      AuthorizationUtils.authorizationPluginRemovePrivileges(
-          ident, Entity.EntityType.TABLE, Collections.emptyList());
-
-      Mockito.verify(authorizer)
-          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
-    }
-  }
-
-  @Test
->>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
   void testRenameTablePrivilegesNotifiesAuthorizationPluginWithExpectedChange() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
     NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");

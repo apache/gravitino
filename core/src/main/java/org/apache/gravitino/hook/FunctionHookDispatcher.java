@@ -82,7 +82,7 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
         dispatcher.registerFunction(ident, comment, functionType, deterministic, definitions);
 
     // Set the creator as the owner of the function.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the function name (and its schema namespace)
       // based on catalog capabilities, so the entity is stored under the normalized identifier.

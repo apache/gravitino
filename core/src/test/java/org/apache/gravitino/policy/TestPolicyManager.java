@@ -121,12 +121,6 @@ public class TestPolicyManager {
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-<<<<<<< HEAD
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
-=======
         GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
@@ -134,11 +128,6 @@ public class TestPolicyManager {
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
->>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
 
     AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
