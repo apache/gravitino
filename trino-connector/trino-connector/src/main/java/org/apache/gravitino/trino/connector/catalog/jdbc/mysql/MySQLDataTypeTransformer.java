@@ -49,13 +49,23 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
-      } else {
-        return TimestampType.TIMESTAMP_SECONDS;
-      }
+      // When the precision is unknown (the MySQL catalog reports it only with MySQL Connector/J
+      // 8.0.16 or later) fall back to the MySQL default fractional seconds precision of 0.
+      int precision =
+          timestampType.hasPrecisionSet()
+              ? toMySQLFractionalSecondsPrecision(timestampType.precision())
+              : TRINO_SECONDS_PRECISION;
+      return timestampType.hasTimeZone()
+          ? TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision)
+          : TimestampType.createTimestampType(precision);
     } else if (Name.TIME == type.name()) {
-      return TimeType.TIME_SECONDS;
+      Types.TimeType timeType = (Types.TimeType) type;
+      // Precision unknown, same fallback as TIMESTAMP above.
+      int precision =
+          timeType.hasPrecisionSet()
+              ? toMySQLFractionalSecondsPrecision(timeType.precision())
+              : TRINO_SECONDS_PRECISION;
+      return TimeType.createTimeType(precision);
     } else if (Name.EXTERNAL == type.name()) {
       String catalogString = ((Types.ExternalType) type).catalogString();
       return MySQLExternalDataType.safeValueOf(catalogString).getTrinoType();
@@ -115,5 +125,19 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
     }
 
     return super.getGravitinoType(type);
+  }
+
+  /**
+   * Maps a Gravitino time/timestamp precision to the precision of the corresponding Trino type. The
+   * Trino type must carry the same precision as the MySQL column, otherwise Trino rejects the
+   * values read from MySQL (for example, "Expected 0s for digits beyond precision 0").
+   *
+   * @param precision the precision reported by Gravitino.
+   * @return the precision to use for the Trino type, capped at the MySQL maximum of 6.
+   */
+  private static int toMySQLFractionalSecondsPrecision(int precision) {
+    // MySQL supports a fractional seconds precision from 0 to 6 (microseconds precision), see
+    // https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html
+    return Math.min(TRINO_MICROS_PRECISION, precision);
   }
 }
