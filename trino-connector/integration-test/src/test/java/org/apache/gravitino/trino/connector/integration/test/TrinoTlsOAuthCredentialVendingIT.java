@@ -64,7 +64,6 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -74,8 +73,6 @@ import org.testcontainers.containers.Container;
  * Gravitino and Iceberg REST requests, and Iceberg REST S3 credential vending.
  */
 @Tag("gravitino-docker-test")
-@EnabledIfEnvironmentVariable(named = "GRAVITINO_CI_TRINO_DOCKER_IMAGE", matches = ".+")
-@EnabledIfEnvironmentVariable(named = "GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", matches = ".+")
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
