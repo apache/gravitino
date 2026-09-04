@@ -41,6 +41,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -48,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -141,6 +143,8 @@ public class FunctionMetaService {
   public boolean deleteFunction(NameIdentifier ident) {
     FunctionPO functionPO = getFunctionPOByIdentifier(ident);
     Long functionId = functionPO.functionId();
+    String metalakeName = NameIdentifierUtil.getMetalake(ident);
+    String functionFullName = ident.toString();
 
     AtomicInteger functionDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -172,6 +176,18 @@ public class FunctionMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         functionId, MetadataObject.Type.FUNCTION.name()));
+          }
+        },
+        () -> {
+          if (functionDeletedCount.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.FUNCTION.name(),
+                        functionFullName,
+                        OperateType.DROP));
           }
         });
 
