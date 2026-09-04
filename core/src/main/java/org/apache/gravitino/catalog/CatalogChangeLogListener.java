@@ -51,10 +51,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p><b>What clearing costs:</b> dropping a catalog from the cache retires its {@code
  * CatalogWrapper}. Idle wrappers release their connection pools and {@code IsolatedClassLoader}s
- * immediately; wrappers with active operation leases defer cleanup until their final lease is
- * closed. Clearing the whole cache therefore avoids serving stale metadata without disrupting
- * requests that are already using a catalog. The clear only happens when a normal removal failed,
- * never during normal operation.
+ * immediately; wrappers with an active operation lease defer cleanup until their last lease is
+ * closed, so an operation is never torn down mid-flight. The lease only covers the operation
+ * itself: a connector object it returns (a {@code Table}, a {@code Fileset}, ...) is still consumed
+ * after the lease is released, up to REST serialization, so a clear can in principle still break a
+ * request that is finishing up. Closing that window needs a request-scoped lease and is tracked
+ * separately. The clear only happens when a normal removal failed, never during normal operation.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -131,7 +133,8 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       } catch (RuntimeException e) {
         // This batch will never be sent again, so giving up here would keep serving the old
         // catalog until it expires on its own. Clear the whole cache instead; active operation
-        // leases defer resource cleanup until those operations finish.
+        // leases defer resource cleanup until those operations finish. See the class javadoc for
+        // what the lease does and does not cover.
         LOG.error(
             "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
                 + "avoid serving it stale; resources in use are retired after their leases close",

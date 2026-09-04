@@ -52,8 +52,10 @@ import org.slf4j.LoggerFactory;
  *       name&#8594;id entry there would be used by authorization checks.
  *   <li>{@code CatalogChangeLogListener} clears its whole catalog cache. Clearing it retires every
  *       cached catalog while operation leases defer {@code IsolatedClassLoader} cleanup for
- *       catalogs this process is still serving. This prevents stale reads without disrupting
- *       in-flight operations, and the clear only happens when a normal removal failed.
+ *       catalogs this process is still serving, so no operation is torn down mid-flight. A
+ *       connector object returned by an operation outlives its lease, so a clear can still break a
+ *       request that is finishing up; see {@code CatalogChangeLogListener} for details. The clear
+ *       only happens when a normal removal failed.
  * </ul>
  *
  * <p>Do not register a listener here if it cannot recover on its own.

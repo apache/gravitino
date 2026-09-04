@@ -1226,7 +1226,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         nameIdentifierForLock,
         LockType.WRITE,
         () -> {
+          // Hold the lifecycle read lock across the whole mutation, from before the entity is
+          // persisted until the refreshed wrapper is published. Taking it only inside
+          // createAndCacheCatalogLease would leave a window in which close() grabs the write lock
+          // after the entity (and its secrets) were already updated, so checkOpen() would fail the
+          // caller's alter even though the change took effect. Same lock ordering as everywhere
+          // else: tree lock first, lifecycle lock second.
+          lifecycleLock.readLock().lock();
           try {
+            checkOpen();
             CatalogEntity updatedCatalog = alterCatalogUnderLock(ident, changes);
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
@@ -1261,6 +1269,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);
             throw new RuntimeException(ioe);
+
+          } finally {
+            lifecycleLock.readLock().unlock();
           }
         });
   }
@@ -1782,7 +1793,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The resolved properties.
    */
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
-    // Resolve properties through the cached wrapper (loadCatalogAndWrap), which reuses the
+    // Resolve properties through the leased cached wrapper, which reuses the
     // pooled/dedicated ClassLoader and the CatalogWrapper cache. This avoids building and tearing
     // down a throwaway BaseCatalog (and leaking its authorizationPlugin) on every listCatalogsInfo
     // call, and keeps the classLoaderSharingEnabled branching in a single place

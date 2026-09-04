@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -555,6 +556,48 @@ public class TestCatalogWrapperLease {
         .atMost(Duration.ofSeconds(1))
         .until(() -> !closeFuture.isDone());
     return closeFuture;
+  }
+
+  @Test
+  public void testManagerCloseWaitsForConcurrentCatalogAlter() throws Exception {
+    NameIdentifier ident = createCatalog("alter_while_closing");
+
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch publicationStarted = new CountDownLatch(1);
+    CountDownLatch continuePublication = new CountDownLatch(1);
+    // The only createCatalogWrapper(entity, null) call of alterCatalog happens after the entity
+    // has been persisted and before the refreshed wrapper is published, i.e. exactly in the window
+    // where a concurrent close() used to fail the alter that had already taken effect.
+    Mockito.doAnswer(
+            invocation -> {
+              publicationStarted.countDown();
+              Assertions.assertTrue(continuePublication.await(10, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Catalog> alteredCatalog =
+          executor.submit(
+              () -> catalogManager.alterCatalog(ident, CatalogChange.updateComment("altered")));
+      Assertions.assertTrue(publicationStarted.await(10, TimeUnit.SECONDS));
+
+      Future<?> closeFuture = submitCloseAndAssertBlocked(executor);
+
+      continuePublication.countDown();
+      Catalog altered = alteredCatalog.get(10, TimeUnit.SECONDS);
+      Assertions.assertEquals(
+          "altered", altered.comment(), "the alter must succeed instead of racing with close()");
+      closeFuture.get(10, TimeUnit.SECONDS);
+
+      Assertions.assertThrows(
+          IllegalStateException.class, () -> catalogManager.acquireCatalogLease(ident));
+    } finally {
+      continuePublication.countDown();
+      executor.shutdownNow();
+    }
   }
 
   private NameIdentifier createCatalog(String name) {
