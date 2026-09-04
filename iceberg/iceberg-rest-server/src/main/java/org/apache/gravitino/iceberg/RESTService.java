@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,11 @@ public class RESTService implements GravitinoAuxiliaryService {
   public static final String ICEBERG_SPEC = "/iceberg/*";
   private static final String ICEBERG_REST_SPEC_PACKAGE =
       "org.apache.gravitino.iceberg.service.rest";
+
+  // /metrics and /prometheus/metrics are registered by JettyServer#initialize() itself, outside
+  // ICEBERG_SPEC, but still need audit-on-failure coverage. See GH-12760.
+  private static final ImmutableList<String> METRICS_PATHS =
+      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
@@ -218,9 +224,20 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint.
+    // systems that expect a /health endpoint. Not part of METRICS_PATHS below: HealthAliasServlet
+    // forwards every request into /iceberg/health*, which ICEBERG_SPEC already covers via the
+    // servlet container's FORWARD dispatcher type, so binding the filter again here would
+    // double-log every probe.
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
+
+    // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
+    // nothing in the build catching it.
+    for (String pathSpec : METRICS_PATHS) {
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_ICEBERG_REST_SERVER), pathSpec);
+      server.addCustomFilters(pathSpec);
+    }
   }
 
   @Override

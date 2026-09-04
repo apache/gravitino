@@ -21,6 +21,7 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
+import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,6 +64,11 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public static final String LANCE_SPEC = "/lance/*";
 
   private static final String LANCE_REST_SPEC_PACKAGE = "org.apache.gravitino.lance.service.rest";
+
+  // /metrics and /prometheus/metrics are registered by JettyServer#initialize() itself, outside
+  // LANCE_SPEC, but still need audit-on-failure coverage. See GH-12760.
+  private static final ImmutableList<String> METRICS_PATHS =
+      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private JettyServer server;
   private NamespaceWrapper lanceNamespace;
@@ -146,9 +152,20 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint.
+    // systems that expect a /health endpoint. Not part of METRICS_PATHS below: HealthAliasServlet
+    // forwards every request into /lance/health*, which LANCE_SPEC already covers via the servlet
+    // container's FORWARD dispatcher type, so binding the filter again here would double-log every
+    // probe.
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
+
+    // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
+    // nothing in the build catching it.
+    for (String pathSpec : METRICS_PATHS) {
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
+      server.addCustomFilters(pathSpec);
+    }
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
