@@ -191,6 +191,7 @@ public class RESTService implements GravitinoAuxiliaryService {
                   .to(InterceptionService.class)
                   .in(Singleton.class);
             }
+            bind(configProvider).to(IcebergConfigProvider.class).ranked(1);
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             cleanupManager.ifPresent(
