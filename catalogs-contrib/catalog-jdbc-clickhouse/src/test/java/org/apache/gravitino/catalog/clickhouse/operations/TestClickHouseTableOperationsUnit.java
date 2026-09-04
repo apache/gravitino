@@ -406,6 +406,69 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testParseSettingsPreservesQuotedAndNestedValues() {
+    ExposedClickHouseTableOperations ops = newOps();
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY id SETTINGS "
+                + "quoted =  'id,name,val', "
+                + "escaped = 'a\\'b\\\\c', "
+                + "doubled = 'a''b,c', "
+                + "double_quoted = \"a,b\"\"c\", "
+                + "nested = custom(`a,b`, tuple(1, 2), 'x=y,z')");
+
+    Assertions.assertEquals(5, settings.size());
+    Assertions.assertEquals(
+        "'id,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
+    Assertions.assertEquals(
+        "'a\\'b\\\\c'", settings.get(TableConstants.SETTINGS_PREFIX + "escaped"));
+    Assertions.assertEquals("'a''b,c'", settings.get(TableConstants.SETTINGS_PREFIX + "doubled"));
+    Assertions.assertEquals(
+        "\"a,b\"\"c\"", settings.get(TableConstants.SETTINGS_PREFIX + "double_quoted"));
+    Assertions.assertEquals(
+        "custom(`a,b`, tuple(1, 2), 'x=y,z')",
+        settings.get(TableConstants.SETTINGS_PREFIX + "nested"));
+  }
+
+  @Test
+  void testParseSettingsPreservesLastDuplicateValue() {
+    Map<String, String> settings =
+        newOps()
+            .parseSettingsFromEngineFull(
+                "MergeTree ORDER BY id SETTINGS duplicate = 1, duplicate = 'last,value'");
+
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "'last,value'", settings.get(TableConstants.SETTINGS_PREFIX + "duplicate"));
+  }
+
+  @Test
+  void testParseSettingsRejectsStructurallyInvalidMetadata() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidSettings = {
+      "missing_equals",
+      "= 1",
+      "key = ",
+      ", key = 1",
+      "key = 1,",
+      "key = 1,, other = 2",
+      "key = 'unterminated",
+      "key = custom(1, 2",
+      "key = value)"
+    };
+
+    for (String invalidSetting : invalidSettings) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.parseSettingsFromEngineFull(
+                      "MergeTree ORDER BY id SETTINGS " + invalidSetting));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
+  }
+
+  @Test
   void testGetSystemTableMetadataThrowsWhenTableIsNotVisible() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
     Connection connection = Mockito.mock(Connection.class);

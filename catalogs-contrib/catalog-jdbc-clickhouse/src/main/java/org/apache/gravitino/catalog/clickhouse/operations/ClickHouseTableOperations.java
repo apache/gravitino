@@ -102,6 +102,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  private static final String INVALID_SETTINGS_METADATA_MSG =
+      "Invalid ClickHouse table SETTINGS metadata";
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
 
@@ -1492,23 +1494,51 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return metadata;
   }
 
-  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
-  // Keys are prefixed with "settings." to match the write path convention in
-  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
-  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
-  // so splitting by comma is safe.
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with
+  // "settings." to match the write path convention in appendTableProperties().
   private static Map<String, String> parseSettingsClause(String settingsStr) {
     Map<String, String> settings = new HashMap<>();
-    for (String pair : settingsStr.split(",")) {
-      String trimmed = pair.trim();
-      int eqIdx = trimmed.indexOf('=');
-      if (eqIdx > 0) {
-        String key = trimmed.substring(0, eqIdx).trim();
-        String value = trimmed.substring(eqIdx + 1).trim();
-        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+    int fragmentStart = 0;
+    int equalsIndex = -1;
+    for (int i = 0; i < settingsStr.length(); i++) {
+      char current = settingsStr.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(settingsStr, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(settingsStr, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (current == '=' && equalsIndex < 0) {
+        equalsIndex = i;
+      } else if (current == ',') {
+        addSetting(settings, settingsStr, fragmentStart, equalsIndex, i);
+        fragmentStart = i + 1;
+        equalsIndex = -1;
       }
     }
+
+    addSetting(settings, settingsStr, fragmentStart, equalsIndex, settingsStr.length());
     return settings;
+  }
+
+  private static void addSetting(
+      Map<String, String> settings,
+      String settingsStr,
+      int fragmentStart,
+      int equalsIndex,
+      int fragmentEnd) {
+    Preconditions.checkArgument(
+        equalsIndex >= fragmentStart && equalsIndex < fragmentEnd, INVALID_SETTINGS_METADATA_MSG);
+    String key = settingsStr.substring(fragmentStart, equalsIndex).trim();
+    String value = settingsStr.substring(equalsIndex + 1, fragmentEnd).trim();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(key) && StringUtils.isNotBlank(value),
+        INVALID_SETTINGS_METADATA_MSG);
+    settings.put(TableConstants.SETTINGS_PREFIX + key, value);
   }
 
   @VisibleForTesting
@@ -2153,48 +2183,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static boolean isSingleQuotedLiteral(@Nullable String value) {
     String literal = StringUtils.trim(value);
-    if (StringUtils.length(literal) < 2 || literal.charAt(0) != '\'') {
-      return false;
-    }
-
-    for (int i = 1; i < literal.length(); i++) {
-      char current = literal.charAt(i);
-      if (current == '\\') {
-        if (i + 1 >= literal.length()) {
-          return false;
-        }
-        i++;
-      } else if (current == '\'') {
-        if (i + 1 < literal.length() && literal.charAt(i + 1) == '\'') {
-          i++;
-        } else {
-          return i == literal.length() - 1;
-        }
-      }
-    }
-    return false;
+    return StringUtils.length(literal) >= 2
+        && literal.charAt(0) == '\''
+        && findClosingQuote(literal, 0) == literal.length() - 1;
   }
 
   private static int findMatchingParenthesis(String value, int openParenthesis) {
     int depth = 1;
-    char quote = 0;
     for (int i = openParenthesis + 1; i < value.length(); i++) {
       char current = value.charAt(i);
-      if (quote != 0) {
-        if (current == '\\' && i + 1 < value.length()) {
-          i++;
-        } else if (current == quote) {
-          if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
-            i++;
-          } else {
-            quote = 0;
-          }
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        if (quoteEnd < 0) {
+          return -1;
         }
-        continue;
-      }
-
-      if (current == '\'' || current == '"' || current == '`') {
-        quote = current;
+        i = quoteEnd;
       } else if (current == '(') {
         depth++;
       } else if (current == ')') {
@@ -2205,6 +2208,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return -1;
+  }
+
+  private static int findClosingQuote(String value, int openQuote) {
+    char quote = value.charAt(openQuote);
+    for (int i = openQuote + 1; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (current == '\\' && i + 1 < value.length()) {
+        i++;
+      } else if (current == quote) {
+        if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
+          i++;
+        } else {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isQuoteDelimiter(char value) {
+    return value == '\'' || value == '"' || value == '`';
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
