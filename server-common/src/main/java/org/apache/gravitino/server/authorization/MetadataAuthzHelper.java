@@ -588,8 +588,10 @@ public class MetadataAuthzHelper {
     if (!GravitinoEnv.getInstance().cacheEnabled()) {
       return;
     }
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     try {
+      // Resolving the entity store must stay inside the try: GravitinoEnv.entityStore() throws
+      // when the environment is not initialized, and this preload is best-effort only.
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
       entityStore
           .relationOperations()
           .batchListEntitiesByRelation(
