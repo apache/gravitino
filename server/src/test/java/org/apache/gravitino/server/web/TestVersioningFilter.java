@@ -166,10 +166,11 @@ public class TestVersioningFilter {
     verify(mockChain).doFilter(any(), any());
 
     reset(mockChain, mockResponse);
+    StringWriter writer = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer);
   }
 
   @Test
@@ -250,17 +251,18 @@ public class TestVersioningFilter {
     verify(mockChain).doFilter(any(), any());
 
     reset(mockChain, mockResponse);
+    StringWriter writer1 = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer1);
 
     reset(mockChain, mockResponse);
-    StringWriter writer = stubWriter(mockResponse);
+    StringWriter writer2 = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    assertUnsupportedVersionResponse(mockResponse, writer);
+    assertUnsupportedVersionResponse(mockResponse, writer2);
   }
 
   @Test
@@ -307,9 +309,10 @@ public class TestVersioningFilter {
                         "application/vnd.gravitino.v2+json, application/json"))
                 .elements());
 
+    StringWriter writer1 = stubWriter(mockResponse);
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer1);
 
     reset(mockChain, mockResponse);
 
@@ -319,9 +322,9 @@ public class TestVersioningFilter {
                     Collections.singletonList(
                         "application/vnd.gravitino.v3+json; q=0.9, application/json"))
                 .elements());
-    StringWriter writer = stubWriter(mockResponse);
+    StringWriter writer2 = stubWriter(mockResponse);
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    assertUnsupportedVersionResponse(mockResponse, writer);
+    assertUnsupportedVersionResponse(mockResponse, writer2);
   }
 }

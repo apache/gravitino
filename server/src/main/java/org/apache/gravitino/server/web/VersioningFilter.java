@@ -106,9 +106,17 @@ public class VersioningFilter implements Filter {
 
         if (!ApiVersion.isSupportedVersion(version)) {
           LOG.error("Unsupported version v{} in Request Header {}.", version, value);
+          String message = String.format("Unsupported version v%d in request header", version);
+          ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
 
+          // Write the JSON ErrorResponse directly instead of calling
+          // HttpServletResponse#sendError, so this filter -- which runs before Jersey ever sees
+          // the request -- doesn't fall through to Jetty's default HTML error page.
           HttpServletResponse resp = (HttpServletResponse) response;
-          resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+          resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+          resp.setContentType("application/json");
+          resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+          ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
         } else {
           chain.doFilter(request, response);
         }
@@ -125,50 +133,6 @@ public class VersioningFilter implements Filter {
     chain.doFilter(mutableRequest, response);
   }
 
-<<<<<<< HEAD
-=======
-  private static Integer versionFromHeaders(Enumeration<String> headers) {
-    while (headers.hasMoreElements()) {
-      Integer version = versionFromHeader(headers.nextElement());
-      if (version != null) {
-        return version;
-      }
-    }
-
-    return null;
-  }
-
-  private static Integer versionFromHeader(String value) {
-    if (value == null) {
-      return null;
-    }
-
-    Matcher matcher = VERSIONED_JSON_MEDIA_TYPE_REGEX.matcher(value);
-    return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
-  }
-
-  private static boolean isUnsupportedVersion(int version, ServletResponse response)
-      throws IOException {
-    if (ApiVersion.isSupportedVersion(version)) {
-      return false;
-    }
-
-    LOG.error("Unsupported version v{} in request header.", version);
-    String message = String.format("Unsupported version v%d in request header", version);
-    ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
-
-    // Write the JSON ErrorResponse directly instead of calling HttpServletResponse#sendError, so
-    // this filter -- which runs before Jersey ever sees the request -- doesn't fall through to
-    // Jetty's default HTML error page.
-    HttpServletResponse resp = (HttpServletResponse) response;
-    resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-    resp.setContentType("application/json");
-    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
-    return true;
-  }
-
->>>>>>> deb1e2d21 ([#12783] fix(server): return JSON errors for the whole pre-resource-method WebApplicationException family (#12878))
   @Override
   public void destroy() {}
 }
