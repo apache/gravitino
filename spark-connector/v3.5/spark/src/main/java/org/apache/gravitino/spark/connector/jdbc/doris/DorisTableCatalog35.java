@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -58,47 +59,66 @@ final class DorisTableCatalog35 extends DorisTableCatalog {
     if (identifier.namespace().length != 1) {
       throw new IllegalArgumentException("Doris table identifiers require one schema");
     }
+    Schema schema;
+    List<JdbcColumnMetadata> jdbcColumns;
     try {
-      Schema schema = frontend().getTableSchema(identifier.namespace()[0], identifier.name());
-      List<JdbcColumnMetadata> jdbcColumns =
-          loadJdbcColumnMetadata(identifier, jdbcUrl, jdbcDriver, jdbcUser, jdbcPassword);
-      if (schema.size() != jdbcColumns.size()) {
-        throw new IllegalArgumentException("Doris FE and JDBC column counts differ");
-      }
-      List<StructField> fields = new ArrayList<>(schema.size());
-      List<String> typeNames = new ArrayList<>(schema.size());
-      List<Boolean> catalystTypesResolved = new ArrayList<>(schema.size());
-      List<Boolean> nullabilityKnown = new ArrayList<>(schema.size());
-      for (int index = 0; index < schema.size(); index++) {
-        Field field = schema.getProperties().get(index);
-        JdbcColumnMetadata jdbcColumn = jdbcColumns.get(index);
-        if (!field.getName().equalsIgnoreCase(jdbcColumn.name)
-            || !samePhysicalTypeFamily(field.getType(), jdbcColumn.typeName)) {
-          throw new IllegalArgumentException("Doris FE and JDBC column metadata differ");
-        }
-        DataType dataType;
-        boolean catalystTypeResolved;
-        try {
-          dataType =
-              SchemaConvertors.toCatalystType(
-                  field.getType(), field.getPrecision(), field.getScale());
-          catalystTypeResolved = true;
-        } catch (Exception e) {
-          // An unrecognized FE type must be carried as unresolved metadata so the compatibility
-          // planner can fail closed using the exact JDBC COLUMN_TYPE.
-          dataType = DataTypes.StringType;
-          catalystTypeResolved = false;
-        }
-        fields.add(DataTypes.createStructField(field.getName(), dataType, jdbcColumn.nullable));
-        typeNames.add(jdbcColumn.typeName);
-        catalystTypesResolved.add(catalystTypeResolved);
-        nullabilityKnown.add(true);
-      }
-      return new DorisPhysicalSchema35(
-          DataTypes.createStructType(fields), typeNames, catalystTypesResolved, nullabilityKnown);
+      schema = frontend().getTableSchema(identifier.namespace()[0], identifier.name());
+      jdbcColumns = loadJdbcColumnMetadata(identifier, jdbcUrl, jdbcDriver, jdbcUser, jdbcPassword);
     } catch (Exception e) {
       throw physicalSchemaLoadFailure(identifier, e);
     }
+    return buildPhysicalSchema(schema, jdbcColumns);
+  }
+
+  static DorisPhysicalSchema35 buildPhysicalSchema(
+      Schema schema, List<JdbcColumnMetadata> jdbcColumns) {
+    if (schema.size() != jdbcColumns.size()) {
+      throw new IllegalArgumentException(
+          String.format(
+              Locale.ROOT,
+              "Doris FE and JDBC column counts differ: FE=%d, JDBC=%d",
+              schema.size(),
+              jdbcColumns.size()));
+    }
+    List<StructField> fields = new ArrayList<>(schema.size());
+    List<String> typeNames = new ArrayList<>(schema.size());
+    List<Boolean> catalystTypesResolved = new ArrayList<>(schema.size());
+    List<Boolean> nullabilityKnown = new ArrayList<>(schema.size());
+    for (int index = 0; index < schema.size(); index++) {
+      Field field = schema.getProperties().get(index);
+      JdbcColumnMetadata jdbcColumn = jdbcColumns.get(index);
+      if (!field.getName().equalsIgnoreCase(jdbcColumn.name)
+          || !samePhysicalTypeFamily(field.getType(), jdbcColumn.typeName)) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT,
+                "Doris FE and JDBC column metadata differ at index %d: FE=%s %s, JDBC=%s %s",
+                index,
+                field.getName(),
+                field.getType(),
+                jdbcColumn.name,
+                jdbcColumn.typeName));
+      }
+      DataType dataType;
+      boolean catalystTypeResolved;
+      try {
+        dataType =
+            SchemaConvertors.toCatalystType(
+                field.getType(), field.getPrecision(), field.getScale());
+        catalystTypeResolved = true;
+      } catch (Exception e) {
+        // An unrecognized FE type must be carried as unresolved metadata so the compatibility
+        // planner can fail closed using the exact JDBC COLUMN_TYPE.
+        dataType = DataTypes.StringType;
+        catalystTypeResolved = false;
+      }
+      fields.add(DataTypes.createStructField(field.getName(), dataType, jdbcColumn.nullable));
+      typeNames.add(jdbcColumn.typeName);
+      catalystTypesResolved.add(catalystTypeResolved);
+      nullabilityKnown.add(true);
+    }
+    return new DorisPhysicalSchema35(
+        DataTypes.createStructType(fields), typeNames, catalystTypesResolved, nullabilityKnown);
   }
 
   static IllegalArgumentException physicalSchemaLoadFailure(
@@ -108,7 +128,7 @@ final class DorisTableCatalog35 extends DorisTableCatalog {
             Locale.ROOT,
             "Failed to load Doris physical schema for %s (%s)",
             identifier,
-            failure.getClass().getSimpleName()));
+            safeFailureDetails(failure)));
   }
 
   Table createJdbcTable(
@@ -163,6 +183,25 @@ final class DorisTableCatalog35 extends DorisTableCatalog {
     return !frontendFamily.isEmpty() && frontendFamily.equals(jdbcFamily);
   }
 
+  private static String safeFailureDetails(Throwable failure) {
+    String failureType = failure.getClass().getSimpleName();
+    if (!(failure instanceof SQLException)) {
+      return failureType;
+    }
+    SQLException sqlFailure = (SQLException) failure;
+    String sqlState = sqlFailure.getSQLState();
+    boolean safeSqlState =
+        sqlState != null
+            && sqlState.length() == 5
+            && sqlState.chars().allMatch(Character::isLetterOrDigit);
+    return String.format(
+        Locale.ROOT,
+        "%s, SQLState=%s, errorCode=%d",
+        failureType,
+        safeSqlState ? sqlState : "unknown",
+        sqlFailure.getErrorCode());
+  }
+
   private static String physicalTypeFamily(String typeName) {
     if (typeName == null) {
       return "";
@@ -210,12 +249,12 @@ final class DorisTableCatalog35 extends DorisTableCatalog {
     return new JDBCOptions(jdbcUrl, tableOrQuery, parameters);
   }
 
-  private static final class JdbcColumnMetadata {
+  static final class JdbcColumnMetadata {
     private final String name;
     private final String typeName;
     private final boolean nullable;
 
-    private JdbcColumnMetadata(String name, String typeName, boolean nullable) {
+    JdbcColumnMetadata(String name, String typeName, boolean nullable) {
       this.name = name;
       this.typeName = typeName;
       this.nullable = nullable;

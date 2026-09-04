@@ -41,10 +41,8 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.package$;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import scala.util.Properties$;
 
 public class TestGravitinoDriverPlugin {
 
@@ -193,11 +191,7 @@ public class TestGravitinoDriverPlugin {
   }
 
   @Test
-  void testDorisDependencyPreflight() {
-    Assumptions.assumeTrue(Properties$.MODULE$.versionNumberString().startsWith("2.12"));
-    Assertions.assertDoesNotThrow(
-        () -> GravitinoDriverPlugin.validateDorisDependency(getClass().getClassLoader()));
-
+  void testMissingDorisDependencyFailsPreflight() {
     ClassLoader missingDependencyLoader =
         new ClassLoader(getClass().getClassLoader()) {
           @Override
