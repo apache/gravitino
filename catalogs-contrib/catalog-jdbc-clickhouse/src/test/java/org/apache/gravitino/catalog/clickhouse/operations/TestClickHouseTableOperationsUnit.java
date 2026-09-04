@@ -746,6 +746,110 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testParseSetPropertiesNormalizesValuesAndOmitsDefault() {
+    Assertions.assertEquals(
+        Map.of("set_max_values", "100"),
+        ClickHouseTableOperations.parseSetProperties(
+            Index.IndexType.DATA_SKIPPING_SET, " set ( 00100 ) ", "idx_set"));
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseSetProperties(
+                Index.IndexType.DATA_SKIPPING_SET, "set(0)", "idx_set")
+            .isEmpty());
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseSetProperties(
+                Index.IndexType.DATA_SKIPPING_MINMAX, "minmax", "idx_minmax")
+            .isEmpty());
+  }
+
+  @Test
+  void testParseSetPropertiesAcceptsIntegerMaxValue() {
+    Assertions.assertEquals(
+        Map.of("set_max_values", String.valueOf(Integer.MAX_VALUE)),
+        ClickHouseTableOperations.parseSetProperties(
+            Index.IndexType.DATA_SKIPPING_SET, "set(" + Integer.MAX_VALUE + ")", "idx_set"));
+  }
+
+  @Test
+  void testParseSetPropertiesRejectsValuesOutsideIntegerRange() {
+    for (String value : List.of("-1", "2147483648", "18446744073709551615")) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseSetProperties(
+                      Index.IndexType.DATA_SKIPPING_SET, "set(" + value + ")", "idx_set"));
+      Assertions.assertTrue(exception.getMessage().contains("outside supported range"));
+      Assertions.assertTrue(exception.getMessage().contains(value));
+      Assertions.assertTrue(exception.getMessage().contains("[0, 2147483647]"));
+      Assertions.assertTrue(exception.getMessage().contains("idx_set"));
+    }
+  }
+
+  @Test
+  void testParseSetPropertiesRejectsMalformedMetadata() {
+    for (String typeFull : List.of("set()", "set(100, 200)", "set(abc)", "set(100")) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseSetProperties(
+                      Index.IndexType.DATA_SKIPPING_SET, typeFull, "idx_bad"));
+      Assertions.assertTrue(exception.getMessage().contains("idx_bad"));
+    }
+
+    IllegalArgumentException wrongTypeException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ClickHouseTableOperations.parseSetProperties(
+                    Index.IndexType.DATA_SKIPPING_SET, "tokenbf_v1(100)", "idx_bad"));
+    Assertions.assertTrue(wrongTypeException.getMessage().contains("idx_bad"));
+  }
+
+  @Test
+  void testGetIndexesFailsOnOutOfRangeSetMetadata() throws Exception {
+    for (String value : List.of("2147483648", "18446744073709551615")) {
+      IllegalArgumentException exception = getIndexesFailureForSetTypeFull("set(" + value + ")");
+      Assertions.assertTrue(exception.getMessage().contains("idx_overflow"));
+      Assertions.assertTrue(exception.getMessage().contains("type_full"));
+      Assertions.assertTrue(exception.getMessage().contains(value));
+      Assertions.assertTrue(exception.getMessage().contains("outside supported range"));
+      Assertions.assertTrue(exception.getMessage().contains("[0, 2147483647]"));
+    }
+  }
+
+  @Test
+  void testGetIndexesReadsSetPropertiesWithGranularity() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_set");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn("set(100)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(3L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals(
+        Map.of("set_max_values", "100", "granularity", "3"), indexes.get(0).properties());
+  }
+
+  @Test
   void testGetIndexesSkipsUnsupportedExpressionForParameterizedIndex() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
 
@@ -756,14 +860,16 @@ public class TestClickHouseTableOperationsUnit {
 
     Mockito.when(primaryKeyRs.next()).thenReturn(false);
     Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
-    Mockito.when(secondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
     Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
-    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_expr", "idx_valid");
-    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn("idx_bad_expr", "idx_valid", "idx_set_bad_expr");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1", "set");
     Mockito.when(secondaryRs.getString("type_full"))
-        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
-    Mockito.when(secondaryRs.getString("expr")).thenReturn("cityHash64(col_1) % 16", "col_2");
-    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)", "set(100)");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("cityHash64(col_1) % 16", "col_2", "cityHash64(col_3) % 16");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L);
 
     Connection connection = Mockito.mock(Connection.class);
     Mockito.when(connection.prepareStatement(Mockito.anyString()))
@@ -782,6 +888,56 @@ public class TestClickHouseTableOperationsUnit {
             "hash_functions", "2",
             "random_seed", "0"),
         indexes.get(0).properties());
+    Assertions.assertFalse(
+        indexes.stream().anyMatch(index -> "idx_set_bad_expr".equals(index.name())));
+  }
+
+  @Test
+  void testGetIndexesFailsOnMalformedSetMetadataBeforeUnsupportedExpression() throws Exception {
+    IllegalArgumentException exception =
+        getIndexesFailureForSetMetadata("set(abc)", "cityHash64(col_1) % 16");
+
+    Assertions.assertTrue(exception.getMessage().contains("idx_bad_set_metadata"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+    Assertions.assertTrue(exception.getMessage().contains("set(abc)"));
+    Assertions.assertTrue(exception.getMessage().contains("SET metadata"));
+  }
+
+  @Test
+  void testGetIndexesFailsOnMalformedLegacySetMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, false);
+    Mockito.when(legacySecondaryRs.getString("name")).thenReturn("idx_legacy_bad");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("set(abc)");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_legacy_bad"));
+    Assertions.assertTrue(exception.getMessage().contains("legacy type"));
+    Assertions.assertTrue(exception.getMessage().contains("set(abc)"));
+    Assertions.assertTrue(exception.getMessage().contains("SET metadata"));
+    Assertions.assertFalse(exception.getMessage().contains("type_full"));
   }
 
   @Test
@@ -822,6 +978,56 @@ public class TestClickHouseTableOperationsUnit {
             "hash_functions", "3",
             "random_seed", "0"),
         indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndReadsLegacySetParameters() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_set", "idx_legacy_bare");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("set(100)", "set");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1", "col_2");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index parameterized =
+        indexes.stream()
+            .filter(index -> "idx_legacy_set".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals("idx_legacy_set", parameterized.name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, parameterized.type());
+    Assertions.assertEquals(Map.of("set_max_values", "100"), parameterized.properties());
+
+    Index bare =
+        indexes.stream()
+            .filter(index -> "idx_legacy_bare".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals("idx_legacy_bare", bare.name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, bare.type());
+    Assertions.assertTrue(bare.properties().isEmpty());
   }
 
   @Test
@@ -880,5 +1086,59 @@ public class TestClickHouseTableOperationsUnit {
       this.connection = connection;
       this.updateStatement = updateStatement;
     }
+  }
+
+  private IllegalArgumentException getIndexesFailureForSetTypeFull(String typeFull)
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_overflow");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(typeFull);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    return Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+  }
+
+  private IllegalArgumentException getIndexesFailureForSetMetadata(
+      String typeFull, String expression) throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_set_metadata");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(typeFull);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn(expression);
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    return Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
   }
 }
