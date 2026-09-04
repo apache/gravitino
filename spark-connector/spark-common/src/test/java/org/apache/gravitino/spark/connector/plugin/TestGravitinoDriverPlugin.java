@@ -20,12 +20,16 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
@@ -140,6 +144,19 @@ public class TestGravitinoDriverPlugin {
                     "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of()));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+  }
+
+  @Test
+  void testSkipsCatalogAlreadyConfiguredInSpark() {
+    SparkConf sparkConf =
+        new SparkConf(false).set("spark.sql.catalog.existing", "example.UserCatalog");
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.provider()).thenReturn("hive");
+
+    new GravitinoDriverPlugin()
+        .registerGravitinoCatalogs(sparkConf, Collections.singletonMap("existing", catalog));
+
+    assertEquals("example.UserCatalog", sparkConf.get("spark.sql.catalog.existing"));
   }
 
   private static SparkConf tokenAuthConf() {
