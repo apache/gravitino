@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -27,7 +26,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.function.Function;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -56,8 +54,6 @@ final class ConnectorObjectSnapshot {
       return (R) DTOConverters.toDTO((Model) result);
     } else if (result instanceof ModelVersion) {
       return (R) DTOConverters.toDTO((ModelVersion) result);
-    } else if (result instanceof Function) {
-      return (R) DTOConverters.toDTO((Function) result);
     } else if (result instanceof Partition) {
       return (R) DTOConverters.toDTO((Partition) result);
     } else if (result instanceof ModelVersion[]) {
@@ -83,8 +79,8 @@ final class ConnectorObjectSnapshot {
       this.name = fileset.name();
       this.comment = fileset.comment();
       this.type = fileset.type();
-      this.storageLocations = immutableCopy(fileset.storageLocations());
-      this.properties = immutableCopy(fileset.properties());
+      this.storageLocations = new HashMap<>(fileset.storageLocations());
+      this.properties = copyNullable(fileset.properties());
       this.audit = DTOConverters.toDTO(fileset.auditInfo());
     }
 
@@ -121,8 +117,8 @@ final class ConnectorObjectSnapshot {
     }
 
     @Nullable
-    private static Map<String, String> immutableCopy(@Nullable Map<String, String> source) {
-      return source == null ? null : Collections.unmodifiableMap(new HashMap<>(source));
+    private static Map<String, String> copyNullable(@Nullable Map<String, String> source) {
+      return source == null ? null : new HashMap<>(source);
     }
   }
 }

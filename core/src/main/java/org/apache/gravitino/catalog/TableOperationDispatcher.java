@@ -295,16 +295,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             tableOps ->
                                 tableOps.alterTable(
                                     ident, applyCapabilities(catalog.capabilities(), changes)));
-                    MaskAndOmitKeys hiddenProperties =
-                        getMaskAndOmitKeys(
-                            catalog,
-                            HasPropertyMetadata::tablePropertiesMetadata,
-                            table.properties());
                     return new AlterTableCatalogResult(
-                        ConnectorObjectSnapshot.detach(table),
-                        managed,
-                        hiddenProperties,
-                        tableEntityBeforeRename);
+                        snapshotTable(catalog, table, managed), tableEntityBeforeRename);
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
@@ -593,12 +585,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             catalogIdentifier,
             catalog -> {
               Table table = catalog.doWithTableOps(tableOps -> tableOps.loadTable(ident));
-              boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
-              MaskAndOmitKeys hiddenProperties =
-                  getMaskAndOmitKeys(
-                      catalog, HasPropertyMetadata::tablePropertiesMetadata, table.properties());
-              return new TableCatalogResult(
-                  ConnectorObjectSnapshot.detach(table), managed, hiddenProperties);
+              return snapshotTable(catalog, table);
             },
             NoSuchTableException.class);
     Table table = catalogResult.table;
@@ -686,12 +673,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                               distribution == null ? Distributions.NONE : distribution,
                               sortOrders == null ? new SortOrder[0] : sortOrders,
                               indexes == null ? Indexes.EMPTY_INDEXES : indexes));
-              boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
-              MaskAndOmitKeys hiddenProperties =
-                  getMaskAndOmitKeys(
-                      catalog, HasPropertyMetadata::tablePropertiesMetadata, table.properties());
-              return new CreateTableCatalogResult(
-                  ConnectorObjectSnapshot.detach(table), managed, hiddenProperties, uid);
+              return new CreateTableCatalogResult(snapshotTable(catalog, table), uid);
             },
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
@@ -731,6 +713,20 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(catalogResult.hiddenProperties);
+  }
+
+  private TableCatalogResult snapshotTable(
+      CatalogManager.CatalogWrapper catalog, Table table, boolean managed) throws Exception {
+    Table snapshot = ConnectorObjectSnapshot.detach(table);
+    MaskAndOmitKeys hiddenProperties =
+        getMaskAndOmitKeys(
+            catalog, HasPropertyMetadata::tablePropertiesMetadata, snapshot.properties());
+    return new TableCatalogResult(snapshot, managed, hiddenProperties);
+  }
+
+  private TableCatalogResult snapshotTable(CatalogManager.CatalogWrapper catalog, Table table)
+      throws Exception {
+    return snapshotTable(catalog, table, isManagedEntity(catalog, Capability.Scope.TABLE));
   }
 
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
@@ -955,11 +951,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     private final Optional<TableEntity> tableEntityBeforeRename;
 
     private AlterTableCatalogResult(
-        Table table,
-        boolean managed,
-        MaskAndOmitKeys hiddenProperties,
-        Optional<TableEntity> tableEntityBeforeRename) {
-      super(table, managed, hiddenProperties);
+        TableCatalogResult tableResult, Optional<TableEntity> tableEntityBeforeRename) {
+      super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
       this.tableEntityBeforeRename = tableEntityBeforeRename;
     }
   }
@@ -968,9 +961,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     private final long id;
 
-    private CreateTableCatalogResult(
-        Table table, boolean managed, MaskAndOmitKeys hiddenProperties, long id) {
-      super(table, managed, hiddenProperties);
+    private CreateTableCatalogResult(TableCatalogResult tableResult, long id) {
+      super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
       this.id = id;
     }
   }

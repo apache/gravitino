@@ -252,6 +252,59 @@ public class TestCatalogWrapperLease {
   }
 
   @Test
+  public void testConcurrentLeaseAcquisitionsLoadOneWrapperPerKey() throws Exception {
+    NameIdentifier ident = createCatalog("concurrent_reload");
+    CatalogWrapper oldWrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+    Assertions.assertNotNull(oldWrapper);
+    catalogManager.getCatalogCache().invalidate(ident);
+    await().atMost(Duration.ofSeconds(10)).until(oldWrapper::isRetired);
+
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch continueLoad = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              loadStarted.countDown();
+              Assertions.assertTrue(continueLoad.await(10, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<CatalogLease> first = executor.submit(() -> catalogManager.acquireCatalogLease(ident));
+      Assertions.assertTrue(loadStarted.await(10, TimeUnit.SECONDS));
+      CountDownLatch secondStarted = new CountDownLatch(1);
+      Future<CatalogLease> second =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                return catalogManager.acquireCatalogLease(ident);
+              });
+      Assertions.assertTrue(secondStarted.await(10, TimeUnit.SECONDS));
+      await()
+          .during(Duration.ofMillis(200))
+          .atMost(Duration.ofSeconds(1))
+          .untilAsserted(
+              () ->
+                  Mockito.verify(catalogManager, Mockito.times(1))
+                      .createCatalogWrapper(Mockito.any(), Mockito.isNull()));
+
+      continueLoad.countDown();
+      try (CatalogLease firstLease = first.get(10, TimeUnit.SECONDS);
+          CatalogLease secondLease = second.get(10, TimeUnit.SECONDS)) {
+        Assertions.assertSame(firstLease.wrapper(), secondLease.wrapper());
+        Mockito.verify(catalogManager, Mockito.times(1))
+            .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+      }
+    } finally {
+      continueLoad.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testCleanupRunsExactlyOnceForRepeatedRetireAndRelease() throws Exception {
     // Two catalogs of the same provider share one pooled ClassLoader, so the pool entry survives
     // as long as exactly one reference is released per wrapper. A double cleanup would drop the

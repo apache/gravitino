@@ -25,10 +25,13 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -88,6 +91,30 @@ class TestOperationDispatcherSnapshots {
     Assertions.assertInstanceOf(TableDTO.class, result);
     Assertions.assertEquals("table", result.name());
     Assertions.assertEquals("comment", result.comment());
+  }
+
+  @Test
+  void testFilesetSnapshotCopiesMapsWithoutChangingMutability() {
+    Map<String, String> locations = new HashMap<>();
+    locations.put(Fileset.LOCATION_NAME_UNKNOWN, "file:/data");
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key", "value");
+
+    Fileset fileset = mock(Fileset.class);
+    when(fileset.name()).thenReturn("fileset");
+    when(fileset.type()).thenReturn(Fileset.Type.MANAGED);
+    when(fileset.storageLocations()).thenReturn(locations);
+    when(fileset.properties()).thenReturn(properties);
+    when(fileset.auditInfo())
+        .thenReturn(AuditInfo.builder().withCreator("user").withCreateTime(Instant.EPOCH).build());
+
+    Fileset snapshot = ConnectorObjectSnapshot.detach(fileset);
+    locations.put("archive", "file:/archive");
+    properties.put("late", "change");
+
+    Assertions.assertFalse(snapshot.storageLocations().containsKey("archive"));
+    Assertions.assertFalse(snapshot.properties().containsKey("late"));
+    Assertions.assertDoesNotThrow(() -> snapshot.properties().put("consumer", "value"));
   }
 
   private static <T> Answer<T> requireActive(AtomicBoolean callbackActive, T value) {

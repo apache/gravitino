@@ -1540,6 +1540,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * <p>If the cached wrapper has already been retired (by an eviction, an invalidation or a drop),
    * the stale entry is evicted and a fresh wrapper is loaded and cached.
    *
+   * <p>Lookup, loading, and lease acquisition are atomic per catalog identifier.
+   *
    * @param ident The identifier of the catalog to load.
    * @return A lease on the CatalogWrapper containing the loaded catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
