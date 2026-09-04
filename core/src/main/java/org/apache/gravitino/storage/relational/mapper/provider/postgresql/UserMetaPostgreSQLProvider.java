@@ -52,15 +52,13 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name, metalake_id, external_id, enabled,"
+        + " (user_id, user_name, metalake_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"
-        + " #{userMeta.externalId},"
-        + " #{userMeta.enabled},"
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
@@ -69,8 +67,6 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " ON CONFLICT(user_id) DO UPDATE SET"
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
-        + " external_id = #{userMeta.externalId},"
-        + " enabled = #{userMeta.enabled},"
         + " audit_info = #{userMeta.auditInfo},"
         // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
         + " current_version = "
@@ -86,7 +82,6 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String listExtendedUserPOsByMetalakeId(Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
@@ -117,7 +112,6 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"

@@ -55,8 +55,12 @@ public final class HttpRequestFailureEvent extends FailureEvent {
    *
    * @param user the authenticated user, or {@code "unknown"} if authentication had not completed.
    * @param remoteAddress the client IP resolved by the filter (X-Forwarded-For or raw socket
-   *     address). Stored explicitly because Iceberg and Lance servers do not install {@code
-   *     RequestContextFilter}, so {@code RequestContext.getRemoteAddress()} may be unset.
+   *     address). Stored explicitly, rather than relying on the base {@link
+   *     org.apache.gravitino.listener.api.event.Event} behaviour of reading {@code
+   *     RequestContext.getRemoteAddress()} at construction time, so this event still carries a
+   *     correct address even on a server that does not install {@code RequestContextFilter} at all
+   *     (all servers in this codebase currently do, but this keeps the event resilient to one that
+   *     doesn't).
    * @param httpMethod the HTTP method (e.g. {@code "GET"}, {@code "POST"}).
    * @param requestUri the request URI path (e.g. {@code "/api/metalakes/m1/catalogs"}).
    * @param statusCode the HTTP response status code (e.g. {@code 401}, {@code 404}).
@@ -84,10 +88,10 @@ public final class HttpRequestFailureEvent extends FailureEvent {
   }
 
   /**
-   * Returns the explicitly-resolved client remote address. This overrides the base {@link
-   * org.apache.gravitino.listener.api.event.Event} behaviour (which reads from {@link
-   * org.apache.gravitino.utils.RequestContext}) so that events emitted by servers that do not
-   * install {@code RequestContextFilter} still carry a correct address.
+   * Returns the explicitly-resolved client remote address supplied at construction time, rather
+   * than the base {@link org.apache.gravitino.listener.api.event.Event} behaviour of reading it
+   * from {@link org.apache.gravitino.utils.RequestContext}. See the constructor's {@code
+   * remoteAddress} parameter doc for why.
    */
   @Override
   public String remoteAddress() {
@@ -101,7 +105,10 @@ public final class HttpRequestFailureEvent extends FailureEvent {
   }
 
   /**
-   * Returns HTTP-specific context that distinguishes this event from operation-layer events.
+   * Returns HTTP-specific context that distinguishes this event from operation-layer events. Merged
+   * automatically by {@link org.apache.gravitino.listener.api.event.Event#customInfo()} with the
+   * request's automatically captured query parameters; these keys always win on a collision with a
+   * query parameter of the same name.
    *
    * <ul>
    *   <li>{@code http.method} — the HTTP verb
@@ -110,7 +117,7 @@ public final class HttpRequestFailureEvent extends FailureEvent {
    * </ul>
    */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return ImmutableMap.of(
         "http.method", httpMethod,
         "http.uri", requestUri,

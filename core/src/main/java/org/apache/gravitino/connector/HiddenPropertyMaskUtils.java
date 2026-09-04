@@ -20,20 +20,28 @@ package org.apache.gravitino.connector;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 
 /**
- * Read/write helpers for sensitive entity properties.
+ * Read/write helpers for sensitive and system-managed entity properties.
  *
- * <p><b>Read (API response)</b>: keep every property key. Replace values with {@link #MASKED_VALUE}
- * when the key is metadata-{@code hidden} (including credential keys such as {@code jdbc-password}
- * / S3 secrets) or the value is a secret-manager URN. Other properties, including
- * reserved-but-visible ones (for example {@code numFiles}, {@code creator}), are returned as-is.
- * Reserved only controls whether users may write the property; it does not remove keys from the
- * response.
+ * <p><b>Read (API response)</b>:
+ *
+ * <ul>
+ *   <li><b>Omit</b> keys that are both metadata-{@code reserved} and {@code hidden} (for example
+ *       {@code gravitino.identifier}). Users cannot set them and UIs cannot edit them, so a masked
+ *       placeholder is useless.
+ *   <li><b>Mask</b> other hidden keys (credentials such as {@code jdbc-password}) and
+ *       secret-manager URN values with {@link #MASKED_VALUE}, so clients can see that the property
+ *       exists.
+ *   <li>Return all other properties as-is, including reserved-but-visible ones (for example {@code
+ *       in-use}, {@code numFiles}).
+ * </ul>
  *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code
@@ -41,7 +49,7 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  */
 public final class HiddenPropertyMaskUtils {
 
-  /** Placeholder returned instead of hidden / credential / secret property values. */
+  /** Placeholder returned instead of editable hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
 
   private HiddenPropertyMaskUtils() {}
@@ -71,22 +79,65 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
+   * Classifies property keys for API responses.
+   *
+   * @return keys to mask and keys to omit
+   */
+  public static MaskAndOmitKeys classifyHiddenProperties(
+      @Nullable Map<String, String> properties, PropertiesMetadata metadata) {
+    Objects.requireNonNull(metadata, "metadata");
+    if (properties == null || properties.isEmpty()) {
+      return MaskAndOmitKeys.empty();
+    }
+
+    Set<String> keysToMask = new HashSet<>();
+    Set<String> keysToOmit = new HashSet<>();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null) {
+        continue;
+      }
+      boolean hidden = metadata.isHiddenProperty(key);
+      boolean reserved = metadata.isReservedProperty(key);
+      if (hidden && reserved) {
+        keysToOmit.add(key);
+      } else if (hidden || SecretPropertyUtils.isSecretProperty(key, value)) {
+        keysToMask.add(key);
+      }
+    }
+    return MaskAndOmitKeys.of(Set.copyOf(keysToMask), Set.copyOf(keysToOmit));
+  }
+
+  /**
    * Returns a mutable copy of {@code properties} with values for {@code keysToMask} replaced by
-   * {@link #MASKED_VALUE}. Entries with null keys or values are dropped.
+   * {@link #MASKED_VALUE}. Entries with null keys or values are dropped. No keys are omitted.
    *
    * <p>The returned map is always mutable so callers can add defaults such as {@code in-use}.
    */
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, Set<String> keysToMask) {
+    return maskHiddenProperties(properties, keysToMask, Collections.emptySet());
+  }
+
+  /**
+   * Like {@link #maskHiddenProperties(Map, Set)}, and also drops {@code keysToOmit} from the
+   * result.
+   */
+  public static Map<String, String> maskHiddenProperties(
+      Map<String, String> properties,
+      @Nullable Set<String> keysToMask,
+      @Nullable Set<String> keysToOmit) {
     if (properties == null || properties.isEmpty()) {
       return new HashMap<>();
     }
     Set<String> mask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    Set<String> omit = keysToOmit == null ? Collections.emptySet() : keysToOmit;
     Map<String, String> result = new HashMap<>(properties.size());
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
-      if (key == null || value == null) {
+      if (key == null || value == null || omit.contains(key)) {
         continue;
       }
       result.put(key, mask.contains(key) ? MASKED_VALUE : value);
@@ -95,29 +146,25 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Returns a mutable API-response copy of {@code properties}.
+   * Like {@link #maskHiddenProperties(Map, Set, Set)} using the given classification.
    *
-   * <p>Values are replaced with {@link #MASKED_VALUE} when {@link
-   * PropertiesMetadata#isHiddenProperty(String)} is true (credential and other sensitive keys) or
-   * {@link SecretPropertyUtils#isSecretProperty(String, String)} is true. Reserved keys are not
-   * removed.
+   * @param properties the source properties
+   * @param keys keys to mask and omit
+   * @return a mutable API-response copy
+   */
+  public static Map<String, String> maskHiddenProperties(
+      Map<String, String> properties, @Nullable MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    return maskHiddenProperties(
+        properties, classification.keysToMask(), classification.keysToOmit());
+  }
+
+  /**
+   * Returns a mutable API-response copy of {@code properties}: reserved+hidden keys are omitted;
+   * other hidden keys and secret-manager URN values are replaced with {@link #MASKED_VALUE}.
    */
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, PropertiesMetadata metadata) {
-    if (properties == null || properties.isEmpty()) {
-      return new HashMap<>();
-    }
-    Map<String, String> result = new HashMap<>(properties.size());
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-      if (key == null || value == null) {
-        continue;
-      }
-      boolean shouldMask =
-          metadata.isHiddenProperty(key) || SecretPropertyUtils.isSecretProperty(key, value);
-      result.put(key, shouldMask ? MASKED_VALUE : value);
-    }
-    return result;
+    return maskHiddenProperties(properties, classifyHiddenProperties(properties, metadata));
   }
 }

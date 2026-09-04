@@ -291,6 +291,27 @@ public class TestTableEvent {
     dummyEventListener.popPreEvent();
   }
 
+  /**
+   * customInfo now has two contributors: the request's automatically captured query parameters
+   * (from {@code Event}) and this dispatcher's explicitly stashed extras. Pins that both are
+   * visible on the event and that an explicit key wins over an automatic one of the same name.
+   */
+  @Test
+  void testCustomInfoMergesAutomaticQueryParamsWithExplicitExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setRequestQueryParams(
+        ImmutableMap.of("details", "true", "audit.reason", "from-query-param"));
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    dispatcher.loadTable(identifier);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals("true", event.customInfo().get("details"));
+    Assertions.assertEquals(
+        "policy-applied",
+        event.customInfo().get("audit.reason"),
+        "explicit extras must override the automatically captured value for the same key");
+  }
+
   @Test
   void testCreateTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());

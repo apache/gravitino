@@ -68,7 +68,7 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
     PolicyEntity policy = dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
 
     // Set the creator as the owner of the policy.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerDispatcher != null) {
       ownerDispatcher.setOwner(
           metalake,

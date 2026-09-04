@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
@@ -474,11 +475,17 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
     String schemaName = nsId.levelAtListPos(1);
-    List<String> tables =
+    // Unauthorized entries are removed before the page is cut, so pagination stays consistent with
+    // what the caller is allowed to see.
+    LanceMetadataFilter metadataFilter = namespaceWrapper.metadataFilter();
+    List<String> tableNames =
         Arrays.stream(namespaceWrapper.asTableCatalog(catalog).listTables(Namespace.of(schemaName)))
-            .map(ident -> ident.name())
-            .sorted()
+            .map(NameIdentifier::name)
             .collect(Collectors.toList());
+
+    List<String> tables =
+        Lists.newArrayList(metadataFilter.filterTables(catalogName, schemaName, tableNames));
+    Collections.sort(tables);
 
     PageUtil.Page page = PageUtil.splitPage(tables, pageToken, PageUtil.normalizePageSize(limit));
     ListTablesResponse response = new ListTablesResponse();

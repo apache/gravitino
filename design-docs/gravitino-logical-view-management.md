@@ -42,7 +42,7 @@ Apache Gravitino, as a unified metadata management system, is well-positioned to
 
 3. **Capability-Driven Storage Strategy**: Automatically select the optimal storage strategy based on each catalog's capabilities — no user-facing storage mode configuration needed. Gravitino transparently handles delegation, extension, and full management per catalog type.
 
-4. **Access Control Integration**: Integrate with Gravitino's existing access control framework to provide metadata-level privileges (CREATE_VIEW, SELECT_VIEW, DROP_VIEW). Data-level access control remains the responsibility of the underlying compute engines.
+4. **Access Control Integration**: Integrate with Gravitino's existing access control framework to provide metadata-operation authorization through `CREATE_VIEW`, `SELECT_VIEW`, and ownership for mutations. Data-level access control remains the responsibility of the underlying compute engines.
 
 5. **Audit Support**: View operations should be auditable with complete audit information.
 
@@ -94,7 +94,6 @@ View
 │       └── sql: string                   # The view definition SQL
 ├── defaultCatalog: string                # Optional, shared across all representations
 ├── defaultSchema: string                 # Optional, shared across all representations
-├── securityMode: enum                    # DEFINER | INVOKER (planned field)
 ├── properties: map<string, string>       # Extensible key-value properties
 └── auditInfo: AuditInfo                  # Creation/modification timestamps and users
 ```
@@ -120,9 +119,7 @@ View
     - In storage, these fields are versioned together with the rest of the replaceable view body.
   - View SQL may contain cross-catalog references (e.g., `catalog_a.schema.table JOIN catalog_b.schema.table`). The SQL is stored as-is; neither Gravitino, the IRC, nor the HMS validates, rewrites, or transforms view SQL at any point. The compute engine is responsible for resolving and executing cross-catalog queries at runtime.
 
-- **securityMode**: Declares the security execution model of the view. This is a metadata property stored by Gravitino and **passed through to the compute engine** — Gravitino does not enforce it. Whether it takes effect depends on the engine's capability (e.g., MySQL natively supports DEFINER/INVOKER; Iceberg and Hive do not).
-  - `DEFINER`: the engine should execute the view query with the view owner's privileges.
-  - `INVOKER`: the engine should execute the view query with the querying user's privileges.
+- **Execution security mode**: The current shared View API and REST DTOs do not contain a `securityMode` field or an explicit `INVOKER`/`DEFINER` option. The current Iceberg engine path behaves as `INVOKER`, so callers still need permission on referenced data. Persisting and enforcing an explicit mode, including `DEFINER` and the required engine integrations, remains future design work rather than metadata represented by the current model.
 
 ### Capability-Driven Storage Strategy
 
@@ -368,7 +365,7 @@ When a view is created through Gravitino (e.g., Trino user runs `CREATE VIEW` vi
 | `hive` | Hive native | No special properties | Plain HiveQL text |
 | `flink` | Flink native (v1.1) | `is_generic=true`, `flink.schema.N.name`, `flink.schema.N.data-type` | Plain Flink SQL text |
 
-**Implementation note:** The Gravitino engine connector must pass sufficient metadata (beyond just SQL text and columns) for the HMS catalog provider to reconstruct the engine-native format. For example, the Trino connector needs to pass the `ConnectorViewDefinition` fields (`catalog`, `schema`, `owner`, `runAsInvoker`) as view properties, which the HMS provider uses to build the Base64 JSON blob.
+**Current implementation note:** Gravitino's View model does not carry Trino-only `owner`, `runAsInvoker`, or SQL-path fields. The HMS provider therefore encodes Gravitino-created Trino views with `owner=null` in the Trino payload, `runAsInvoker=true`, and an empty SQL path; this engine-native owner field is separate from Gravitino metadata ownership. Replacing a native Trino view whose values cannot be represented is rejected instead of silently changing its execution semantics. Preserving those engine-native fields requires future View-model and engine-integration work.
 
 **v1 limitation:** Each HMS view stores exactly one dialect — the dialect of the creating engine. Multi-dialect views in HMS are not supported in v1. For multi-dialect view support, use IRC-backed catalogs.
 
@@ -601,7 +598,7 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 }
 ```
 
-> **Planned field:** `securityMode` remains part of the API design, but the current shared REST DTOs (`ViewCreateRequest`, `ViewDTO`, `ViewUpdateRequest`) do not expose it yet.
+> **Current boundary:** The shared REST DTOs (`ViewCreateRequest`, `ViewDTO`, `ViewUpdateRequest`) do not expose a `securityMode` field. The current Iceberg path uses invoker behavior; explicit `INVOKER`/`DEFINER` metadata and engine enforcement are future work.
 
 ##### Get View
 
@@ -741,7 +738,7 @@ DELETE /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view
 
 #### Java API
 
-The current `client-java` surface exposes the implemented subset above, so alter examples use `replaceView` / property changes today. Planned fine-grained helpers such as `addRepresentation`, `updateRepresentation`, and `updateComment` are not exposed yet. The design-level `securityMode` field is also not part of the current `createView(...)` signature.
+The current `client-java` surface exposes the implemented subset above, so alter examples use `replaceView` / property changes today. Planned fine-grained helpers such as `addRepresentation`, `updateRepresentation`, and `updateComment` are not exposed yet. The current `createView(...)` signature has no execution-security-mode parameter.
 
 ```java
 // Get ViewCatalog interface from catalog
@@ -820,7 +817,7 @@ boolean dropped = viewCatalog.dropView(NameIdentifier.of("analytics_schema", "cu
 
 ```python
 from gravitino import NameIdentifier, Namespace
-from gravitino.api.view import SQLRepresentation, SecurityMode
+from gravitino.api.view import SQLRepresentation
 
 # Get ViewCatalog interface
 view_catalog = catalog.as_view_catalog()
@@ -848,7 +845,6 @@ view = view_catalog.create_view(
             default_schema="sales"
         ),
     ],
-    security_mode=SecurityMode.DEFINER,
     properties={"description": "Customer order summary for analytics"}
 )
 
@@ -885,14 +881,14 @@ dropped = view_catalog.drop_view(NameIdentifier.of("analytics_schema", "customer
 
 ### View Privileges
 
-Gravitino defines the following privileges for view management, integrated with the existing access control framework:
+Gravitino defines the following privileges for View metadata operations, integrated with the existing access control framework:
 
 | Privilege | Description |
 |-----------|-------------|
 | `CREATE_VIEW` | Permission to create views in a schema |
-| `SELECT_VIEW` | Permission to read view metadata and use the view |
-| `ALTER_VIEW` | Permission to modify view definition |
-| `DROP_VIEW` | Permission to delete a view |
+| `SELECT_VIEW` | Permission to read view metadata |
+
+There are no `ALTER_VIEW` or `DROP_VIEW` privileges. A newly created View is owned by its creator when authorization is enabled, and View mutations use ownership.
 
 **Permission Requirements:**
 
@@ -900,20 +896,23 @@ Gravitino defines the following privileges for view management, integrated with 
 |-----------|-------------------|
 | Create View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + `CREATE_VIEW` on schema |
 | Read View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + `SELECT_VIEW` on view |
-| Alter View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + `ALTER_VIEW` on view |
-| Drop View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + `DROP_VIEW` on view |
+| List Views | Access to the schema; results are filtered by View ownership or `SELECT_VIEW` |
+| Alter View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + ownership of the view |
+| Drop View | `USE_CATALOG` on catalog + `USE_SCHEMA` on schema + ownership of the view |
 
-> **Note:** These privileges control access to view **metadata** in Gravitino. Access to the **underlying data** when executing view queries is controlled by the compute engine and underlying catalog's permission system.
+> **Scope:** These checks authorize View **metadata operations** through the native Gravitino REST API and the Iceberg REST Catalog. They do not grant access to referenced tables or authorize query execution.
 
-> **Relationship with `securityMode`**: The `securityMode` field (DEFINER/INVOKER) is a metadata property stored by Gravitino but enforced by the compute engine at query execution time. Whether it takes effect depends on engine capability — for example, MySQL natively supports DEFINER/INVOKER semantics, while Iceberg and Hive do not. For engines without native support, the field serves as a metadata annotation only. In summary: View Privileges govern *who can manage view metadata through Gravitino*, while `securityMode` governs *how the engine accesses underlying data when executing the view* (subject to engine support).
+> **Execution boundary:** The current Iceberg engine path behaves as `INVOKER`, and the caller must have access to the underlying data. The current View model has no explicit `INVOKER`/`DEFINER` option. This authorization delivery does not implement `DEFINER` behavior or add an engine integration.
 
 ---
 
 ### Engine Adaptation
 
-#### Trino Integration
+The examples in this section describe possible future engine adapters. They are not implemented by the metadata-operation authorization described above, and they must not be read as support for an explicit execution security mode in the current View API.
 
-Gravitino's Trino connector implements the view-related interfaces in [`ConnectorMetadata`](https://github.com/trinodb/trino/blob/480/core/trino-spi/src/main/java/io/trino/spi/connector/ConnectorMetadata.java#L957):
+#### Proposed Trino Integration
+
+A future Gravitino Trino connector could implement the view-related interfaces in [`ConnectorMetadata`](https://github.com/trinodb/trino/blob/480/core/trino-spi/src/main/java/io/trino/spi/connector/ConnectorMetadata.java#L957):
 
 ```java
 public class GravitinoConnectorMetadata implements ConnectorMetadata {
@@ -933,10 +932,7 @@ public class GravitinoConnectorMetadata implements ConnectorMetadata {
                     .withSql(definition.getOriginalSql())
                     .withDefaultCatalog(definition.getCatalog().orElse(null))
                     .withDefaultSchema(definition.getSchema().orElse(null))
-                    .build())
-            .withSecurityMode(definition.isRunAsInvoker() 
-                        ? SecurityMode.INVOKER 
-                        : SecurityMode.DEFINER);
+                    .build());
         
         // Add columns
         for (ViewColumn col : definition.getColumns()) {
@@ -965,8 +961,8 @@ public class GravitinoConnectorMetadata implements ConnectorMetadata {
             Optional.ofNullable(rep.getDefaultSchema()),
             convertColumns(view.getColumns()),
             Optional.ofNullable(view.getComment()),
-            Optional.empty(), // owner managed via Gravitino's owner_meta
-            view.getSecurityMode() == SecurityMode.INVOKER
+            Optional.empty(), // owner managed via Gravitino's owner metadata
+            true // current View model can only be represented safely as INVOKER
         ));
     }
     

@@ -30,10 +30,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -53,8 +51,6 @@ import org.junit.jupiter.api.TestInstance;
 public class TestUserEvent {
   private static final String METALAKE = "demo_metalake";
   private static final String INEXIST_METALAKE = "inexist_metalake";
-  private static final String USER_EXT_ID = "ext-user-1";
-  private static final long USER_ID = 1L;
   private AccessControlEventDispatcher dispatcher;
   private AccessControlEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -62,7 +58,6 @@ public class TestUserEvent {
   private String otherUserName;
   private String inExistUserName;
   private User user;
-  private User externalIdUser;
   private User otherUser;
   private NameIdentifier identifier;
   private NameIdentifier otherIdentifier;
@@ -76,7 +71,6 @@ public class TestUserEvent {
     this.otherUserName = "user_admin";
     this.inExistUserName = "user_not_exist";
     this.user = getMockUser(userName, ImmutableList.of("test", "engineer"));
-    this.externalIdUser = getMockUserWithExtId(userName, USER_EXT_ID, true, user.roles());
     this.otherUser = getMockUser(otherUserName, null);
     this.identifier = NameIdentifierUtil.ofUser(METALAKE, userName);
     this.otherIdentifier = NameIdentifierUtil.ofUser(METALAKE, otherUserName);
@@ -98,7 +92,6 @@ public class TestUserEvent {
 
     Assertions.assertEquals(1L, info.id());
     Assertions.assertEquals("mock_user", info.name());
-    Assertions.assertEquals(Optional.empty(), info.externalId());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
   }
 
@@ -491,6 +484,8 @@ public class TestUserEvent {
 
     GrantUserRolesEvent grantUserRolesEvent = (GrantUserRolesEvent) event;
     Assertions.assertEquals(identifier, grantUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = grantUserRolesEvent.grantUserInfo();
 
     validateUserInfo(userInfo, user);
@@ -514,6 +509,8 @@ public class TestUserEvent {
         grantUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, grantUserRolesFailureEvent.userName());
     Assertions.assertEquals(grantedRoles, grantUserRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
@@ -545,6 +542,8 @@ public class TestUserEvent {
 
     RevokeUserRolesEvent revokeUserRolesEvent = (RevokeUserRolesEvent) event;
     Assertions.assertEquals(otherIdentifier, revokeUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = revokeUserRolesEvent.revokedUserInfo();
 
     validateUserInfo(userInfo, otherUser);
@@ -568,29 +567,15 @@ public class TestUserEvent {
         revokeUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, revokeUserRolesFailureEvent.userName());
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
-  }
-
-  @Test
-  void testAddUserWithExternalIdEvent() {
-    dispatcher.addUser(METALAKE, userName, USER_EXT_ID, true);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(AddUserPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.ADD_USER, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(AddUserEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.ADD_USER, event.operationType());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
   void testBulkAddUsersDispatchesPerUserEvents() {
     dummyEventListener.clear();
 
-    dispatcher.addUsers(
-        METALAKE,
-        Arrays.asList(
-            new UserAdd(userName, USER_EXT_ID, true), new UserAdd(otherUserName, null, null)));
+    dispatcher.addUsers(METALAKE, Arrays.asList(new UserAdd(userName), new UserAdd(otherUserName)));
 
     Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
     PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
@@ -612,33 +597,6 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
     Assertions.assertEquals(otherIdentifier, secondEvent.identifier());
     Assertions.assertEquals(otherUserName, ((AddUserFailureEvent) secondEvent).userName());
-  }
-
-  @Test
-  void testGetUserByExternalIdEvent() {
-    dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(GetUserByExternalIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(
-        AuthorizationUtils.ofUserExternalId(METALAKE, USER_EXT_ID), preEvent.identifier());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(GetUserByExternalIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.GET_USER_BY_EXTERNAL_ID, event.operationType());
-  }
-
-  @Test
-  void testRemoveUserByExternalIdEvent() {
-    dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(RemoveUserByExternalIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(RemoveUserByExternalIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, event.operationType());
   }
 
   @Test
@@ -670,105 +628,10 @@ public class TestUserEvent {
     Assertions.assertEquals(inExistUserName, ((RemoveUserFailureEvent) secondEvent).userName());
   }
 
-  @Test
-  void testGetUserByExternalIdFailureEvent() {
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> failureDispatcher.getUserByExternalId(METALAKE, USER_EXT_ID));
-
-    dummyEventListener.popPreEvent();
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(GetUserByExternalIdFailureEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.GET_USER_BY_EXTERNAL_ID, event.operationType());
-  }
-
-  @Test
-  void testGetUserByIdEvent() {
-    dispatcher.getUserById(METALAKE, USER_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(GetUserByIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.GET_USER_BY_ID, preEvent.operationType());
-    Assertions.assertEquals(USER_ID, ((GetUserByIdPreEvent) preEvent).userId());
-    Assertions.assertEquals(AuthorizationUtils.ofUserId(METALAKE, USER_ID), preEvent.identifier());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(GetUserByIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.GET_USER_BY_ID, event.operationType());
-    validateUserInfo(((GetUserByIdEvent) event).loadedUserInfo(), user);
-  }
-
-  @Test
-  void testGetUserByIdFailureEvent() {
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class, () -> failureDispatcher.getUserById(METALAKE, USER_ID));
-
-    dummyEventListener.popPreEvent();
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(GetUserByIdFailureEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.GET_USER_BY_ID, event.operationType());
-    Assertions.assertEquals(USER_ID, ((GetUserByIdFailureEvent) event).userId());
-  }
-
-  @Test
-  void testRemoveUserByIdEvent() {
-    dispatcher.removeUserById(METALAKE, USER_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(RemoveUserByIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_ID, preEvent.operationType());
-    Assertions.assertEquals(USER_ID, ((RemoveUserByIdPreEvent) preEvent).userId());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(RemoveUserByIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_ID, event.operationType());
-    Assertions.assertTrue(((RemoveUserByIdEvent) event).isExists());
-  }
-
-  @Test
-  void testAlterUserEvent() {
-    UserChange[] changes =
-        new UserChange[] {
-          UserChange.updateEnabled(false), UserChange.updateExternalId("ext-user-2")
-        };
-    dispatcher.alterUserById(METALAKE, USER_ID, changes);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(AlterUserPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.ALTER_USER, preEvent.operationType());
-    AlterUserPreEvent alterPreEvent = (AlterUserPreEvent) preEvent;
-    Assertions.assertEquals(USER_ID, alterPreEvent.userId());
-    Assertions.assertArrayEquals(changes, alterPreEvent.changes());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(AlterUserEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.ALTER_USER, event.operationType());
-    AlterUserEvent alterEvent = (AlterUserEvent) event;
-    Assertions.assertArrayEquals(changes, alterEvent.changes());
-    validateUserInfo(alterEvent.updatedUserInfo(), user);
-  }
-
-  @Test
-  void testAlterUserFailureEvent() {
-    UserChange change = UserChange.updateEnabled(true);
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> failureDispatcher.alterUserById(METALAKE, USER_ID, change));
-
-    dummyEventListener.popPreEvent();
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(AlterUserFailureEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.ALTER_USER, event.operationType());
-    AlterUserFailureEvent failureEvent = (AlterUserFailureEvent) event;
-    Assertions.assertEquals(USER_ID, failureEvent.userId());
-    Assertions.assertArrayEquals(new UserChange[] {change}, failureEvent.changes());
-  }
-
   private AccessControlEventDispatcher mockUserDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.addUser(METALAKE, otherUserName)).thenReturn(otherUser);
-    when(dispatcher.addUser(METALAKE, userName, USER_EXT_ID, true)).thenReturn(externalIdUser);
     when(dispatcher.addUsers(eq(METALAKE), any()))
         .thenReturn(
             Arrays.asList(
@@ -778,7 +641,6 @@ public class TestUserEvent {
 
     when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
     when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
-    when(dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(true);
     when(dispatcher.removeUsers(eq(METALAKE), any(), any()))
         .thenReturn(
             Arrays.asList(
@@ -793,11 +655,6 @@ public class TestUserEvent {
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
-    when(dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
-    when(dispatcher.getUserById(METALAKE, USER_ID)).thenReturn(user);
-    when(dispatcher.removeUserById(METALAKE, USER_ID)).thenReturn(true);
-    when(dispatcher.alterUserById(eq(METALAKE), eq(USER_ID), any(UserChange[].class)))
-        .thenReturn(user);
     when(dispatcher.getUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
@@ -826,22 +683,9 @@ public class TestUserEvent {
     return user;
   }
 
-  private User getMockUserWithExtId(
-      String name, String externalId, boolean enabled, List<String> roles) {
-    User user = mock(User.class);
-    when(user.id()).thenReturn(1L);
-    when(user.name()).thenReturn(name);
-    when(user.externalId()).thenReturn(externalId);
-    when(user.enabled()).thenReturn(enabled);
-    when(user.roles()).thenReturn(roles);
-
-    return user;
-  }
-
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
     Assertions.assertEquals(expectedUser.id(), userInfo.id());
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
-    Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }
 }

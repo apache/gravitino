@@ -120,7 +120,8 @@ public class TestBulkOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "bulkManager", new BulkManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     bulkOperations = new BulkOperations();
@@ -182,9 +183,7 @@ public class TestBulkOperations extends BaseOperationsTest {
 
     BulkUserAddRequest request =
         new BulkUserAddRequest(
-            new UserAddRequest[] {
-              new UserAddRequest("user1", "ext-user1", false), new UserAddRequest("user2")
-            });
+            new UserAddRequest[] {new UserAddRequest("user1"), new UserAddRequest("user2")});
     Response response =
         target("/bulk/metalakes/metalake1/users/add")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -207,8 +206,6 @@ public class TestBulkOperations extends BaseOperationsTest {
     ArgumentCaptor<List<UserAdd>> usersCaptor = ArgumentCaptor.forClass(List.class);
     Mockito.verify(manager).addUsers(eq("metalake1"), usersCaptor.capture());
     Assertions.assertEquals("user1", usersCaptor.getValue().get(0).name());
-    Assertions.assertEquals("ext-user1", usersCaptor.getValue().get(0).externalId());
-    Assertions.assertEquals(false, usersCaptor.getValue().get(0).enabled());
   }
 
   @Test
@@ -258,9 +255,7 @@ public class TestBulkOperations extends BaseOperationsTest {
 
     BulkGroupAddRequest request =
         new BulkGroupAddRequest(
-            new GroupAddRequest[] {
-              new GroupAddRequest("group1", "ext-group1"), new GroupAddRequest("group2")
-            });
+            new GroupAddRequest[] {new GroupAddRequest("group1"), new GroupAddRequest("group2")});
     Response response =
         target("/bulk/metalakes/metalake1/groups/add")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -283,7 +278,6 @@ public class TestBulkOperations extends BaseOperationsTest {
     ArgumentCaptor<List<GroupAdd>> groupsCaptor = ArgumentCaptor.forClass(List.class);
     Mockito.verify(manager).addGroups(eq("metalake1"), groupsCaptor.capture());
     Assertions.assertEquals("group1", groupsCaptor.getValue().get(0).name());
-    Assertions.assertEquals("ext-group1", groupsCaptor.getValue().get(0).externalId());
   }
 
   @Test
@@ -308,6 +302,28 @@ public class TestBulkOperations extends BaseOperationsTest {
     Assertions.assertEquals(1, bulkResponse.getErrors().length);
     Assertions.assertEquals("ghost", bulkResponse.getErrors()[0].getName());
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, bulkResponse.getErrors()[0].getCode());
+  }
+
+  @Test
+  public void testRemoveUsersWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/users/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testRemoveGroupsWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/groups/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
   }
 
   @Test

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.audit.v2;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -26,6 +27,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.GrantUserRolesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
 import org.apache.gravitino.listener.api.event.ListSchemaEvent;
@@ -36,10 +38,17 @@ import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestSimpleAuditLogV2 {
+
+  @AfterEach
+  void cleanup() {
+    RequestContext.clear();
+  }
 
   @Test
   public void testTimestampHasMillisecondPrecision() {
@@ -69,6 +78,42 @@ public class TestSimpleAuditLogV2 {
     String[] fields = output.split("\t", -1);
     Assertions.assertEquals(8, fields.length);
     Assertions.assertEquals("", fields[7], "Last field should be empty when customInfo is absent");
+  }
+
+  /**
+   * End-to-end proof that redaction happens exactly once, at format time: an auto-captured query
+   * parameter is stashed raw (as RequestContextFilter now does), reaches Event.customInfo()
+   * unredacted, and is only masked here, when SimpleAuditLogV2 renders it via AuditLogRedactor.
+   */
+  @Test
+  public void testAutoCapturedQueryParamIsRedactedAtFormatTime() {
+    RequestContext.setRequestQueryParams(ImmutableMap.of("token", "raw-secret-value"));
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(new StubEvent());
+
+    // Not redacted yet on the event itself — redaction is the formatter's job, not capture's.
+    Assertions.assertEquals("raw-secret-value", log.customInfo().get("token"));
+
+    String output = log.toString();
+    String[] fields = output.split("\t", -1);
+    Assertions.assertTrue(
+        fields[7].contains("***"), "Rendered output must redact the token value: " + fields[7]);
+    Assertions.assertFalse(
+        fields[7].contains("raw-secret-value"),
+        "Rendered output must not contain the raw token value: " + fields[7]);
+  }
+
+  @Test
+  public void testRoleAssignmentIncludesRoleNames() {
+    GrantUserRolesFailureEvent event =
+        new GrantUserRolesFailureEvent(
+            "admin",
+            "metalake",
+            new RuntimeException("failed"),
+            "alice",
+            ImmutableList.of("reader", "admin"));
+
+    String customInfo = new SimpleAuditLogV2(event).toString().split("\\t", -1)[7];
+    Assertions.assertEquals("{roleNames=reader,admin}", customInfo);
   }
 
   @Test
@@ -326,7 +371,7 @@ public class TestSimpleAuditLogV2 {
 
   static class StubEventWithCustomInfo extends StubEvent {
     @Override
-    public Map<String, String> customInfo() {
+    protected Map<String, String> ownCustomInfo() {
       return ImmutableMap.of("k1", "v1");
     }
   }

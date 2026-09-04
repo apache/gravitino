@@ -33,6 +33,9 @@ public interface Statistic extends Auditable {
   /** The prefix for custom statistics. Custom statistics are user-defined statistics. */
   String CUSTOM_PREFIX = "custom-";
 
+  /** The maximum number of characters allowed in a statistic name. */
+  int MAX_NAME_LENGTH = 128;
+
   /**
    * Get the name of the statistic.
    *

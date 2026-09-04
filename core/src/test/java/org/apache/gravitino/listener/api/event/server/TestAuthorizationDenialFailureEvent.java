@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.listener.api.event.server;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +33,11 @@ public class TestAuthorizationDenialFailureEvent {
 
   private static final NameIdentifier TABLE_IDENT =
       NameIdentifier.of("metalake1", "catalog1", "schema1", "table1");
+
+  @AfterEach
+  void cleanup() {
+    RequestContext.clear();
+  }
 
   @Test
   public void testFieldsStoredCorrectly() {
@@ -68,6 +76,23 @@ public class TestAuthorizationDenialFailureEvent {
     Assertions.assertEquals("TABLE:LOAD", info.get("auth.expression"));
     // resource name must NOT be duplicated in customInfo — it is in identifier()
     Assertions.assertFalse(info.containsKey("auth.resource"));
+  }
+
+  /**
+   * Pins the fix for a bug where customInfo() overrode and discarded Event's automatically captured
+   * request query parameters, exactly like the bug already fixed in TableEvent,
+   * HttpRequestFailureEvent, and Iceberg's event classes.
+   */
+  @Test
+  public void testCustomInfoMergesAutomaticQueryParamsWithAuthFields() {
+    RequestContext.setRequestQueryParams(ImmutableMap.of("details", "true"));
+    AuthorizationDenialFailureEvent event =
+        new AuthorizationDenialFailureEvent("alice", TABLE_IDENT, "loadTable", "TABLE:LOAD");
+
+    Map<String, String> info = event.customInfo();
+    Assertions.assertEquals("true", info.get("details"));
+    Assertions.assertEquals("loadTable", info.get("auth.method"));
+    Assertions.assertEquals("TABLE:LOAD", info.get("auth.expression"));
   }
 
   @Test

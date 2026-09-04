@@ -20,6 +20,7 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.LIST_TABLES_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
@@ -189,6 +190,7 @@ public class LanceNamespaceOperations {
   @Path("{id}/table/list")
   @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-tables", absolute = true)
+  @AuthorizationExpression(expression = LIST_TABLES_AUTHORIZATION_EXPRESSION)
   public Response listTables(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,

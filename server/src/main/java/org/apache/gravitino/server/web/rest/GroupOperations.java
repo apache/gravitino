@@ -31,7 +31,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -77,7 +76,7 @@ public class GroupOperations {
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   @GET
@@ -129,11 +128,7 @@ public class GroupOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            Group addedGroup =
-                StringUtils.isNotBlank(request.getExternalId())
-                    ? accessControlManager.addGroup(
-                        metalake, request.getName(), request.getExternalId())
-                    : accessControlManager.addGroup(metalake, request.getName());
+            Group addedGroup = accessControlManager.addGroup(metalake, request.getName());
             return Utils.ok(new GroupResponse(DTOConverters.toDTO(addedGroup)));
           });
     } catch (Exception e) {

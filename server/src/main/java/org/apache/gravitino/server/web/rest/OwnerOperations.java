@@ -88,7 +88,9 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
+            if (object.type() != MetadataObject.Type.METALAKE) {
+              MetalakeManager.checkMetalakeInUse(metalake);
+            }
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
@@ -117,6 +119,14 @@ public class OwnerOperations {
       @PathParam("metadataObjectType") String metadataObjectType,
       @PathParam("fullName") String fullName,
       OwnerSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleOwnerException(
+          OperationType.SET,
+          String.format("metadata object %s", fullName),
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       MetadataObject object =
           MetadataObjects.parse(

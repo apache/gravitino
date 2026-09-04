@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -64,6 +65,12 @@ public class GrantUserRolesEvent extends UserEvent {
    */
   public List<String> roles() {
     return roles;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return RoleAssignmentAuditInfos.of(roles);
   }
 
   /**

@@ -71,7 +71,7 @@ public final class RemovePolicyFromTagEvent extends TagEvent {
 
   /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return ImmutableMap.of("policyName", policyName);
   }
 
