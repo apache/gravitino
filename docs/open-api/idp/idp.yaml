@@ -269,8 +269,8 @@ paths:
           $ref: "../openapi.yaml#/components/responses/RemoveResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
-        "405":
-          description: Method Not Allowed - The group is not empty and force is false
+        "409":
+          description: Conflict - The group is not empty and force is false
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -666,8 +666,8 @@ components:
 
     IdpGroupNotEmptyException:
       value: {
-        "code": 1006,
-        "type": "IllegalStateException",
+        "code": 1005,
+        "type": "NonEmptyEntityException",
         "message": "Failed to operate local user store group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
       }
 

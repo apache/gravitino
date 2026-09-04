@@ -27,6 +27,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -103,7 +104,7 @@ public final class IdpRESTUtils {
 
   public static Response unsupportedOperation(String message, Throwable throwable) {
     return json(
-        Response.Status.METHOD_NOT_ALLOWED, ErrorResponse.unsupportedOperation(message, throwable));
+        Response.Status.NOT_IMPLEMENTED, ErrorResponse.unsupportedOperation(message, throwable));
   }
 
   public static Response internalError(String message, Throwable throwable) {
@@ -121,7 +122,12 @@ public final class IdpRESTUtils {
     if (e instanceof AlreadyExistsException) {
       return alreadyExists(errorMsg, e);
     }
-    if (e instanceof IllegalStateException || e instanceof UnsupportedOperationException) {
+    if (e instanceof NonEmptyEntityException) {
+      return json(
+          Response.Status.CONFLICT,
+          ErrorResponse.nonEmpty(e.getClass().getSimpleName(), errorMsg, e));
+    }
+    if (e instanceof UnsupportedOperationException) {
       return unsupportedOperation(errorMsg, e);
     }
     return internalError(errorMsg, e);
