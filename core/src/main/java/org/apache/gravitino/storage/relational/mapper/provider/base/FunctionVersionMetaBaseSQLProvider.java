@@ -39,24 +39,6 @@ public class FunctionVersionMetaBaseSQLProvider {
         + " #{functionVersionMeta.deletedAt})";
   }
 
-  public String insertFunctionVersionMetaOnDuplicateKeyUpdate(
-      @Param("functionVersionMeta") FunctionVersionPO functionVersionPO) {
-    return "INSERT INTO "
-        + FunctionVersionMetaMapper.TABLE_NAME
-        + " (metalake_id, catalog_id, schema_id, function_id, version,"
-        + " function_comment, definitions, audit_info, deleted_at)"
-        + " VALUES (#{functionVersionMeta.metalakeId}, #{functionVersionMeta.catalogId},"
-        + " #{functionVersionMeta.schemaId}, #{functionVersionMeta.functionId},"
-        + " #{functionVersionMeta.functionVersion}, #{functionVersionMeta.functionComment},"
-        + " #{functionVersionMeta.definitions}, #{functionVersionMeta.auditInfo},"
-        + " #{functionVersionMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " function_comment = #{functionVersionMeta.functionComment},"
-        + " definitions = #{functionVersionMeta.definitions},"
-        + " audit_info = #{functionVersionMeta.auditInfo},"
-        + " deleted_at = #{functionVersionMeta.deletedAt}";
-  }
-
   public String softDeleteFunctionVersionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return "<script>"

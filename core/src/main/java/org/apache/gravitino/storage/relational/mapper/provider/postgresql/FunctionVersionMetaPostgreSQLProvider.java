@@ -22,29 +22,9 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionVersionMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.ibatis.annotations.Param;
 
 public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBaseSQLProvider {
-
-  @Override
-  public String insertFunctionVersionMetaOnDuplicateKeyUpdate(
-      @Param("functionVersionMeta") FunctionVersionPO functionVersionPO) {
-    return "INSERT INTO "
-        + FunctionVersionMetaMapper.TABLE_NAME
-        + " (metalake_id, catalog_id, schema_id, function_id, version,"
-        + " function_comment, definitions, audit_info, deleted_at)"
-        + " VALUES (#{functionVersionMeta.metalakeId}, #{functionVersionMeta.catalogId},"
-        + " #{functionVersionMeta.schemaId}, #{functionVersionMeta.functionId},"
-        + " #{functionVersionMeta.functionVersion}, #{functionVersionMeta.functionComment},"
-        + " #{functionVersionMeta.definitions}, #{functionVersionMeta.auditInfo},"
-        + " #{functionVersionMeta.deletedAt})"
-        + " ON CONFLICT (function_id, version, deleted_at) DO UPDATE SET"
-        + " function_comment = #{functionVersionMeta.functionComment},"
-        + " definitions = #{functionVersionMeta.definitions},"
-        + " audit_info = #{functionVersionMeta.auditInfo},"
-        + " deleted_at = #{functionVersionMeta.deletedAt}";
-  }
 
   @Override
   public String softDeleteFunctionVersionMetasBySchemaIds(
