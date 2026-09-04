@@ -29,7 +29,6 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +103,8 @@ public final class IdpRESTUtils {
   }
 
   public static Response unsupportedOperation(String message, Throwable throwable) {
-    return Utils.unsupportedOperation(message, throwable);
+    return json(
+        Response.Status.NOT_IMPLEMENTED, ErrorResponse.unsupportedOperation(message, throwable));
   }
 
   public static Response internalError(String message, Throwable throwable) {
@@ -123,7 +123,9 @@ public final class IdpRESTUtils {
       return alreadyExists(errorMsg, e);
     }
     if (e instanceof NonEmptyEntityException) {
-      return Utils.nonEmpty(errorMsg, e);
+      return json(
+          Response.Status.CONFLICT,
+          ErrorResponse.nonEmpty(e.getClass().getSimpleName(), errorMsg, e));
     }
     if (e instanceof UnsupportedOperationException) {
       return unsupportedOperation(errorMsg, e);
