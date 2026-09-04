@@ -129,5 +129,16 @@ public final class LanceAuthorizationExpressions {
           + AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
           + ")";
 
+  /**
+   * Authorizes removing a table, whether the storage is deleted with it or only the Gravitino
+   * metadata is. Both require ownership of the table or of one of its ancestors, matching the
+   * Gravitino and Iceberg REST surfaces: MODIFY_TABLE alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+      entityType == 'TABLE' && (ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER)
+      """;
+
   private LanceAuthorizationExpressions() {}
 }
