@@ -80,7 +80,6 @@ public class TestSchemaHookDispatcher {
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockCatalogWrapper));
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);

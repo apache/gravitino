@@ -49,13 +49,11 @@ import org.slf4j.LoggerFactory;
  * local one. If the clear itself fails, the exception goes up to the poller, which logs it at
  * {@code ERROR} and moves on, and the catalog stays stale until it expires.
  *
- * <p><b>What clearing costs:</b> dropping a catalog from the cache closes its {@code
- * CatalogWrapper}, which shuts down its connection pool and its {@code IsolatedClassLoader}.
- * Clearing the whole cache therefore also closes catalogs this process is serving right now, and
- * requests still using classes from a closed classloader can fail with {@code NoClassDefFoundError}
- * (that is the bug in #11739). We accept this on purpose so a changed catalog is never served from
- * a stale cache; without it, this node would keep serving the old catalog for up to {@code
- * gravitino.catalog.cache.evictionIntervalMs}. The clear only happens when a normal removal failed,
+ * <p><b>What clearing costs:</b> dropping a catalog from the cache retires its {@code
+ * CatalogWrapper}. Idle wrappers release their connection pools and {@code IsolatedClassLoader}s
+ * immediately; wrappers with active operation leases defer cleanup until their final lease is
+ * closed. Clearing the whole cache therefore avoids serving stale metadata without disrupting
+ * requests that are already using a catalog. The clear only happens when a normal removal failed,
  * never during normal operation.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
@@ -119,9 +117,9 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
     for (CatalogInvalidation invalidation : remoteInvalidations) {
       EntityChangeRecord change = invalidation.change;
       NameIdentifier ident = invalidation.ident;
-      // INFO on purpose: dropping the catalog from the cache also closes its connection pool and
-      // its isolated classloader, and this is the main thing the change log does across nodes.
-      // CatalogManager prints the matching "Closing catalog" line when the removal happens.
+      // INFO on purpose: dropping the catalog from the cache retires its wrapper and eventually
+      // closes the connection pool and isolated classloader, either immediately or after active
+      // leases finish. This is the main thing the change log does across nodes.
       LOG.info(
           "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
           ident,
@@ -132,11 +130,11 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
         // This batch will never be sent again, so giving up here would keep serving the old
-        // catalog until it expires on its own. Clear the whole cache instead; see the class
-        // javadoc for the classloader cost that comes with it.
+        // catalog until it expires on its own. Clear the whole cache instead; active operation
+        // leases defer resource cleanup until those operations finish.
         LOG.error(
             "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
-                + "avoid serving it stale; catalogs in use by this node are closed as a result",
+                + "avoid serving it stale; resources in use are retired after their leases close",
             ident,
             change.getId(),
             e);

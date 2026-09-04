@@ -57,12 +57,8 @@ public class TestFunctionOperationDispatcher {
     CatalogManager.CatalogWrapper icebergWrapper = createMockCatalogWrapper("lakehouse-iceberg");
     CatalogManager.CatalogWrapper hiveWrapper = createMockCatalogWrapper("hive");
 
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
-        .thenReturn(icebergWrapper);
     when(catalogManager.acquireCatalogLease(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(icebergWrapper));
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
-        .thenReturn(hiveWrapper);
     when(catalogManager.acquireCatalogLease(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(hiveWrapper));
 

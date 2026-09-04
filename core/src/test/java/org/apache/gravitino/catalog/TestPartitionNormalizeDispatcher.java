@@ -111,8 +111,6 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(mockWrapper.capabilities())
         .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
-    Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
-        .thenReturn(mockWrapper);
     Mockito.when(mockCatalogManager.acquireCatalogLease(Mockito.any(NameIdentifier.class)))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockWrapper));
 

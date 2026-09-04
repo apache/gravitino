@@ -58,7 +58,6 @@ public class TestViewHookDispatcher {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
 
@@ -108,7 +107,6 @@ public class TestViewHookDispatcher {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);

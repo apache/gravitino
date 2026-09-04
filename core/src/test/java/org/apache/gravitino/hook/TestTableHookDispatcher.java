@@ -85,7 +85,6 @@ public class TestTableHookDispatcher {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
 
@@ -153,7 +152,6 @@ public class TestTableHookDispatcher {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
     TableHookDispatcher hook =

@@ -231,7 +231,6 @@ public class TestFunctionHookDispatcher {
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(catalogWrapper.capabilities()).thenReturn(capability);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
     return catalogManager;

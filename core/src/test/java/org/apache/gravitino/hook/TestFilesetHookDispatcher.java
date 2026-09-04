@@ -98,7 +98,6 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     Mockito.when(catalogWrapper.catalog()).thenReturn(catalog);
     Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
@@ -115,7 +114,6 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
     Mockito.when(mockCatalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockWrapper));
 
