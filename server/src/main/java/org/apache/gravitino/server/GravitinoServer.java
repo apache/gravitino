@@ -202,7 +202,7 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(new HealthAliasServlet(), "/health/*");
     server.addServlet(new HealthAliasServlet(), "/health.html");
 
-    server.addFilter(new RequestContextFilter(), API_ANY_PATH);
+    server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), API_ANY_PATH);
     server.addFilter(
         new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), API_ANY_PATH);
     server.addCustomFilters(API_ANY_PATH);
