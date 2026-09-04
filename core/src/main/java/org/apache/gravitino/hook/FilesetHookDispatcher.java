@@ -82,7 +82,7 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
             ident, comment, type, storageLocations, properties);
 
     // Set the creator as the owner of the fileset.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the fileset name (and its schema namespace)
       // based on catalog capabilities, so the entity is stored under the normalized identifier.

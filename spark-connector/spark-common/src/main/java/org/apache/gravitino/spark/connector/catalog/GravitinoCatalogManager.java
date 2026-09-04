@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoClient;
 import org.slf4j.Logger;
@@ -35,19 +36,26 @@ public class GravitinoCatalogManager {
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
+  private final String metalakeName;
   private final Cache<String, Catalog> gravitinoCatalogs;
   private final GravitinoClient gravitinoClient;
 
-  private GravitinoCatalogManager(Supplier<GravitinoClient> clientBuilder) {
+  // Resolved lazily on first access and cached for the life of this manager; Spark catalogs are
+  // initialized once, so there is no refresh path if the Iceberg REST endpoint changes later.
+  private volatile Optional<String> icebergRestUri;
+
+  private GravitinoCatalogManager(String metalakeName, Supplier<GravitinoClient> clientBuilder) {
+    this.metalakeName = metalakeName;
     this.gravitinoClient = clientBuilder.get();
     // Will not evict catalog by default
     this.gravitinoCatalogs = Caffeine.newBuilder().build();
   }
 
-  public static GravitinoCatalogManager create(Supplier<GravitinoClient> clientBuilder) {
+  public static GravitinoCatalogManager create(
+      String metalakeName, Supplier<GravitinoClient> clientBuilder) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(clientBuilder);
+    gravitinoCatalogManager = new GravitinoCatalogManager(metalakeName, clientBuilder);
     return gravitinoCatalogManager;
   }
 
@@ -84,6 +92,24 @@ public class GravitinoCatalogManager {
 
   public Map<String, Catalog> getCatalogs() {
     return gravitinoCatalogs.asMap();
+  }
+
+  /**
+   * Resolves the Gravitino Iceberg REST server endpoint for this manager's metalake, if the server
+   * exposes one. The lookup is performed once and a successful response, including a response with
+   * no endpoint, is cached for the lifetime of this manager. Request failures are propagated.
+   *
+   * @return the discovered Iceberg REST endpoint, or empty if none is available
+   */
+  public Optional<String> getIcebergRestUri() {
+    if (icebergRestUri == null) {
+      synchronized (this) {
+        if (icebergRestUri == null) {
+          icebergRestUri = gravitinoClient.icebergRestServiceUri(metalakeName);
+        }
+      }
+    }
+    return icebergRestUri;
   }
 
   private Catalog loadCatalog(String catalogName) {

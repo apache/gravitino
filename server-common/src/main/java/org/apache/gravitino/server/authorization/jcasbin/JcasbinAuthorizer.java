@@ -398,7 +398,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isServiceAdmin() {
     return GravitinoEnv.getInstance()
-        .accessControlDispatcher()
+        .internalAccessControlDispatcher()
         .isServiceAdmin(PrincipalUtils.getCurrentUserName());
   }
 

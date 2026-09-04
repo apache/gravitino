@@ -57,10 +57,12 @@ from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
 from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
 from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
+from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
@@ -350,6 +352,44 @@ class GravitinoMetalake(
         self.rest_client.patch(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
+
+    def test_connection(self, name: str, *changes: CatalogChange) -> None:
+        """Test an existing catalog connection with optional proposed changes.
+
+        Args:
+            name: The name of the existing catalog.
+            changes: Proposed catalog changes to apply temporarily without persisting.
+
+        Raises:
+            NoSuchCatalogException: If the catalog does not exist.
+            UnsupportedOperationException: If the catalog does not define a connection probe.
+            ConnectionFailedException: If the catalog cannot reach its external system.
+        """
+        url = (
+            self.API_METALAKES_CATALOGS_PATH.format(
+                encode_string(self.name()), encode_string(name)
+            )
+            + "/testConnection"
+        )
+        if changes:
+            requests = [
+                DTOConverters.to_catalog_update_request(change) for change in changes
+            ]
+            updates_request = CatalogUpdatesRequest(requests)
+            updates_request.validate()
+            response = self.rest_client.post(
+                url, json=updates_request, error_handler=CATALOG_ERROR_HANDLER
+            )
+        else:
+            response = self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+        base_response = BaseResponse.from_json(response.body, infer_missing=True)
+        base_response.validate()
+        if base_response.code() == 0:
+            return
+
+        error_response = ErrorResponse.from_json(response.body, infer_missing=True)
+        error_response.validate()
+        CATALOG_ERROR_HANDLER.handle(error_response)
 
     ##########
     # Job operations

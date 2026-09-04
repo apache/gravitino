@@ -63,23 +63,31 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -97,10 +105,14 @@ public class TestPolicyManager {
   private static final String SCHEMA = "schema_for_policy_test";
   private static final String TABLE = "table_for_policy_test";
   private static final String COLUMN = "column_for_policy_test";
+  private static final String VIEW = "view_for_policy_test";
+  private static final String FUNCTION = "function_for_policy_test";
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
   private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+  private static final FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
@@ -121,10 +133,17 @@ public class TestPolicyManager {
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
 
     AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -184,6 +203,31 @@ public class TestPolicyManager {
             .build();
     entityStore.put(table, false /* overwritten */);
     when(tableDispatcher.tableExists(any())).thenReturn(true);
+    when(viewDispatcher.viewExists(any())).thenReturn(true);
+    when(functionDispatcher.functionExists(any())).thenReturn(true);
+
+    ViewEntity view =
+        ViewEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(VIEW)
+            .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
+            .withColumns(new Column[0])
+            .withRepresentations(new Representation[0])
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(view, false /* overwritten */);
+
+    FunctionEntity function =
+        FunctionEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(FUNCTION)
+            .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withDefinitions(new FunctionDefinition[0])
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(function, false /* overwritten */);
   }
 
   private static Config mockConfig() {
@@ -561,6 +605,45 @@ public class TestPolicyManager {
     Assertions.assertEquals(2, policies6.length);
     Assertions.assertEquals(
         ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies6));
+
+    // Test associate policies for view
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    String[] policies7 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE, viewObject, new String[] {policyName1}, null);
+
+    Assertions.assertEquals(1, policies7.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies7));
+
+    // Test associate and disassociate policies for view
+    String[] policies8 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE, viewObject, new String[] {policyName2}, new String[] {policyName1});
+
+    Assertions.assertEquals(1, policies8.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName2), ImmutableSet.copyOf(policies8));
+
+    // Test associate policies for function
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
+    String[] policies9 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE, functionObject, new String[] {policyName1}, null);
+
+    Assertions.assertEquals(1, policies9.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies9));
+
+    // Test associate and disassociate policies for function
+    String[] policies10 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE, functionObject, new String[] {policyName3}, new String[] {policyName1});
+
+    Assertions.assertEquals(1, policies10.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName3), ImmutableSet.copyOf(policies10));
   }
 
   @Test

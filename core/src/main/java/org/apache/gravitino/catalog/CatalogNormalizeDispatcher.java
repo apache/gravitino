@@ -125,6 +125,25 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public void testConnection(NameIdentifier ident) throws Exception {
+    validateCatalogName(ident.name());
+    dispatcher.testConnection(ident);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
+    validateCatalogName(ident.name());
+    Arrays.stream(changes)
+        .forEach(
+            change -> {
+              if (change instanceof CatalogChange.RenameCatalog) {
+                validateCatalogName(((CatalogChange.RenameCatalog) change).getNewName());
+              }
+            });
+    dispatcher.testConnection(ident, changes);
+  }
+
+  @Override
   public void enableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     dispatcher.enableCatalog(ident);
   }

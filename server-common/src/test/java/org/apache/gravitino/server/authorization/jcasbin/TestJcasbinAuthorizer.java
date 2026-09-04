@@ -70,6 +70,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -385,6 +386,17 @@ public class TestJcasbinAuthorizer {
   public void testIsMetalakeUserUsesUserInfoCache() {
     assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
     verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
+  public void testIsServiceAdminUsesInternalDispatcher() {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+
+    verify(dispatcher).isServiceAdmin(USERNAME);
   }
 
   @Test

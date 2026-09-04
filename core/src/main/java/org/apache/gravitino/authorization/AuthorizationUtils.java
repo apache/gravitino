@@ -327,7 +327,7 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, List<String> locations) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
       MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       String metalake =
@@ -366,7 +366,7 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObject newMetadataObject =
@@ -534,7 +534,7 @@ public class AuthorizationUtils {
     List<String> locations = new ArrayList<>();
 
     // If we don't enable authorization, the location should return empty collection.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() == null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() == null) {
       return locations;
     }
 

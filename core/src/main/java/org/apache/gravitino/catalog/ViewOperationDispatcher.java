@@ -72,7 +72,11 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   public ViewOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+    this(
+        catalogManager,
+        store,
+        idGenerator,
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher());
   }
 
   /**

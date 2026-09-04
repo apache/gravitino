@@ -393,6 +393,8 @@ public class TestUserEvent {
 
     GrantUserRolesEvent grantUserRolesEvent = (GrantUserRolesEvent) event;
     Assertions.assertEquals(identifier, grantUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = grantUserRolesEvent.grantUserInfo();
 
     validateUserInfo(userInfo, user);
@@ -416,6 +418,8 @@ public class TestUserEvent {
         grantUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, grantUserRolesFailureEvent.userName());
     Assertions.assertEquals(grantedRoles, grantUserRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
@@ -447,6 +451,8 @@ public class TestUserEvent {
 
     RevokeUserRolesEvent revokeUserRolesEvent = (RevokeUserRolesEvent) event;
     Assertions.assertEquals(otherIdentifier, revokeUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = revokeUserRolesEvent.revokedUserInfo();
 
     validateUserInfo(userInfo, otherUser);
@@ -470,6 +476,8 @@ public class TestUserEvent {
         revokeUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, revokeUserRolesFailureEvent.userName());
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {
