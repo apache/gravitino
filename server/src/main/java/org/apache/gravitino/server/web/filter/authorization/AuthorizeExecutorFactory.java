@@ -46,6 +46,7 @@ public class AuthorizeExecutorFactory {
           expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);
       case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
           parameters,
           args,
