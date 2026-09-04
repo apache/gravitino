@@ -56,10 +56,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -519,12 +521,53 @@ public abstract class BaseGVFSOperations implements Closeable {
       Path gvfsPath, String locationName, FilesetDataOperation operation)
       throws FileNotFoundException {
     NameIdentifier filesetIdent = extractIdentifier(metalakeName, gvfsPath.toString());
+    return buildActualFilePath(
+        filesetIdent,
+        getFilesetCatalog(catalogIdentOf(filesetIdent)),
+        gvfsPath,
+        locationName,
+        operation);
+  }
+
+  /** The catalog a fileset belongs to. */
+  private static NameIdentifier catalogIdentOf(NameIdentifier filesetIdent) {
+    return NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+  }
+
+  /**
+   * Resolves a virtual path to the filesystem and storage path that serve it.
+   *
+   * <p>Equivalent to calling {@link #getActualFileSystem} and {@link #getActualFilePath} in turn,
+   * except that the two halves share one catalog lookup. Every filesystem operation needs both, so
+   * resolving them separately loads the same catalog twice whenever the metadata cache is off.
+   *
+   * @param gvfsPath the virtual path.
+   * @param locationName the location name, or null for the fileset's default.
+   * @param operation the fileset data operation being performed.
+   * @return the filesystem to act on, and the storage path to act on.
+   * @throws FileNotFoundException if the fileset or location name cannot be resolved.
+   */
+  protected Pair<FileSystem, Path> resolvePath(
+      Path gvfsPath, String locationName, FilesetDataOperation operation)
+      throws FileNotFoundException {
+    NameIdentifier filesetIdent = extractIdentifier(metalakeName, gvfsPath.toString());
+    FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdentOf(filesetIdent));
+    Fileset fileset = getFileset(filesetIdent, filesetCatalog);
+    return Pair.of(
+        buildFileSystem(filesetIdent, filesetCatalog, fileset, locationName),
+        buildActualFilePath(filesetIdent, filesetCatalog, gvfsPath, locationName, operation));
+  }
+
+  private Path buildActualFilePath(
+      NameIdentifier filesetIdent,
+      FilesetCatalog filesetCatalog,
+      Path gvfsPath,
+      String locationName,
+      FilesetDataOperation operation)
+      throws FileNotFoundException {
     String subPath = getSubPathFromGvfsPath(filesetIdent, gvfsPath.toString());
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     String fileLocation;
     try {
-      FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
       setCallerContextForGetFileLocation(operation);
       fileLocation =
           filesetCatalog.getFileLocation(
@@ -532,7 +575,9 @@ public abstract class BaseGVFSOperations implements Closeable {
               subPath,
               locationName);
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
-      String message = String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
+      String message =
+          String.format(
+              "Cannot get fileset catalog by identifier: %s", catalogIdentOf(filesetIdent));
       LOG.warn(message, e);
       throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
@@ -560,18 +605,15 @@ public abstract class BaseGVFSOperations implements Closeable {
     return new Path(fileLocation);
   }
 
-  private void createFilesetLocationIfNeed(
-      NameIdentifier filesetIdent, FileSystem fs, Path filesetPath) {
+  private void createFilesetLocationIfNeed(FileSystem fs, Path filesetPath, Catalog catalog) {
     if (!autoCreateLocation) {
       return;
     }
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
     // case the operations like create, open, list files under this directory will fail. So we
     // need to check the existence of the fileset directory beforehand.
     boolean fsOpsDisabled =
-        ((Catalog) getFilesetCatalog(catalogIdent))
+        catalog
             .properties()
             .getOrDefault("disable-filesystem-ops", "false")
             .equalsIgnoreCase("true");
@@ -671,15 +713,25 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset.
    */
   protected Fileset getFileset(NameIdentifier filesetIdent) {
+    return getFileset(filesetIdent, getFilesetCatalog(catalogIdentOf(filesetIdent)));
+  }
+
+  /**
+   * Get the fileset by the fileset identifier from the cache, or load it from the server through an
+   * already-resolved catalog if the cache is disabled. See {@link #getSchema(NameIdentifier,
+   * Catalog)} for why the catalog is threaded through.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @param filesetCatalog the catalog owning the fileset, already loaded.
+   * @return the fileset.
+   */
+  protected Fileset getFileset(NameIdentifier filesetIdent, FilesetCatalog filesetCatalog) {
     return getFilesetMetadataCache()
         .map(cache -> cache.getFileset(filesetIdent))
         .orElseGet(
             () ->
-                getFilesetCatalog(
-                        NameIdentifier.of(
-                            filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)))
-                    .loadFileset(
-                        NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
+                filesetCatalog.loadFileset(
+                    NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
   /**
@@ -690,16 +742,28 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the schema.
    */
   protected Schema getSchema(NameIdentifier schemaIdent) {
-    return filesetMetadataCache
+    return getSchema(schemaIdent, (Catalog) getFilesetCatalog(catalogIdentOf(schemaIdent)));
+  }
+
+  /**
+   * Get the schema by the schema identifier from the cache, or load it from the server through an
+   * already-resolved catalog if the cache is disabled.
+   *
+   * <p>Callers that have a {@link Catalog} in hand pass it here so a single filesystem operation
+   * does not reload the same catalog once per lookup. With the metadata cache off that is the
+   * difference between one catalog load and several identical ones per {@code listStatus} or {@code
+   * open}, which a query engine issues once per file.
+   *
+   * @param schemaIdent the schema identifier.
+   * @param catalog the catalog owning the schema, already loaded.
+   * @return the schema.
+   */
+  protected Schema getSchema(NameIdentifier schemaIdent, Catalog catalog) {
+    // getFilesetMetadataCache(), not the field: the cache is initialized lazily, and every other
+    // accessor here goes through the getter.
+    return getFilesetMetadataCache()
         .map(cache -> cache.getSchema(schemaIdent))
-        .orElseGet(
-            () -> {
-              NameIdentifier catalogIdent =
-                  NameIdentifier.of(
-                      schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
-              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
-              return c.asSchemas().loadSchema(schemaIdent.name());
-            });
+        .orElseGet(() -> catalog.asSchemas().loadSchema(schemaIdent.name()));
   }
 
   /**
@@ -712,10 +776,18 @@ public abstract class BaseGVFSOperations implements Closeable {
    */
   protected FileSystem getActualFileSystemByLocationName(
       NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdentOf(filesetIdent));
+    return buildFileSystem(
+        filesetIdent, filesetCatalog, getFileset(filesetIdent, filesetCatalog), locationName);
+  }
+
+  private FileSystem buildFileSystem(
+      NameIdentifier filesetIdent,
+      FilesetCatalog filesetCatalog,
+      Fileset fileset,
+      String locationName)
+      throws FileNotFoundException {
     try {
-      Fileset fileset = getFileset(filesetIdent);
       String targetLocationName =
           locationName == null
               ? fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME)
@@ -728,27 +800,43 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties = getAllProperties(filesetIdent);
-      allProperties.putAll(
+      Catalog catalog = (Catalog) filesetCatalog;
+
+      // Cheap: catalog and fileset are already loaded, and no secret is read here. This is what
+      // decides which cached FileSystem the path belongs to, so it is built on every operation.
+      Map<String, String> identityProperties = getIdentityProperties(fileset, catalog);
+      Map<String, String> pathConfigs =
           FilesetUtil.getUserDefinedFileSystemConfigs(
-              targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
+              targetLocation.toUri(), identityProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX);
+      identityProperties.putAll(pathConfigs);
 
-      if (enableCredentialVending()) {
-        allProperties.putAll(
-            getCredentialProperties(
-                getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
-                filesetIdent,
-                locationName));
-      }
+      // Expensive: a schema load, and a credential request when vending is on. Only a cache miss
+      // constructs a FileSystem and reads these, so they stay unevaluated the rest of the time.
+      Supplier<Map<String, String>> allProperties =
+          () -> {
+            Map<String, String> properties = getAllProperties(filesetIdent, fileset, catalog);
+            properties.putAll(pathConfigs);
+            if (enableCredentialVending()) {
+              properties.putAll(
+                  getCredentialProperties(
+                      getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
+                      filesetIdent,
+                      fileset,
+                      locationName));
+            }
+            return properties;
+          };
 
-      FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
-      createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
+      FileSystem actualFileSystem =
+          getActualFileSystemByPath(targetLocation, identityProperties, allProperties);
+      createFilesetLocationIfNeed(actualFileSystem, targetLocation, catalog);
       return actualFileSystem;
     } catch (RuntimeException e) {
       Throwable cause = e.getCause();
       if (cause instanceof NoSuchCatalogException || cause instanceof CatalogNotInUseException) {
         String message =
-            String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
+            String.format(
+                "Cannot get fileset catalog by identifier: %s", catalogIdentOf(filesetIdent));
         LOG.warn(message, e);
         throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
       }
@@ -820,13 +908,34 @@ public abstract class BaseGVFSOperations implements Closeable {
    */
   protected FileSystem getActualFileSystemByPath(
       Path actualFilePath, Map<String, String> allProperties) {
+    return getActualFileSystemByPath(actualFilePath, allProperties, () -> allProperties);
+  }
+
+  /**
+   * Get the actual file system, building it from {@code allProperties} only when the filesystem
+   * cache misses.
+   *
+   * <p>One {@link FileSystem} serves every path under the same scheme, authority and user, so after
+   * the first operation the cache answers and the constructed properties are discarded. Producing
+   * them eagerly would still pay for a schema load and, with credential vending on, a credential
+   * request — once per file a query engine touches.
+   *
+   * @param actualFilePath the actual file path.
+   * @param identityProperties the properties that form the cache key; must be cheap to build.
+   * @param allProperties the full properties, evaluated only when a new filesystem is constructed.
+   * @return the actual file system.
+   */
+  protected FileSystem getActualFileSystemByPath(
+      Path actualFilePath,
+      Map<String, String> identityProperties,
+      Supplier<Map<String, String>> allProperties) {
     URI uri = actualFilePath.toUri();
     String scheme = uri.getScheme();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
 
     FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
-    String authority = provider.getFullAuthority(actualFilePath, allProperties);
+    String authority = provider.getFullAuthority(actualFilePath, identityProperties);
     UserGroupInformation ugi;
     try {
 
@@ -845,11 +954,12 @@ public abstract class BaseGVFSOperations implements Closeable {
             // https://github.com/apache/gravitino/issues/5609
             resetFileSystemServiceLoader(scheme);
 
+            Map<String, String> properties = allProperties.get();
             FileSystem created;
             if (scheme.equals(SCHEME_HDFS)) {
-              created = new HDFSFileSystemProxy(actualFilePath, allProperties).getProxy();
+              created = new HDFSFileSystemProxy(actualFilePath, properties).getProxy();
             } else {
-              created = provider.getFileSystem(actualFilePath, allProperties);
+              created = provider.getFileSystem(actualFilePath, properties);
             }
             // Track every FS we create so we can guarantee close() at GVFS shutdown,
             // even if the entry is later evicted from the cache (see #11303).
@@ -963,14 +1073,42 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
+  /**
+   * The properties that identify which {@link FileSystem} instance a path belongs to: the catalog
+   * and fileset properties plus this filesystem's own configuration. Every value here is already in
+   * hand once the fileset is loaded, so building this costs no server call.
+   *
+   * <p>Kept separate from {@link #getAllProperties} because {@link
+   * FileSystemProvider#getFullAuthority} reads from it to form the filesystem cache key, which has
+   * to happen before the cache is consulted -- and therefore on every single operation. Secrets are
+   * deliberately not resolved here: each {@code getSecrets()} is a REST call, and no provider
+   * derives an authority from a secret.
+   */
+  private Map<String, String> getIdentityProperties(Fileset fileset, Catalog catalog) {
+    Map<String, String> properties = new HashMap<>();
+    if (catalog.properties() != null) {
+      properties.putAll(catalog.properties());
+    }
+    if (fileset.properties() != null) {
+      properties.putAll(fileset.properties());
+    }
+    properties.putAll(extractNonDefaultConfig(conf));
+    return properties;
+  }
+
+  /**
+   * Everything needed to construct a {@link FileSystem}: the schema's properties, and the secrets
+   * of the catalog, schema and fileset.
+   *
+   * <p>Loading the schema is a server call when the metadata cache is off, and each {@code
+   * getSecrets()} is another one that no cache absorbs. The result is only read when the filesystem
+   * cache misses -- once per scheme, authority and user per JVM. Callers therefore pass this as a
+   * supplier rather than a value; see {@link #getActualFileSystemByPath}.
+   */
   @VisibleForTesting
-  Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
-    String catalogName = filesetIdent.namespace().level(1);
-    String schemaName = filesetIdent.namespace().level(2);
-    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(schemaName);
-    Fileset fileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
+  Map<String, String> getAllProperties(
+      NameIdentifier filesetIdent, Fileset fileset, Catalog catalog) {
+    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()), catalog);
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
@@ -999,6 +1137,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   private Map<String, String> getCredentialProperties(
       FileSystemProvider fileSystemProvider,
       NameIdentifier filesetIdentifier,
+      Fileset fileset,
       String locationName) {
     // Do not support credential vending, we do not need to add any credential properties.
     if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
@@ -1007,7 +1146,6 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
     try {
-      Fileset fileset = getFileset(filesetIdentifier);
       GravitinoVirtualFileSystemUtils.setCallerContextForGetCredentials(locationName);
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       if (credentials.length > 0) {

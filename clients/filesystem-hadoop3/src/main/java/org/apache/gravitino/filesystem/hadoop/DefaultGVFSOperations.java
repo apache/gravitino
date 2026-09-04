@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.hadoop.conf.Configuration;
@@ -61,18 +62,16 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
 
   @Override
   public FSDataInputStream open(Path gvfsPath, int bufferSize) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
-    return actualFs.open(actualFilePath, bufferSize);
+    Pair<FileSystem, Path> resolved =
+        resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
+    return resolved.getLeft().open(resolved.getRight(), bufferSize);
   }
 
   @Override
   public synchronized void setWorkingDirectory(Path gvfsDir) throws FileNotFoundException {
-    FileSystem actualFs = getActualFileSystem(gvfsDir, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsDir, currentLocationName(), FilesetDataOperation.SET_WORKING_DIR);
-    actualFs.setWorkingDirectory(actualFilePath);
+    Pair<FileSystem, Path> resolved =
+        resolvePath(gvfsDir, currentLocationName(), FilesetDataOperation.SET_WORKING_DIR);
+    resolved.getLeft().setWorkingDirectory(resolved.getRight());
   }
 
   @Override
@@ -86,11 +85,18 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
       Progressable progress)
       throws IOException {
     try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.CREATE);
-      return actualFs.create(
-          actualFilePath, permission, overwrite, bufferSize, replication, blockSize, progress);
+      Pair<FileSystem, Path> resolved =
+          resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.CREATE);
+      return resolved
+          .getLeft()
+          .create(
+              resolved.getRight(),
+              permission,
+              overwrite,
+              bufferSize,
+              replication,
+              blockSize,
+              progress);
     } catch (FileNotFoundException e) {
       String message =
           "Fileset is not found for path: "
@@ -105,10 +111,9 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
   @Override
   public FSDataOutputStream append(Path gvfsPath, int bufferSize, Progressable progress)
       throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.APPEND);
-    return actualFs.append(actualFilePath, bufferSize, progress);
+    Pair<FileSystem, Path> resolved =
+        resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.APPEND);
+    return resolved.getLeft().append(resolved.getRight(), bufferSize, progress);
   }
 
   @Override
@@ -124,21 +129,20 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
         srcIdentifier,
         dstIdentifier);
 
-    Path srcActualPath =
-        getActualFilePath(srcGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
+    Pair<FileSystem, Path> src =
+        resolvePath(srcGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
+    // Both paths are in the same fileset, asserted above, so the source's filesystem serves both.
     Path dstActualPath =
         getActualFilePath(dstGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
-    FileSystem actualFs = getActualFileSystem(srcGvfsPath, currentLocationName());
-    return actualFs.rename(srcActualPath, dstActualPath);
+    return src.getLeft().rename(src.getRight(), dstActualPath);
   }
 
   @Override
   public boolean delete(Path gvfsPath, boolean recursive) throws IOException {
     try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.DELETE);
-      return actualFs.delete(actualFilePath, recursive);
+      Pair<FileSystem, Path> resolved =
+          resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.DELETE);
+      return resolved.getLeft().delete(resolved.getRight(), recursive);
     } catch (FileNotFoundException e) {
       return false;
     }
@@ -146,10 +150,10 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
 
   @Override
   public FileStatus getFileStatus(Path gvfsPath) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.GET_FILE_STATUS);
-    FileStatus fileStatus = actualFs.getFileStatus(actualFilePath);
+    Pair<FileSystem, Path> resolved =
+        resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.GET_FILE_STATUS);
+    Path actualFilePath = resolved.getRight();
+    FileStatus fileStatus = resolved.getLeft().getFileStatus(actualFilePath);
 
     NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
     String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
@@ -164,10 +168,10 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
 
   @Override
   public FileStatus[] listStatus(Path gvfsPath) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.LIST_STATUS);
-    FileStatus[] fileStatusResults = actualFs.listStatus(actualFilePath);
+    Pair<FileSystem, Path> resolved =
+        resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.LIST_STATUS);
+    Path actualFilePath = resolved.getRight();
+    FileStatus[] fileStatusResults = resolved.getLeft().listStatus(actualFilePath);
 
     NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
     String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
@@ -187,10 +191,9 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
   @Override
   public boolean mkdirs(Path gvfsPath, FsPermission permission) throws IOException {
     try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.MKDIRS);
-      return actualFs.mkdirs(actualFilePath, permission);
+      Pair<FileSystem, Path> resolved =
+          resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.MKDIRS);
+      return resolved.getLeft().mkdirs(resolved.getRight(), permission);
     } catch (FileNotFoundException e) {
       String message =
           "Fileset is not found for path: "
@@ -205,11 +208,10 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
   @Override
   public short getDefaultReplication(Path gvfsPath) {
     try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(
+      Pair<FileSystem, Path> resolved =
+          resolvePath(
               gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_REPLICATION);
-      return actualFs.getDefaultReplication(actualFilePath);
+      return resolved.getLeft().getDefaultReplication(resolved.getRight());
     } catch (FileNotFoundException e) {
       return 1;
     }
@@ -218,11 +220,9 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
   @Override
   public long getDefaultBlockSize(Path gvfsPath) {
     try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(
-              gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
-      return actualFs.getDefaultBlockSize(actualFilePath);
+      Pair<FileSystem, Path> resolved =
+          resolvePath(gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
+      return resolved.getLeft().getDefaultBlockSize(resolved.getRight());
     } catch (FileNotFoundException e) {
       return defaultBlockSize();
     }

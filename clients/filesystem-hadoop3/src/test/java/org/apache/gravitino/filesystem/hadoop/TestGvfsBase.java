@@ -1755,4 +1755,58 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   private MockGVFSHook getHook(FileSystem gvfs) {
     return (MockGVFSHook) ((GravitinoVirtualFileSystem) gvfs).getHook();
   }
+
+  @Test
+  public void testOneCatalogLoadPerOperation() throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    String filesetName = "testOneCatalogLoadPerOperation";
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String catalogPath = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+
+    try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+      FileSystemTestUtils.mkdirs(localPath, localFileSystem);
+      mockFilesetDTO(
+          metalakeName,
+          catalogName,
+          schemaName,
+          filesetName,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("location1", localPath.toString()),
+          ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "/test.txt");
+      buildMockResource(
+          Method.GET,
+          locationPath,
+          queryParams,
+          null,
+          new FileLocationResponse(localPath + "/test.txt"),
+          SC_OK);
+      buildMockResourceForCredential(filesetName, localPath + "/test.txt");
+
+      // Warm the filesystem cache first: the very first operation additionally constructs a
+      // FileSystem, which is what the deferred property map is for. Steady state is the interesting
+      // number -- it is the one a query engine pays once per file.
+      Path filePath = new Path(managedFilesetPath + "/test.txt");
+      FileSystemTestUtils.create(filePath, gravitinoFileSystem);
+
+      HttpRequest catalogRequest = HttpRequest.request(catalogPath);
+      int before = mockServer().retrieveRecordedRequests(catalogRequest).length;
+      FileSystemTestUtils.create(filePath, gravitinoFileSystem);
+      int after = mockServer().retrieveRecordedRequests(catalogRequest).length;
+
+      // Before this was collapsed, a single create resolved the catalog four separate times.
+      assertEquals(
+          1, after - before, "one filesystem operation must load the catalog exactly once");
+
+      localFileSystem.delete(new Path(localPath + "/test.txt"), true);
+    }
+  }
 }
