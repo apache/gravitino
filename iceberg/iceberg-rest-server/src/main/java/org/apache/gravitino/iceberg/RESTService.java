@@ -232,8 +232,10 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
     // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
-    // nothing in the build catching it.
+    // nothing in the build catching it. RequestContextFilter is included here too so
+    // query-parameter capture applies uniformly, matching ICEBERG_SPEC above.
     for (String pathSpec : METRICS_PATHS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
       server.addFilter(
           new HttpAuditFilter(eventBus, EventSource.GRAVITINO_ICEBERG_REST_SERVER), pathSpec);
       server.addCustomFilters(pathSpec);

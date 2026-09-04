@@ -160,8 +160,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
     // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
-    // nothing in the build catching it.
+    // nothing in the build catching it. RequestContextFilter is included here too so
+    // query-parameter capture applies uniformly, matching LANCE_SPEC above.
     for (String pathSpec : METRICS_PATHS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
       server.addFilter(
           new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
       server.addCustomFilters(pathSpec);
