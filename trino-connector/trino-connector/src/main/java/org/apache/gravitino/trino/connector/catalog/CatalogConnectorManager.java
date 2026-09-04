@@ -24,12 +24,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
-<<<<<<< HEAD
-import java.util.Arrays;
-=======
 import java.util.ArrayList;
-import java.util.HashMap;
->>>>>>> 67a06e60d ([#12546] improvement(trino-connector): Report catalog registration status through system tables (#12547))
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -525,34 +520,6 @@ public class CatalogConnectorManager {
                     && !catalogConnectors.containsKey(state.getTrinoCatalogName()));
 
     // Load new catalogs belows to the metalake.
-<<<<<<< HEAD
-    catalogNames.stream()
-        .forEach(
-            (String catalogName) -> {
-              try {
-                Catalog catalog = metalake.loadCatalog(catalogName);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
-                if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
-                  // Reload catalogs that have been updated in Gravitino server.
-                  reloadCatalog(gravitinoCatalog);
-                } else {
-                  if (catalog.type() == Catalog.Type.RELATIONAL
-                      && catalogConnectorFactory
-                          .getSupportedCatalogProviders()
-                          .contains(gravitinoCatalog.getProvider())) {
-                    loadCatalog(gravitinoCatalog);
-                  }
-                }
-              } catch (UnsupportedOperationException e) {
-                LOG.warn(
-                    "Unsupported catalog type for catalog %s in metalake %s: %s",
-                    catalogName, metalake.name(), e.getMessage());
-              } catch (Exception e) {
-                LOG.error(
-                    e, "Failed to load metalake %s's catalog %s.", metalake.name(), catalogName);
-              }
-            });
-=======
     for (String catalogName : catalogNames) {
       String trinoCatalogName = getTrinoCatalogName(metalakeName, catalogName);
       // Known before the catalog is even loaded, since it only depends on the name.
@@ -561,12 +528,7 @@ public class CatalogConnectorManager {
       String provider = null;
       try {
         Catalog catalog = metalake.loadCatalog(catalogName);
-        // Registration deliberately carries only the visible properties. The resolved secrets are
-        // added by each node in createCatalogConnectorContext(), so that they never reach the
-        // CREATE CATALOG statement, the catalog properties file Trino persists from it, or
-        // anything that quotes either of them back.
-        GravitinoCatalog gravitinoCatalog =
-            new GravitinoCatalog(metalakeName, catalog, visibleProps(catalog));
+        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog);
         provider = gravitinoCatalog.getProvider();
         // Checked before the already-registered path: a catalog can be dropped and recreated
         // under the same name with a type or provider this connector cannot serve, and treating
@@ -629,7 +591,6 @@ public class CatalogConnectorManager {
         }
       }
     }
->>>>>>> 67a06e60d ([#12546] improvement(trino-connector): Report catalog registration status through system tables (#12547))
   }
 
   private void recordCatalogState(CatalogRegistrationState newState, Throwable cause) {
@@ -961,7 +922,6 @@ public class CatalogConnectorManager {
       }
       GravitinoMetalake metalake =
           metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake);
-      catalog = withResolvedSecrets(catalog, metalake);
       CatalogConnectorContext.Builder builder =
           catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
       builder.withMetalake(metalake).withContext(context).withConfig(config);
@@ -1024,50 +984,6 @@ public class CatalogConnectorManager {
     return false;
   }
 
-<<<<<<< HEAD
-=======
-  /** The catalog properties as the Gravitino server reports them, secret URNs unresolved. */
-  static Map<String, String> visibleProps(Catalog catalog) {
-    return new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-  }
-
-  /**
-   * Overlays the secrets the Gravitino server vends for this catalog onto its properties.
-   *
-   * <p>Resolved here, on the node that is about to build the connector, rather than once at
-   * registration time: the registered definition travels through a CREATE CATALOG statement that
-   * Trino persists as a catalog properties file, and a secret placed in it would be readable there
-   * for as long as the catalog exists.
-   */
-  private GravitinoCatalog withResolvedSecrets(
-      GravitinoCatalog catalog, GravitinoMetalake metalake) {
-    Map<String, String> secrets;
-    try {
-      secrets = metalake.loadCatalog(catalog.getName()).supportsSecrets().getSecrets();
-    } catch (Exception e) {
-      // Named explicitly: the caller's message only says the connector could not be created, and
-      // this step is the one that needs the Gravitino server reachable from this node.
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-          String.format(
-              "Failed to resolve the secrets of catalog %s in metalake %s: %s",
-              catalog.getName(), catalog.getMetalake(), toErrorMessage(e)),
-          e);
-    }
-    if (secrets.isEmpty()) {
-      return catalog;
-    }
-    Map<String, String> properties = new HashMap<>(catalog.getProperties());
-    properties.putAll(secrets);
-    return new GravitinoCatalog(
-        catalog.getMetalake(),
-        catalog.getProvider(),
-        catalog.getName(),
-        properties,
-        catalog.getLastModifiedTime());
-  }
-
->>>>>>> 67a06e60d ([#12546] improvement(trino-connector): Report catalog registration status through system tables (#12547))
   public interface TrinoCatalogNameHandler {
     String getCatalogName(String metalake, String catalog);
   }

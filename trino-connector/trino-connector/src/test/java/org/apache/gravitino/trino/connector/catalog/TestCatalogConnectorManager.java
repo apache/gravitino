@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,9 +37,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
-<<<<<<< HEAD
-import java.util.Optional;
-=======
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -48,7 +44,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
->>>>>>> 67a06e60d ([#12546] improvement(trino-connector): Report catalog registration status through system tables (#12547))
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
@@ -56,7 +51,6 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestCatalogConnectorManager {
@@ -1273,74 +1267,6 @@ public class TestCatalogConnectorManager {
     assertEquals("http://irc-host:9001/iceberg", config.getDiscoveredIcebergRestUri("test"));
   }
 
-<<<<<<< HEAD
-=======
-  @Test
-  public void testRegistrationCarriesNoSecrets() throws Exception {
-    LoadFixture fixture = new LoadFixture();
-    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
-    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
-    when(catalog.supportsSecrets().getSecrets())
-        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
-    fixture.withCatalogs(catalog);
-
-    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
-    manager.loadMetalakeSync();
-
-    // The registered definition is what the CREATE CATALOG statement carries and what Trino
-    // persists as a catalog properties file, so no secret may be in it.
-    ArgumentCaptor<GravitinoCatalog> registered = ArgumentCaptor.forClass(GravitinoCatalog.class);
-    verify(fixture.catalogRegister).registerCatalog(eq("memory"), registered.capture());
-    Map<String, String> properties = registered.getValue().getProperties();
-    assertEquals("v1", properties.get("visible"));
-    assertEquals("from-props", properties.get("shared"));
-    assertFalse(properties.containsKey("jdbc-password"));
-    assertFalse(properties.toString().contains("hunter2"));
-  }
-
-  @Test
-  public void testConnectorContextResolvesSecrets() throws Exception {
-    LoadFixture fixture = new LoadFixture();
-    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
-    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
-    when(catalog.supportsSecrets().getSecrets())
-        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
-    fixture.withCatalogs(catalog);
-    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
-
-    // What Trino hands back to the node when it loads the catalog that was registered without
-    // secrets.
-    manager.createCatalogConnectorContext(
-        "memory",
-        createConnectorConfig(
-            GravitinoCatalog.toJson(
-                new GravitinoCatalog(
-                    "test",
-                    "memory",
-                    "memory",
-                    Map.of("visible", "v1", "shared", "from-props"),
-                    0L))),
-        mockContext());
-
-    // The node resolves them against the server, and a secret wins over a visible property of
-    // the same name the way the merge at registration time used to.
-    ArgumentCaptor<GravitinoCatalog> built = ArgumentCaptor.forClass(GravitinoCatalog.class);
-    verify(fixture.catalogFactory).createCatalogConnectorContextBuilder(built.capture());
-    Map<String, String> properties = built.getValue().getProperties();
-    assertEquals("v1", properties.get("visible"));
-    assertEquals("hunter2", properties.get("jdbc-password"));
-    assertEquals("from-secret", properties.get("shared"));
-  }
-
-  @Test
-  public void testVisiblePropsHandlesNullProperties() {
-    Catalog catalog = mock(Catalog.class);
-    when(catalog.properties()).thenReturn(null);
-
-    assertTrue(CatalogConnectorManager.visibleProps(catalog).isEmpty());
-  }
-
->>>>>>> 67a06e60d ([#12546] improvement(trino-connector): Report catalog registration status through system tables (#12547))
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
       throws Exception {
     return createManager(createCatalogConnectorFactory(), configMap);
@@ -1416,9 +1342,6 @@ public class TestCatalogConnectorManager {
     when(catalog.provider()).thenReturn(provider);
     when(catalog.type()).thenReturn(type);
     when(catalog.properties()).thenReturn(ImmutableMap.of());
-    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
-    when(supportsSecrets.getSecrets()).thenReturn(Map.of());
-    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
     Audit audit = mock(Audit.class);
     when(audit.createTime()).thenReturn(Instant.now());
     when(audit.lastModifiedTime()).thenReturn(null);

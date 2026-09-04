@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
@@ -249,7 +250,7 @@ public final class CatalogRegistrationState {
     String effectiveProvider = provider != null ? provider : previous.provider;
     if (successTime == lastSuccessTimeMs
         && failures == failureCount
-        && effectiveProvider == provider) {
+        && Objects.equals(effectiveProvider, provider)) {
       return this;
     }
     return new CatalogRegistrationState(
