@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -29,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -193,6 +195,12 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE catalog_id = #{catalogId}))"
+        + "   OR (metadata_object_type = 'VIEW' AND metadata_object_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}))"
+        + "   OR (metadata_object_type = 'FUNCTION' AND metadata_object_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}))"
         + " )";
   }
 
@@ -232,6 +240,20 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "))"
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'VIEW' AND metadata_object_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'FUNCTION' AND metadata_object_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
         + " WHERE schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
         + "#{schemaId}"
