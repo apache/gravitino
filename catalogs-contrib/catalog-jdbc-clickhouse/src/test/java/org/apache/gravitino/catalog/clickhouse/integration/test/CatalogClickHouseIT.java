@@ -2798,6 +2798,59 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testLoadAndRecreateTableWithQuotedCommaSetting() {
+    String sourceName = GravitinoITUtils.genRandomName("settings_quoted_comma_source");
+    String recreatedName = GravitinoITUtils.genRandomName("settings_quoted_comma_recreated");
+    String settingName = "merge_workload";
+    String settingValue = "'gravitino,quoted,comma'";
+    String settingProperty = TableConstants.SETTINGS_PREFIX + settingName;
+
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS %s = %s",
+            schemaName, sourceName, settingName, settingValue));
+
+    String sourceEngineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, sourceName));
+    Assertions.assertNotNull(sourceEngineFull);
+    Assertions.assertTrue(
+        sourceEngineFull.contains(settingName + " = " + settingValue), sourceEngineFull);
+
+    Table loadedSource =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, sourceName));
+    Assertions.assertEquals(settingValue, loadedSource.properties().get(settingProperty));
+
+    Map<String, String> recreatedProperties = createProperties();
+    recreatedProperties.put(settingProperty, loadedSource.properties().get(settingProperty));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, recreatedName),
+            loadedSource.columns(),
+            "quoted comma setting roundtrip",
+            recreatedProperties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loadedRecreated =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, recreatedName));
+    Assertions.assertEquals(settingValue, loadedRecreated.properties().get(settingProperty));
+
+    String recreatedEngineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, recreatedName));
+    Assertions.assertNotNull(recreatedEngineFull);
+    Assertions.assertTrue(
+        recreatedEngineFull.contains(settingName + " = " + settingValue), recreatedEngineFull);
+  }
+
+  @Test
   void testCreateTableWithSettingsViaGravitinoApi() {
     String name = GravitinoITUtils.genRandomName("settings_api");
     NameIdentifier ident = NameIdentifier.of(schemaName, name);
