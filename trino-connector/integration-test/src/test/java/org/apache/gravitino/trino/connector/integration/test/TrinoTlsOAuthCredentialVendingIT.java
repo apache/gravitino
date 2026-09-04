@@ -127,6 +127,11 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   public void testTlsOAuthAndCredentialVending() {
     assertTrue(trinoContainer.checkSyncCatalogFromGravitino(10, catalogName));
 
+    // Captured before any writes so the post-write delta can prove LocalStack actually received
+    // an STS AssumeRole call, rather than the write silently using the S3TokenGenerator's own
+    // static root credential directly (which LocalStack would accept just the same).
+    String logsBeforeWrite = localStack.getContainer().getLogs();
+
     String schema = "secured";
     String table = catalogName + "." + schema + ".people";
     trinoContainer.executeUpdateSQL("CREATE SCHEMA " + catalogName + "." + schema);
@@ -136,6 +141,13 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
     assertEquals(
         "2", trinoContainer.executeQuerySQL("SELECT count(*) FROM " + table).get(0).get(0));
+
+    String logsDuringWrite =
+        localStack.getContainer().getLogs().substring(logsBeforeWrite.length());
+    assertTrue(
+        logsDuringWrite.contains("AssumeRole"),
+        "LocalStack did not receive an STS AssumeRole request while writing Iceberg data,"
+            + " meaning vended credentials may not actually have been used");
     assertTrue(
         oauthServer.gravitinoTokenRequests() > 0,
         "The Trino connector did not request a Gravitino OAuth2 token");
