@@ -152,9 +152,11 @@ public class IcebergClassLoaderPoolIT extends BaseIT {
 
   private Object classLoaderOf(String metalake, String catalog) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    // doWithCatalog installs the pooled loader as the TCCL; the catalog class itself may be shared
+    // and therefore defined by the application ClassLoader.
     return catalogManager.doWithCatalog(
         NameIdentifier.of(metalake, catalog),
-        loadedCatalog -> loadedCatalog.getClass().getClassLoader());
+        ignored -> Thread.currentThread().getContextClassLoader());
   }
 
   @Test
