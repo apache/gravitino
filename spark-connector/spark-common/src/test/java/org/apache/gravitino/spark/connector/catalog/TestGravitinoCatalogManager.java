@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -42,6 +44,7 @@ import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.stubbing.Answer;
 
 /**
  * Verifies that GravitinoCatalogManager partitions its client and catalog caches by the identity
@@ -184,6 +187,67 @@ public class TestGravitinoCatalogManager {
     assertEquals(2, clientFactory.loadCount(), "A stale catalog entry must be reloaded");
     // The client is cached independently of the catalog entry.
     assertEquals(1, clientFactory.clientCount());
+  }
+
+  @Test
+  void testIcebergRestUriIsCachedAfterSuccessfulDiscovery() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              discoveryCalls.incrementAndGet();
+              return Optional.of("http://irc:9001/iceberg");
+            });
+
+    Optional<String> first = manager.getIcebergRestUri();
+    Optional<String> second = manager.getIcebergRestUri();
+
+    assertEquals(Optional.of("http://irc:9001/iceberg"), first);
+    assertSame(first, second, "A cached discovery result must not be recomputed");
+    assertEquals(1, discoveryCalls.get());
+  }
+
+  @Test
+  void testNoIcebergRestUriDiscoveredIsAlsoCached() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              discoveryCalls.incrementAndGet();
+              return Optional.empty();
+            });
+
+    manager.getIcebergRestUri();
+    manager.getIcebergRestUri();
+
+    assertEquals(1, discoveryCalls.get(), "A negative discovery result must be cached too");
+  }
+
+  @Test
+  void testIcebergRestUriDiscoveryFailurePropagatesAndIsNotCached() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              if (discoveryCalls.incrementAndGet() == 1) {
+                throw new RuntimeException("Gravitino server unreachable");
+              }
+              return Optional.of("http://irc:9001/iceberg");
+            });
+
+    assertThrows(RuntimeException.class, manager::getIcebergRestUri);
+    Optional<String> second = manager.getIcebergRestUri();
+
+    assertEquals(Optional.of("http://irc:9001/iceberg"), second);
+    assertEquals(2, discoveryCalls.get(), "A failed discovery must be retried on the next call");
+  }
+
+  private GravitinoCatalogManager createManagerWithIcebergRestUri(Answer<Optional<String>> answer) {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_METALAKE, "test_metalake");
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.icebergRestServiceUri(anyString())).thenAnswer(answer);
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", identity -> client);
   }
 
   private GravitinoCatalogManager createManager(SparkConf sparkConf) {

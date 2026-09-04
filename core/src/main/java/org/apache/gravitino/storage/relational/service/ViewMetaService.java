@@ -39,6 +39,7 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -391,6 +392,11 @@ public class ViewMetaService {
         TagMetadataObjectRelMapper.class,
         mapper ->
             mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                viewId, MetadataObject.Type.VIEW.name()));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                 viewId, MetadataObject.Type.VIEW.name()));
   }
 

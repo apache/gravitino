@@ -81,9 +81,6 @@ public class StatisticOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(StatisticOperations.class);
 
-  private static final String NULL_STATS_UPDATE_REQUEST_BODY_ERROR =
-      "Statistics update request body cannot be null";
-
   @Context private HttpServletRequest httpRequest;
 
   private final StatisticDispatcher statisticDispatcher;
@@ -154,6 +151,14 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleStatisticException(
+          OperationType.UPDATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     String statisticNames = getStatisticNames(request);
     try {
       LOG.info(
@@ -164,9 +169,6 @@ public class StatisticOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            if (request == null) {
-              throw new IllegalArgumentException(NULL_STATS_UPDATE_REQUEST_BODY_ERROR);
-            }
             request.validate();
             MetadataObject object =
                 MetadataObjects.parse(
@@ -178,13 +180,7 @@ public class StatisticOperations {
 
             Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
             for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
-              // Current we only support custom statistics
-              if (!entry.getKey().startsWith(Statistic.CUSTOM_PREFIX)) {
-                throw new IllegalStatisticNameException(
-                    "Statistic name must start with %s , but got: %s",
-                    Statistic.CUSTOM_PREFIX, entry.getKey());
-              }
-
+              validateStatisticName(entry.getKey());
               statisticMaps.put(entry.getKey(), entry.getValue());
             }
 
@@ -215,10 +211,16 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsDropRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleStatisticException(
+          OperationType.DROP,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     String statisticNames =
-        request == null || request.getNames() == null
-            ? ""
-            : StringUtils.join(request.getNames(), ",");
+        request.getNames() == null ? "" : StringUtils.join(request.getNames(), ",");
     try {
       LOG.info(
           "Received drop statistics request for object full name: {} type: {} in the metalake {}",
@@ -358,8 +360,16 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsUpdateRequest request) {
-    String partitions = getPartitionNames(request);
+    if (request == null) {
+      return ExceptionHandlers.handlePartitionStatsException(
+          OperationType.UPDATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Updating partition statistics for table: {} in the metalake {}", fullName, metalake);
+    String partitions = getPartitionNames(request);
     try {
       return Utils.doAs(
           httpRequest,
@@ -376,18 +386,7 @@ public class StatisticOperations {
 
             List<PartitionStatisticsUpdateDTO> updates = request.getUpdates();
             for (PartitionStatisticsUpdateDTO update : updates) {
-              update
-                  .statistics()
-                  .keySet()
-                  .forEach(
-                      statistic -> {
-                        if (!statistic.startsWith(Statistic.CUSTOM_PREFIX)) {
-                          // Current we only support custom statistics
-                          throw new IllegalStatisticNameException(
-                              "Statistic name must start with %s, but got: %s",
-                              Statistic.CUSTOM_PREFIX, statistic);
-                        }
-                      });
+              update.statistics().keySet().forEach(StatisticOperations::validateStatisticName);
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
@@ -432,6 +431,14 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsDropRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handlePartitionStatsException(
+          OperationType.DROP,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     String partitions = getDropPartitionNames(request);
 
     try {
@@ -503,15 +510,37 @@ public class StatisticOperations {
   }
 
   private static String getStatisticNames(StatisticsUpdateRequest request) {
-    if (request == null || request.getUpdates() == null) {
+    if (request.getUpdates() == null) {
       return "";
     }
 
-    return StringUtils.join(request.getUpdates().keySet(), ",");
+    return request.getUpdates().keySet().stream()
+        .map(StatisticOperations::formatStatisticName)
+        .collect(Collectors.joining(","));
+  }
+
+  private static String formatStatisticName(String statisticName) {
+    if (statisticName != null && statisticName.length() > Statistic.MAX_NAME_LENGTH) {
+      return String.format("<statistic name exceeds %d characters>", Statistic.MAX_NAME_LENGTH);
+    }
+    return statisticName;
+  }
+
+  private static void validateStatisticName(String statisticName) {
+    if (statisticName.length() > Statistic.MAX_NAME_LENGTH) {
+      throw new IllegalStatisticNameException(
+          "Statistic name must not exceed %d characters", Statistic.MAX_NAME_LENGTH);
+    }
+
+    // Currently we only support custom statistics.
+    if (!statisticName.startsWith(Statistic.CUSTOM_PREFIX)) {
+      throw new IllegalStatisticNameException(
+          "Statistic name must start with %s, but got: %s", Statistic.CUSTOM_PREFIX, statisticName);
+    }
   }
 
   private static String getPartitionNames(PartitionStatisticsUpdateRequest request) {
-    if (request == null || request.getUpdates() == null) {
+    if (request.getUpdates() == null) {
       return "";
     }
 
@@ -523,7 +552,7 @@ public class StatisticOperations {
   }
 
   private static String getDropPartitionNames(PartitionStatisticsDropRequest request) {
-    if (request == null || request.getDrops() == null) {
+    if (request.getDrops() == null) {
       return "";
     }
 

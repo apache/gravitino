@@ -230,8 +230,7 @@ public class TestJdbcCatalogCredential {
 
     // GravitinoEnv is not initialized in unit tests, so backfill is disabled by default.
     Map<String, String> publicProps = jdbcCatalog.properties();
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.USERNAME.getKey()));
+    Assertions.assertEquals("test-user", publicProps.get(JdbcConfig.USERNAME.getKey()));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.PASSWORD.getKey()));
 

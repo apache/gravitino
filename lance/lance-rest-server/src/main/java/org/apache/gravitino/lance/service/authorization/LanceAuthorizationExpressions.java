@@ -23,6 +23,8 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION;
 
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+
 /**
  * Authorization expressions for the Lance REST namespace surface.
  *
@@ -105,6 +107,38 @@ public final class LanceAuthorizationExpressions {
           + LOAD_TABLE_AUTHORIZATION_EXPRESSION
           + ") || (ANY_USE_CATALOG && ANY_USE_SCHEMA"
           + " && (ANY_PROBE_TABLE_LIKE || ANY_CREATE_TABLE)))";
+
+  /**
+   * Authorizes creating a table. The identifier must address a table, and the privilege is required
+   * on the schema that will hold it.
+   *
+   * <p>This expression covers the {@code create} and {@code exist_ok} modes only. The {@code
+   * overwrite} mode replaces an existing table, so it is authorized against {@link
+   * #MODIFY_TABLE_AUTHORIZATION_EXPRESSION} instead and CREATE_TABLE alone never grants it.
+   */
+  public static final String CREATE_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+      entityType == 'TABLE' && (ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE)
+      """;
+
+  /** Authorizes altering an existing table, which requires MODIFY_TABLE or ownership. */
+  public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
+      "entityType == 'TABLE' && ("
+          + AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
+          + ")";
+
+  /**
+   * Authorizes removing a table, whether the storage is deleted with it or only the Gravitino
+   * metadata is. Both require ownership of the table or of one of its ancestors, matching the
+   * Gravitino and Iceberg REST surfaces: MODIFY_TABLE alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+      entityType == 'TABLE' && (ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER)
+      """;
 
   private LanceAuthorizationExpressions() {}
 }

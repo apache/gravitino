@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.model.Model;
@@ -33,7 +34,10 @@ public final class EntityCombinedModel implements Model {
 
   private final ModelEntity modelEntity;
 
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedModel(Model model, ModelEntity modelEntity) {
     this.model = model;
@@ -56,8 +60,10 @@ public final class EntityCombinedModel implements Model {
     return new EntityCombinedModel(model, null);
   }
 
-  public EntityCombinedModel withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedModel withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -75,7 +81,7 @@ public final class EntityCombinedModel implements Model {
   public Map<String, String> properties() {
     return model.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(model.properties(), hiddenProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(model.properties(), keysToMask, keysToOmit);
   }
 
   @Override

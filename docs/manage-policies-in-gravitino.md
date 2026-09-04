@@ -220,7 +220,7 @@ client.deletePolicy("retention_30d");
 ### Attach and Detach Policies
 
 Both happen in one request, and either list can be omitted. Catalogs, schemas, tables, filesets,
-topics, and models can carry a policy.
+topics, models, views, and functions can carry a policy.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
