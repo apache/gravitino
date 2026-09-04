@@ -31,11 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
->>>>>>> 3afc9f168 ([#12501][#12500] feat(core): Support FUNCTION and VIEW metadata object policies (#12503))
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetadataObjectRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
