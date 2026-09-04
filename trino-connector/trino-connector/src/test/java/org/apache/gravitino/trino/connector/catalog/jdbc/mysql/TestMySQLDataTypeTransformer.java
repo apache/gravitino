@@ -31,6 +31,7 @@ import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
+import java.util.Optional;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -159,6 +160,84 @@ public class TestMySQLDataTypeTransformer {
 
     // MySQL supports at most microseconds precision.
     Assertions.assertEquals(TimeType.TIME_MICROS, transformer.getTrinoType(Types.TimeType.of(12)));
+  }
+
+  @Test
+  public void testTrinoTimestampToGravitinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    // Same as the native Trino MySQL connector: the precision is kept, DATETIME(p)/TIMESTAMP(p)
+    for (int precision = 0; precision <= 6; precision++) {
+      Assertions.assertEquals(
+          Types.TimestampType.withoutTimeZone(precision),
+          transformer.getGravitinoType(TimestampType.createTimestampType(precision)));
+      Assertions.assertEquals(
+          Types.TimestampType.withTimeZone(precision),
+          transformer.getGravitinoType(
+              TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision)));
+    }
+
+    // MySQL supports at most microseconds precision.
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6),
+        transformer.getGravitinoType(TimestampType.TIMESTAMP_NANOS));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6),
+        transformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_PICOS));
+
+    // Round trip keeps the precision, so a table created through Trino reads back with the same
+    // types.
+    Assertions.assertEquals(
+        TimestampType.TIMESTAMP_MICROS,
+        transformer.getTrinoType(transformer.getGravitinoType(TimestampType.TIMESTAMP_MICROS)));
+    Assertions.assertEquals(
+        TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS,
+        transformer.getTrinoType(
+            transformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS)));
+  }
+
+  @Test
+  public void testTrinoTimeToGravitinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    for (int precision = 0; precision <= 6; precision++) {
+      Assertions.assertEquals(
+          Types.TimeType.of(precision),
+          transformer.getGravitinoType(TimeType.createTimeType(precision)));
+    }
+
+    // MySQL supports at most microseconds precision.
+    Assertions.assertEquals(
+        Types.TimeType.of(6), transformer.getGravitinoType(TimeType.TIME_NANOS));
+
+    Assertions.assertEquals(
+        TimeType.TIME_MICROS,
+        transformer.getTrinoType(transformer.getGravitinoType(TimeType.TIME_MICROS)));
+  }
+
+  @Test
+  public void testSupportedType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    // Up to microseconds the requested type is used as is.
+    Assertions.assertEquals(
+        Optional.empty(), transformer.getSupportedType(TimestampType.TIMESTAMP_MICROS));
+    Assertions.assertEquals(
+        Optional.empty(),
+        transformer.getSupportedType(TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS));
+    Assertions.assertEquals(Optional.empty(), transformer.getSupportedType(TimeType.TIME_MILLIS));
+    Assertions.assertEquals(
+        Optional.empty(), transformer.getSupportedType(VarcharType.createVarcharType(10)));
+
+    // Above microseconds the column is created with precision 6 and the values are coerced.
+    Assertions.assertEquals(
+        Optional.of(TimestampType.TIMESTAMP_MICROS),
+        transformer.getSupportedType(TimestampType.TIMESTAMP_NANOS));
+    Assertions.assertEquals(
+        Optional.of(TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS),
+        transformer.getSupportedType(TimestampWithTimeZoneType.TIMESTAMP_TZ_PICOS));
+    Assertions.assertEquals(
+        Optional.of(TimeType.TIME_MICROS), transformer.getSupportedType(TimeType.TIME_NANOS));
   }
 
   @Test

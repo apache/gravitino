@@ -83,10 +83,10 @@ index 117d2f1d4..c3e55683f 100644
 -   f11 integer WITH (default = '1'),
 -   f12 bigint WITH (default = '1'),
 -   f13 date WITH (default = '2024-04-01'),
--   f14 time(0) WITH (default = '08:00'),
--   f15 timestamp(0) WITH (default = '2012-12-31 11:30:45'),
--   f16 timestamp(0) with time zone WITH (default = '2012-12-31 11:30:45'),
--   f17 timestamp(0) with time zone WITH (default = 'CURRENT_TIMESTAMP')
+-   f14 time(3) WITH (default = '08:00'),
+-   f15 timestamp(3) WITH (default = '2012-12-31 11:30:45'),
+-   f16 timestamp(3) with time zone WITH (default = '2012-12-31 11:30:45'),
+-   f17 timestamp(3) with time zone WITH (default = 'CURRENT_TIMESTAMP')
 +   key1 integer NOT NULL WITH ( auto_increment = true ),
 +   f1 varchar(200) WITH ( default = 'VARCHAR' ),
 +   f2 char(20) WITH ( default = 'CHAR' ),
@@ -99,10 +99,10 @@ index 117d2f1d4..c3e55683f 100644
 +   f11 integer WITH ( default = '1' ),
 +   f12 bigint WITH ( default = '1' ),
 +   f13 date WITH ( default = '2024-04-01' ),
-+   f14 time(0) WITH ( default = '08:00' ),
-+   f15 timestamp(0) WITH ( default = '2012-12-31 11:30:45' ),
-+   f16 timestamp(0) with time zone WITH ( default = '2012-12-31 11:30:45' ),
-+   f17 timestamp(0) with time zone WITH ( default = 'CURRENT_TIMESTAMP' )
++   f14 time(3) WITH ( default = '08:00' ),
++   f15 timestamp(3) WITH ( default = '2012-12-31 11:30:45' ),
++   f16 timestamp(3) with time zone WITH ( default = '2012-12-31 11:30:45' ),
++   f17 timestamp(3) with time zone WITH ( default = 'CURRENT_TIMESTAMP' )
  )
  COMMENT ''
  WITH (
@@ -112,7 +112,7 @@ index 117d2f1d4..c3e55683f 100644
  "CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_auto_increment_1 (
 -   key1 integer NOT NULL WITH (auto_increment = true),
 +   key1 integer NOT NULL WITH ( auto_increment = true ),
-    f1 timestamp(0),
+    f1 timestamp(3),
     f2 date
  )
 @@ -105,7 +105,7 @@ DROP TABLE
@@ -122,7 +122,7 @@ index 117d2f1d4..c3e55683f 100644
 -   key1 integer NOT NULL WITH (auto_increment = true),
 +   key1 integer NOT NULL WITH ( auto_increment = true ),
     key2 integer NOT NULL,
-    f1 timestamp(0),
+    f1 timestamp(3),
     f2 date
 @@ -121,7 +121,7 @@ DROP TABLE
  CREATE TABLE
@@ -142,3 +142,16 @@ index 117d2f1d4..c3e55683f 100644
     key2 integer,
     col1 integer
  )
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00016_datetime_precision.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00016_datetime_precision.txt
+index 51f226ea2..b57d66f9e 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00016_datetime_precision.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00016_datetime_precision.txt
+@@ -25,7 +25,7 @@ CREATE TABLE
+    datetime_col_6 timestamp(6),
+    datetime_col_9 timestamp(6),
+    timestamp_col timestamp(3) with time zone,
+-   timestamp_col_6 timestamp(6) with time zone WITH (default = 'CURRENT_TIMESTAMP')
++   timestamp_col_6 timestamp(6) with time zone WITH ( default = 'CURRENT_TIMESTAMP' )
+ )
+ COMMENT ''
+ WITH (
