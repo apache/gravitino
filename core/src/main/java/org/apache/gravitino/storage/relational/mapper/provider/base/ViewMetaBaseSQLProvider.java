@@ -131,6 +131,44 @@ public class ViewMetaBaseSQLProvider {
         + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Returns SQL that locks an active view by natural key without joining its version row.
+   *
+   * <p>This query is reserved for overwrite decisions. Normal reads keep using the inner-joined
+   * query above so a broken current-version invariant is reported as missing instead of producing a
+   * partially populated {@code ViewPO}.
+   */
+  public String selectViewMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name) {
+    return "SELECT view_id as viewId, view_name as viewName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND view_name = #{viewName}"
+        + " AND deleted_at = 0 FOR UPDATE";
+  }
+
+  /**
+   * Returns the active view metadata row and holds it exclusively for the transaction.
+   *
+   * <p>The version table is deliberately not joined: PostgreSQL rejects locking the nullable side
+   * of an outer join, and conflict classification only needs the root row's identity and version.
+   *
+   * @param viewId the view ID
+   * @return the locking select SQL
+   */
+  public String selectViewMetaByIdForUpdate(@Param("viewId") Long viewId) {
+    return "SELECT view_id as viewId, view_name as viewName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " audit_info as auditInfo, deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE view_id = #{viewId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String insertViewMeta(@Param("viewMeta") ViewPO viewPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -148,34 +186,6 @@ public class ViewMetaBaseSQLProvider {
         + " #{viewMeta.auditInfo},"
         + " #{viewMeta.deletedAt}"
         + " )";
-  }
-
-  public String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (view_id, view_name, metalake_id,"
-        + " catalog_id, schema_id,"
-        + " current_version, last_version, audit_info, deleted_at)"
-        + " VALUES ("
-        + " #{viewMeta.viewId},"
-        + " #{viewMeta.viewName},"
-        + " #{viewMeta.metalakeId},"
-        + " #{viewMeta.catalogId},"
-        + " #{viewMeta.schemaId},"
-        + " #{viewMeta.currentVersion},"
-        + " #{viewMeta.lastVersion},"
-        + " #{viewMeta.auditInfo},"
-        + " #{viewMeta.deletedAt}"
-        + " )"
-        + " ON DUPLICATE KEY UPDATE"
-        + " view_name = #{viewMeta.viewName},"
-        + " metalake_id = #{viewMeta.metalakeId},"
-        + " catalog_id = #{viewMeta.catalogId},"
-        + " schema_id = #{viewMeta.schemaId},"
-        + " current_version = #{viewMeta.currentVersion},"
-        + " last_version = #{viewMeta.lastVersion},"
-        + " audit_info = #{viewMeta.auditInfo},"
-        + " deleted_at = #{viewMeta.deletedAt}";
   }
 
   public String updateViewMeta(
@@ -215,12 +225,21 @@ public class ViewMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
+  /**
+   * Returns SQL that deletes only the view version observed by the caller.
+   *
+   * @param viewId the view ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE view_id = #{viewId} AND deleted_at = 0";
+        + " WHERE view_id = #{viewId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
