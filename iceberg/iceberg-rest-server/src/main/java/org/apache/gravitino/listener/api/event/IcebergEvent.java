@@ -53,8 +53,9 @@ public abstract class IcebergEvent extends Event {
     return icebergRequestContext.remoteHostName();
   }
 
+  /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return icebergRequestContext.httpHeaders();
   }
 }
