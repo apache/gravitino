@@ -67,6 +67,83 @@ class TestIcebergRequestContext {
             .asyncPurge());
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Extras are a parallel map, not headers. A later audit formatter that reads {@code
+   * httpHeaders()} must not see a fact that was never on the wire.
+   */
+  @Test
+  void testExtrasDoNotAppearOnHttpHeaders() {
+    IcebergRequestContext original =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    IcebergRequestContext enriched =
+        original.withAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+
+    Assertions.assertNotSame(original, enriched);
+    Assertions.assertTrue(original.auditExtras().isEmpty());
+    Assertions.assertEquals("policy-applied", enriched.auditExtras().get("audit.reason"));
+    Assertions.assertFalse(enriched.httpHeaders().containsKey("audit.reason"));
+    Assertions.assertEquals("req-1", enriched.httpHeaders().get("X-Request-Id"));
+  }
+
+  /**
+   * Today's {@code customInfo()} is the headers map. Empty extras have to keep that identity so
+   * existing callers do not observe a copy.
+   */
+  @Test
+  void testCustomInfoIsHeadersWhenExtrasEmpty() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    Assertions.assertSame(context.httpHeaders(), context.customInfo());
+    Assertions.assertSame(
+        context.httpHeaders(), context.withAuditExtras(ImmutableMap.of()).customInfo());
+    Assertions.assertSame(context.httpHeaders(), context.withAuditExtras(null).customInfo());
+  }
+
+  @Test
+  void testCustomInfoMergesHeadersAndExtras() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat")
+            .withAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    Assertions.assertEquals("req-1", context.customInfo().get("X-Request-Id"));
+    Assertions.assertEquals("policy-applied", context.customInfo().get("audit.reason"));
+    Assertions.assertFalse(context.httpHeaders().containsKey("audit.reason"));
+  }
+
+  /**
+   * Failure events are the case where the reason matters most. Pins that {@link
+   * IcebergFailureEvent#customInfo()} is headers ∪ extras ∪ any automatically captured request
+   * query parameters, and that extras stay off {@code httpHeaders()}.
+   */
+  @Test
+  void testFailureEventCustomInfoMergesHeadersAndExtras() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat")
+            .withAuditExtras(ImmutableMap.of("audit.reason", "validation-failed"));
+    IcebergLoadTableFailureEvent event =
+        new IcebergLoadTableFailureEvent(
+            context, NameIdentifier.of("ml", "cat", "ns", "t"), new RuntimeException("boom"));
+
+    Assertions.assertEquals("req-1", event.customInfo().get("X-Request-Id"));
+    Assertions.assertEquals("validation-failed", event.customInfo().get("audit.reason"));
+    Assertions.assertFalse(event.icebergRequestContext().httpHeaders().containsKey("audit.reason"));
+  }
+
+  @Test
+  void testFailureEventCustomInfoIsHeaderOnlyWhenExtrasEmpty() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    IcebergLoadTableFailureEvent event =
+        new IcebergLoadTableFailureEvent(
+            context, NameIdentifier.of("ml", "cat", "ns", "t"), new RuntimeException("boom"));
+    // Content equality, not identity: Event.customInfo() now merges in the request's
+    // automatically captured query parameters, so the result is always a freshly built map even
+    // when that automatic contribution is empty.
+    Assertions.assertEquals(context.httpHeaders(), event.customInfo());
+  }
+
+>>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
   private static HttpServletRequest requestWithoutHeader() {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteHost()).thenReturn("localhost");

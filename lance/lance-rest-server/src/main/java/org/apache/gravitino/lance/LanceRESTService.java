@@ -36,6 +36,11 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.server.web.RequestContextFilter;
+import org.glassfish.hk2.api.InterceptionService;
+>>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -93,6 +98,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
+    // Registered before HttpAuditFilter so audit events dispatched during this request carry the
+    // request's query parameters and remote address, exactly as on the main server.
+    server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
     server.addFilter(
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
