@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -193,7 +194,7 @@ public class TestIdpUserGroupManager {
     manager.changeGroupMembership("testRemoveGroup", Lists.newArrayList("groupMember"), null);
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> manager.removeGroup("testRemoveGroup", false));
+        NonEmptyEntityException.class, () -> manager.removeGroup("testRemoveGroup", false));
 
     manager.changeGroupMembership("testRemoveGroup", null, Lists.newArrayList("groupMember"));
     Assertions.assertTrue(manager.removeGroup("testRemoveGroup", false));

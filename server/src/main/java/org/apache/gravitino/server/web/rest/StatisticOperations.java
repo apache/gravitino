@@ -119,7 +119,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Listing statistics is only supported for tables now.");
             }
 
@@ -170,7 +170,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Update statistics is only supported for tables now.");
             }
 
@@ -227,7 +227,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Dropping statistics is only supported for tables now.");
             }
 
@@ -280,7 +280,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Listing partition statistics is only supported for tables now.");
             }
 
@@ -364,7 +364,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Updating partition statistics is only supported for tables now.");
             }
 
@@ -430,7 +430,7 @@ public class StatisticOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
-              throw new UnsupportedOperationException(
+              throw new IllegalArgumentException(
                   "Dropping partition statistics is only supported for tables now.");
             }
 

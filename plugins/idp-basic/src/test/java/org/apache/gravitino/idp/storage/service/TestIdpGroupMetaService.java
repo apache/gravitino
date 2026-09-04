@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.junit.jupiter.api.Tag;
@@ -121,7 +122,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
     assertThrows(
-        IllegalStateException.class, () -> groupMetaService.deleteIdpGroup("group1", false));
+        NonEmptyEntityException.class, () -> groupMetaService.deleteIdpGroup("group1", false));
 
     runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1", true)));
     assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
