@@ -144,7 +144,6 @@ dependencies {
     testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
-    testImplementation(libs.doris.spark.connector)
   }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client

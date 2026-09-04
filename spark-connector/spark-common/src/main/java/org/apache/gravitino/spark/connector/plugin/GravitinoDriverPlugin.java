@@ -168,30 +168,24 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                   && !enablePaimonSupport) {
                 return;
               }
-              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT)) && !enableDorisSupport) {
-                // Keep the existing generic JDBC behavior when the specialized adapter is not
-                // explicitly enabled. The provider-specific mapping is reserved for the opt-in
-                // Doris path below.
-                try {
-                  registerCatalog(sparkConf, catalogName, "jdbc");
-                } catch (Exception e) {
-                  LOG.warn("Register catalog {} failed.", catalogName, e);
+              String registrationProvider = provider;
+              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))) {
+                if (!enableDorisSupport) {
+                  // Keep the existing generic JDBC behavior unless the specialized adapter is
+                  // explicitly enabled.
+                  registrationProvider = "jdbc";
+                } else {
+                  if (StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))
+                      || !isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION())) {
+                    throw new IllegalArgumentException(
+                        "Apache Doris Spark support requires Spark 3.5.3 or newer in the Spark 3.5 "
+                            + "line with Scala 2.12");
+                  }
+                  validateDorisDependency(Thread.currentThread().getContextClassLoader());
                 }
-                return;
-              }
-              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))
-                  && enableDorisSupport
-                  && (StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))
-                      || !isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION()))) {
-                throw new IllegalArgumentException(
-                    "Apache Doris Spark support requires Spark 3.5.3 or newer in the Spark 3.5 "
-                        + "line with Scala 2.12");
-              }
-              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT)) && enableDorisSupport) {
-                validateDorisDependency(Thread.currentThread().getContextClassLoader());
               }
               try {
-                registerCatalog(sparkConf, catalogName, provider);
+                registerCatalog(sparkConf, catalogName, registrationProvider);
               } catch (Exception e) {
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
