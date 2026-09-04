@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -64,6 +65,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
 import org.lance.index.IndexOptions;
@@ -471,6 +474,111 @@ public class TestLanceTableOperations {
 
     Assertions.assertEquals("9", alteredTable.properties().get(LANCE_TABLE_VERSION));
     Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+  }
+
+  @ParameterizedTest(name = "recordedVersion={0}")
+  @ValueSource(booleans = {false, true})
+  public void testAlterTableHydratesRegisteredSchemaBeforeRecordingVersion(boolean recordedVersion)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("alter-registered-table-" + recordedVersion).toString();
+    Map<String, String> properties =
+        recordedVersion
+            ? Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_REGISTER,
+                Boolean.TRUE.toString(),
+                LANCE_TABLE_VERSION,
+                "2")
+            : Map.of(
+                Table.PROPERTY_LOCATION, location, LANCE_TABLE_REGISTER, Boolean.TRUE.toString());
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    stubMutableTable(ident, storedTable);
+    when(idGenerator.nextId()).thenReturn(10L);
+
+    Dataset schemaDataset = mock(Dataset.class);
+    when(schemaDataset.version()).thenReturn(3L);
+    when(schemaDataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("embedding", new ArrowType.Utf8()))));
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doReturn(schemaDataset, alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    Table alteredTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertEquals(1, alteredTable.columns().length);
+    Assertions.assertEquals("embedding", alteredTable.columns()[0].name());
+    Assertions.assertEquals("4", alteredTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals(1, alteredTable.index().length);
+    Assertions.assertEquals("embedding_idx", alteredTable.index()[0].name());
+    Assertions.assertEquals(1, storedTable.get().columns().size());
+    Assertions.assertEquals("4", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+
+    InOrder inOrder = Mockito.inOrder(schemaDataset, alterDataset);
+    inOrder.verify(schemaDataset).getSchema();
+    inOrder.verify(alterDataset).createIndex(any(IndexOptions.class));
+    inOrder.verify(alterDataset).getVersion();
+    verify(store, Mockito.times(2))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testAlterTableStopsWhenRegisteredSchemaCannotBeHydrated() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("unavailable-registered-table").toString();
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_REGISTER,
+                    Boolean.TRUE.toString(),
+                    LANCE_TABLE_VERSION,
+                    "3")));
+    stubMutableTable(ident, storedTable);
+
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doThrow(new RuntimeException("storage unavailable"))
+        .doReturn(alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    IllegalStateException failure =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertTrue(failure.getMessage().contains("schema"));
+    Assertions.assertEquals("storage unavailable", failure.getCause().getMessage());
+    Assertions.assertTrue(storedTable.get().columns().isEmpty());
+    Assertions.assertEquals("3", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+    verify(lanceTableOps).openDataset(location, Map.of());
+    verify(alterDataset, never()).createIndex(any(IndexOptions.class));
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   @Test
@@ -954,4 +1062,49 @@ public class TestLanceTableOperations {
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
   }
+<<<<<<< HEAD
+=======
+
+  private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)
+      throws IOException {
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> storedTable.get());
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(storedTable.get());
+              storedTable.set(updated);
+              return updated;
+            });
+  }
+
+  private NameIdentifier prepareDeclaredTableForRepair(String directoryName) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve(directoryName).toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_DECLARED,
+                "true",
+                LANCE_STORAGE_OPTIONS_PREFIX + "endpoint",
+                "http://endpoint"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(8L);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of("endpoint", "http://endpoint"));
+    return ident;
+  }
+>>>>>>> 1db489458 ([#12407] fix(lance): Hydrate empty schema before table alteration (#12895))
 }
