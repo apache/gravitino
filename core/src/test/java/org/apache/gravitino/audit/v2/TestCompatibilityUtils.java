@@ -195,6 +195,11 @@ public class TestCompatibilityUtils {
         Operation.ASSOCIATE_POLICIES_FOR_METADATA_OBJECT
       },
       {OperationType.GET_POLICY_FOR_METADATA_OBJECT, Operation.GET_POLICY_FOR_METADATA_OBJECT},
+      {OperationType.CREATE_SEMANTIC_MODEL, Operation.CREATE_SEMANTIC_MODEL},
+      {OperationType.ALTER_SEMANTIC_MODEL, Operation.ALTER_SEMANTIC_MODEL},
+      {OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL},
+      {OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL},
+      {OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL},
       {OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION},
       {OperationType.GET_FUNCTION, Operation.GET_FUNCTION},
       {OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION},

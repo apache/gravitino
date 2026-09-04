@@ -192,6 +192,11 @@ public class CompatibilityUtils {
           .put(
               OperationType.GET_POLICY_FOR_METADATA_OBJECT,
               Operation.GET_POLICY_FOR_METADATA_OBJECT)
+          .put(OperationType.CREATE_SEMANTIC_MODEL, Operation.CREATE_SEMANTIC_MODEL)
+          .put(OperationType.ALTER_SEMANTIC_MODEL, Operation.ALTER_SEMANTIC_MODEL)
+          .put(OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL)
+          .put(OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL)
+          .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
           .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
           .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)
