@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTOs;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -255,12 +256,7 @@ public class TableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          """
-              ANY(OWNER, METALAKE, CATALOG) ||
-              SCHEMA_OWNER_WITH_USE_CATALOG ||
-              ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER
-              """,
+      expression = DROP_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

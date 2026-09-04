@@ -31,6 +31,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -40,11 +42,29 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.server.web.VersioningFilter.MutableHttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 public class TestVersioningFilter {
+
+  private static StringWriter stubWriter(HttpServletResponse mockResponse) throws IOException {
+    StringWriter stringWriter = new StringWriter();
+    when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    return stringWriter;
+  }
+
+  private static void assertUnsupportedVersionResponse(
+      HttpServletResponse mockResponse, StringWriter writer) throws IOException {
+    verify(mockResponse).setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+    verify(mockResponse).setContentType("application/json");
+    ErrorResponse errorResponse =
+        ObjectMapperProvider.objectMapper().readValue(writer.toString(), ErrorResponse.class);
+    assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    assertTrue(errorResponse.getMessage().contains("Unsupported version"));
+  }
 
   @Test
   public void testDoFilterWithSupportedVersion() throws ServletException, IOException {
@@ -75,11 +95,12 @@ public class TestVersioningFilter {
         .thenReturn(
             new Vector<>(Collections.singletonList("application/vnd.gravitino.v2+json"))
                 .elements());
+    StringWriter writer = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
 
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer);
   }
 
   @Test
@@ -145,10 +166,11 @@ public class TestVersioningFilter {
     verify(mockChain).doFilter(any(), any());
 
     reset(mockChain, mockResponse);
+    StringWriter writer = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer);
   }
 
   @Test
@@ -229,16 +251,18 @@ public class TestVersioningFilter {
     verify(mockChain).doFilter(any(), any());
 
     reset(mockChain, mockResponse);
+    StringWriter writer1 = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer1);
 
     reset(mockChain, mockResponse);
+    StringWriter writer2 = stubWriter(mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer2);
   }
 
   @Test
@@ -285,9 +309,10 @@ public class TestVersioningFilter {
                         "application/vnd.gravitino.v2+json, application/json"))
                 .elements());
 
+    StringWriter writer1 = stubWriter(mockResponse);
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer1);
 
     reset(mockChain, mockResponse);
 
@@ -297,8 +322,9 @@ public class TestVersioningFilter {
                     Collections.singletonList(
                         "application/vnd.gravitino.v3+json; q=0.9, application/json"))
                 .elements());
+    StringWriter writer2 = stubWriter(mockResponse);
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    assertUnsupportedVersionResponse(mockResponse, writer2);
   }
 }
