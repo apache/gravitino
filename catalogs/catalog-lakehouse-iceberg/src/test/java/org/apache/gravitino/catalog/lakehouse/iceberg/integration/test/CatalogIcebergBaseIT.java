@@ -257,6 +257,11 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     catalog = loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(schemaName);
     Map<String, String> prop = Maps.newHashMap();

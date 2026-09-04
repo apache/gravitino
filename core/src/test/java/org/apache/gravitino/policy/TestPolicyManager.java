@@ -355,6 +355,61 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testAlterBuiltInPolicyContent() {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    policyManager.createPolicy(
+        METALAKE,
+        policyName,
+        Policy.BuiltInType.ICEBERG_COMPACTION,
+        null,
+        true,
+        PolicyContents.icebergDataCompaction());
+
+    // Adding a type not in the original set must be rejected.
+    Set<MetadataObject.Type> withExtra =
+        ImmutableSet.of(
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.FILESET);
+    PolicyContent addedType = PolicyContents.custom(ImmutableMap.of(), withExtra, null);
+    IllegalArgumentException addEx =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                policyManager.alterPolicy(
+                    METALAKE,
+                    policyName,
+                    PolicyChange.updateContent("system_iceberg_compaction", addedType)));
+    Assertions.assertTrue(
+        addEx.getMessage().contains("Policy content type mismatch"),
+        "expected mismatch message, got: " + addEx.getMessage());
+    // Format arguments must be substituted — neither placeholder should survive literally.
+    Assertions.assertFalse(
+        addEx.getMessage().contains("%s"),
+        "format args were not substituted: " + addEx.getMessage());
+
+    // Removing a type must equally be rejected.
+    Set<MetadataObject.Type> withFewer =
+        ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA);
+    PolicyContent removedType = PolicyContents.custom(ImmutableMap.of(), withFewer, null);
+    IllegalArgumentException removeEx =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                policyManager.alterPolicy(
+                    METALAKE,
+                    policyName,
+                    PolicyChange.updateContent("system_iceberg_compaction", removedType)));
+    Assertions.assertTrue(
+        removeEx.getMessage().contains("Policy content type mismatch"),
+        "expected mismatch message, got: " + removeEx.getMessage());
+    Assertions.assertFalse(
+        removeEx.getMessage().contains("%s"),
+        "format args were not substituted: " + removeEx.getMessage());
+  }
+
+  @Test
   public void testDeletePolicy() {
     String policyName = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");

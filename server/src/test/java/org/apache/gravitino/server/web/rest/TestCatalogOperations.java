@@ -30,6 +30,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -37,6 +39,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -44,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -63,6 +67,8 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
@@ -76,6 +82,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestCatalogOperations extends BaseOperationsTest {
@@ -313,6 +320,20 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testTestConnectionWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    // A missing request body never reaches the connection test, so it is reported as a regular
+    // HTTP 400 rather than through the HTTP 200 envelope used for connection-test failures.
+    assertNullRequestBodyRejected(resp);
+    verify(manager, never()).testConnection(any(), any(), any(), any(), any());
+  }
+
+  @Test
   public void testConnection() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -350,6 +371,125 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    ConnectionFailedException legacyFailure =
+        new ConnectionFailedException(
+            new IllegalStateException("database connection detail"), "connection failed");
+    doThrow(legacyFailure).when(manager).testConnection(any(), any(), any(), any(), any());
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    ErrorResponse connectionError = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, connectionError.getCode());
+    Assertions.assertNotNull(connectionError.getStack());
+    Assertions.assertTrue(
+        String.join("\n", connectionError.getStack()).contains("database connection detail"));
+  }
+
+  @Test
+  public void testExistingCatalogConnection() {
+    doNothing().when(manager).testConnection(any(NameIdentifier.class));
+    Response response =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(0, response.readEntity(BaseResponse.class).getCode());
+
+    CatalogUpdatesRequest proposedChanges =
+        new CatalogUpdatesRequest(
+            ImmutableList.of(
+                new CatalogUpdateRequest.RenameCatalogRequest("catalog2"),
+                new CatalogUpdateRequest.UpdateCatalogCommentRequest("new comment"),
+                new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "new value"),
+                new CatalogUpdateRequest.RemoveCatalogPropertyRequest("old-key")));
+    doNothing().when(manager).testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response changedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), changedResponse.getStatus());
+    Assertions.assertEquals(0, changedResponse.readEntity(BaseResponse.class).getCode());
+    ArgumentCaptor<CatalogChange[]> changesCaptor = ArgumentCaptor.forClass(CatalogChange[].class);
+    Mockito.verify(manager).testConnection(any(NameIdentifier.class), changesCaptor.capture());
+    Assertions.assertArrayEquals(
+        new CatalogChange[] {
+          CatalogChange.rename("catalog2"),
+          CatalogChange.updateComment("new comment"),
+          CatalogChange.setProperty("key", "new value"),
+          CatalogChange.removeProperty("old-key")
+        },
+        changesCaptor.getValue());
+
+    doThrow(new IllegalArgumentException("invalid proposed change"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response invalidChangesResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), invalidChangesResponse.getStatus());
+    ErrorResponse invalidChanges = invalidChangesResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, invalidChanges.getCode());
+    Assertions.assertEquals("invalid proposed change", invalidChanges.getMessage());
+    Assertions.assertNull(invalidChanges.getStack());
+
+    doThrow(new ConnectionFailedException("sanitized failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), failedResponse.getStatus());
+    ErrorResponse errorResponse = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, errorResponse.getCode());
+    Assertions.assertEquals("sanitized failure", errorResponse.getMessage());
+    Assertions.assertNull(errorResponse.getStack());
+
+    doThrow(new UnsupportedOperationException("unsupported"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response unsupportedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    ErrorResponse unsupported = unsupportedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, unsupported.getCode());
+    Assertions.assertNull(unsupported.getStack());
+
+    assertExistingCatalogConnectionError(
+        new IllegalArgumentException("invalid catalog configuration"),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertExistingCatalogConnectionError(
+        new NoSuchCatalogException("catalog does not exist"), ErrorConstants.NOT_FOUND_CODE);
+    assertExistingCatalogConnectionError(
+        new CatalogNotInUseException("catalog is not in use"), ErrorConstants.NOT_IN_USE_CODE);
+
+    doThrow(new RuntimeException("unexpected failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response internalErrorResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    Assertions.assertEquals(
+        INTERNAL_SERVER_ERROR.getStatusCode(), internalErrorResponse.getStatus());
+    ErrorResponse internalError = internalErrorResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, internalError.getCode());
+    Assertions.assertEquals("unexpected failure", internalError.getMessage());
+    Assertions.assertNull(internalError.getStack());
   }
 
   @Test
@@ -608,6 +748,52 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testSetCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  private static TestCatalog buildCatalogWithProperties(
+      String metalake, String catalogName, Map<String, String> properties) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withComment("comment")
+            .withNamespace(Namespace.of(metalake))
+            .withProperties(properties)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
+  }
+
+  private void assertExistingCatalogConnectionError(RuntimeException exception, int expectedCode) {
+    doThrow(exception).when(manager).testConnection(any(NameIdentifier.class));
+    Response response =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(expectedCode, errorResponse.getCode());
+    Assertions.assertEquals(exception.getClass().getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals(exception.getMessage(), errorResponse.getMessage());
+    Assertions.assertNull(errorResponse.getStack());
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

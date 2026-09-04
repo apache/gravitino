@@ -120,6 +120,10 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def disable_catalog(self, name: str):
         return self.get_metalake().disable_catalog(name)
 
+    def test_connection(self, name: str, *changes: CatalogChange) -> None:
+        """Test an existing catalog connection with optional proposed changes."""
+        self.get_metalake().test_connection(name, *changes)
+
     def list_job_templates(self) -> List[JobTemplate]:
         """Lists all job templates in the current metalake.
 

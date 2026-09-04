@@ -650,12 +650,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               .build();
 
       CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
-      wrapper.doWithCatalogOps(
-          c -> {
-            c.testConnection(ident, type, provider, comment, mergedConfig);
-            return null;
-          });
-    } catch (GravitinoRuntimeException e) {
+      try {
+        wrapper.doWithCatalogOps(
+            c -> {
+              c.testConnection(ident, type, provider, comment, mergedConfig);
+              return null;
+            });
+      } finally {
+        wrapper.close();
+      }
+    } catch (GravitinoRuntimeException | UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
       LOG.warn("Failed to test catalog creation {}", ident, e);
@@ -664,6 +668,109 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       }
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param ident The identifier of the existing catalog.
+   */
+  @Override
+  public void testConnection(NameIdentifier ident) {
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          CatalogWrapper wrapper = loadCatalogAndWrap(ident);
+          wrapper.catalog().checkMetalakeAndCatalogInUse();
+          try {
+            wrapper.doWithCatalogOps(
+                c -> {
+                  c.testConnection(ident);
+                  return null;
+                });
+          } catch (UnsupportedOperationException e) {
+            throw e;
+          } catch (Exception e) {
+            LOG.warn("Failed to test existing catalog connection {}", ident, e);
+            if (e instanceof RuntimeException) {
+              throw (RuntimeException) e;
+            }
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
+  }
+
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param ident The identifier of the existing catalog.
+   * @param changes The proposed changes to apply temporarily.
+   */
+  @Override
+  public void testConnection(NameIdentifier ident, CatalogChange... changes) {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(ident);
+      return;
+    }
+
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          CatalogWrapper storedWrapper = loadCatalogAndWrap(ident);
+          BaseCatalog<?> storedCatalog = storedWrapper.catalog();
+          storedCatalog.checkMetalakeAndCatalogInUse();
+          try {
+            storedWrapper.doWithPropertiesMeta(
+                metadata -> {
+                  Pair<Map<String, String>, Map<String, String>> alterProperty =
+                      getCatalogAlterProperty(changes);
+                  validatePropertyForAlter(
+                      metadata.catalogPropertiesMetadata(),
+                      alterProperty.getLeft(),
+                      alterProperty.getRight());
+                  return null;
+                });
+
+            CatalogEntity storedEntity = storedCatalog.entity();
+            Map<String, String> effectiveProperties =
+                storedEntity.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(storedEntity.getProperties());
+            CatalogEntity effectiveEntity =
+                updateEntity(
+                        newCatalogBuilder(storedEntity.namespace(), storedEntity),
+                        effectiveProperties,
+                        changes)
+                    .build();
+            effectiveEntity = convertFilesetCatalogEntity(effectiveEntity);
+
+            CatalogWrapper temporaryWrapper = createCatalogWrapper(effectiveEntity, null);
+            try {
+              NameIdentifier effectiveIdent = effectiveEntity.nameIdentifier();
+              temporaryWrapper.doWithCatalogOps(
+                  operations -> {
+                    operations.testConnection(effectiveIdent);
+                    return null;
+                  });
+            } finally {
+              temporaryWrapper.close();
+            }
+          } catch (UnsupportedOperationException e) {
+            throw e;
+          } catch (Exception e) {
+            LOG.warn(
+                "Failed to test existing catalog connection {} with proposed changes", ident, e);
+            if (e instanceof RuntimeException) {
+              throw (RuntimeException) e;
+            }
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
   }
 
   @Override

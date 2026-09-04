@@ -168,6 +168,7 @@ public class FilesetOSSCatalogIT extends FilesetCatalogIT {
                 ImmutableMap.of("k1", "v1"));
     Assertions.assertEquals(
         ossLocation + "/local_schema/local_fileset", localFileset.storageLocation());
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(localCatalogName));
 
     // Delete schema
     localCatalog.asSchemas().dropSchema(localSchema.name(), true);

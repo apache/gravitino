@@ -163,6 +163,11 @@ public class PaimonCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       paimonCatalogOps.listDatabases();
     } catch (Exception e) {

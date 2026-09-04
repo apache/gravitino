@@ -168,6 +168,16 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public void testConnection(NameIdentifier ident) throws Exception {
+    dispatcher.testConnection(ident);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
+    dispatcher.testConnection(ident, changes);
+  }
+
+  @Override
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
     dispatcher.enableCatalog(ident);

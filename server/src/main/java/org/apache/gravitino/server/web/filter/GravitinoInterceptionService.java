@@ -73,6 +73,7 @@ import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
+import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -95,6 +96,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
+            ViewOperations.class.getName(),
             ModelOperations.class.getName(),
             FunctionOperations.class.getName(),
             TopicOperations.class.getName(),

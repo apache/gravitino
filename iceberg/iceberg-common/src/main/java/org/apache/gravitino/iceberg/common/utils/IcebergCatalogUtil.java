@@ -121,6 +121,14 @@ public class IcebergCatalogUtil {
     // explicit config.
     properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "true");
 
+    // Add SQLSTATE 08S01 (Communication link failure) to retryable status codes so that
+    // idle connections dropped by MySQL wait_timeout are automatically retried instead of
+    // failing with CommunicationsException.
+    String existing = properties.putIfAbsent("retryable_status_codes", "08S01");
+    if (existing != null && !existing.contains("08S01")) {
+      properties.put("retryable_status_codes", existing + ",08S01");
+    }
+
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);

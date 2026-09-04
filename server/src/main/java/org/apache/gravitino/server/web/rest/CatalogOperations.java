@@ -188,6 +188,13 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+    if (request == null) {
+      // Unlike a failed connection test, which handleTestConnectionException() reports inside an
+      // HTTP 200 response by design, a missing request body never reaches the connection test, so
+      // it is rejected with a regular HTTP 400.
+      return Utils.illegalArguments("Request body cannot be null");
+    }
+
     LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
     try {
       return Utils.doAs(
@@ -213,6 +220,48 @@ public class CatalogOperations {
     }
   }
 
+  @POST
+  @Path("{catalog}/testConnection")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
+  @ResponseMetered(name = "test-existing-connection", absolute = true)
+  public Response testExistingConnection(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName,
+      CatalogUpdatesRequest request) {
+    LOG.info("Received test connection request for existing catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            if (request == null) {
+              catalogDispatcher.testConnection(ident);
+            } else {
+              request.validate();
+              CatalogChange[] changes =
+                  request.getUpdates().stream()
+                      .map(CatalogUpdateRequest::catalogChange)
+                      .toArray(CatalogChange[]::new);
+              catalogDispatcher.testConnection(ident, changes);
+            }
+            LOG.info(
+                "Successfully tested connection for existing catalog: {}.{}",
+                metalake,
+                catalogName);
+            return Utils.ok(new BaseResponse());
+          });
+    } catch (Exception e) {
+      LOG.info("Failed to test connection for existing catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleExistingCatalogTestConnectionException(e);
+    }
+  }
+
   @PATCH
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -227,8 +276,15 @@ public class CatalogOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       CatalogSetRequest request) {
-    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.SET,
+          catalogName,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
+    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
