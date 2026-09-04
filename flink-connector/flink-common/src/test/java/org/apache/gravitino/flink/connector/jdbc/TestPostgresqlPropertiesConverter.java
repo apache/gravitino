@@ -46,6 +46,8 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
     Map<String, String> catalogPropertiesWithDatabase = new HashMap<>(catalogProperties);
     catalogPropertiesWithDatabase.remove(FLINK_BYPASS_DEFAULT_DATABASE);
     catalogPropertiesWithDatabase.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_URL, gravitinoUrlWithDomain);
+    catalogPropertiesWithDatabase.put(
         JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, jdbcDatabase);
 
     // Mirrors the production call in BaseCatalog#toFlinkTable: the first argument is the Flink
@@ -61,7 +63,7 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
 
     // The connection URL must target the PostgreSQL database (jdbc-database), not the schema.
     Assertions.assertEquals(
-        flinkUrl + jdbcDatabase,
+        flinkUrlWithDomain + jdbcDatabase,
         tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
     // The schema must be carried via the schema-qualified table name instead.
     Assertions.assertEquals(
@@ -76,6 +78,8 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
     String explicitDefaultDatabase = "explicit_db";
     Map<String, String> catalogPropertiesWithBoth = new HashMap<>(catalogProperties);
     catalogPropertiesWithBoth.put(FLINK_BYPASS_DEFAULT_DATABASE, explicitDefaultDatabase);
+    catalogPropertiesWithBoth.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_URL, gravitinoUrlWithDomain);
     catalogPropertiesWithBoth.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "gravitino");
 
     Map<String, String> flinkCatalogProperties =
@@ -86,7 +90,7 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
                 flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t"));
 
     Assertions.assertEquals(
-        flinkUrl + explicitDefaultDatabase,
+        flinkUrlWithDomain + explicitDefaultDatabase,
         tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
   }
 
