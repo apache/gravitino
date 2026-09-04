@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -36,6 +37,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,6 +125,50 @@ public class VersioningFilter implements Filter {
     chain.doFilter(mutableRequest, response);
   }
 
+<<<<<<< HEAD
+=======
+  private static Integer versionFromHeaders(Enumeration<String> headers) {
+    while (headers.hasMoreElements()) {
+      Integer version = versionFromHeader(headers.nextElement());
+      if (version != null) {
+        return version;
+      }
+    }
+
+    return null;
+  }
+
+  private static Integer versionFromHeader(String value) {
+    if (value == null) {
+      return null;
+    }
+
+    Matcher matcher = VERSIONED_JSON_MEDIA_TYPE_REGEX.matcher(value);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
+  }
+
+  private static boolean isUnsupportedVersion(int version, ServletResponse response)
+      throws IOException {
+    if (ApiVersion.isSupportedVersion(version)) {
+      return false;
+    }
+
+    LOG.error("Unsupported version v{} in request header.", version);
+    String message = String.format("Unsupported version v%d in request header", version);
+    ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
+
+    // Write the JSON ErrorResponse directly instead of calling HttpServletResponse#sendError, so
+    // this filter -- which runs before Jersey ever sees the request -- doesn't fall through to
+    // Jetty's default HTML error page.
+    HttpServletResponse resp = (HttpServletResponse) response;
+    resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+    resp.setContentType("application/json");
+    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
+    return true;
+  }
+
+>>>>>>> deb1e2d21 ([#12783] fix(server): return JSON errors for the whole pre-resource-method WebApplicationException family (#12878))
   @Override
   public void destroy() {}
 }
