@@ -1062,8 +1062,6 @@ public class TestLanceTableOperations {
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
   }
-<<<<<<< HEAD
-=======
 
   private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)
       throws IOException {
@@ -1079,32 +1077,4 @@ public class TestLanceTableOperations {
               return updated;
             });
   }
-
-  private NameIdentifier prepareDeclaredTableForRepair(String directoryName) throws Exception {
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve(directoryName).toString();
-    TableEntity tableEntity =
-        tableEntity(
-            ident,
-            List.of(),
-            Map.of(
-                Table.PROPERTY_LOCATION,
-                location,
-                LANCE_TABLE_DECLARED,
-                "true",
-                LANCE_STORAGE_OPTIONS_PREFIX + "endpoint",
-                "http://endpoint"));
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.getSchema())
-        .thenReturn(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))));
-    when(dataset.version()).thenReturn(8L);
-    Mockito.doReturn(dataset)
-        .when(lanceTableOps)
-        .openDataset(location, Map.of("endpoint", "http://endpoint"));
-    return ident;
-  }
->>>>>>> 1db489458 ([#12407] fix(lance): Hydrate empty schema before table alteration (#12895))
 }
