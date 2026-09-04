@@ -31,9 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -318,6 +324,60 @@ public class CatalogDoris4xIT extends BaseIT {
   }
 
   @Test
+  void testNativeNgramBfIndexFailsClosed() throws Exception {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_ngram_bf");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String indexName = "PRIMARY";
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_4_0);
+    String jdbcUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/%s",
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort(), schemaName);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          String.format(
+              "CREATE INDEX `%s` ON `%s` (`%s`) USING NGRAM_BF "
+                  + "PROPERTIES(\"gram_size\"=\"3\", \"bf_size\"=\"256\")",
+              indexName, tableName, colName2));
+
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  assertEquals(
+                      "NGRAM_BF", getNativeIndexMetadata(statement, tableName, indexName).get(0)));
+
+      List<String> metadataBefore = getNativeIndexMetadata(statement, tableName, indexName);
+      UnsupportedOperationException exception =
+          assertThrows(UnsupportedOperationException.class, () -> tc.loadTable(tid));
+
+      assertTrue(exception.getMessage().contains(schemaName));
+      assertTrue(exception.getMessage().contains(tableName));
+      assertTrue(exception.getMessage().contains(indexName));
+      assertTrue(exception.getMessage().contains("NGRAM_BF"));
+      assertFalse(exception.getMessage().contains("gram_size"));
+      assertFalse(exception.getMessage().contains("bf_size"));
+      assertEquals(metadataBefore, getNativeIndexMetadata(statement, tableName, indexName));
+    }
+  }
+
+  @Test
   void testExternalTypeRoundTrip() {
     // Verify ExternalType columns survive the create → Doris 4.0 → load round-trip.
     //
@@ -572,6 +632,20 @@ public class CatalogDoris4xIT extends BaseIT {
                 assertTrue(
                     tc.loadTable(tid).properties().containsKey(LIGHT_SCHEMA_CHANGE),
                     "light_schema_change=true should appear after ALTER TABLE SET"));
+  }
+
+  private List<String> getNativeIndexMetadata(
+      Statement statement, String tableName, String indexName) throws SQLException {
+    try (ResultSet resultSet =
+        statement.executeQuery(String.format("SHOW INDEX FROM `%s`", tableName))) {
+      while (resultSet.next()) {
+        if (indexName.equals(resultSet.getString("Key_name"))) {
+          return Arrays.asList(
+              resultSet.getString("Index_type"), resultSet.getString("Properties"));
+        }
+      }
+    }
+    throw new AssertionError("Index not found: " + indexName);
   }
 
   private Column findColumn(Table table, String columnName) {
