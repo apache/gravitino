@@ -79,6 +79,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
@@ -1011,6 +1012,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              try {
+                catalogWrapper.doWithCatalogOps(
+                    operations -> {
+                      if (operations instanceof CatalogDropAware) {
+                        ((CatalogDropAware) operations).onCatalogDropped();
+                      }
+                      return null;
+                    });
+              } catch (Exception e) {
+                LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
+              }
             }
             catalogCache.invalidate(ident);
             return deleted;

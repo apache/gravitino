@@ -35,10 +35,12 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -583,5 +585,35 @@ public class TestDynamicIcebergConfigProvider {
 
     executor.shutdown();
     executor.awaitTermination(5, TimeUnit.SECONDS);
+  }
+
+  @Test
+  public void testAuxiliaryCatalogConfigIncludesCatalogUuid() {
+    String metalakeName = "test_metalake";
+    String catalogName = "memory_catalog";
+    Map<String, String> catalogProperties =
+        Map.of(
+            IcebergConstants.CATALOG_BACKEND,
+            "memory",
+            IcebergConstants.CATALOG_BACKEND_NAME,
+            catalogName);
+
+    @SuppressWarnings("unchecked")
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    CatalogEntity catalogEntity = Mockito.mock(CatalogEntity.class);
+    Mockito.when(baseCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(baseCatalog.propertiesWithCredentialProviders()).thenReturn(catalogProperties);
+    Mockito.when(baseCatalog.entity()).thenReturn(catalogEntity);
+    Mockito.when(catalogEntity.id()).thenReturn(9L);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(Map.of(IcebergConstants.GRAVITINO_METALAKE, metalakeName));
+    setMockCatalogFetcher(provider, Map.of(catalogName, baseCatalog));
+
+    Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
+
+    Assertions.assertTrue(config.isPresent());
+    Assertions.assertEquals(
+        "9", config.get().getIcebergCatalogProperties().get(IcebergConstants.CATALOG_UUID));
   }
 }

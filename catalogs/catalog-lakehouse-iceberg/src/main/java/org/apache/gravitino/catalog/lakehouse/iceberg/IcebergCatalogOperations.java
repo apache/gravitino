@@ -31,12 +31,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
+import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -56,6 +58,7 @@ import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -90,7 +93,7 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog, CatalogDropAware {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -98,6 +101,7 @@ public class IcebergCatalogOperations
 
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
 
+  @VisibleForTesting @Nullable String catalogUuid;
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
@@ -122,7 +126,8 @@ public class IcebergCatalogOperations
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
-    resultConf.put("catalog_uuid", info.id().toString());
+    this.catalogUuid = info.id().toString();
+    resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
@@ -135,6 +140,13 @@ public class IcebergCatalogOperations
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
+  }
+
+  @Override
+  public void onCatalogDropped() {
+    if (catalogUuid != null) {
+      IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    }
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */

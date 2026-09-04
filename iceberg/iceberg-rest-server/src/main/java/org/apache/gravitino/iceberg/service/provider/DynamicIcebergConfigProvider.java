@@ -116,7 +116,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // fields into the properties map so the JDBC backend can connect.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
-      catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
+      BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
+      catalogProperties = new HashMap<>(baseCatalog.propertiesWithCredentialProviders());
+      catalogProperties.put(IcebergConstants.CATALOG_UUID, baseCatalog.entity().id().toString());
     } else {
       catalogProperties = new HashMap<>(catalog.properties());
       if (catalog instanceof SupportsCredentials) {
