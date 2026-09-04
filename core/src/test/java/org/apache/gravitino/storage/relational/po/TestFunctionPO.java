@@ -18,6 +18,14 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -88,6 +96,57 @@ public class TestFunctionPO {
 
     Assertions.assertEquals(1L, functionMaxVersionPO.functionId());
     Assertions.assertEquals(1L, functionMaxVersionPO.version());
+  }
+
+  @Test
+  public void testLoadLegacyUnparsedFunctionDefinition() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreator("legacy-user")
+            .withCreateTime(Instant.parse("2025-01-01T00:00:00Z"))
+            .build();
+    String auditJson = JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
+    String definitions =
+        """
+        [{
+          "parameters": [{"name": "input", "dataType": "legacy_parameter"}],
+          "returnType": "legacy_return",
+          "impls": [{"language": "SQL", "runtime": "SPARK", "sql": "SELECT input"}]
+        }]
+        """;
+    FunctionVersionPO versionPO =
+        FunctionVersionPO.builder()
+            .withFunctionId(1L)
+            .withMetalakeId(1L)
+            .withCatalogId(2L)
+            .withSchemaId(3L)
+            .withFunctionVersion(1)
+            .withDefinitions(definitions)
+            .withAuditInfo(auditJson)
+            .withDeletedAt(0L)
+            .build();
+    FunctionPO functionPO =
+        FunctionPO.builder()
+            .withFunctionId(1L)
+            .withFunctionName("legacy_function")
+            .withMetalakeId(1L)
+            .withCatalogId(2L)
+            .withSchemaId(3L)
+            .withFunctionType("SCALAR")
+            .withDeterministic(1)
+            .withFunctionLatestVersion(1)
+            .withFunctionCurrentVersion(1)
+            .withAuditInfo(auditJson)
+            .withDeletedAt(0L)
+            .withFunctionVersionPO(versionPO)
+            .build();
+
+    FunctionEntity function =
+        FunctionPO.fromFunctionPO(functionPO, Namespace.of("metalake", "catalog", "schema"));
+    FunctionDefinition definition = function.definitions()[0];
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_parameter"), definition.parameters()[0].dataType());
+    Assertions.assertEquals(Types.UnparsedType.of("legacy_return"), definition.returnType());
   }
 
   @Test
