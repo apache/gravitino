@@ -120,7 +120,7 @@ public class TestFunctionOperationDispatcher {
 
     CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     when(wrapper.catalog()).thenReturn(catalog);
-    return wrapper;
+    return CatalogTestUtils.mockDetachConnectorResult(wrapper);
   }
 
   @SuppressWarnings("unchecked")

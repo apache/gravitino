@@ -370,6 +370,32 @@ public class TestCatalogWrapperLease {
   }
 
   @Test
+  public void testLeaseCallbackKeepsTheApplicationClassLoader() throws Exception {
+    NameIdentifier ident = createCatalog("callback_classloader");
+    ClassLoader applicationClassLoader = Thread.currentThread().getContextClassLoader();
+
+    ClassLoader[] observed = new ClassLoader[2];
+    catalogManager.doWithCatalogWrapper(
+        ident,
+        wrapper -> {
+          // Gravitino's own work inside the callback, entity-store reads above all, must not run
+          // with a connector ClassLoader installed: MyBatis and DriverManager resolve through the
+          // thread context ClassLoader and a catalog that bundles its own JDBC driver would win.
+          observed[0] = Thread.currentThread().getContextClassLoader();
+          // Connector calls still get the catalog ClassLoader, from the wrapper itself.
+          observed[1] = wrapper.doWithCatalog(c -> Thread.currentThread().getContextClassLoader());
+          return null;
+        });
+
+    Assertions.assertSame(applicationClassLoader, observed[0]);
+    Assertions.assertNotSame(applicationClassLoader, observed[1]);
+    Assertions.assertSame(
+        applicationClassLoader,
+        Thread.currentThread().getContextClassLoader(),
+        "the connector ClassLoader must be restored when the callback returns");
+  }
+
+  @Test
   public void testDoWithCatalogKeepsLeaseForEntireCallback() throws Exception {
     NameIdentifier ident = createCatalog("callback_with_lease");
     CountDownLatch callbackStarted = new CountDownLatch(1);

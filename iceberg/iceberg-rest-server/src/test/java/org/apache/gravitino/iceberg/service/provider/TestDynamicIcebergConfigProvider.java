@@ -304,6 +304,11 @@ public class TestDynamicIcebergConfigProvider {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    // The internal fetcher now hands resolveProps the live BaseCatalog, which reads the catalog
+    // entity to publish the Iceberg catalog UUID.
+    CatalogEntity mockCatalogEntity = Mockito.mock(CatalogEntity.class);
+    Mockito.when(mockCatalog.entity()).thenReturn(mockCatalogEntity);
+    Mockito.when(mockCatalogEntity.id()).thenReturn(7L);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
     mockDoWithCatalog(mockCatalogManager, mockCatalog);
@@ -517,6 +522,11 @@ public class TestDynamicIcebergConfigProvider {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    // The internal fetcher now hands resolveProps the live BaseCatalog, which reads the catalog
+    // entity to publish the Iceberg catalog UUID.
+    CatalogEntity mockCatalogEntity = Mockito.mock(CatalogEntity.class);
+    Mockito.when(mockCatalog.entity()).thenReturn(mockCatalogEntity);
+    Mockito.when(mockCatalogEntity.id()).thenReturn(7L);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
     mockDoWithCatalog(mockCatalogManager, mockCatalog);

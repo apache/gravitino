@@ -359,6 +359,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return doWithCatalog(fn);
     }
 
+    /**
+     * Converts a connector-backed result into a snapshot that no longer depends on this catalog's
+     * ClassLoader, reading the connector object with that ClassLoader installed.
+     *
+     * <p>Scoped to the conversion alone: the caller's surrounding work is Gravitino's own code and
+     * must keep the application ClassLoader as its thread context ClassLoader.
+     *
+     * @param result the value returned by a connector operation
+     * @param <R> the result type
+     * @return a detached snapshot, or the value itself if it carries no connector state
+     * @throws Exception if reading the connector object fails
+     */
+    <R> R detachConnectorResult(R result) throws Exception {
+      return classLoader.withClassLoader(ignored -> ConnectorObjectSnapshot.detach(result));
+    }
+
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
       return classLoader.withClassLoader(
           cl -> {
@@ -799,7 +815,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public <R> R doWithCatalog(NameIdentifier ident, ThrowableFunction<BaseCatalog, R> operation)
       throws NoSuchCatalogException {
     try {
-      return doWithCatalogWrapper(ident, wrapper -> operation.apply(wrapper.catalog()));
+      // wrapper.doWithCatalog installs the catalog ClassLoader: the operation runs against the
+      // connector's own catalog instance, for example to call its authorization plugin.
+      return doWithCatalogWrapper(ident, wrapper -> wrapper.doWithCatalog(operation));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -815,8 +833,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   <R> R doWithCatalogWrapper(NameIdentifier ident, ThrowableFunction<CatalogWrapper, R> operation)
       throws Exception {
     try (CatalogLease lease = acquireCatalogLease(ident)) {
-      CatalogWrapper wrapper = lease.wrapper();
-      return wrapper.classLoader.withClassLoader(ignored -> operation.apply(wrapper));
+      // Deliberately no ClassLoader swap around the whole callback. The wrapper's doWithXxxOps,
+      // doWithPropertiesMeta and capabilities() already install the catalog ClassLoader for the
+      // connector calls that need it, while the rest of the callback is Gravitino's own code:
+      // entity-store reads in particular must not run with a connector ClassLoader as the thread
+      // context ClassLoader, because MyBatis resolves resources and drivers through it and a
+      // catalog that bundles its own JDBC driver would win those lookups.
+      return operation.apply(lease.wrapper());
     }
   }
 

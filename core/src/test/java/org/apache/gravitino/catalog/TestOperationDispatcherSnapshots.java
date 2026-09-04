@@ -23,22 +23,34 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -66,6 +78,8 @@ class TestOperationDispatcherSnapshots {
             })
         .when(catalogManager)
         .doWithCatalogWrapper(any(), any());
+
+    CatalogTestUtils.mockDetachConnectorResult(wrapper);
 
     Table connectorTable = mock(Table.class);
     when(connectorTable.name()).thenAnswer(requireActive(callbackActive, "table"));
@@ -115,6 +129,79 @@ class TestOperationDispatcherSnapshots {
     Assertions.assertFalse(snapshot.storageLocations().containsKey("archive"));
     Assertions.assertFalse(snapshot.properties().containsKey("late"));
     Assertions.assertDoesNotThrow(() -> snapshot.properties().put("consumer", "value"));
+  }
+
+  /**
+   * Every value a dispatcher returns leaves the catalog lease, so it must either carry no connector
+   * state or be converted by {@link ConnectorObjectSnapshot#detach}. That method is a manual type
+   * switch with a pass-through default, so nothing else stops a newly added return type from
+   * silently escaping with connector classes attached. This test is that stop.
+   */
+  @Test
+  void testEveryDispatcherReturnTypeIsDetachedOrCarriesNoConnectorState() {
+    List<Class<?>> dispatchers =
+        List.of(
+            TableDispatcher.class,
+            ViewDispatcher.class,
+            SchemaDispatcher.class,
+            FilesetDispatcher.class,
+            TopicDispatcher.class,
+            ModelDispatcher.class,
+            PartitionDispatcher.class,
+            FunctionDispatcher.class);
+
+    List<String> escaping = new ArrayList<>();
+    for (Class<?> dispatcher : dispatchers) {
+      for (Method method : dispatcher.getMethods()) {
+        Class<?> returnType = method.getReturnType();
+        if (!DETACHED_TYPES.contains(returnType) && !carriesNoConnectorState(returnType)) {
+          escaping.add(dispatcher.getSimpleName() + "#" + method.getName() + " -> " + returnType);
+        }
+      }
+    }
+
+    Assertions.assertTrue(
+        escaping.isEmpty(),
+        "These dispatcher results leave the catalog lease without being detached. Either add the "
+            + "type to ConnectorObjectSnapshot.detach or confirm it holds no connector state and "
+            + "list it here: "
+            + escaping);
+  }
+
+  /** Types ConnectorObjectSnapshot.detach knows how to convert. Keep in sync with that method. */
+  private static final Set<Class<?>> DETACHED_TYPES =
+      Set.of(
+          Table.class,
+          View.class,
+          Schema.class,
+          Fileset.class,
+          Topic.class,
+          Model.class,
+          ModelVersion.class,
+          Partition.class,
+          ModelVersion[].class,
+          Partition[].class,
+          FileInfo[].class);
+
+  /**
+   * Returns whether values of this type are built by Gravitino itself rather than by a connector,
+   * so they never reference a catalog ClassLoader.
+   *
+   * <p>{@code Function} is on this list because functions are managed-only: {@code CatalogWrapper}
+   * exposes no function operations at all and every {@code FunctionDispatcher} method goes through
+   * {@code ManagedFunctionOperations}, which builds its results from {@code FunctionEntity}. Give a
+   * catalog connector-backed functions and that stops being true, which is when this test should
+   * start failing.
+   */
+  private static boolean carriesNoConnectorState(Class<?> type) {
+    if (type.isArray()) {
+      Class<?> component = type.getComponentType();
+      return component.isPrimitive() || carriesNoConnectorState(component);
+    }
+    return type.isPrimitive()
+        || type == String.class
+        || type == NameIdentifier.class
+        || type == Function.class;
   }
 
   private static <T> Answer<T> requireActive(AtomicBoolean callbackActive, T value) {

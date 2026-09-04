@@ -717,7 +717,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
   private TableCatalogResult snapshotTable(
       CatalogManager.CatalogWrapper catalog, Table table, boolean managed) throws Exception {
-    Table snapshot = ConnectorObjectSnapshot.detach(table);
+    Table snapshot = catalog.detachConnectorResult(table);
     MaskAndOmitKeys hiddenProperties =
         getMaskAndOmitKeys(
             catalog, HasPropertyMetadata::tablePropertiesMetadata, snapshot.properties());

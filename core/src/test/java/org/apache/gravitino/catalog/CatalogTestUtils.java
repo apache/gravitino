@@ -34,6 +34,28 @@ public final class CatalogTestUtils {
    * @param catalogManager the mocked catalog manager.
    * @param catalog the live catalog to pass to callbacks.
    */
+  /**
+   * Stubs a mocked {@link CatalogManager.CatalogWrapper} so that detaching a connector result
+   * behaves like the real one instead of returning null.
+   *
+   * <p>{@code OperationDispatcher.doWithCatalog} routes every result through the wrapper, so a
+   * mocked wrapper without this stub makes each dispatcher call under test return null.
+   *
+   * @param wrapper the mocked catalog wrapper.
+   * @return the same wrapper, for chaining.
+   */
+  public static CatalogManager.CatalogWrapper mockDetachConnectorResult(
+      CatalogManager.CatalogWrapper wrapper) {
+    try {
+      Mockito.doAnswer(invocation -> ConnectorObjectSnapshot.detach(invocation.getArgument(0)))
+          .when(wrapper)
+          .detachConnectorResult(Mockito.any());
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to stub detachConnectorResult", e);
+    }
+    return wrapper;
+  }
+
   @SuppressWarnings("unchecked")
   public static void mockDoWithCatalog(CatalogManager catalogManager, BaseCatalog<?> catalog) {
     Mockito.doAnswer(

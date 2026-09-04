@@ -90,7 +90,7 @@ public abstract class OperationDispatcher {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
       return catalogManager.doWithCatalogWrapper(
           catalogIdent,
-          wrapper -> ConnectorObjectSnapshot.detach(wrapper.doWithPartitionOps(tableIdent, fn)));
+          wrapper -> wrapper.detachConnectorResult(wrapper.doWithPartitionOps(tableIdent, fn)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -107,7 +107,7 @@ public abstract class OperationDispatcher {
       throws E {
     try {
       return catalogManager.doWithCatalogWrapper(
-          ident, wrapper -> ConnectorObjectSnapshot.detach(fn.apply(wrapper)));
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -127,7 +127,7 @@ public abstract class OperationDispatcher {
       throws E1, E2 {
     try {
       return catalogManager.doWithCatalogWrapper(
-          ident, wrapper -> ConnectorObjectSnapshot.detach(fn.apply(wrapper)));
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex1.isInstance(exception)) {
         throw ex1.cast(exception);
@@ -293,7 +293,9 @@ public abstract class OperationDispatcher {
 
   boolean isManagedEntity(CatalogManager.CatalogWrapper catalog, Capability.Scope scope)
       throws Exception {
-    return catalog.capabilities().managedStorage(scope).supported();
+    // Read the capability and interpret it in one pass under the catalog ClassLoader: a connector
+    // CapabilityResult can load classes of its own on the first call.
+    return catalog.doWithCatalog(c -> c.capability().managedStorage(scope).supported());
   }
 
   protected <E extends Entity & HasIdentifier> E getEntity(
