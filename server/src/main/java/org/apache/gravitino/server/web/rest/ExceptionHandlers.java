@@ -1121,23 +1121,6 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
-<<<<<<< HEAD
-=======
-
-      // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
-      // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
-      // outage from a server bug.
-      if (e instanceof ConnectionFailedException) {
-        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
-        LOG.warn(errorMsg, e);
-        return Utils.connectionFailed(errorMsg, e);
-      }
-
-      if (e instanceof OptimisticLockException) {
-        LOG.warn(errorMsg, e);
-        return Utils.optimisticLockConflict(errorMsg, e);
-      }
-
       // Classify domain-specific UnsupportedOperationException subclasses before the generic
       // capability fallback below.
       if (e instanceof UnmodifiableStatisticException) {
@@ -1150,7 +1133,6 @@ public class ExceptionHandlers {
         return Utils.unsupportedOperation(errorMsg, e);
       }
 
->>>>>>> 8e41cedff ([#12879] fix(server): return accurate HTTP statuses for unsupported operations (#12880))
       LOG.error(errorMsg, e);
       return Utils.internalError(errorMsg, e);
     }
