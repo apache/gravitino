@@ -212,10 +212,10 @@ public class GravitinoServer extends ResourceConfig {
 
     // Root-level aliases for enterprise GTMs that require probes at well-known root paths.
     // Forwards /health, /health/live, /health/ready, and /health.html to the canonical
-    // /api/health/* endpoints. Not part of ROOT_MOUNTED_PATHS below: HealthAliasServlet forwards
-    // every request into /api/health*, which API_ANY_PATH already covers via the servlet
-    // container's FORWARD dispatcher type, so binding the filters again here would double-log
-    // every probe.
+    // /api/health/* endpoints. Not part of ROOT_MOUNTED_API_PATHS/ROOT_MOUNTED_NON_API_PATHS
+    // below: HealthAliasServlet forwards every request into /api/health*, which API_ANY_PATH
+    // already covers via the servlet container's FORWARD dispatcher type, so binding the filters
+    // again here would double-log every probe.
     server.addServlet(new HealthAliasServlet(), "/health/*");
     server.addServlet(new HealthAliasServlet(), "/health.html");
 

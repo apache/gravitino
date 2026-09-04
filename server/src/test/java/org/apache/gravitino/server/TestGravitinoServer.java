@@ -223,7 +223,7 @@ public class TestGravitinoServer {
                 + pathSpec
                 + "' is registered without HttpAuditFilter coverage. See GH-12760: every "
                 + "servlet mounted outside /api/* must be wired into GravitinoServer's "
-                + "ROOT_MOUNTED_PATHS filter loop, or added to "
+                + "ROOT_MOUNTED_API_PATHS/ROOT_MOUNTED_NON_API_PATHS filter loops, or added to "
                 + "PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above with a documented reason.");
       }
     }
