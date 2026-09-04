@@ -233,6 +233,9 @@ public class Utils {
   /**
    * Returns an HTTP 405 response when the target resource does not allow the request method.
    *
+   * <p>The unsupported-operation error payload is retained for compatibility with clients that
+   * identify this response by its application error code.
+   *
    * @param message the error message
    * @return the HTTP response
    */

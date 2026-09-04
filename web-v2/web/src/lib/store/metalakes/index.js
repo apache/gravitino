@@ -2251,7 +2251,7 @@ export const fetchViews = createAsyncThunk(
     const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 501) — return empty views silently
+      // Catalog doesn't support views (HTTP 501, or legacy 405 with code 1006) — return empty views silently
       if (isUnsupportedOperationError(err)) {
         return { views: [], init }
       }
@@ -2305,7 +2305,7 @@ export const getViewDetails = createAsyncThunk(
     const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 501) — return empty result silently
+      // Catalog doesn't support views (HTTP 501, or legacy 405 with code 1006) — return empty result silently
       if (isUnsupportedOperationError(err)) {
         return { view: null, init }
       }

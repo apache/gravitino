@@ -33,6 +33,10 @@ describe('isUnsupportedOperationError', () => {
     expect(isUnsupportedOperationError({ response: { status: 405, data: { code: 1000 } } })).toBe(false)
   })
 
+  it('does not treat an HTTP conflict as an unsupported operation', () => {
+    expect(isUnsupportedOperationError({ response: { status: 409, data: { code: 1006 } } })).toBe(false)
+  })
+
   it('handles errors without an HTTP response', () => {
     expect(isUnsupportedOperationError(new Error('network error'))).toBe(false)
   })
