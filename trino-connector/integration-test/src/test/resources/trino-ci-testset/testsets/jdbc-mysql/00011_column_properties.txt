@@ -46,7 +46,7 @@ WITH (
    date_col_2 date,
    date_col_3 date,
    timestamp_col_1 timestamp(0) with time zone WITH (default = 'CURRENT_TIMESTAMP'),
-   timestamp_col_2 timestamp(0) with time zone WITH (default = 'CURRENT_TIMESTAMP')
+   timestamp_col_2 timestamp(6) with time zone WITH (default = 'CURRENT_TIMESTAMP')
 )
 COMMENT ''
 WITH (

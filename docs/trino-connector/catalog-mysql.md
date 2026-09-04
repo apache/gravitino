@@ -15,6 +15,9 @@ Join data between different systems like MySQL and Hive, or between two differen
 To connect to MySQL, you need:
 - MySQL 5.7, 8.0 or higher.
 - Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
+- MySQL Connector/J 8.0.16 or higher in the Gravitino MySQL catalog, otherwise the fractional seconds precision of
+  `TIME`, `DATETIME` and `TIMESTAMP` columns is reported as 0, see
+  [Driver Version Compatibility](../jdbc-mysql-catalog.md#driver-version-compatibility).
 
 ## Create Table
 

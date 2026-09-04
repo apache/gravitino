@@ -26,6 +26,9 @@ import io.trino.spi.type.DateType;
 import io.trino.spi.type.DoubleType;
 import io.trino.spi.type.IntegerType;
 import io.trino.spi.type.RealType;
+import io.trino.spi.type.TimeType;
+import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
@@ -107,6 +110,55 @@ public class TestMySQLDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(unsignBigintType),
         io.trino.spi.type.DecimalType.createDecimalType(20, 0));
+  }
+
+  @Test
+  public void testGravitinoTimestampToTrinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    // MySQL DATETIME/TIMESTAMP default to a fractional seconds precision of 0.
+    Assertions.assertEquals(
+        TimestampType.TIMESTAMP_SECONDS,
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS,
+        transformer.getTrinoType(Types.TimestampType.withTimeZone()));
+
+    // The Trino type must keep the precision of the MySQL column, otherwise reading a
+    // DATETIME(3)/TIMESTAMP(6) column fails with "Expected 0s for digits beyond precision 0".
+    for (int precision = 0; precision <= 6; precision++) {
+      Assertions.assertEquals(
+          TimestampType.createTimestampType(precision),
+          transformer.getTrinoType(Types.TimestampType.withoutTimeZone(precision)));
+      Assertions.assertEquals(
+          TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision),
+          transformer.getTrinoType(Types.TimestampType.withTimeZone(precision)));
+    }
+
+    // MySQL supports at most microseconds precision.
+    Assertions.assertEquals(
+        TimestampType.TIMESTAMP_MICROS,
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(9)));
+    Assertions.assertEquals(
+        TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS,
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(12)));
+  }
+
+  @Test
+  public void testGravitinoTimeToTrinoType() {
+    GeneralDataTypeTransformer transformer = new MySQLDataTypeTransformer();
+
+    // MySQL TIME defaults to a fractional seconds precision of 0.
+    Assertions.assertEquals(TimeType.TIME_SECONDS, transformer.getTrinoType(Types.TimeType.get()));
+
+    for (int precision = 0; precision <= 6; precision++) {
+      Assertions.assertEquals(
+          TimeType.createTimeType(precision),
+          transformer.getTrinoType(Types.TimeType.of(precision)));
+    }
+
+    // MySQL supports at most microseconds precision.
+    Assertions.assertEquals(TimeType.TIME_MICROS, transformer.getTrinoType(Types.TimeType.of(12)));
   }
 
   @Test

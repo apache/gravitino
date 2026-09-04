@@ -1,0 +1,16 @@
+"CREATE TABLE gt_mysql.gt_mysql_test_all_type.demo_datetime_precision (
+   id integer NOT NULL,
+   time_col_3 time(3),
+   time_col_6 time(6),
+   datetime_col_3 timestamp(3),
+   datetime_col_6 timestamp(6),
+   timestamp_col_3 timestamp(3) with time zone,
+   timestamp_col_6 timestamp(6) with time zone
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['id']
+)"
+
+"1","14:30:00.123","14:30:00.123456","2025-07-04 14:30:00.123","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123 UTC","2025-07-04 14:30:00.123456 UTC"
