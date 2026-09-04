@@ -39,14 +39,7 @@ paths:
         content:
           application/json:
             schema:
-<<<<<<< HEAD
-              oneOf:
-                - $ref: '#/components/schemas/RunEvent'
-                - $ref: '#/components/schemas/DatasetEvent'
-                - $ref: '#/components/schemas/JobEvent'
-=======
               $ref: '#/components/schemas/RunEvent'
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
       responses:
         "201":
           description: Created

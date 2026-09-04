@@ -42,12 +42,10 @@ import java.net.URI;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -57,7 +55,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -159,37 +156,6 @@ class TestLineageAuthorizationExecutor {
           errorResponse.getMessage().contains("job.namespace"),
           "The response should identify the invalid field");
       verify(invocation, never()).proceed();
-    }
-  }
-
-  @Test
-  void testInterceptorRejectsUnheldActiveRoleForDynamicMetalake() throws Throwable {
-    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-    when(authorizer.findUnheldRoles(any(), eq(METALAKE), any(), any()))
-        .thenReturn(Set.of("ghostRole"));
-    UserPrincipal principal =
-        new UserPrincipal("tester")
-            .withActiveRoles(ActiveRoles.of(Collections.singletonList("ghostRole")));
-    MethodInvocation invocation = invocation(event());
-
-    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
-        MockedStatic<AuthorizationUtils> authorizationUtils = mockStatic(AuthorizationUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> providerStatic =
-            mockStatic(GravitinoAuthorizerProvider.class)) {
-      principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
-      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
-      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
-      providerStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
-      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
-
-      Response response = (Response) lineageInterceptor().invoke(invocation);
-
-      Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      verify(invocation, never()).proceed();
-      authorizationUtils.verify(
-          () ->
-              AuthorizationUtils.checkCurrentUser(
-                  eq(METALAKE), eq("tester"), any(AuthorizationRequestContext.class)));
     }
   }
 
@@ -451,8 +417,7 @@ class TestLineageAuthorizationExecutor {
         lineageMethod().getParameters(),
         new Object[] {event},
         "",
-        ExpressionCondition.NEVER,
-        "");
+        ExpressionCondition.NEVER);
   }
 
   private static Method lineageMethod() throws NoSuchMethodException {

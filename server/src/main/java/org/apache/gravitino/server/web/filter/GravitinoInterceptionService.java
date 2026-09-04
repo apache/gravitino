@@ -115,13 +115,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
-<<<<<<< HEAD
-            MetadataObjectCredentialOperations.class.getName()));
-=======
             MetadataObjectCredentialOperations.class.getName(),
-            MetadataObjectSecretOperations.class.getName(),
             LineageOperations.class.getName()));
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
   }
 
   @Override
@@ -173,36 +168,9 @@ public class GravitinoInterceptionService implements InterceptionService {
           Optional<String> authorizationMetalake = Optional.empty();
           NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
           if (metalakeIdent != null) {
-<<<<<<< HEAD
-            String currentUser = PrincipalUtils.getCurrentUserName();
-            try {
-              AuthorizationUtils.checkCurrentUser(
-                  metalakeIdent.name(), currentUser, authorizationRequestContext);
-            } catch (NoSuchMetalakeException e) {
-              LOG.warn(
-                  "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
-              // Not a real authz denial — metalake is absent, not forbidden. Skip event dispatch;
-              // HttpAuditFilter will emit a generic HttpRequestFailureEvent for this 403.
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
-            } catch (ForbiddenException ex) {
-              LOG.warn(
-                  "User validation failed - User: {}, Metalake: {}, Reason: {}",
-                  currentUser,
-                  metalakeIdent.name(),
-                  ex.getMessage());
-              dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
-              return Utils.forbidden(ex.getMessage(), ex);
-            } catch (Exception ex) {
-              LOG.error(
-                  "Unexpected error during user validation - User: {}, Metalake: {}",
-                  currentUser,
-                  metalakeIdent.name(),
-                  ex);
-              return Utils.internalError("Failed to validate user", ex);
-=======
             authorizationMetalake = Optional.of(metalakeIdent.name());
             Optional<Response> validationFailure =
-                validateCurrentUserAndActiveRoles(
+                validateCurrentUser(
                     metalakeIdent,
                     authorizationRequestContext,
                     expressionAnnotation,
@@ -212,7 +180,6 @@ public class GravitinoInterceptionService implements InterceptionService {
                     false);
             if (validationFailure.isPresent()) {
               return validationFailure.get();
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
             }
           }
 
@@ -233,12 +200,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-<<<<<<< HEAD
                     secondaryExpressionCondition);
-            boolean authorizeResult = executor.execute(authorizationRequestContext);
-=======
-                    secondaryExpressionCondition,
-                    expressionAnnotation.allowCheckExistence());
             Optional<String> dynamicMetalake;
             try {
               dynamicMetalake = executor.getAuthorizationMetalake();
@@ -257,7 +219,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
             if (dynamicMetalake.isPresent() && authorizationMetalake.isEmpty()) {
               Optional<Response> validationFailure =
-                  validateCurrentUserAndActiveRoles(
+                  validateCurrentUser(
                       NameIdentifier.of(dynamicMetalake.get()),
                       authorizationRequestContext,
                       expressionAnnotation,
@@ -279,7 +241,6 @@ public class GravitinoInterceptionService implements InterceptionService {
               LOG.warn("Invalid authorization request", exception);
               return Utils.illegalArguments(exception.getMessage(), exception);
             }
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
               NameIdentifier accessMetadataName =
@@ -308,7 +269,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
     }
 
-    private Optional<Response> validateCurrentUserAndActiveRoles(
+    private Optional<Response> validateCurrentUser(
         NameIdentifier metalakeIdent,
         AuthorizationRequestContext authorizationRequestContext,
         AuthorizationExpression expressionAnnotation,
@@ -350,28 +311,6 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Optional.of(Utils.internalError("Failed to validate user", ex));
       }
 
-      // Role assumption: reject a NAMED declaration that names roles the caller does not hold
-      // (403); ALL/NONE need no membership check.
-      ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
-      if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
-        Set<String> unheldRoles =
-            GravitinoAuthorizerProvider.getInstance()
-                .getGravitinoAuthorizer()
-                .findUnheldRoles(
-                    PrincipalUtils.getCurrentPrincipal(),
-                    metalakeIdent.name(),
-                    activeRoles.roleNames(),
-                    authorizationRequestContext);
-        if (!unheldRoles.isEmpty()) {
-          dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
-          return Optional.of(
-              Utils.forbidden(
-                  String.format(
-                      "User '%s' cannot assume active role(s) that are not held: %s",
-                      currentUser, unheldRoles),
-                  null));
-        }
-      }
       return Optional.empty();
     }
 

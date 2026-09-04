@@ -47,11 +47,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.ViewDispatcher;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
-import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -62,11 +58,7 @@ import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
->>>>>>> c0871fa58 ([#12840] fix(lineage): Validate and authorize lineage events (#12850))
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
