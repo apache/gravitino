@@ -104,6 +104,70 @@ public class TestAuthorization {
   }
 
   @Test
+  public void testAuthorizationProviderConfiguredSurvivesClose() throws Exception {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(3L)
+            .withName("catalog-test3")
+            .withNamespace(Namespace.of("default"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TestCatalog catalog =
+        new TestCatalog()
+            .withCatalogConf(
+                ImmutableMap.of(
+                    Catalog.AUTHORIZATION_PROVIDER,
+                    "test-ranger",
+                    "authorization.ranger.service.type",
+                    "HadoopSQL"))
+            .withCatalogEntity(entity);
+    Assertions.assertFalse(catalog.isAuthorizationProviderConfigured());
+
+    IsolatedClassLoader isolatedClassLoader =
+        new IsolatedClassLoader(
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
+    Assertions.assertTrue(catalog.isAuthorizationProviderConfigured());
+    Assertions.assertNotNull(catalog.getAuthorizationPlugin());
+
+    // Closing the catalog drops the plugin, but the catalog still reports that an authorization
+    // provider was configured, so a null plugin can be told apart from "no authorization".
+    catalog.close();
+    Assertions.assertNull(catalog.getAuthorizationPlugin());
+    Assertions.assertTrue(catalog.isAuthorizationProviderConfigured());
+  }
+
+  @Test
+  public void testAuthorizationProviderNotConfigured() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(4L)
+            .withName("catalog-test4")
+            .withNamespace(Namespace.of("default"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TestCatalog catalog =
+        new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(entity);
+    IsolatedClassLoader isolatedClassLoader =
+        new IsolatedClassLoader(
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
+
+    Assertions.assertFalse(catalog.isAuthorizationProviderConfigured());
+    Assertions.assertNull(catalog.getAuthorizationPlugin());
+  }
+
+  @Test
   public void testRangerHDFSAuthorization() {
     AuthorizationPlugin rangerHDFSAuthPlugin = filesetCatalog.getAuthorizationPlugin();
     Assertions.assertInstanceOf(TestRangerAuthorizationHDFSPlugin.class, rangerHDFSAuthPlugin);

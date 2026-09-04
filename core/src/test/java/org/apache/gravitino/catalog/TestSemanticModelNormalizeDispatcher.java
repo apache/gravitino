@@ -58,8 +58,8 @@ public class TestSemanticModelNormalizeDispatcher {
     CatalogManager catalogManager = mock(CatalogManager.class);
     CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     when(wrapper.capabilities()).thenReturn(new ParentNormalizingCapability());
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of("metalake", "catalog")))
-        .thenReturn(wrapper);
+    when(catalogManager.acquireCatalogLease(NameIdentifier.of("metalake", "catalog")))
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
     dispatcher = new SemanticModelNormalizeDispatcher(delegate, catalogManager);
   }
 

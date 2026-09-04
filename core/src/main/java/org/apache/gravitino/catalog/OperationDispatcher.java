@@ -88,8 +88,9 @@ public abstract class OperationDispatcher {
       throws E {
     try {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
-      return c.doWithPartitionOps(tableIdent, fn);
+      try (CatalogLease lease = catalogManager.acquireCatalogLease(catalogIdent)) {
+        return lease.wrapper().doWithPartitionOps(tableIdent, fn);
+      }
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -105,8 +106,9 @@ public abstract class OperationDispatcher {
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      try (CatalogLease lease = catalogManager.acquireCatalogLease(ident)) {
+        return fn.apply(lease.wrapper());
+      }
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -125,8 +127,9 @@ public abstract class OperationDispatcher {
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      try (CatalogLease lease = catalogManager.acquireCatalogLease(ident)) {
+        return fn.apply(lease.wrapper());
+      }
     } catch (Exception exception) {
       if (ex1.isInstance(exception)) {
         throw ex1.cast(exception);

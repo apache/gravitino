@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -208,20 +209,16 @@ public class AuthorizationUtils {
     for (SecurableObject securableObject : securableObjects) {
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
         NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-        // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
-        // call authorization plugin method.
         for (NameIdentifier catalog : catalogs) {
-          callAuthorizationPluginImpl(consumer, catalogManager.loadCatalog(catalog));
+          callAuthorizationPluginImpl(consumer, catalogManager, catalog);
         }
 
       } else if (needApplyAuthorization(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
-        Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-        if (!catalogsAlreadySet.contains(catalog.name())) {
-          catalogsAlreadySet.add(catalog.name());
-          callAuthorizationPluginImpl(consumer, catalog);
+        if (catalogsAlreadySet.add(catalogIdent.name())) {
+          callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
         }
       }
     }
@@ -229,9 +226,10 @@ public class AuthorizationUtils {
 
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
-    List<Catalog> loadedCatalogs = loadMetadataObjectCatalog(metalake, metadataObject);
-    for (Catalog catalog : loadedCatalogs) {
-      callAuthorizationPluginImpl(consumer, catalog);
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    List<NameIdentifier> catalogIdents = getMetadataObjectCatalogs(metalake, metadataObject);
+    for (NameIdentifier catalogIdent : catalogIdents) {
+      callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
     }
   }
 
@@ -346,18 +344,19 @@ public class AuthorizationUtils {
     }
   }
 
-  public static void removeCatalogPrivileges(Catalog catalog, List<String> locations) {
+  public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
     MetadataObject metadataObject =
-        MetadataObjects.of(null, catalog.name(), MetadataObject.Type.CATALOG);
+        MetadataObjects.of(null, catalogIdent.name(), MetadataObject.Type.CATALOG);
     MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject, locations);
 
     callAuthorizationPluginImpl(
         authorizationPlugin -> {
           authorizationPlugin.onMetadataUpdated(removeObject);
         },
-        catalog);
+        GravitinoEnv.getInstance().catalogManager(),
+        catalogIdent);
   }
 
   public static void authorizationPluginRenamePrivileges(
@@ -449,36 +448,56 @@ public class AuthorizationUtils {
     return !SKIP_APPLY_TYPES.contains(type);
   }
 
-  private static void callAuthorizationPluginImpl(
-      BiConsumer<AuthorizationPlugin, String> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin(), catalog.name());
-      }
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
-              catalog.type()));
+  /**
+   * Returns the authorization plugin of the given catalog, or null if the catalog is not configured
+   * with an authorization provider.
+   *
+   * <p>A catalog that was configured with an authorization provider but no longer has a plugin may
+   * have been closed. Calling the plugin is then impossible, and silently skipping the call could
+   * leave stale grants in the external authorization system, so this method fails loudly instead.
+   *
+   * @param catalog the leased catalog to read the authorization plugin from.
+   * @return the authorization plugin, or null if none is configured.
+   */
+  static AuthorizationPlugin getAuthorizationPlugin(BaseCatalog<?> catalog) {
+    AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+    if (authorizationPlugin == null && catalog.isAuthorizationProviderConfigured()) {
+      throw new AuthorizationPluginException(
+          "The authorization plugin of catalog %s is unavailable even though an authorization "
+              + "provider is configured; the catalog may have been closed while it was in use",
+          catalog.name());
     }
+    return authorizationPlugin;
   }
 
   private static void callAuthorizationPluginImpl(
-      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+      BiConsumer<AuthorizationPlugin, String> consumer,
+      CatalogManager catalogManager,
+      NameIdentifier catalogIdent) {
+    catalogManager.doWithCatalog(
+        catalogIdent,
+        catalog -> {
+          AuthorizationPlugin authorizationPlugin = getAuthorizationPlugin(catalog);
+          if (authorizationPlugin != null) {
+            consumer.accept(authorizationPlugin, catalog.name());
+          }
+          return null;
+        });
+  }
 
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin());
-      }
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
-              catalog.type()));
-    }
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer,
+      CatalogManager catalogManager,
+      NameIdentifier catalogIdent) {
+    catalogManager.doWithCatalog(
+        catalogIdent,
+        catalog -> {
+          AuthorizationPlugin authorizationPlugin = getAuthorizationPlugin(catalog);
+          if (authorizationPlugin != null) {
+            consumer.accept(authorizationPlugin);
+          }
+          return null;
+        });
   }
 
   private static void checkCatalogType(
@@ -492,26 +511,21 @@ public class AuthorizationUtils {
     }
   }
 
-  private static List<Catalog> loadMetadataObjectCatalog(
+  private static List<NameIdentifier> getMetadataObjectCatalogs(
       String metalake, MetadataObject metadataObject) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    List<Catalog> loadedCatalogs = Lists.newArrayList();
+    List<NameIdentifier> catalogIdents = Lists.newArrayList();
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
       NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-      // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
-      // call authorization plugin method.
-      for (NameIdentifier catalog : catalogs) {
-        loadedCatalogs.add(catalogManager.loadCatalog(catalog));
-      }
+      catalogIdents.addAll(Arrays.asList(catalogs));
     } else if (needApplyAuthorization(metadataObject.type())) {
       NameIdentifier catalogIdent =
           NameIdentifierUtil.getCatalogIdentifier(
               MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-      loadedCatalogs.add(catalog);
+      catalogIdents.add(catalogIdent);
     }
 
-    return loadedCatalogs;
+    return catalogIdents;
   }
 
   // The Hive default schema location is Hive warehouse directory

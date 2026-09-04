@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -189,5 +190,22 @@ public class TestFutureGrantManager {
         .listEntitiesByRelation(any(), any(), any());
     Assertions.assertThrows(
         RuntimeException.class, () -> manager.grantNewlyCreatedCatalog(METALAKE, catalog));
+  }
+
+  @Test
+  void testGrantFailsWhenConfiguredAuthorizationPluginIsUnavailable() {
+    BaseCatalog<?> closedCatalog = mock(BaseCatalog.class);
+    when(closedCatalog.name()).thenReturn("closed_catalog");
+    when(closedCatalog.getAuthorizationPlugin()).thenReturn(null);
+    when(closedCatalog.isAuthorizationProviderConfigured()).thenReturn(true);
+
+    FutureGrantManager manager = new FutureGrantManager(entityStore, ownerManager);
+
+    AuthorizationPluginException exception =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> manager.grantNewlyCreatedCatalog(METALAKE, closedCatalog));
+    Assertions.assertTrue(
+        exception.getMessage().contains("closed_catalog"), exception.getMessage());
   }
 }
