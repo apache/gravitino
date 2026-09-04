@@ -641,7 +641,7 @@ public class TestGravitinoInterceptionService {
       TableDispatcher tableDispatcher = mock(TableDispatcher.class);
       EventBus mockEventBus = mock(EventBus.class);
       envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-      when(mockEnv.tableDispatcher()).thenReturn(tableDispatcher);
+      when(mockEnv.internalTableDispatcher()).thenReturn(tableDispatcher);
       when(mockEnv.eventBus()).thenReturn(mockEventBus);
       when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(false);
 
@@ -688,7 +688,7 @@ public class TestGravitinoInterceptionService {
       TableDispatcher tableDispatcher = mock(TableDispatcher.class);
       EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
       envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-      when(mockEnv.tableDispatcher()).thenReturn(tableDispatcher);
+      when(mockEnv.internalTableDispatcher()).thenReturn(tableDispatcher);
       when(mockEnv.eventBus()).thenReturn(mockEventBus);
       when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(true);
 

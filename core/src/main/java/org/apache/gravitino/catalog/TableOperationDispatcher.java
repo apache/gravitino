@@ -97,7 +97,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         catalogManager,
         store,
         idGenerator,
-        () -> GravitinoEnv.getInstance().schemaDispatcher(),
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
         secretManager);
   }
 

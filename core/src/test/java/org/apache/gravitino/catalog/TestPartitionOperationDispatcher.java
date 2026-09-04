@@ -91,7 +91,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
