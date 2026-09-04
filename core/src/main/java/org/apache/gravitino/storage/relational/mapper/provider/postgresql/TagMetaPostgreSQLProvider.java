@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
 
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TagPO;
@@ -28,16 +27,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   @Override
-  public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
+  public String softDeleteTagMetaByIdAndVersion(Long tagId, Long currentVersion) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " tm SET deleted_at = "
+        + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE tm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0";
+        + " WHERE tag_id = #{tagId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override
@@ -47,37 +43,6 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  @Override
-  public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
-    return "INSERT INTO "
-        + TAG_TABLE_NAME
-        + " (tag_id, tag_name,"
-        + " metalake_id, tag_comment, properties, allowed_values, audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ("
-        + " #{tagMeta.tagId},"
-        + " #{tagMeta.tagName},"
-        + " #{tagMeta.metalakeId},"
-        + " #{tagMeta.comment},"
-        + " #{tagMeta.properties},"
-        + " #{tagMeta.allowedValues},"
-        + " #{tagMeta.auditInfo},"
-        + " #{tagMeta.currentVersion},"
-        + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
-        + " )"
-        + " ON CONFLICT(tag_id) DO UPDATE SET"
-        + " tag_name = #{tagMeta.tagName},"
-        + " metalake_id = #{tagMeta.metalakeId},"
-        + " tag_comment = #{tagMeta.comment},"
-        + " properties = #{tagMeta.properties},"
-        + " allowed_values = #{tagMeta.allowedValues},"
-        + " audit_info = #{tagMeta.auditInfo},"
-        + " current_version = #{tagMeta.currentVersion},"
-        + " last_version = #{tagMeta.lastVersion},"
-        + " deleted_at = #{tagMeta.deletedAt}";
   }
 
   @Override
@@ -94,14 +59,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " last_version = #{newTagMeta.lastVersion},"
         + " deleted_at = #{newTagMeta.deletedAt}"
         + " WHERE tag_id = #{oldTagMeta.tagId}"
-        + " AND metalake_id = #{oldTagMeta.metalakeId}"
-        + " AND tag_name = #{oldTagMeta.tagName}"
-        + " AND (tag_comment = #{oldTagMeta.comment} "
-        + "   OR (CAST(tag_comment AS VARCHAR) IS NULL AND CAST(#{oldTagMeta.comment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldTagMeta.properties}"
-        + " AND audit_info = #{oldTagMeta.auditInfo}"
         + " AND current_version = #{oldTagMeta.currentVersion}"
-        + " AND last_version = #{oldTagMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
