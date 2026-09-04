@@ -35,10 +35,17 @@ import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestSimpleAuditLogV2 {
+
+  @AfterEach
+  void cleanup() {
+    RequestContext.clear();
+  }
 
   @Test
   public void testTimestampHasMillisecondPrecision() {
@@ -68,6 +75,28 @@ public class TestSimpleAuditLogV2 {
     String[] fields = output.split("\t", -1);
     Assertions.assertEquals(8, fields.length);
     Assertions.assertEquals("", fields[7], "Last field should be empty when customInfo is absent");
+  }
+
+  /**
+   * End-to-end proof that redaction happens exactly once, at format time: an auto-captured query
+   * parameter is stashed raw (as RequestContextFilter now does), reaches Event.customInfo()
+   * unredacted, and is only masked here, when SimpleAuditLogV2 renders it via AuditLogRedactor.
+   */
+  @Test
+  public void testAutoCapturedQueryParamIsRedactedAtFormatTime() {
+    RequestContext.setRequestQueryParams(ImmutableMap.of("token", "raw-secret-value"));
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(new StubEvent());
+
+    // Not redacted yet on the event itself — redaction is the formatter's job, not capture's.
+    Assertions.assertEquals("raw-secret-value", log.customInfo().get("token"));
+
+    String output = log.toString();
+    String[] fields = output.split("\t", -1);
+    Assertions.assertTrue(
+        fields[7].contains("***"), "Rendered output must redact the token value: " + fields[7]);
+    Assertions.assertFalse(
+        fields[7].contains("raw-secret-value"),
+        "Rendered output must not contain the raw token value: " + fields[7]);
   }
 
   @Test
@@ -315,7 +344,7 @@ public class TestSimpleAuditLogV2 {
 
   static class StubEventWithCustomInfo extends StubEvent {
     @Override
-    public Map<String, String> customInfo() {
+    protected Map<String, String> ownCustomInfo() {
       return ImmutableMap.of("k1", "v1");
     }
   }

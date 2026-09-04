@@ -74,7 +74,7 @@ public class GrantGroupRolesFailureEvent extends GroupFailureEvent {
 
   /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return RoleAssignmentAuditInfos.of(roles);
   }
 

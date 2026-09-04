@@ -22,27 +22,28 @@ package org.apache.gravitino.listener.api.event.server;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
-import org.apache.gravitino.listener.api.event.FailureEvent;
+import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
- * Represents an HTTP-level request failure that occurred before or outside the operation dispatcher
- * layer — for example, a 401 authentication rejection, a 400 malformed JSON body, or a 404 unknown
- * route. It is emitted by {@code HttpAuditFilter} when the HTTP response status is 4xx or 5xx and
- * no operation-layer {@link FailureEvent} was already dispatched for the same request.
+ * A fallback audit event for HTTP requests that complete with a 2xx/3xx status but for which no
+ * operation-layer success {@link Event} was dispatched — for example, a REST endpoint that has not
+ * (yet) been wired into the operation dispatcher/event system. It is emitted by {@code
+ * HttpAuditFilter} so that such endpoints still produce an audit record (method, URI, status, query
+ * parameters) instead of none at all.
  *
- * <p>Unlike operation-layer failure events, this event carries no {@link
- * org.apache.gravitino.NameIdentifier} (the resource was never resolved) and its {@link
- * #operationType()} is always {@link OperationType#UNKNOWN}. HTTP-specific context (method, URI,
- * status code) is available via {@link #customInfo()}.
+ * <p>Unlike operation-layer success events, this event carries no {@link
+ * org.apache.gravitino.NameIdentifier} (the resource was never resolved as a structured entity) and
+ * its {@link #operationType()} is always {@link OperationType#UNKNOWN}. Once an endpoint gains its
+ * own structured operation-layer event, that event suppresses this fallback for the same request —
+ * see {@code RequestContext#markOperationSuccessFired()}.
  *
- * <p>This event extends {@link FailureEvent} so it is routed through {@code
- * EventBus.dispatchFailureEvent()}, which swallows listener exceptions and prevents audit failures
- * from masking the original HTTP error.
+ * <p>This is the success-path counterpart of {@link HttpRequestFailureEvent}.
  */
 @DeveloperApi
-public final class HttpRequestFailureEvent extends FailureEvent {
+public final class HttpRequestEvent extends Event {
 
   private final String explicitRemoteAddress;
   private final String httpMethod;
@@ -51,29 +52,28 @@ public final class HttpRequestFailureEvent extends FailureEvent {
   private final EventSource explicitEventSource;
 
   /**
-   * Constructs an {@code HttpRequestFailureEvent}.
+   * Constructs an {@code HttpRequestEvent}.
    *
    * @param user the authenticated user, or {@code "unknown"} if authentication had not completed.
    * @param remoteAddress the client IP resolved by the filter (X-Forwarded-For or raw socket
-   *     address). Stored explicitly, rather than relying on the base {@link
-   *     org.apache.gravitino.listener.api.event.Event} behaviour of reading {@code
-   *     RequestContext.getRemoteAddress()} at construction time, so this event still carries a
-   *     correct address even on a server that does not install {@code RequestContextFilter} at all
-   *     (all servers in this codebase currently do, but this keeps the event resilient to one that
-   *     doesn't).
+   *     address). Stored explicitly, rather than relying on the base {@link Event} behaviour of
+   *     reading {@code RequestContext.getRemoteAddress()} at construction time, so this event still
+   *     carries a correct address even on a server that does not install {@code
+   *     RequestContextFilter} at all (all servers in this codebase currently do, but this keeps the
+   *     event resilient to one that doesn't).
    * @param httpMethod the HTTP method (e.g. {@code "GET"}, {@code "POST"}).
-   * @param requestUri the request URI path (e.g. {@code "/api/metalakes/m1/catalogs"}).
-   * @param statusCode the HTTP response status code (e.g. {@code 401}, {@code 404}).
+   * @param requestUri the request URI path (e.g. {@code "/search/query"}).
+   * @param statusCode the HTTP response status code (e.g. {@code 200}).
    * @param eventSource identifies which server produced the event.
    */
-  public HttpRequestFailureEvent(
+  public HttpRequestEvent(
       String user,
       String remoteAddress,
       String httpMethod,
       String requestUri,
       int statusCode,
       EventSource eventSource) {
-    super(user, null, new HttpRequestException(httpMethod, requestUri, statusCode));
+    super(user, null);
     this.explicitRemoteAddress = remoteAddress != null ? remoteAddress : "unknown";
     this.httpMethod = httpMethod;
     this.requestUri = requestUri;
@@ -87,11 +87,17 @@ public final class HttpRequestFailureEvent extends FailureEvent {
     return OperationType.UNKNOWN;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
+
   /**
    * Returns the explicitly-resolved client remote address supplied at construction time, rather
-   * than the base {@link org.apache.gravitino.listener.api.event.Event} behaviour of reading it
-   * from {@link org.apache.gravitino.utils.RequestContext}. See the constructor's {@code
-   * remoteAddress} parameter doc for why.
+   * than the base {@link Event} behaviour of reading it from {@link
+   * org.apache.gravitino.utils.RequestContext}. See the constructor's {@code remoteAddress}
+   * parameter doc for why.
    */
   @Override
   public String remoteAddress() {
@@ -106,9 +112,8 @@ public final class HttpRequestFailureEvent extends FailureEvent {
 
   /**
    * Returns HTTP-specific context that distinguishes this event from operation-layer events. Merged
-   * automatically by {@link org.apache.gravitino.listener.api.event.Event#customInfo()} with the
-   * request's automatically captured query parameters; these keys always win on a collision with a
-   * query parameter of the same name.
+   * automatically by {@link Event#customInfo()} with the request's automatically captured query
+   * parameters; these keys always win on a collision with a query parameter of the same name.
    *
    * <ul>
    *   <li>{@code http.method} — the HTTP verb
@@ -137,22 +142,5 @@ public final class HttpRequestFailureEvent extends FailureEvent {
   /** Returns the HTTP response status code. */
   public int statusCode() {
     return statusCode;
-  }
-
-  /**
-   * A lightweight synthetic exception used as the {@link FailureEvent#exception()} carrier for
-   * {@link HttpRequestFailureEvent}. It encodes the HTTP method, URI, and status so that log
-   * formatters that render the exception message get readable output without needing to inspect
-   * {@link HttpRequestFailureEvent#customInfo()} separately.
-   */
-  public static final class HttpRequestException extends RuntimeException {
-
-    private HttpRequestException(String httpMethod, String requestUri, int statusCode) {
-      super(
-          String.format("HTTP request failed: %s %s -> %d", httpMethod, requestUri, statusCode),
-          null,
-          true,
-          false /* suppress stack trace — this is a synthetic carrier, not a real exception */);
-    }
   }
 }
