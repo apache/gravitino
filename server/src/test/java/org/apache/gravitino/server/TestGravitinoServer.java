@@ -75,9 +75,10 @@ public class TestGravitinoServer {
       ImmutableSet.of(
           "/", // DefaultServlet / WebUIFilter: serves static UI assets, no server-side logic.
           "/ui/*", // WebUIFilter: serves static UI assets, no server-side logic.
-          "/health/*", // HealthAliasServlet forwards into /api/health*, already covered via the
-          "/health.html" // FORWARD dispatcher type; binding again here would double-log probes.
-          );
+          // HealthAliasServlet forwards both of the next two into /api/health*, which is already
+          // covered via the servlet container's FORWARD dispatcher type.
+          "/health/*",
+          "/health.html");
 
   // Paths that legitimately have no HttpAuditFilter binding of their own. GH-12760: extending
   // this set is a deliberate, reviewed decision, not a default — everything else registered on

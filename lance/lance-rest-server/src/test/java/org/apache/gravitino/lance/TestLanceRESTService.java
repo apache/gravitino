@@ -49,27 +49,29 @@ public class TestLanceRESTService {
     server.initialize(jettyServerConfig, "test-lance-rest", false);
     EventBus eventBus = new EventBus(Collections.emptyList());
 
-    LanceRESTService.registerMetricsPathFilters(server, eventBus);
+    try {
+      LanceRESTService.registerMetricsPathFilters(server, eventBus);
 
-    ServletHandler servletHandler =
-        JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
-    Set<String> auditedPathSpecs =
-        JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
-    Set<String> requestContextPathSpecs =
-        JettyServerTestUtils.filterPathSpecsFor(servletHandler, RequestContextFilter.class);
+      ServletHandler servletHandler =
+          JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
+      Set<String> auditedPathSpecs =
+          JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
+      Set<String> requestContextPathSpecs =
+          JettyServerTestUtils.filterPathSpecsFor(servletHandler, RequestContextFilter.class);
 
-    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-      assertTrue(
-          auditedPathSpecs.contains(pathSpec),
-          "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
-      assertTrue(
-          requestContextPathSpecs.contains(pathSpec),
-          "'"
-              + pathSpec
-              + "' must be covered by RequestContextFilter for query-parameter "
-              + "capture, see GH-12760");
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        assertTrue(
+            auditedPathSpecs.contains(pathSpec),
+            "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
+        assertTrue(
+            requestContextPathSpecs.contains(pathSpec),
+            "'"
+                + pathSpec
+                + "' must be covered by RequestContextFilter for query-parameter "
+                + "capture, see GH-12760");
+      }
+    } finally {
+      server.stop();
     }
-
-    server.stop();
   }
 }
