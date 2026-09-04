@@ -29,17 +29,23 @@ public class TestClickHouseTableOperationsIndexParsing {
     String[][] single = operations.parseIndexFields("col_1");
     Assertions.assertArrayEquals(new String[][] {{"col_1"}}, single);
 
+    String[][] quoted = operations.parseIndexFields("`quoted_col`");
+    Assertions.assertArrayEquals(new String[][] {{"quoted_col"}}, quoted);
+
     String[][] tuple = operations.parseIndexFields("tuple(`a`, b)");
     Assertions.assertArrayEquals(new String[][] {{"a"}, {"b"}}, tuple);
   }
 
   @Test
-  public void testParseFunctionWrappedExpression() {
-    String[][] bloom = operations.parseIndexFields("bloom_filter(cityHash64(user_id))");
-    Assertions.assertArrayEquals(new String[][] {{"user_id"}}, bloom);
-
-    String[][] nested = operations.parseIndexFields("minmax(lower(`tenant_id`))");
-    Assertions.assertArrayEquals(new String[][] {{"tenant_id"}}, nested);
+  public void testRejectFunctionWrappedExpression() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> operations.parseIndexFields("lower(name)"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.parseIndexFields("bloom_filter(cityHash64(user_id))"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.parseIndexFields("minmax(lower(`tenant_id`))"));
   }
 
   @Test
@@ -52,5 +58,8 @@ public class TestClickHouseTableOperationsIndexParsing {
   public void testUnsupportedExpression() {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> operations.parseIndexFields("cityHash64(id) % 16"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.parseIndexFields("tuple(lower(name), id)"));
   }
 }
