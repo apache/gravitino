@@ -34,9 +34,14 @@ Table routing is based on the `table-format` property in Glue table parameters. 
 - Network access to the AWS Glue API and Amazon S3
 - AWS IAM credentials with necessary Glue and S3 permissions.
   See [AWS IAM permissions](../aws-glue-catalog.md#aws-iam-permissions) for the required policy
-- Apache Spark 3.3, 3.4, or 3.5
+- Apache Spark 3.5
 - Patched Hive and AWS Glue client JARs (see [Setup](#setup); pre-installed on Amazon EMR)
 - `iceberg-spark-runtime` and `iceberg-aws-bundle` JARs on the Spark classpath for Iceberg table support (not required on Amazon EMR)
+
+:::note
+The connector resolves a Glue catalog class on Spark 4 as well, but the patched Hive JARs this
+catalog needs are only published for Spark 3, so Glue is verified on Spark 3.5 only.
+:::
 
 ## Setup
 
@@ -75,7 +80,7 @@ that include the patched Hive 2.3.10 and the AWS Glue Data Catalog client for Sp
 Download all JARs from the `spark3/glue-3.4.0` directory of
 [spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs).
 The directory name refers to the Glue client version (3.4.0), not the Spark version;
-these JARs are compatible with Spark 3.3, 3.4, and 3.5.
+these JARs are compatible with Spark 3.5.
 
 ```bash
 mkdir -p /opt/glue-hive-jars

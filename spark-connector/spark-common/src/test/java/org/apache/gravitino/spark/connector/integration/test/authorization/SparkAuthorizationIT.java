@@ -92,10 +92,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
   protected final String TIME_ZONE_UTC = "UTC";
 
-  protected SparkSession getSparkSession() {
-    return normalUserSparkSession;
-  }
-
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
@@ -359,9 +355,14 @@ public abstract class SparkAuthorizationIT extends BaseIT {
               ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, testTable), MetadataObject.Type.TABLE),
           ImmutableList.of(Privileges.ModifyTable.deny()));
 
-      // Assert INSERT behavior - Spark 3.5+ should throw ForbiddenException,
-      // lower versions won't because they don't support TableWritePrivilege
-      assertInsertBehaviorWithoutModifyPrivilege(testTable);
+      // INSERT must be rejected: BaseCatalog implements
+      // loadTable(Identifier, Set<TableWritePrivilege>), so Spark routes the write through the
+      // privilege-checking path.
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              normalUserSparkSession.sql(
+                  String.format("INSERT INTO %s VALUES (1, 'test')", testTable)));
     } finally {
       // Clean up
       try {
@@ -373,17 +374,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
       gravitinoMetalake.deleteRole(testRole);
       gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
     }
-  }
-
-  /**
-   * Assert the behavior when user tries to INSERT without MODIFY_TABLE privilege. Spark 3.3/3.4
-   * don't support TableWritePrivilege, so INSERT will succeed. Spark 3.5+ supports it, so INSERT
-   * should throw ForbiddenException. Subclasses can override this method to assert the expected
-   * behavior.
-   */
-  protected void assertInsertBehaviorWithoutModifyPrivilege(String tableName) {
-    // Spark 3.3/3.4 don't support TableWritePrivilege, so INSERT will succeed
-    normalUserSparkSession.sql(String.format("INSERT INTO %s VALUES (1, 'test')", tableName));
   }
 
   private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {

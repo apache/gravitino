@@ -74,14 +74,12 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
   If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:
 
    ```shell
-   ./gradlew spark-connector:spark-runtime-3.4:build -PscalaVersion=2.12
+   ./gradlew spark-connector:spark-runtime-3.5:build -PscalaVersion=2.12
    ```
 
-  This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.4/spark-runtime/build/libs` directory. You could replace `3.4` with  `3.3` or `3.5` to specify different Spark versions and replace `2.12` with `2.13` for different Scala versions. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
+  This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.5/spark-runtime/build/libs` directory. Replace `2.12` with `2.13` to build against a different Scala version. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
 
-  :::info
-  Gravitino Spark connector doesn't support Scala 2.13 for Spark 3.3.
-  :::
+  Replace `spark-runtime-3.5` with `spark-runtime-4.0` for Spark 4. Spark 4 is Scala 2.13 only, so that module ignores `-PscalaVersion` and always builds against 2.13.
 
   :::note
   The first time you build the project, downloading the dependencies may take a while.

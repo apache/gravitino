@@ -68,14 +68,17 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
-# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
+# Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
-iceberg4spark34 = "1.11.0"
 iceberg4spark35 = "1.11.0"
+iceberg4spark40 = "1.11.0"
 paimon = '1.2.0'
+# spark33 and spark34 are pinned by modules other than the Spark connector for their own tests, so
+# they stay after the connector dropped 3.3 and 3.4; they say nothing about connector support.
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
+spark40 = "4.0.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'

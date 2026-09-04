@@ -30,18 +30,23 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveGravitinoOperationOperator {
 
-  private org.apache.gravitino.rel.Table gravitinoTable;
+  private static final Logger LOG = LoggerFactory.getLogger(HiveGravitinoOperationOperator.class);
+
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
+
+  private org.apache.gravitino.rel.Table gravitinoTable;
 
   public HiveGravitinoOperationOperator(org.apache.gravitino.rel.Table gravitinoTable) {
     this.gravitinoTable = gravitinoTable;
@@ -49,7 +54,7 @@ public class HiveGravitinoOperationOperator {
 
   public void createPartition(
       InternalRow ident, Map<String, String> properties, StructType partitionSchema)
-      throws PartitionAlreadyExistsException {
+      throws PartitionsAlreadyExistException {
     List<String[]> fields = new ArrayList<>();
     List<Literal<?>> values = new ArrayList<>();
 
@@ -68,8 +73,12 @@ public class HiveGravitinoOperationOperator {
     try {
       gravitinoTable.supportPartitions().addPartition(partition);
     } catch (org.apache.gravitino.exceptions.PartitionAlreadyExistsException e) {
-      throw new org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException(
-          e.getMessage());
+      // Build the exception from (table, ident, schema): that is the only constructor present on
+      // every supported Spark version, since Spark 4 dropped the single-String form this class used
+      // to call. It produces Spark's documented PARTITIONS_ALREADY_EXIST message rather than
+      // Gravitino's, so log the Gravitino-side detail, which the constructor takes no cause for.
+      LOG.debug("Gravitino rejected addPartition for table {}", gravitinoTable.name(), e);
+      throw new PartitionsAlreadyExistException(gravitinoTable.name(), ident, partitionSchema);
     }
   }
 
