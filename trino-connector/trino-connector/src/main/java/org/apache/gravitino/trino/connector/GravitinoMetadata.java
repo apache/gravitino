@@ -225,6 +225,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   }
 
   @Override
+  public Optional<Type> getSupportedType(
+      ConnectorSession session, Map<String, Object> tableProperties, Type type) {
+    return metadataAdapter.getDataTypeTransformer().getSupportedType(type);
+  }
+
+  @Override
   public ConnectorOutputTableHandle beginCreateTable(
       ConnectorSession session,
       ConnectorTableMetadata tableMetadata,

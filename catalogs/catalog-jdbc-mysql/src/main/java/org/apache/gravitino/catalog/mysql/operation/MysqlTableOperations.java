@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.mysql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter.CURRENT_TIMESTAMP;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
@@ -50,11 +51,13 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for MySQL. */
@@ -312,6 +315,29 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>MySQL requires the fractional seconds precision of CURRENT_TIMESTAMP to match the one of the
+   * column: {@code DATETIME(6) DEFAULT CURRENT_TIMESTAMP} is rejected while {@code DATETIME(6)
+   * DEFAULT CURRENT_TIMESTAMP(6)} is accepted. Columns without a precision, or with precision 0,
+   * keep the bare CURRENT_TIMESTAMP.
+   *
+   * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/timestamp-initialization.html">Automatic
+   *     Initialization and Updating for TIMESTAMP and DATETIME</a>
+   */
+  @Override
+  protected String renderDefaultValue(Type type, Expression defaultValue) {
+    String rendered = super.renderDefaultValue(type, defaultValue);
+    if (CURRENT_TIMESTAMP.equals(rendered) && type instanceof Types.TimestampType) {
+      int precision = ((Types.TimestampType) type).precision();
+      if (precision > 0) {
+        return String.format("%s(%d)", rendered, precision);
+      }
+    }
+    return rendered;
+  }
+
   private String updateColumnAutoIncrementDefinition(
       JdbcTable table, TableChange.UpdateColumnAutoIncrement change) {
     if (change.fieldName().length > 1) {
@@ -471,7 +497,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(renderDefaultValue(addColumn.getDataType(), addColumn.getDefaultValue()))
           .append(SPACE);
     }
 
