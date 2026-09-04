@@ -416,6 +416,14 @@ fixed list of keys the server itself always uses (e.g. `http.method`, `http.stat
 is exempt from that substring check, since otherwise `auth.method` would be masked for merely
 containing "auth".
 
+Every request that reaches the server produces at least one audit entry, even one whose operation
+has no dedicated `Event` subclass: `HttpAuditFilter` dispatches a generic fallback event (method,
+URI, status code, and the same auto-captured query parameters) for any request where no
+operation-layer event fired. On a server that sees a high rate of otherwise-unaudited calls to the
+same endpoint — for example an Iceberg REST catalog's `/v1/config`, which some clients poll
+frequently — this can measurably increase audit log volume; size log rotation and retention in
+`conf/log4j2.properties` (below) accordingly.
+
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
@@ -465,6 +473,12 @@ package.
 
 Throwing a `ForbiddenException` from a pre-event handler stops the operation before it runs, which
 makes pre-events a veto point rather than a notification.
+
+`customInfo()` on every event includes the request's query parameters, and a custom listener
+receives them **unredacted** — the masking described under "Audit Logging" above is applied only by
+the two built-in audit-log formatters at format time, not to the event object itself. A listener
+that forwards `customInfo()` elsewhere (logs, a metrics pipeline, a downstream service) is
+responsible for its own redaction if that matters for its destination.
 
 A plugin declares how its events are dispatched:
 

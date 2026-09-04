@@ -22,11 +22,12 @@ package org.apache.gravitino.server.web;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -137,11 +138,7 @@ public class TestRequestContextFilter {
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("1.2.3.4");
-    when(req.getParameterMap())
-        .thenReturn(
-            ImmutableMap.of(
-                "details", new String[] {"true"},
-                "token", new String[] {"secret-value"}));
+    when(req.getQueryString()).thenReturn("details=true&token=secret-value");
 
     AtomicReference<Map<String, String>> captured = new AtomicReference<>();
     FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
@@ -158,8 +155,7 @@ public class TestRequestContextFilter {
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("1.2.3.4");
-    when(req.getParameterMap())
-        .thenReturn(ImmutableMap.of("keyword", new String[] {"a", "b", "c"}));
+    when(req.getQueryString()).thenReturn("keyword=a&keyword=b&keyword=c");
 
     AtomicReference<Map<String, String>> captured = new AtomicReference<>();
     FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
@@ -170,23 +166,112 @@ public class TestRequestContextFilter {
   }
 
   /**
-   * A servlet container is not expected to hand back a null value array, but the type
-   * (Map<String,String[]>) allows it, and this is fed from request data — a null value must not
-   * crash the whole request.
+   * Query strings are percent-encoded ({@code application/x-www-form-urlencoded}); both the name
+   * and the value must come back decoded, including {@code +} decoding to a space.
    */
   @Test
-  public void testNullValueArrayDoesNotThrow() throws IOException, ServletException {
+  public void testQueryParamsAreUrlDecoded() throws IOException, ServletException {
     HttpServletRequest req = mock(HttpServletRequest.class);
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("1.2.3.4");
-    when(req.getParameterMap()).thenReturn(Collections.singletonMap("empty", null));
+    when(req.getQueryString()).thenReturn("full+name=Alice+Smith&sym=%26");
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    filterWithEventBus.doFilter(req, resp, chain);
+
+    Assertions.assertEquals("Alice Smith", captured.get().get("full name"));
+    Assertions.assertEquals("&", captured.get().get("sym"));
+  }
+
+  /**
+   * A name with no {@code =} (e.g. {@code ?flag}) is a valid query string; it must be captured with
+   * an empty value rather than crashing the whole request.
+   */
+  @Test
+  public void testValuelessParamDoesNotThrow() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getQueryString()).thenReturn("flag");
 
     AtomicReference<Map<String, String>> captured = new AtomicReference<>();
     FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
 
     Assertions.assertDoesNotThrow(() -> filterWithEventBus.doFilter(req, resp, chain));
-    Assertions.assertEquals("", captured.get().get("empty"));
+    Assertions.assertEquals("", captured.get().get("flag"));
+  }
+
+  /**
+   * The query string is attacker-influenced input; malformed percent-encoding (e.g. a truncated
+   * {@code %} escape) must not crash the whole request — it falls back to the raw component.
+   */
+  @Test
+  public void testMalformedPercentEncodingDoesNotThrow() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getQueryString()).thenReturn("bad=100%");
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    Assertions.assertDoesNotThrow(() -> filterWithEventBus.doFilter(req, resp, chain));
+    Assertions.assertEquals("100%", captured.get().get("bad"));
+  }
+
+  /**
+   * Pins the bound on parameter count: a query string with more distinct names than {@link
+   * RequestContextFilter#MAX_PARAMETERS} must not grow the captured map without limit.
+   */
+  @Test
+  public void testParameterCountIsCapped() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    String queryString =
+        IntStream.range(0, RequestContextFilter.MAX_PARAMETERS + 20)
+            .mapToObj(i -> "p" + i + "=v")
+            .collect(Collectors.joining("&"));
+    when(req.getQueryString()).thenReturn(queryString);
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    filterWithEventBus.doFilter(req, resp, chain);
+
+    Assertions.assertEquals(RequestContextFilter.MAX_PARAMETERS, captured.get().size());
+  }
+
+  /**
+   * Pins the bound on value length: a single oversized value must be truncated with an explicit
+   * marker, not copied in full into every event constructed during the request.
+   */
+  @Test
+  public void testValueLengthIsTruncated() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    String hugeValue =
+        String.join("", Collections.nCopies(RequestContextFilter.MAX_VALUE_LENGTH + 100, "a"));
+    when(req.getQueryString()).thenReturn("big=" + hugeValue);
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    filterWithEventBus.doFilter(req, resp, chain);
+
+    String capturedBig = captured.get().get("big");
+    Assertions.assertTrue(capturedBig.endsWith(RequestContextFilter.TRUNCATED_SUFFIX), capturedBig);
+    Assertions.assertEquals(
+        RequestContextFilter.MAX_VALUE_LENGTH + RequestContextFilter.TRUNCATED_SUFFIX.length(),
+        capturedBig.length());
   }
 
   @Test
@@ -195,7 +280,7 @@ public class TestRequestContextFilter {
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("1.2.3.4");
-    when(req.getParameterMap()).thenReturn(ImmutableMap.of("details", new String[] {"true"}));
+    when(req.getQueryString()).thenReturn("details=true");
 
     filterWithEventBus.doFilter(req, resp, (request, response) -> {});
 
@@ -216,7 +301,7 @@ public class TestRequestContextFilter {
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("1.2.3.4");
-    when(req.getParameterMap()).thenReturn(ImmutableMap.of("details", new String[] {"true"}));
+    when(req.getQueryString()).thenReturn("details=true");
 
     AtomicReference<Map<String, String>> capturedParams = new AtomicReference<>();
     AtomicReference<String> capturedAddress = new AtomicReference<>();

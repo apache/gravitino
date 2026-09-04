@@ -199,4 +199,19 @@ public class TestRequestContext {
     RequestContext.clear();
     Assertions.assertFalse(RequestContext.isOperationSuccessFired());
   }
+
+  /**
+   * Failure is sticky: a success dispatch that happens to follow a failure dispatch on the same
+   * thread (not expected in practice, but not structurally prevented either) must not overwrite it
+   * — otherwise HttpAuditFilter would see isOperationFailureFired() == false and double-log a
+   * 4xx/5xx response with its own fallback failure event, on top of the real operation-layer one.
+   */
+  @Test
+  public void testMarkOperationSuccessFiredDoesNotOverwriteFailure() {
+    RequestContext.markOperationFailureFired();
+    RequestContext.markOperationSuccessFired();
+    Assertions.assertTrue(RequestContext.isOperationFailureFired(), "failure must remain recorded");
+    Assertions.assertFalse(
+        RequestContext.isOperationSuccessFired(), "success must not overwrite a recorded failure");
+  }
 }

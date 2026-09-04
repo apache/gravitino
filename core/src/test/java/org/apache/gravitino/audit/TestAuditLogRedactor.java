@@ -97,6 +97,34 @@ public class TestAuditLogRedactor {
         AuditLogRedactor.REDACTED_VALUE, AuditLogRedactor.redactCustomInfo(info).get("PASSWORD"));
   }
 
+  /**
+   * The substring list has multi-word entries ("apikey", "accesskey", "privatekey"), but
+   * caller-supplied key names almost always separate those words with a hyphen or underscore
+   * ("api-key", "x-api-key", "access-key-id", "private_key"). Pins that the match is done against a
+   * separator-stripped form of the key, not just a lowercased one, so these realistic spellings are
+   * actually caught instead of silently passing through in cleartext.
+   */
+  @Test
+  public void testSubstringMatchIgnoresSeparators() {
+    Map<String, String> info = Collections.singletonMap("api-key", "abcd1234");
+    Assertions.assertEquals(
+        AuditLogRedactor.REDACTED_VALUE, AuditLogRedactor.redactCustomInfo(info).get("api-key"));
+
+    Map<String, String> info2 = Collections.singletonMap("x-api-key", "abcd1234");
+    Assertions.assertEquals(
+        AuditLogRedactor.REDACTED_VALUE, AuditLogRedactor.redactCustomInfo(info2).get("x-api-key"));
+
+    Map<String, String> info3 = Collections.singletonMap("access-key-id", "abcd1234");
+    Assertions.assertEquals(
+        AuditLogRedactor.REDACTED_VALUE,
+        AuditLogRedactor.redactCustomInfo(info3).get("access-key-id"));
+
+    Map<String, String> info4 = Collections.singletonMap("private_key", "abcd1234");
+    Assertions.assertEquals(
+        AuditLogRedactor.REDACTED_VALUE,
+        AuditLogRedactor.redactCustomInfo(info4).get("private_key"));
+  }
+
   @Test
   public void testKeyIsPreservedEvenWhenValueIsRedacted() {
     Map<String, String> info = Collections.singletonMap("token", "secretvalue");

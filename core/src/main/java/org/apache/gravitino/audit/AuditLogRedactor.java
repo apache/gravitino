@@ -47,13 +47,14 @@ public final class AuditLogRedactor {
           "authorization", "cookie", "x-amz-security-token", "s3.access-key-id", "jdbc-password");
 
   /**
-   * Case-insensitive substrings of a {@code customInfo} key that mark it as sensitive, checked in
+   * Case-insensitive substrings of a {@code customInfo} key that mark it as sensitive, checked
+   * (against a separator-stripped form of the key — see {@link #isSensitiveKey(String)}) in
    * addition to the exact-match {@link #MASKED_CUSTOM_INFO_KEYS}. This exists because some keys —
    * notably request query-parameter names, which become {@code customInfo} entries via {@link
    * org.apache.gravitino.listener.api.event.Event#customInfo()} — are supplied by the caller and
-   * can use arbitrary naming conventions (e.g. {@code accessToken}, {@code s3-secret-access-key})
-   * that an exact-match list alone would miss. Extend this set as new sensitive key names are
-   * identified.
+   * can use arbitrary naming conventions (e.g. {@code accessToken}, {@code s3-secret-access-key},
+   * {@code api-key}, {@code x_api_key}) that an exact-match list alone would miss. Extend this set
+   * as new sensitive key names are identified.
    */
   private static final Set<String> SENSITIVE_KEY_SUBSTRINGS =
       ImmutableSet.of(
@@ -112,11 +113,19 @@ public final class AuditLogRedactor {
     if (key == null) {
       return false;
     }
+    // Exact-match checks run against the raw (only case-folded) key: NEVER_SENSITIVE_KEYS and
+    // MASKED_CUSTOM_INFO_KEYS are fixed literals, so there is nothing to normalize away.
     String lowerCaseKey = key.toLowerCase(Locale.ROOT);
     if (NEVER_SENSITIVE_KEYS.contains(lowerCaseKey)) {
       return false;
     }
-    return MASKED_CUSTOM_INFO_KEYS.contains(lowerCaseKey)
-        || SENSITIVE_KEY_SUBSTRINGS.stream().anyMatch(lowerCaseKey::contains);
+    if (MASKED_CUSTOM_INFO_KEYS.contains(lowerCaseKey)) {
+      return true;
+    }
+    // Caller-supplied key names vary in separator style (api-key, api_key, x-api-key, ...), so the
+    // substring check strips everything but letters and digits before matching; otherwise a
+    // hyphenated or underscored spelling of a multi-word entry like "apikey" would never match.
+    String normalizedKey = lowerCaseKey.replaceAll("[^a-z0-9]", "");
+    return SENSITIVE_KEY_SUBSTRINGS.stream().anyMatch(normalizedKey::contains);
   }
 }

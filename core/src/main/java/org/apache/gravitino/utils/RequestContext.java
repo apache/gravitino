@@ -36,12 +36,16 @@ import java.util.Map;
  *       org.apache.gravitino.listener.api.event.FailureEvent} is dispatched, so that {@code
  *       HttpAuditFilter} can skip emitting a redundant HTTP-level fallback event for the same
  *       request. Exposed as two independent-looking flags ({@code operationFailureFired}/{@code
- *       operationSuccessFired}) for callers, but backed by a single tri-state value — a request's
- *       operation layer dispatches at most one terminal event (success or failure), never both, so
- *       there is nothing to track independently. {@code HttpAuditFilter} still produces both a
- *       success and a failure entry for the "operation succeeded but HTTP delivery failed" case,
- *       because that failure entry comes from the filter's own HTTP-status check, not from a second
- *       operation-layer flag.
+ *       operationSuccessFired}) for callers, but backed by a single tri-state value — normally a
+ *       request's operation layer dispatches at most one terminal event (success or failure), never
+ *       both, so there is nothing to track independently. That is an expectation on callers, not
+ *       something this class enforces, so failure is treated as sticky: {@link
+ *       #markOperationSuccessFired()} is a no-op once a failure has been recorded on this thread,
+ *       so a later success dispatch can never erase it and cause a 4xx/5xx response to be
+ *       double-logged as if no operation-layer failure had fired. {@code HttpAuditFilter} still
+ *       produces both a success and a failure entry for the "operation succeeded but HTTP delivery
+ *       failed" case, because that failure entry comes from the filter's own HTTP-status check, not
+ *       from a second operation-layer flag.
  *   <li><b>auditExtras</b> — optional {@code customInfo} facts stashed by an inner dispatcher and
  *       consumed by the outer event dispatcher so one operation still produces one event.
  *   <li><b>requestQueryParams</b> — the current request's query parameters, captured raw (not
@@ -123,9 +127,17 @@ public class RequestContext {
    * Marks that an operation-layer success {@code Event} has been dispatched for the current
    * request. Called by {@code EventBus.dispatchPostEvent()} for every success event that is not
    * itself an {@code HttpRequestEvent}.
+   *
+   * <p>A no-op if a failure was already recorded on this thread: the failure outcome is monotonic
+   * (mirroring the pre-existing {@code operationFailureFired} boolean this replaced), so a success
+   * event dispatched after a failure event for the same request — which should not normally happen,
+   * but is not structurally prevented — can never erase it and cause {@code HttpAuditFilter} to
+   * double-log a 4xx/5xx response as if no operation-layer failure had fired.
    */
   public static void markOperationSuccessFired() {
-    OPERATION_OUTCOME.set(OperationOutcome.SUCCESS);
+    if (OPERATION_OUTCOME.get() != OperationOutcome.FAILURE) {
+      OPERATION_OUTCOME.set(OperationOutcome.SUCCESS);
+    }
   }
 
   /**
