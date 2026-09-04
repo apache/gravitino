@@ -330,7 +330,8 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, List<String> locations) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
+      notifyEntityNameIdMappingChange(ident, type);
       MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       String metalake =
           type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
@@ -368,7 +369,7 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObject newMetadataObject =
@@ -390,8 +391,16 @@ public class AuthorizationUtils {
     }
   }
 
-  private static void notifyEntityNameIdMappingChange(
-      NameIdentifier ident, Entity.EntityType type) {
+  /**
+   * Notifies the built-in authorizer that an entity name may now resolve to a different ID.
+   *
+   * <p>This does not push a metadata change to the catalog authorization plugin. Use it when only
+   * Gravitino's local authorization caches support the entity type.
+   *
+   * @param ident the entity identifier whose mapping changed
+   * @param type the entity type
+   */
+  public static void notifyEntityNameIdMappingChange(NameIdentifier ident, Entity.EntityType type) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer == null) {
       return;
@@ -528,7 +537,7 @@ public class AuthorizationUtils {
     List<String> locations = new ArrayList<>();
 
     // If we don't enable authorization, the location should return empty collection.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() == null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() == null) {
       return locations;
     }
 

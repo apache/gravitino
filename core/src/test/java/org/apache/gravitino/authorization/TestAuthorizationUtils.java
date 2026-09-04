@@ -249,7 +249,10 @@ class TestAuthorizationUtils {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
@@ -279,7 +282,10 @@ class TestAuthorizationUtils {
     Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(
@@ -337,7 +343,7 @@ class TestAuthorizationUtils {
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
     Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
@@ -346,6 +352,31 @@ class TestAuthorizationUtils {
       NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
       AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.TABLE, "new_table");
+
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testRemovePrivilegesNotifiesEntityNameIdMappingChange() {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalogManager.loadCatalog(Mockito.any())).thenReturn(baseCatalog);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, Collections.emptyList());
 
       Mockito.verify(authorizer)
           .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
@@ -366,7 +397,7 @@ class TestAuthorizationUtils {
     Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
@@ -406,7 +437,7 @@ class TestAuthorizationUtils {
     Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {

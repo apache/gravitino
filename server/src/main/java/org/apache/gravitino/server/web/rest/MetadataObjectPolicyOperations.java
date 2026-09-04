@@ -251,12 +251,19 @@ public class MetadataObjectPolicyOperations {
       @PathParam("fullName") @AuthorizationFullName String fullName,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_POLICY)
           PoliciesAssociateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handlePolicyException(
+          OperationType.ASSOCIATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received associate policies request for object type: {}, full name: {} under metalake: {}",
         type,
         fullName,
         metalake);
-
     try {
       return Utils.doAs(
           httpRequest,
