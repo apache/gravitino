@@ -56,6 +56,8 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -354,7 +356,15 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class,
-                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())));
+                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelMetaMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelVersionInfoMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelVersionsBySchemaIds(schemaIds.get())));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -502,10 +512,10 @@ public class SchemaMetaService {
   }
 
   /**
-   * Holds the parent schema row while a table, view, fileset, function, model, model version, or
-   * topic is written, so a child cannot be added below a schema that is going away. The lock is
-   * shared, so children of the same schema can still be written in parallel; dropping the schema
-   * takes the row exclusively and therefore waits for them.
+   * Holds the parent schema row while a table, view, fileset, function, model, model version,
+   * Semantic Model, or topic is written, so a child cannot be added below a schema that is going
+   * away. The lock is shared, so children of the same schema can still be written in parallel;
+   * dropping the schema takes the row exclusively and therefore waits for them.
    */
   void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
@@ -566,8 +576,8 @@ public class SchemaMetaService {
   }
 
   /**
-   * Checks that nothing is left under the schema. Views and functions are included: they used to be
-   * missing here, which let a non-cascade drop leave their rows behind with no parent.
+   * Checks that nothing is left under the schema. Views, functions, and Semantic Models are
+   * included so a non-cascade drop cannot leave their rows behind with no parent.
    */
   private void checkSchemaIsEmpty(NameIdentifier identifier, SchemaPO schemaPO) {
     boolean hasDescendantSchemas = !listDescendantSchemaPOs(schemaPO).isEmpty();
@@ -601,13 +611,19 @@ public class SchemaMetaService {
                 FunctionMetaMapper.class,
                 mapper -> mapper.listFunctionPOsBySchemaId(schemaPO.getSchemaId()))
             .isEmpty();
+    boolean hasSemanticModels =
+        !SessionUtils.getWithoutCommit(
+                SemanticModelMetaMapper.class,
+                mapper -> mapper.listSemanticModelPOsBySchemaId(schemaPO.getSchemaId()))
+            .isEmpty();
     if (hasDescendantSchemas
         || hasTables
         || hasFilesets
         || hasModels
         || hasTopics
         || hasViews
-        || hasFunctions) {
+        || hasFunctions
+        || hasSemanticModels) {
       throw new NonEmptyEntityException(
           "Entity %s has sub-entities, you should remove sub-entities first", identifier);
     }
@@ -668,7 +684,8 @@ public class SchemaMetaService {
     IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
     if (generator == null) {
       throw new IllegalStateException(
-          "IdGenerator is not initialized in GravitinoEnv; ensure it is set up before inserting nested schemas");
+          "IdGenerator is not initialized in GravitinoEnv; ensure it is set up before inserting"
+              + " nested schemas");
     }
     return generator.nextId();
   }
