@@ -48,6 +48,8 @@ import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -144,6 +146,14 @@ public class TestPaimonCatalog {
                 "paimon",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  void testS3AFileSystemIsAvailable() throws IOException {
+    Class<? extends FileSystem> fileSystemClass =
+        FileSystem.getFileSystemClass("s3a", new Configuration());
+
+    Assertions.assertEquals("org.apache.hadoop.fs.s3a.S3AFileSystem", fileSystemClass.getName());
   }
 
   @Test
