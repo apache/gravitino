@@ -28,6 +28,20 @@ The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
 
+### Time type mapping
+
+`TIME`, `TIMESTAMP` and `TIMESTAMP WITH TIME ZONE` columns keep their precision in both directions, the same way
+the native Trino MySQL connector does:
+
+| Trino type                    | MySQL type     |
+|-------------------------------|----------------|
+| `TIME(n)`                     | `TIME(n)`      |
+| `TIMESTAMP(n)`                | `DATETIME(n)`  |
+| `TIMESTAMP(n) WITH TIME ZONE` | `TIMESTAMP(n)` |
+
+`n` ranges from 0 to 6, a higher precision is reduced to 6. `TIMESTAMP` without a precision is `TIMESTAMP(3)` in
+Trino, so it creates a `DATETIME(3)` column.
+
 ## Alter Table
 
 Support for the following alter table operations:
