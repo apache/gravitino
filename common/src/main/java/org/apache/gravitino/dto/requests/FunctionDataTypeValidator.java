@@ -74,7 +74,7 @@ final class FunctionDataTypeValidator {
       Types.ExternalType externalType = (Types.ExternalType) dataType;
       Preconditions.checkArgument(
           StringUtils.isNotBlank(externalType.catalogString()),
-          "\"%s.catalogString\" field is required and cannot be empty",
+          "\"%s.catalogString\" field is required and cannot be blank",
           fieldPath);
       return;
     }
