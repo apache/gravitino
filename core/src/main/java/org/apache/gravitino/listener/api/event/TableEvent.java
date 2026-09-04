@@ -48,13 +48,4 @@ public abstract class TableEvent extends Event {
   public OperationStatus operationStatus() {
     return OperationStatus.SUCCESS;
   }
-<<<<<<< HEAD
-=======
-
-  /** {@inheritDoc} */
-  @Override
-  protected Map<String, String> ownCustomInfo() {
-    return customInfo;
-  }
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
 }

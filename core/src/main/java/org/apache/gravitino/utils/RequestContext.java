@@ -19,15 +19,14 @@
 
 package org.apache.gravitino.utils;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+
 /**
  * Holds per-request context data in a {@link ThreadLocal} so that event classes constructed on the
  * servlet thread can capture it without carrying a servlet dependency.
  *
-<<<<<<< HEAD
- * <p>Currently tracks two pieces of state:
-=======
  * <p>Currently tracks four pieces of state:
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
  *
  * <ul>
  *   <li><b>remoteAddress</b> — the client IP resolved from {@code X-Forwarded-For} or {@link
@@ -35,10 +34,6 @@ package org.apache.gravitino.utils;
  *   <li><b>operationOutcome</b> — set by {@link org.apache.gravitino.listener.EventBus} when an
  *       operation-layer {@link org.apache.gravitino.listener.api.event.Event} or {@link
  *       org.apache.gravitino.listener.api.event.FailureEvent} is dispatched, so that {@code
-<<<<<<< HEAD
- *       HttpAuditFilter} can skip emitting a redundant HTTP-level failure event for the same
- *       request.
-=======
  *       HttpAuditFilter} can skip emitting a redundant HTTP-level fallback event for the same
  *       request. Exposed as two independent-looking flags ({@code operationFailureFired}/{@code
  *       operationSuccessFired}) for callers, but backed by a single tri-state value — normally a
@@ -57,7 +52,6 @@ package org.apache.gravitino.utils;
  *       redacted — see {@code AuditLogRedactor}) once per request by {@code RequestContextFilter}
  *       and read (non-destructively) by every {@link org.apache.gravitino.listener.api.event.Event}
  *       constructor.
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
  * </ul>
  *
  * <p><b>Threading contract:</b> values must be set and cleared on the same (servlet) thread. Event
@@ -73,13 +67,9 @@ public class RequestContext {
   }
 
   private static final ThreadLocal<String> REMOTE_ADDRESS = new ThreadLocal<>();
-<<<<<<< HEAD
-  private static final ThreadLocal<Boolean> OPERATION_FAILURE_FIRED = new ThreadLocal<>();
-=======
   private static final ThreadLocal<OperationOutcome> OPERATION_OUTCOME = new ThreadLocal<>();
   private static final ThreadLocal<Map<String, String>> AUDIT_EXTRAS = new ThreadLocal<>();
   private static final ThreadLocal<Map<String, String>> REQUEST_QUERY_PARAMS = new ThreadLocal<>();
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
 
   private RequestContext() {}
 
@@ -173,8 +163,6 @@ public class RequestContext {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Stashes optional audit extras for the current request thread. An inner dispatcher calls this
    * before returning or throwing so the outer event dispatcher can attach the extras to the
    * existing table event.
@@ -235,18 +223,13 @@ public class RequestContext {
   }
 
   /**
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
    * Removes all per-request bindings from the current thread. Must be called in a {@code finally}
    * block after the request completes to prevent thread-pool leaks.
    */
   public static void clear() {
     REMOTE_ADDRESS.remove();
-<<<<<<< HEAD
-    OPERATION_FAILURE_FIRED.remove();
-=======
     OPERATION_OUTCOME.remove();
     AUDIT_EXTRAS.remove();
     REQUEST_QUERY_PARAMS.remove();
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
   }
 }

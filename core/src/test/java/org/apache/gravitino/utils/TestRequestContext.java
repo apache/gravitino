@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.utils;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -67,8 +69,6 @@ public class TestRequestContext {
     Assertions.assertEquals(
         "main-thread-ip", RequestContext.getRemoteAddress(), "Main thread value unchanged");
   }
-<<<<<<< HEAD
-=======
 
   /**
    * Callers read the stash unconditionally on every table operation, so the common case is that
@@ -214,5 +214,4 @@ public class TestRequestContext {
     Assertions.assertFalse(
         RequestContext.isOperationSuccessFired(), "success must not overwrite a recorded failure");
   }
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
 }

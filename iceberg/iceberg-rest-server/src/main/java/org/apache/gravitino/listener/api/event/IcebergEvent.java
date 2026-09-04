@@ -55,12 +55,7 @@ public abstract class IcebergEvent extends Event {
 
   /** {@inheritDoc} */
   @Override
-<<<<<<< HEAD
-  public Map<String, String> customInfo() {
-    return icebergRequestContext.httpHeaders();
-=======
   protected Map<String, String> ownCustomInfo() {
-    return icebergRequestContext.customInfo();
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
+    return icebergRequestContext.httpHeaders();
   }
 }

@@ -45,18 +45,5 @@ public abstract class TableFailureEvent extends FailureEvent {
    */
   protected TableFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
-<<<<<<< HEAD
-=======
-    this.customInfo =
-        customInfo == null || customInfo.isEmpty()
-            ? ImmutableMap.of()
-            : ImmutableMap.copyOf(customInfo);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected Map<String, String> ownCustomInfo() {
-    return customInfo;
->>>>>>> 15259af5d ([#12872] fix(core): Capture and redact request query parameters in audit log entries (#12891))
   }
 }
