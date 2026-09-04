@@ -120,6 +120,23 @@ public class TestOccWriteSupport {
   }
 
   @Test
+  void testUpdateWithVersionSuccess() {
+    assertDoesNotThrow(
+        () ->
+            OccWriteSupport.updateWithVersion(
+                () -> 1, () -> new RuntimeException("Should not be thrown")));
+  }
+
+  @Test
+  void testUpdateWithVersionThrowsOnMiss() {
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            OccWriteSupport.updateWithVersion(
+                () -> 0, () -> new OptimisticLockException("test conflict")));
+  }
+
+  @Test
   void testDeleteChildrenWithVersionsEmptyOrNull() {
     NameIdentifier parentIdent = NameIdentifier.of("parent");
     assertDoesNotThrow(
