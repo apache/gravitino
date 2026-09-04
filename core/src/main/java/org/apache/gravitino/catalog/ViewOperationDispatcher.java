@@ -83,7 +83,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         catalogManager,
         store,
         idGenerator,
-        () -> GravitinoEnv.getInstance().schemaDispatcher(),
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
         secretManager);
   }
 

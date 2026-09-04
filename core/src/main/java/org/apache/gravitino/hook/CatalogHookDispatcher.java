@@ -102,7 +102,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
     try {
       // Set the creator as the owner of the catalog.
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
       if (ownerDispatcher != null) {
         ownerDispatcher.setOwner(
             ident.namespace().level(0),
