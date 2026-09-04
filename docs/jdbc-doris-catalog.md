@@ -240,6 +240,7 @@ The Doris catalog supports the following index types. Each index applies to a si
 - `PRIMARY_KEY` stays in the INDEX clause as a bare index (e.g. `` INDEX `PRIMARY` (`id`) ``), with no USING clause.
 - `UNIQUE_KEY` is emitted as a table model declaration (e.g. `` UNIQUE KEY(`id`) ``), outside the INDEX clause.
 - `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+- Native Doris `NGRAM_BF` indexes are detected during table loading but are not currently representable by a Gravitino index type. Loading a table that contains one fails with `UnsupportedOperationException` instead of mapping it to an unrelated Gravitino index type. Creating or altering NGRAM_BF indexes through Gravitino and preserving their `gram_size` or `bf_size` properties are not supported.
 :::
 
 **Primary Key example:**
