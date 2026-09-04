@@ -78,11 +78,19 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FUNCTION);
 
+  private static final Set<MetadataObject.Type> SEMANTIC_MODEL_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.SEMANTIC_MODEL);
+
   /**
    * Object types that {@link ManageGrants} can be bound to.
    *
    * <p>Binding at a parent level implicitly covers all children — for example, a grant on a SCHEMA
-   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, and MODEL inside it.
+   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, MODEL, FUNCTION, and
+   * SEMANTIC_MODEL inside it.
    */
   private static final Set<MetadataObject.Type> MANAGE_GRANTS_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
@@ -94,7 +102,8 @@ public class Privileges {
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.FILESET,
           MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION);
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   /**
    * Returns the Privilege with allow condition from the string representation.
@@ -218,6 +227,14 @@ public class Privileges {
         return ExecuteFunction.allow();
       case MODIFY_FUNCTION:
         return ModifyFunction.allow();
+
+        // Semantic model
+      case CREATE_SEMANTIC_MODEL:
+        return CreateSemanticModel.allow();
+      case SELECT_SEMANTIC_MODEL:
+        return SelectSemanticModel.allow();
+      case MODIFY_SEMANTIC_MODEL:
+        return ModifySemanticModel.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -346,6 +363,14 @@ public class Privileges {
         return ExecuteFunction.deny();
       case MODIFY_FUNCTION:
         return ModifyFunction.deny();
+
+        // Semantic model
+      case CREATE_SEMANTIC_MODEL:
+        return CreateSemanticModel.deny();
+      case SELECT_SEMANTIC_MODEL:
+        return SelectSemanticModel.deny();
+      case MODIFY_SEMANTIC_MODEL:
+        return ModifySemanticModel.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -1570,6 +1595,99 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return FUNCTION_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a semantic model. */
+  public static class CreateSemanticModel extends GenericPrivilege<CreateSemanticModel> {
+    private static final CreateSemanticModel ALLOW_INSTANCE =
+        new CreateSemanticModel(Condition.ALLOW, Name.CREATE_SEMANTIC_MODEL);
+    private static final CreateSemanticModel DENY_INSTANCE =
+        new CreateSemanticModel(Condition.DENY, Name.CREATE_SEMANTIC_MODEL);
+
+    private CreateSemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateSemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateSemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to discover a semantic model and load its definition. */
+  public static class SelectSemanticModel extends GenericPrivilege<SelectSemanticModel> {
+    private static final SelectSemanticModel ALLOW_INSTANCE =
+        new SelectSemanticModel(Condition.ALLOW, Name.SELECT_SEMANTIC_MODEL);
+    private static final SelectSemanticModel DENY_INSTANCE =
+        new SelectSemanticModel(Condition.DENY, Name.SELECT_SEMANTIC_MODEL);
+
+    private SelectSemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static SelectSemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static SelectSemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to rename a semantic model or alter its definition and metadata. */
+  public static class ModifySemanticModel extends GenericPrivilege<ModifySemanticModel> {
+    private static final ModifySemanticModel ALLOW_INSTANCE =
+        new ModifySemanticModel(Condition.ALLOW, Name.MODIFY_SEMANTIC_MODEL);
+    private static final ModifySemanticModel DENY_INSTANCE =
+        new ModifySemanticModel(Condition.DENY, Name.MODIFY_SEMANTIC_MODEL);
+
+    private ModifySemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ModifySemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ModifySemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
     }
   }
 }

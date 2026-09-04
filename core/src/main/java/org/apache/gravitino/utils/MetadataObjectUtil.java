@@ -284,6 +284,13 @@ public class MetadataObjectUtil {
         check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
         break;
 
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        check(
+            env.semanticModelDispatcher().semanticModelExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
       case ROLE:
         AuthorizationUtils.checkRole(identifier);
         try {
