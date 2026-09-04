@@ -345,6 +345,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
             + "gravitino.iceberg.rest-uri="
             + containerIcebergRestUri()
             + "\n"
+            + "gravitino.iceberg.rest-catalog.security=OAUTH2\n"
             + "gravitino.iceberg.rest-catalog.oauth2.server-uri="
             + oauthServer.serverUri("host.docker.internal")
             + OAuthServer.ICEBERG_TOKEN_PATH
