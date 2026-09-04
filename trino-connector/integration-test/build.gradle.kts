@@ -85,11 +85,8 @@ dependencies {
 }
 
 tasks.register("setupDependencies") {
-<<<<<<< HEAD
   dependsOn(":trino-connector:trino-connector-435-439:copyLibs")
-=======
   dependsOn(":bundles:aws-bundle:jar", ":bundles:iceberg-aws-bundle:jar")
->>>>>>> 5027095c1 ([#12712] fix(trino-connector): Add integration test for TLS + OAuth2 credential vending (#12713))
   dependsOn(":trino-connector:trino-connector-440-445:copyLibs")
   dependsOn(":trino-connector:trino-connector-446-451:copyLibs")
   dependsOn(":trino-connector:trino-connector-452-468:copyLibs")
