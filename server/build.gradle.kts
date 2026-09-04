@@ -54,6 +54,7 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.commons.io)
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
