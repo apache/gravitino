@@ -231,9 +231,21 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
-    // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
-    // nothing in the build catching it. RequestContextFilter is included here too so
-    // query-parameter capture applies uniformly, matching ICEBERG_SPEC above.
+    registerMetricsPathFilters(server, eventBus);
+  }
+
+  /**
+   * Registers request-context tracking and audit-on-failure coverage on {@link #METRICS_PATHS}.
+   * {@code /metrics} and {@code /prometheus/metrics} used to receive no such coverage at all, with
+   * nothing in the build catching it; {@code RequestContextFilter} is included too so
+   * query-parameter capture applies uniformly, matching {@link #ICEBERG_SPEC}. Package-private and
+   * static so a unit test can exercise it directly against a plain {@link JettyServer}, without
+   * booting the rest of {@link #initServer}. See GH-12760.
+   *
+   * @param server the Jetty server whose {@link #METRICS_PATHS} need filter coverage
+   * @param eventBus the event bus audit events are dispatched through
+   */
+  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
     for (String pathSpec : METRICS_PATHS) {
       server.addFilter(new RequestContextFilter(eventBus), pathSpec);
       server.addFilter(

@@ -42,16 +42,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.servlet.Filter;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.eclipse.jetty.http.pathmap.ServletPathSpec;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletMapping;
@@ -195,22 +198,28 @@ public class TestGravitinoServer {
           "/health.html" // FORWARD dispatcher type; binding again here would double-log probes.
           );
 
+  // Paths that are deliberately reachable without authentication, each with the reason it's
+  // still safe. GH-12760: extending this set is a deliberate, reviewed decision, not a default —
+  // every other servlet path must be covered by AuthenticationFilter. This is a distinct
+  // invariant from PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above: e.g. /configs is fully audited
+  // but intentionally unauthenticated, so it belongs in this set but not that one.
+  private static final Set<String> KNOWN_PUBLIC_PATHS =
+      ImmutableSet.of(
+          "/", // DefaultServlet / WebUIFilter: static UI assets, must load before login.
+          "/ui/*", // WebUIFilter: static UI assets, must load before login.
+          "/health/*", // HealthAliasServlet forwards into /api/health*, which IS authenticated
+          "/health.html", // via the FORWARD dispatcher type.
+          "/configs", // Intentionally public: backs the Web UI's pre-login OAuth bootstrap.
+          "/configs/secrets/providers", // Open pending GH-12921 (tracked authorization gate).
+          "/metrics", // Conventionally scraped without credentials.
+          "/prometheus/metrics");
+
   @Test
   public void testEveryServletPathIsCoveredByAuditFilter() throws Exception {
     gravitinoServer.initialize();
 
     ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
-
-    Set<String> auditedPathSpecs =
-        Arrays.stream(servletHandler.getFilterMappings())
-            .filter(
-                filterMapping ->
-                    HttpAuditFilter.class
-                        .getName()
-                        .equals(
-                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
-            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
-            .collect(Collectors.toSet());
+    Set<String> auditedPathSpecs = filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
 
     for (ServletMapping servletMapping : servletHandler.getServletMappings()) {
       for (String pathSpec : servletMapping.getPathSpecs()) {
@@ -218,7 +227,7 @@ public class TestGravitinoServer {
           continue;
         }
         assertTrue(
-            auditedPathSpecs.contains(pathSpec),
+            isPathSpecCovered(pathSpec, auditedPathSpecs),
             "Servlet path '"
                 + pathSpec
                 + "' is registered without HttpAuditFilter coverage. See GH-12760: every "
@@ -227,6 +236,73 @@ public class TestGravitinoServer {
                 + "PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above with a documented reason.");
       }
     }
+  }
+
+  @Test
+  public void testEveryServletPathIsEitherAuthenticatedOrDeliberatelyPublic() throws Exception {
+    gravitinoServer.initialize();
+
+    ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
+    Set<String> authenticatedPathSpecs =
+        filterPathSpecsFor(servletHandler, AuthenticationFilter.class);
+
+    for (ServletMapping servletMapping : servletHandler.getServletMappings()) {
+      for (String pathSpec : servletMapping.getPathSpecs()) {
+        if (isPathSpecCovered(pathSpec, authenticatedPathSpecs)) {
+          continue;
+        }
+        assertTrue(
+            KNOWN_PUBLIC_PATHS.contains(pathSpec),
+            "Servlet path '"
+                + pathSpec
+                + "' is neither covered by AuthenticationFilter nor listed in "
+                + "KNOWN_PUBLIC_PATHS. See GH-12760: a servlet must either require "
+                + "authentication or be a deliberate, reviewed public exception.");
+      }
+    }
+  }
+
+  /**
+   * Returns every pathSpec that {@code filterClass} is bound to on {@code servletHandler}.
+   *
+   * @param servletHandler the live servlet handler to inspect
+   * @param filterClass the filter class to look for
+   * @return the set of pathSpecs the filter is registered on
+   */
+  private static Set<String> filterPathSpecsFor(
+      ServletHandler servletHandler, Class<? extends Filter> filterClass) {
+    return Arrays.stream(servletHandler.getFilterMappings())
+        .filter(
+            filterMapping ->
+                filterClass
+                    .getName()
+                    .equals(servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
+        .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Whether every request a servlet registered under {@code servletPathSpec} can receive is also
+   * matched by at least one of {@code filterPathSpecs}, using Jetty's own path-spec matching
+   * semantics rather than exact string equality — so a servlet mounted at, say, {@code
+   * /api/internal/*} is correctly recognized as already covered by a filter bound to {@code
+   * /api/*}.
+   *
+   * @param servletPathSpec the servlet's registered pathSpec
+   * @param filterPathSpecs the pathSpecs a filter is bound to
+   * @return true if {@code servletPathSpec} is covered by one of {@code filterPathSpecs}
+   */
+  private static boolean isPathSpecCovered(String servletPathSpec, Set<String> filterPathSpecs) {
+    // A path-prefix spec like "/api/*" matches any concrete path under it; substitute a
+    // representative concrete path so ServletPathSpec#matches can evaluate a real request path
+    // instead of a pattern.
+    String representativePath =
+        servletPathSpec.endsWith("/*")
+            ? servletPathSpec.substring(0, servletPathSpec.length() - 1) + "probe"
+            : servletPathSpec;
+    return filterPathSpecs.stream()
+        .anyMatch(
+            filterPathSpec -> new ServletPathSpec(filterPathSpec).matches(representativePath));
   }
 
   private static ServletContextHandler getServletContextHandler(GravitinoServer gravitinoServer)

@@ -20,9 +20,19 @@ package org.apache.gravitino.lance;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.gravitino.lance.common.config.LanceConfig;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.server.web.HttpAuditFilter;
+import org.apache.gravitino.server.web.JettyServer;
+import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.RequestContextFilter;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHandler;
 import org.junit.jupiter.api.Test;
 
 public class TestLanceRESTService {
@@ -30,27 +40,61 @@ public class TestLanceRESTService {
   /**
    * LanceRESTService.serviceInit() previously registered /metrics and /prometheus/metrics (added by
    * JettyServer#initialize() itself, outside LANCE_SPEC) with no audit coverage at all, and nothing
-   * in the build caught it. This test pins the fix by inspecting the source directly, since
-   * serviceInit() has too many external dependencies (namespace backends, Gravitino env state) to
-   * boot in a plain unit test. See GH-12760.
+   * in the build caught it. Rather than parse source text, this exercises the extracted
+   * LanceRESTService#registerMetricsPathFilters against a plain JettyServer and inspects the real
+   * ServletHandler filter mappings it produces, so a broken METRICS_PATHS list or a filter that
+   * merely appears in a comment cannot pass. See GH-12760.
    */
   @Test
-  public void testMetricsPathsHaveAuditFilterCoverage() throws IOException {
-    Path sourceFile = Path.of("src/main/java/org/apache/gravitino/lance/LanceRESTService.java");
-    String source = Files.readString(sourceFile);
+  public void testMetricsPathsHaveAuditFilterCoverage() throws Exception {
+    JettyServer server = new JettyServer();
+    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(new LanceConfig());
+    server.initialize(jettyServerConfig, "test-lance-rest", false);
+    EventBus eventBus = new EventBus(Collections.emptyList());
 
-    int loopStart = source.indexOf("for (String pathSpec : METRICS_PATHS)");
-    assertTrue(
-        loopStart >= 0,
-        "LanceRESTService must wire filters onto every path in METRICS_PATHS, see GH-12760");
+    LanceRESTService.registerMetricsPathFilters(server, eventBus);
 
-    int loopEnd = source.indexOf("}", loopStart);
-    assertTrue(loopEnd > loopStart, "Malformed METRICS_PATHS filter loop");
+    ServletHandler servletHandler = getServletContextHandler(server).getServletHandler();
+    Set<String> auditedPathSpecs =
+        Arrays.stream(servletHandler.getFilterMappings())
+            .filter(
+                filterMapping ->
+                    HttpAuditFilter.class
+                        .getName()
+                        .equals(
+                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
+            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
+            .collect(Collectors.toSet());
+    Set<String> requestContextPathSpecs =
+        Arrays.stream(servletHandler.getFilterMappings())
+            .filter(
+                filterMapping ->
+                    RequestContextFilter.class
+                        .getName()
+                        .equals(
+                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
+            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
+            .collect(Collectors.toSet());
 
-    String loopBody = source.substring(loopStart, loopEnd);
-    assertTrue(
-        loopBody.contains("HttpAuditFilter"),
-        "The METRICS_PATHS filter loop must bind HttpAuditFilter so /metrics and "
-            + "/prometheus/metrics get audit-on-failure coverage, see GH-12760");
+    for (String pathSpec : new String[] {"/metrics", "/prometheus/metrics"}) {
+      assertTrue(
+          auditedPathSpecs.contains(pathSpec),
+          "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
+      assertTrue(
+          requestContextPathSpecs.contains(pathSpec),
+          "'"
+              + pathSpec
+              + "' must be covered by RequestContextFilter for query-parameter "
+              + "capture, see GH-12760");
+    }
+
+    server.stop();
+  }
+
+  private static ServletContextHandler getServletContextHandler(JettyServer server)
+      throws Exception {
+    Field handlerField = JettyServer.class.getDeclaredField("servletContextHandler");
+    handlerField.setAccessible(true);
+    return (ServletContextHandler) handlerField.get(server);
   }
 }

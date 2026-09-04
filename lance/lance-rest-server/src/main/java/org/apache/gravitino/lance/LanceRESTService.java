@@ -159,15 +159,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
-    // GH-12760: /metrics and /prometheus/metrics used to receive no audit coverage at all, with
-    // nothing in the build catching it. RequestContextFilter is included here too so
-    // query-parameter capture applies uniformly, matching LANCE_SPEC above.
-    for (String pathSpec : METRICS_PATHS) {
-      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
-      server.addFilter(
-          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
-      server.addCustomFilters(pathSpec);
-    }
+    registerMetricsPathFilters(server, eventBus);
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
@@ -198,6 +190,26 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public void join() {
     if (server != null) {
       server.join();
+    }
+  }
+
+  /**
+   * Registers request-context tracking and audit-on-failure coverage on {@link #METRICS_PATHS}.
+   * {@code /metrics} and {@code /prometheus/metrics} used to receive no such coverage at all, with
+   * nothing in the build catching it; {@code RequestContextFilter} is included too so
+   * query-parameter capture applies uniformly, matching {@link #LANCE_SPEC}. Package-private and
+   * static so a unit test can exercise it directly against a plain {@link JettyServer}, without
+   * booting the rest of {@link #serviceInit}. See GH-12760.
+   *
+   * @param server the Jetty server whose {@link #METRICS_PATHS} need filter coverage
+   * @param eventBus the event bus audit events are dispatched through
+   */
+  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
+    for (String pathSpec : METRICS_PATHS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
+      server.addCustomFilters(pathSpec);
     }
   }
 
