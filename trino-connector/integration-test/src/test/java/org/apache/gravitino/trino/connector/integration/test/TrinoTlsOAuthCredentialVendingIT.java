@@ -83,9 +83,10 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   private static final String AUDIENCE = "gravitino-trino-it";
   private static final String CLIENT_CREDENTIAL = "test-client:test-secret";
   private static final String STORE_PASSWORD = "changeit";
-  // The enclosing @EnabledIfEnvironmentVariable guarantees this is non-blank whenever the test
-  // actually runs, so it always reflects the CI-prepared Trino image.
-  private static final String TRINO_IMAGE = TrinoContainer.DEFAULT_IMAGE;
+  // Deliberately not TrinoContainer.DEFAULT_IMAGE / GRAVITINO_CI_TRINO_DOCKER_IMAGE: that CI image
+  // identifies itself as Trino SPI version 435, which trino-connector-473-478 rejects outright.
+  // This test needs an actual Trino 473-478 build, so it pins the upstream image directly.
+  private static final String TRINO_IMAGE = "trinodb/trino:478";
   private static final String CONTAINER_TRUSTSTORE = "/etc/trino/tls/truststore.p12";
 
   private final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
@@ -154,10 +155,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     assertTrue(
         oauthServer.trinoIcebergTokenRequests() > 0,
         "The Trino Iceberg connector did not request an Iceberg REST OAuth2 token");
-    assertTrue(
-        oauthServer.auxIcebergTokenRequests() > 0,
-        "The embedded Iceberg REST service did not request its own OAuth2 token for dynamic"
-            + " catalog provisioning");
     assertEquals(
         0,
         oauthServer.invalidRequests(),
@@ -243,23 +240,11 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME,
         catalogName);
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_AUTH_TYPE, "oauth");
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_SERVER_URI,
-        oauthServer.serverUri("127.0.0.1"));
-    // Distinct from OAuthServer.ICEBERG_TOKEN_PATH: this path authenticates the embedded Iceberg
-    // REST service's own client to Gravitino for dynamic catalog provisioning, whereas
-    // ICEBERG_TOKEN_PATH is what Trino's Iceberg REST catalog authenticates against. Keeping them
-    // separate lets the test tell the two OAuth2 flows apart instead of one masking the other.
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_TOKEN_PATH,
-        OAuthServer.AUX_ICEBERG_TOKEN_PATH);
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_CREDENTIAL,
-        CLIENT_CREDENTIAL);
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_SCOPE, "test");
+    // No gravitino.iceberg-rest.gravitino-oauth2.* config here: with the Iceberg REST service
+    // embedded as an auxiliary service (ignoreIcebergAuxRestService = false above),
+    // DynamicIcebergConfigProvider resolves catalogs through GravitinoEnv's in-process dispatcher
+    // (IcebergRESTServerContext#isAuxMode()), never through an HTTP+OAuth2 client. Configuring
+    // that OAuth2 block here would be dead configuration this test can never actually exercise.
   }
 
   private void createCatalog() {
@@ -504,13 +489,11 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   }
 
   /**
-   * A minimal OAuth2 client-credentials token endpoint. It serves three distinct flows, each on its
+   * A minimal OAuth2 client-credentials token endpoint. It serves two distinct flows, each on its
    * own path with its own counter so the test can tell them apart:
    *
    * <ul>
    *   <li>{@link #GRAVITINO_TOKEN_PATH}: Trino's Gravitino client authenticating to Gravitino.
-   *   <li>{@link #AUX_ICEBERG_TOKEN_PATH}: the embedded Iceberg REST service authenticating itself
-   *       to Gravitino for dynamic catalog provisioning.
    *   <li>{@link #ICEBERG_TOKEN_PATH}: Trino's Iceberg REST catalog authenticating to the Iceberg
    *       REST service.
    * </ul>
@@ -518,7 +501,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   private static final class OAuthServer implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(OAuthServer.class);
     private static final String GRAVITINO_TOKEN_PATH = "/oauth2/gravitino/token";
-    private static final String AUX_ICEBERG_TOKEN_PATH = "/oauth2/iceberg-rest-server/token";
     private static final String ICEBERG_TOKEN_PATH = "/oauth2/iceberg/token";
 
     private final HttpServer server;
@@ -528,7 +510,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     private final String expectedClientId;
     private final String expectedClientSecret;
     private final AtomicInteger gravitinoTokenRequests = new AtomicInteger();
-    private final AtomicInteger auxIcebergTokenRequests = new AtomicInteger();
     private final AtomicInteger trinoIcebergTokenRequests = new AtomicInteger();
     private final AtomicInteger invalidRequests = new AtomicInteger();
 
@@ -544,8 +525,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
       this.server.createContext(
           GRAVITINO_TOKEN_PATH, exchange -> handle(exchange, gravitinoTokenRequests));
       this.server.createContext(
-          AUX_ICEBERG_TOKEN_PATH, exchange -> handle(exchange, auxIcebergTokenRequests));
-      this.server.createContext(
           ICEBERG_TOKEN_PATH, exchange -> handle(exchange, trinoIcebergTokenRequests));
     }
 
@@ -559,10 +538,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
     private int gravitinoTokenRequests() {
       return gravitinoTokenRequests.get();
-    }
-
-    private int auxIcebergTokenRequests() {
-      return auxIcebergTokenRequests.get();
     }
 
     private int trinoIcebergTokenRequests() {
