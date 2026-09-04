@@ -512,6 +512,14 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
             .collect(
                 Collectors.toMap(
                     Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue())));
+    // The engine variable name for each column handle passed in, the reverse of
+    // internalAssignments. Used below to find the engine variable a returned assignment refers
+    // to even if the internal connector renamed it (e.g. to avoid a name collision), since the
+    // same underlying column handle is preserved either way.
+    Map<ColumnHandle, String> engineVariableByColumn =
+        internalAssignments.entrySet().stream()
+            .collect(
+                Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey, (first, second) -> first));
     SchemaTableName tableName = getTableName(handle);
     return internalMetadata
         .applyProjection(session, GravitinoHandle.unWrap(handle), projections, internalAssignments)
@@ -535,7 +543,8 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
                                           GravitinoHandle.unWrap(handle),
                                           entry.getColumn()),
                                       entry.getColumn()),
-                                  resolveAssignmentType(entry, engineTypes, internalAssignments)))
+                                  resolveAssignmentType(
+                                      entry, engineTypes, engineVariableByColumn)))
                       .toList(),
                   result.isPrecalculateStatistics());
             });
@@ -921,23 +930,27 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
    * may type an assignment from its own column handle, which can disagree with the type this
    * connector declared for the same column, for example an unbounded varchar here and a
    * varchar(65535) there for MySQL tinytext. Since Trino 444, a plan whose symbol and expression
-   * types differ is rejected, so the engine type is applied instead, but only when the assignment
-   * still refers to the column the engine passed in under that name; columns the internal connector
-   * synthesized keep their internal types.
+   * types differ is rejected, so the engine type is applied instead - looked up via the column
+   * handle rather than the assignment's variable name, since the internal connector may have
+   * renamed the variable (e.g. to avoid a name collision) while keeping the same underlying column.
+   * Columns the internal connector synthesized, which have no entry in {@code
+   * engineVariableByColumn}, keep their internal types.
    *
    * @param assignment the assignment returned by the internal connector
    * @param engineTypes the types the engine assigned to the projected variables, by variable name
-   * @param internalAssignments the column handles the engine passed in, by variable name
+   * @param engineVariableByColumn the engine variable name for each column handle the engine passed
+   *     in
    * @return the type the returned assignment must carry
    */
   private static Type resolveAssignmentType(
       Assignment assignment,
       Map<String, Type> engineTypes,
-      Map<String, ColumnHandle> internalAssignments) {
-    if (!assignment.getColumn().equals(internalAssignments.get(assignment.getVariable()))) {
+      Map<ColumnHandle, String> engineVariableByColumn) {
+    String engineVariable = engineVariableByColumn.get(assignment.getColumn());
+    if (engineVariable == null) {
       return assignment.getType();
     }
-    return engineTypes.getOrDefault(assignment.getVariable(), assignment.getType());
+    return engineTypes.getOrDefault(engineVariable, assignment.getType());
   }
 
   private static Map<String, Type> collectVariableTypes(List<ConnectorExpression> expressions) {

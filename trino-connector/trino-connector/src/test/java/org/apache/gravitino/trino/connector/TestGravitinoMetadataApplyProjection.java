@@ -76,6 +76,25 @@ public class TestGravitinoMetadataApplyProjection {
   }
 
   @Test
+  public void testEngineTypeIsRestoredForRenamedColumn() {
+    ColumnHandle internalColumnHandle = mock(ColumnHandle.class);
+    Fixture fixture = new Fixture();
+    fixture.declareColumn("col_tinytext", internalColumnHandle);
+    // The internal connector renames the variable (e.g. to avoid a name collision) but keeps the
+    // same underlying column handle, matching the "col_tinytext_7" symbol from issue #12518.
+    fixture.internalReturns(
+        List.of(new Variable("col_tinytext_7", BOUNDED_VARCHAR)),
+        List.of(new Assignment("col_tinytext_7", internalColumnHandle, BOUNDED_VARCHAR)));
+
+    List<Assignment> assignments =
+        fixture.applyProjection(List.of(new Variable("col_tinytext", UNBOUNDED_VARCHAR)));
+
+    assertEquals(1, assignments.size());
+    assertEquals(UNBOUNDED_VARCHAR, assignments.get(0).getType());
+    assertEquals("col_tinytext_7", assignments.get(0).getVariable());
+  }
+
+  @Test
   public void testEngineTypeIsRestoredForColumnNestedInExpression() {
     ColumnHandle internalColumnHandle = mock(ColumnHandle.class);
     Fixture fixture = new Fixture();
