@@ -21,7 +21,9 @@ package org.apache.gravitino.server;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
@@ -86,18 +88,17 @@ public class GravitinoServer extends ResourceConfig {
 
   private static final String API_ANY_PATH = "/api/*";
 
-  // Servlets mounted outside API_ANY_PATH that are part of the Gravitino REST surface and need
-  // full coverage, including API versioning. See GH-12760.
-  private static final ImmutableList<String> ROOT_MOUNTED_API_PATHS =
-      ImmutableList.of(API_ANY_PATH, "/configs", "/configs/secrets/providers");
-
-  // /metrics and /prometheus/metrics are registered by JettyServer#initialize() itself (see
-  // server-common's JettyServer), outside the Gravitino REST surface, but still need
-  // request-context tracking and audit-on-failure. They intentionally skip VersioningFilter,
-  // which negotiates Gravitino's "application/vnd.gravitino.vN+json" media type and has no
-  // meaning for metrics output. See GH-12760.
-  private static final ImmutableList<String> ROOT_MOUNTED_NON_API_PATHS =
-      ImmutableList.of("/metrics", "/prometheus/metrics");
+  // Servlets mounted outside API_ANY_PATH that still need request-context tracking and
+  // audit-on-failure coverage. VersioningFilter is intentionally not applied to these: it
+  // negotiates Gravitino's "application/vnd.gravitino.vN+json" media type for the Jersey-managed
+  // REST surface, and none of these servlets are part of it or read that header. /metrics and
+  // /prometheus/metrics are registered by JettyServer#initialize() itself (see server-common's
+  // JettyServer), outside GravitinoServer's own control entirely. See GH-12760.
+  private static final ImmutableList<String> ROOT_MOUNTED_PATHS =
+      ImmutableList.<String>builder()
+          .add("/configs", "/configs/secrets/providers")
+          .addAll(JettyServer.METRICS_PATH_SPECS)
+          .build();
 
   public static final String CONF_FILE = "gravitino.conf";
 
@@ -212,34 +213,40 @@ public class GravitinoServer extends ResourceConfig {
 
     // Root-level aliases for enterprise GTMs that require probes at well-known root paths.
     // Forwards /health, /health/live, /health/ready, and /health.html to the canonical
-    // /api/health/* endpoints. Not part of ROOT_MOUNTED_API_PATHS/ROOT_MOUNTED_NON_API_PATHS
-    // below: HealthAliasServlet forwards every request into /api/health*, which API_ANY_PATH
-    // already covers via the servlet container's FORWARD dispatcher type, so binding the filters
-    // again here would double-log every probe.
+    // /api/health/* endpoints. Not part of ROOT_MOUNTED_PATHS below: HealthAliasServlet forwards
+    // every request into /api/health*, which API_ANY_PATH already covers via the servlet
+    // container's FORWARD dispatcher type, so binding the filters again here would double-log
+    // every probe.
     server.addServlet(new HealthAliasServlet(), "/health/*");
     server.addServlet(new HealthAliasServlet(), "/health.html");
 
+    // API_ANY_PATH keeps its original, unabridged filter set: this is the only pathspec that is
+    // part of the Jersey-managed REST surface, so it's the only one VersioningFilter applies to.
+    server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), API_ANY_PATH);
+    server.addFilter(
+        new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), API_ANY_PATH);
+    server.addFilter(new VersioningFilter(), API_ANY_PATH);
+
     // GH-12760: servlets mounted outside API_ANY_PATH used to receive none of the filters below
-    // (no request-context tracking, no audit-on-failure, no versioning, no custom filters), with
-    // nothing in the build catching it. Every pathSpec a servlet is registered under above must
-    // appear in one of the two lists below, unless it forwards into an already-covered path (see
-    // HealthAliasServlet above) or is added to the exemption list documented on
+    // (no request-context tracking, no audit-on-failure, no custom filters), with nothing in the
+    // build catching it. Every pathSpec a servlet is registered under above must appear in
+    // ROOT_MOUNTED_PATHS, unless it forwards into an already-covered path (see HealthAliasServlet
+    // above) or is added to the exemption list documented on
     // TestGravitinoServer#testEveryServletPathIsCoveredByAuditFilter. RequestContextFilter is
-    // given gravitinoEnv.eventBus() everywhere (not just API_ANY_PATH) so query-parameter capture
+    // given gravitinoEnv.eventBus() here too (not just API_ANY_PATH) so query-parameter capture
     // (see RequestContextFilter's class doc) applies uniformly, not only to the REST API.
-    for (String pathSpec : ROOT_MOUNTED_API_PATHS) {
+    for (String pathSpec : ROOT_MOUNTED_PATHS) {
       server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), pathSpec);
       server.addFilter(
           new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), pathSpec);
-      server.addCustomFilters(pathSpec);
-      server.addFilter(new VersioningFilter(), pathSpec);
     }
-    for (String pathSpec : ROOT_MOUNTED_NON_API_PATHS) {
-      server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), pathSpec);
-      server.addFilter(
-          new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), pathSpec);
-      server.addCustomFilters(pathSpec);
-    }
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(ROOT_MOUNTED_PATHS);
+    customFilterPaths.add(API_ANY_PATH);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     // Only API_ANY_PATH requires authentication today. /configs must stay open for the Web UI's
     // pre-login OAuth bootstrap (see docs/gravitino-server-config.md); /configs/secrets/providers

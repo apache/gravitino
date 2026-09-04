@@ -103,6 +103,7 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.lance)
 
   lanceSparkBundleVersions.forEach { version ->

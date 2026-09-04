@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.iceberg;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,11 +81,6 @@ public class RESTService implements GravitinoAuxiliaryService {
   public static final String ICEBERG_SPEC = "/iceberg/*";
   private static final String ICEBERG_REST_SPEC_PACKAGE =
       "org.apache.gravitino.iceberg.service.rest";
-
-  // /metrics and /prometheus/metrics are registered by JettyServer#initialize() itself, outside
-  // ICEBERG_SPEC, but still need audit-on-failure coverage. See GH-12760.
-  private static final ImmutableList<String> METRICS_PATHS =
-      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
@@ -220,37 +215,44 @@ public class RESTService implements GravitinoAuxiliaryService {
             EventSource.GRAVITINO_ICEBERG_REST_SERVER,
             new IcebergHealthCheckPathMatcher()),
         ICEBERG_SPEC);
-    server.addCustomFilters(ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint. Not part of METRICS_PATHS below: HealthAliasServlet
-    // forwards every request into /iceberg/health*, which ICEBERG_SPEC already covers via the
-    // servlet container's FORWARD dispatcher type, so binding the filter again here would
-    // double-log every probe.
+    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // HealthAliasServlet forwards every request into /iceberg/health*, which ICEBERG_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
     registerMetricsPathFilters(server, eventBus);
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
+    customFilterPaths.add(ICEBERG_SPEC);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
   }
 
   /**
-   * Registers request-context tracking and audit-on-failure coverage on {@link #METRICS_PATHS}.
-   * {@code /metrics} and {@code /prometheus/metrics} used to receive no such coverage at all, with
-   * nothing in the build catching it; {@code RequestContextFilter} is included too so
-   * query-parameter capture applies uniformly, matching {@link #ICEBERG_SPEC}. Package-private and
-   * static so a unit test can exercise it directly against a plain {@link JettyServer}, without
-   * booting the rest of {@link #initServer}. See GH-12760.
+   * Registers request-context tracking and audit-on-failure coverage on {@link
+   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
+   * receive no such coverage at all, with nothing in the build catching it; {@code
+   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
+   * {@link #ICEBERG_SPEC}. Package-private and static so a unit test can exercise it directly
+   * against a plain {@link JettyServer}, without booting the rest of {@link #initServer}. See
+   * GH-12760.
    *
-   * @param server the Jetty server whose {@link #METRICS_PATHS} need filter coverage
+   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
+   *     coverage
    * @param eventBus the event bus audit events are dispatched through
    */
   static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
-    for (String pathSpec : METRICS_PATHS) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
       server.addFilter(new RequestContextFilter(eventBus), pathSpec);
       server.addFilter(
           new HttpAuditFilter(eventBus, EventSource.GRAVITINO_ICEBERG_REST_SERVER), pathSpec);
-      server.addCustomFilters(pathSpec);
     }
   }
 

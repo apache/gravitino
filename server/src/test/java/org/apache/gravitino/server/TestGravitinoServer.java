@@ -36,13 +36,10 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import javax.servlet.Filter;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -53,6 +50,7 @@ import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.JettyServerTestUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.eclipse.jetty.http.pathmap.ServletPathSpec;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -69,6 +67,36 @@ import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestGravitinoServer {
+
+  // Static-asset and forwarding paths shared by both exemption sets below, each for the same
+  // reason in both: WebUIFilter's static assets and HealthAliasServlet's forwarded probes need
+  // no direct filter binding of their own on this path. See GH-12760.
+  private static final Set<String> STATIC_AND_FORWARDING_PATHS =
+      ImmutableSet.of(
+          "/", // DefaultServlet / WebUIFilter: serves static UI assets, no server-side logic.
+          "/ui/*", // WebUIFilter: serves static UI assets, no server-side logic.
+          "/health/*", // HealthAliasServlet forwards into /api/health*, already covered via the
+          "/health.html" // FORWARD dispatcher type; binding again here would double-log probes.
+          );
+
+  // Paths that legitimately have no HttpAuditFilter binding of their own. GH-12760: extending
+  // this set is a deliberate, reviewed decision, not a default — everything else registered on
+  // the servlet context must be covered.
+  private static final Set<String> PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE =
+      STATIC_AND_FORWARDING_PATHS;
+
+  // Paths that are deliberately reachable without authentication. GH-12760: extending this set
+  // is a deliberate, reviewed decision, not a default — every other servlet path must be covered
+  // by AuthenticationFilter. This is a distinct invariant from
+  // PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above: e.g. /configs is fully audited but
+  // intentionally unauthenticated, so it belongs in this set but not that one.
+  private static final Set<String> KNOWN_PUBLIC_PATHS =
+      ImmutableSet.<String>builder()
+          .addAll(STATIC_AND_FORWARDING_PATHS)
+          .add("/configs") // Intentionally public: backs the Web UI's pre-login OAuth bootstrap.
+          .add("/configs/secrets/providers") // Open pending GH-12921 (tracked authz gate).
+          .addAll(JettyServer.METRICS_PATH_SPECS) // Conventionally scraped without credentials.
+          .build();
 
   private GravitinoServer gravitinoServer;
   private ServerConfig spyServerConfig;
@@ -187,39 +215,13 @@ public class TestGravitinoServer {
     assertFalse(providers.get(0).containsKey("className"));
   }
 
-  // Paths that legitimately have no HttpAuditFilter binding of their own, each with the reason
-  // it's still safe. GH-12760: extending this set is a deliberate, reviewed decision, not a
-  // default — everything else registered on the servlet context must be covered.
-  private static final Set<String> PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE =
-      ImmutableSet.of(
-          "/", // DefaultServlet / WebUIFilter: serves static UI assets, no server-side logic.
-          "/ui/*", // WebUIFilter: serves static UI assets, no server-side logic.
-          "/health/*", // HealthAliasServlet forwards into /api/health*, already covered via the
-          "/health.html" // FORWARD dispatcher type; binding again here would double-log probes.
-          );
-
-  // Paths that are deliberately reachable without authentication, each with the reason it's
-  // still safe. GH-12760: extending this set is a deliberate, reviewed decision, not a default —
-  // every other servlet path must be covered by AuthenticationFilter. This is a distinct
-  // invariant from PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above: e.g. /configs is fully audited
-  // but intentionally unauthenticated, so it belongs in this set but not that one.
-  private static final Set<String> KNOWN_PUBLIC_PATHS =
-      ImmutableSet.of(
-          "/", // DefaultServlet / WebUIFilter: static UI assets, must load before login.
-          "/ui/*", // WebUIFilter: static UI assets, must load before login.
-          "/health/*", // HealthAliasServlet forwards into /api/health*, which IS authenticated
-          "/health.html", // via the FORWARD dispatcher type.
-          "/configs", // Intentionally public: backs the Web UI's pre-login OAuth bootstrap.
-          "/configs/secrets/providers", // Open pending GH-12921 (tracked authorization gate).
-          "/metrics", // Conventionally scraped without credentials.
-          "/prometheus/metrics");
-
   @Test
   public void testEveryServletPathIsCoveredByAuditFilter() throws Exception {
     gravitinoServer.initialize();
 
     ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
-    Set<String> auditedPathSpecs = filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
+    Set<String> auditedPathSpecs =
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
 
     for (ServletMapping servletMapping : servletHandler.getServletMappings()) {
       for (String pathSpec : servletMapping.getPathSpecs()) {
@@ -232,7 +234,7 @@ public class TestGravitinoServer {
                 + pathSpec
                 + "' is registered without HttpAuditFilter coverage. See GH-12760: every "
                 + "servlet mounted outside /api/* must be wired into GravitinoServer's "
-                + "ROOT_MOUNTED_API_PATHS/ROOT_MOUNTED_NON_API_PATHS filter loops, or added to "
+                + "ROOT_MOUNTED_PATHS filter loop, or added to "
                 + "PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above with a documented reason.");
       }
     }
@@ -244,7 +246,7 @@ public class TestGravitinoServer {
 
     ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
     Set<String> authenticatedPathSpecs =
-        filterPathSpecsFor(servletHandler, AuthenticationFilter.class);
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, AuthenticationFilter.class);
 
     for (ServletMapping servletMapping : servletHandler.getServletMappings()) {
       for (String pathSpec : servletMapping.getPathSpecs()) {
@@ -260,25 +262,6 @@ public class TestGravitinoServer {
                 + "authentication or be a deliberate, reviewed public exception.");
       }
     }
-  }
-
-  /**
-   * Returns every pathSpec that {@code filterClass} is bound to on {@code servletHandler}.
-   *
-   * @param servletHandler the live servlet handler to inspect
-   * @param filterClass the filter class to look for
-   * @return the set of pathSpecs the filter is registered on
-   */
-  private static Set<String> filterPathSpecsFor(
-      ServletHandler servletHandler, Class<? extends Filter> filterClass) {
-    return Arrays.stream(servletHandler.getFilterMappings())
-        .filter(
-            filterMapping ->
-                filterClass
-                    .getName()
-                    .equals(servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
-        .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
-        .collect(Collectors.toSet());
   }
 
   /**
@@ -310,10 +293,7 @@ public class TestGravitinoServer {
     Field serverField = GravitinoServer.class.getDeclaredField("server");
     serverField.setAccessible(true);
     JettyServer jettyServer = (JettyServer) serverField.get(gravitinoServer);
-
-    Field handlerField = JettyServer.class.getDeclaredField("servletContextHandler");
-    handlerField.setAccessible(true);
-    return (ServletContextHandler) handlerField.get(jettyServer);
+    return JettyServerTestUtils.getServletContextHandler(jettyServer);
   }
 
   private static ServerConfig serverConfigWithMemoryProvider() throws IOException {

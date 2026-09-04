@@ -20,18 +20,15 @@ package org.apache.gravitino.lance;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.JettyServerTestUtils;
 import org.apache.gravitino.server.web.RequestContextFilter;
-import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +39,8 @@ public class TestLanceRESTService {
    * JettyServer#initialize() itself, outside LANCE_SPEC) with no audit coverage at all, and nothing
    * in the build caught it. Rather than parse source text, this exercises the extracted
    * LanceRESTService#registerMetricsPathFilters against a plain JettyServer and inspects the real
-   * ServletHandler filter mappings it produces, so a broken METRICS_PATHS list or a filter that
-   * merely appears in a comment cannot pass. See GH-12760.
+   * ServletHandler filter mappings it produces, so a broken JettyServer.METRICS_PATH_SPECS list or
+   * a filter that merely appears in a comment cannot pass. See GH-12760.
    */
   @Test
   public void testMetricsPathsHaveAuditFilterCoverage() throws Exception {
@@ -54,29 +51,14 @@ public class TestLanceRESTService {
 
     LanceRESTService.registerMetricsPathFilters(server, eventBus);
 
-    ServletHandler servletHandler = getServletContextHandler(server).getServletHandler();
+    ServletHandler servletHandler =
+        JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
     Set<String> auditedPathSpecs =
-        Arrays.stream(servletHandler.getFilterMappings())
-            .filter(
-                filterMapping ->
-                    HttpAuditFilter.class
-                        .getName()
-                        .equals(
-                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
-            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
-            .collect(Collectors.toSet());
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
     Set<String> requestContextPathSpecs =
-        Arrays.stream(servletHandler.getFilterMappings())
-            .filter(
-                filterMapping ->
-                    RequestContextFilter.class
-                        .getName()
-                        .equals(
-                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
-            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
-            .collect(Collectors.toSet());
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, RequestContextFilter.class);
 
-    for (String pathSpec : new String[] {"/metrics", "/prometheus/metrics"}) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
       assertTrue(
           auditedPathSpecs.contains(pathSpec),
           "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
@@ -89,12 +71,5 @@ public class TestLanceRESTService {
     }
 
     server.stop();
-  }
-
-  private static ServletContextHandler getServletContextHandler(JettyServer server)
-      throws Exception {
-    Field handlerField = JettyServer.class.getDeclaredField("servletContextHandler");
-    handlerField.setAccessible(true);
-    return (ServletContextHandler) handlerField.get(server);
   }
 }

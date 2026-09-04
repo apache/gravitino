@@ -21,9 +21,10 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
-import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
@@ -64,11 +65,6 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public static final String LANCE_SPEC = "/lance/*";
 
   private static final String LANCE_REST_SPEC_PACKAGE = "org.apache.gravitino.lance.service.rest";
-
-  // /metrics and /prometheus/metrics are registered by JettyServer#initialize() itself, outside
-  // LANCE_SPEC, but still need audit-on-failure coverage. See GH-12760.
-  private static final ImmutableList<String> METRICS_PATHS =
-      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private JettyServer server;
   private NamespaceWrapper lanceNamespace;
@@ -143,7 +139,6 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new HttpAuditFilter(
             eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
         LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
     if (auxMode) {
       server.addFilter(
@@ -152,14 +147,21 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint. Not part of METRICS_PATHS below: HealthAliasServlet
-    // forwards every request into /lance/health*, which LANCE_SPEC already covers via the servlet
-    // container's FORWARD dispatcher type, so binding the filter again here would double-log every
-    // probe.
+    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
     registerMetricsPathFilters(server, eventBus);
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
+    customFilterPaths.add(LANCE_SPEC);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
@@ -194,22 +196,22 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   }
 
   /**
-   * Registers request-context tracking and audit-on-failure coverage on {@link #METRICS_PATHS}.
-   * {@code /metrics} and {@code /prometheus/metrics} used to receive no such coverage at all, with
-   * nothing in the build catching it; {@code RequestContextFilter} is included too so
-   * query-parameter capture applies uniformly, matching {@link #LANCE_SPEC}. Package-private and
-   * static so a unit test can exercise it directly against a plain {@link JettyServer}, without
-   * booting the rest of {@link #serviceInit}. See GH-12760.
+   * Registers request-context tracking and audit-on-failure coverage on {@link
+   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
+   * receive no such coverage at all, with nothing in the build catching it; {@code
+   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
+   * {@link #LANCE_SPEC}. Package-private and static so a unit test can exercise it directly against
+   * a plain {@link JettyServer}, without booting the rest of {@link #serviceInit}. See GH-12760.
    *
-   * @param server the Jetty server whose {@link #METRICS_PATHS} need filter coverage
+   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
+   *     coverage
    * @param eventBus the event bus audit events are dispatched through
    */
   static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
-    for (String pathSpec : METRICS_PATHS) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
       server.addFilter(new RequestContextFilter(eventBus), pathSpec);
       server.addFilter(
           new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
-      server.addCustomFilters(pathSpec);
     }
   }
 
