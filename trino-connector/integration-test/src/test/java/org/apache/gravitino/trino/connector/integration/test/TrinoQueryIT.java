@@ -289,7 +289,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
    * @param result the actual result
    * @return false if the expected result is empty or the actual result does not match the expected.
    *     For {@literal <BLANK_LINE>} case, return true if the actual result is empty. For {@literal
-   *     <QUERY_FAILED>} case, replace the placeholder with "^Query \\w+ failed.*: " and do match.
+   *     <QUERY_FAILED>} case, match the query failure prefix and the remaining expected result.
    */
   static boolean match(String expectResult, String result) {
     if (expectResult.isEmpty()) {
@@ -314,11 +314,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     // expectResult:
     // <QUERY_FAILED> Schema must be specified when session schema is not set
     if (expectResult.startsWith("<QUERY_FAILED>")) {
-      return Pattern.compile(
-              "^Query \\w+ failed.*: "
-                  + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
-          .matcher(result)
-          .find();
+      String failureMessage = expectResult.replace("<QUERY_FAILED>", "").trim();
+      return wildcardMatch(
+          "^Query \\w+ failed.*: " + wildcardPattern(failureMessage), result, false);
     }
 
     // match text
@@ -338,11 +336,20 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     //
     //    location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
     //    ...
-    expectResult = expectResult.replace("\n", "");
-    expectResult = "^\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E$";
+    return wildcardMatch("^" + wildcardPattern(expectResult), result, true);
+  }
+
+  private static boolean wildcardMatch(String expectPattern, String result, boolean matchEnd) {
+    expectPattern = expectPattern.replace("\n", "");
+    if (matchEnd) {
+      expectPattern += "$";
+    }
     result = result.replace("\n", "");
-    match = Pattern.compile(expectResult).matcher(result).find();
-    return match;
+    return Pattern.compile(expectPattern).matcher(result).find();
+  }
+
+  private static String wildcardPattern(String expectResult) {
+    return "\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E";
   }
 
   public void testSql() throws Exception {
