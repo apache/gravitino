@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.PO
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -57,8 +58,8 @@ public class PolicyVersionBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " pv SET pv.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " pv SET pv.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE pv.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -97,8 +98,8 @@ public class PolicyVersionBaseSQLProvider {
       @Param("limit") int limit) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE policy_id = #{policyId} AND version <= #{versionRetentionLine} AND deleted_at = 0"
         + " LIMIT #{limit}";
   }
@@ -106,8 +107,8 @@ public class PolicyVersionBaseSQLProvider {
   public String softDeletePolicyVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 }

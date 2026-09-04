@@ -83,7 +83,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         catalogManager,
         store,
         idGenerator,
-        () -> GravitinoEnv.getInstance().schemaDispatcher(),
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
         secretManager);
   }
 
@@ -249,7 +249,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           if (isManagedView) {
             return EntityCombinedView.of(alteredView)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::tablePropertiesMetadata,
                         alteredView.properties()));
@@ -265,7 +265,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             if (existing == null) {
               return EntityCombinedView.of(alteredView)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::tablePropertiesMetadata,
                           alteredView.properties()));
@@ -297,7 +297,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           return EntityCombinedView.of(alteredView, updatedViewEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::tablePropertiesMetadata,
                       alteredView.properties()));
@@ -401,7 +401,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     if (isManagedView) {
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   catalogView.properties()));
@@ -433,7 +433,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   catalogView.properties()));
@@ -442,7 +442,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedView.of(catalogView, viewEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::tablePropertiesMetadata,
                 catalogView.properties()));
@@ -471,7 +471,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     if (isManagedView) {
       return EntityCombinedView.of(view)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   view.properties()))
@@ -487,7 +487,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       if (viewEntity == null) {
         return EntityCombinedView.of(view)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdentifier,
                     HasPropertyMetadata::tablePropertiesMetadata,
                     view.properties()))
@@ -499,7 +499,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
       return EntityCombinedView.of(view, viewEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   view.properties()))
@@ -518,7 +518,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     return EntityCombinedView.of(view, viewEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdentifier, HasPropertyMetadata::tablePropertiesMetadata, view.properties()))
         .withImported(viewEntity != null);
   }
@@ -586,7 +586,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     return EntityCombinedView.of(catalogView, viewEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
                 catalogView.properties()))

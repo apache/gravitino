@@ -181,6 +181,13 @@ public class MetalakeOperations {
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       MetalakeSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.SET,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received set request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(

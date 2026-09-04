@@ -311,6 +311,17 @@ public class TestModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRegisterModelWithNullRequest() {
+    Response resp =
+        target(modelPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRegisterModel() {
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
     Model mockModel = mockModel("model1", "comment1", 0);

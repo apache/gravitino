@@ -40,6 +40,7 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
@@ -50,6 +51,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -547,8 +549,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   /**
    * Detects credential providers for this catalog type and appends them to {@code
    * credentialProviders}. The default implementation calls {@link
-   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS credentials. Subclasses
-   * override this to add catalog-specific providers (e.g., JDBC).
+   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS/COS credentials.
+   * Subclasses override this to add catalog-specific providers (e.g., JDBC).
    *
    * @param properties the raw catalog properties
    * @param credentialProviders the list to append detected provider names to
@@ -595,6 +597,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
     if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
       credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
+    }
+
+    String cosAccessKeyId = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID);
+    String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
+      credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
     }
   }
 

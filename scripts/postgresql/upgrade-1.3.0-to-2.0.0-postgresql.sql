@@ -17,17 +17,9 @@
 -- under the License.
 --
 
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
 
-ALTER TABLE group_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
 
-COMMENT ON COLUMN user_meta.external_id IS 'external identifier from an upstream identity system';
-COMMENT ON COLUMN user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
-COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstream identity system';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_ueid_del ON user_meta (metalake_id, external_id, deleted_at);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, external_id, deleted_at);
 
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
@@ -42,6 +34,9 @@ COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON strin
 
 ALTER TABLE tag_relation_meta ADD COLUMN IF NOT EXISTS tag_value VARCHAR(256) NOT NULL DEFAULT '';
 COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
+
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
 
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
@@ -77,6 +72,9 @@ COMMENT ON COLUMN policy_tag_relation_meta.audit_info IS 'policy tag relation au
 COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relation current version';
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
+
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
 CREATE TABLE IF NOT EXISTS semantic_model_meta (
     semantic_model_id BIGINT NOT NULL,

@@ -117,12 +117,19 @@ public class TestRoleOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "topicDispatcher", topicDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "filesetDispatcher", filesetDispatcher, true);
+        GravitinoEnv.getInstance(), "internalAccessControlDispatcher", manager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTopicDispatcher", topicDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalFilesetDispatcher", filesetDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -146,6 +153,17 @@ public class TestRoleOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  @Test
+  public void testCreateRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

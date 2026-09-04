@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -99,8 +100,7 @@ public class PolicyTagRelBaseSQLProvider {
 
   /** Returns the database expression for the current epoch-millisecond timestamp. */
   protected String deletedAtNowExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 
   private String listRelations(

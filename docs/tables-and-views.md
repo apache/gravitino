@@ -187,13 +187,23 @@ a specific field rather than a whole table. Policies attach at the table level.
 
 | Privilege      | Grantable on                        | What it allows                  |
 |----------------|-------------------------------------|---------------------------------|
-| `CREATE_TABLE` | Metalake, catalog, or schema        | Creating tables and views       |
-| `SELECT_TABLE` | Metalake, catalog, schema, or table | Reading a table or view         |
+| `CREATE_TABLE` | Metalake, catalog, or schema        | Creating tables                 |
+| `SELECT_TABLE` | Metalake, catalog, schema, or table | Reading table metadata          |
 | `MODIFY_TABLE` | Metalake, catalog, schema, or table | Writing to and altering a table |
+| `CREATE_VIEW`  | Metalake, catalog, or schema        | Creating views                  |
+| `SELECT_VIEW`  | Metalake, catalog, schema, or view  | Reading view metadata           |
 
 Granting at a wider scope covers everything beneath it. Dropping a table is reserved for the
 metalake owner and the object owner, and ownership resolves down the hierarchy, so the owner of a
 catalog has the owner path to every table in it.
+
+When metadata authorization is enabled, listing views first requires access to the schema and then
+returns only views the caller owns or can read with `SELECT_VIEW`. Creating a view requires
+`CREATE_VIEW` in scope and makes the caller its owner; altering and dropping a view are owner-only.
+
+View permissions cover metadata operations only. The API does not yet define an `INVOKER` or
+`DEFINER` execution mode, so access to referenced data remains subject to the engine's
+authorization.
 
 ## Using the API
 

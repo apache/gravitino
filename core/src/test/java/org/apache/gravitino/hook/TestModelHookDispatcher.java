@@ -66,13 +66,14 @@ public class TestModelHookDispatcher {
     when(mockCatalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockCatalogWrapper));
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Read the catalogManager field directly via reflection because the public accessor
     // Preconditions-checks for non-null, which would fail when GravitinoEnv has not been
     // initialized for this test class.
     savedCatalogManager =
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     hookDispatcher = new ModelHookDispatcher(mockDispatcher);
   }
@@ -80,7 +81,7 @@ public class TestModelHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
   }
 

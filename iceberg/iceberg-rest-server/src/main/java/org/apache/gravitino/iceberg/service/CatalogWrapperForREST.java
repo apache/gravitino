@@ -181,6 +181,20 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Whether this catalog wrapper supports server-side scan planning.
+   *
+   * <p>Gravitino plans scans locally on top of loaded table metadata, which works for every backend
+   * this class handles directly (Hive, JDBC, Memory, Custom). {@link FederatedCatalogWrapper}
+   * delegates planning to the remote catalog instead, so it overrides this to report what that
+   * catalog actually advertises.
+   *
+   * @return {@code true} if the scan-plan endpoint should be advertised
+   */
+  public boolean supportsScanPlanOperations() {
+    return true;
+  }
+
   @Override
   public void close() throws Exception {
     try {

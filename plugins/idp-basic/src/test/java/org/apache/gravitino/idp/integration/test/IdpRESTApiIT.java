@@ -42,8 +42,8 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
@@ -165,17 +165,27 @@ public class IdpRESTApiIT extends BaseIT {
     changePassword(USER1, UPDATED_PASSWORD);
     Assertions.assertEquals(USER1, getUser(USER1).getUser().name());
 
+    put("/idp/users/" + USER1, new UpdateUserRequest(null, false));
+    Assertions.assertFalse(getUser(USER1).getUser().enabled());
+    put("/idp/users/" + USER1, new UpdateUserRequest(null, true));
+    Assertions.assertTrue(getUser(USER1).getUser().enabled());
+    assertError(
+        400,
+        put("/idp/users/" + ADMIN, new UpdateUserRequest(null, false)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    Assertions.assertTrue(getUser(ADMIN).getUser().enabled());
+
     assertError(
         404,
         get("/idp/users/" + MISSING_USER, ADMIN, ADMIN_PASSWORD),
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         404,
-        put("/idp/users/" + MISSING_USER, new ChangePasswordRequest(UPDATED_PASSWORD)),
+        put("/idp/users/" + MISSING_USER, new UpdateUserRequest(UPDATED_PASSWORD)),
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         400,
-        put("/idp/users/" + USER1, new ChangePasswordRequest(" ")),
+        put("/idp/users/" + USER1, new UpdateUserRequest(" ")),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
     Assertions.assertTrue(deleteUser(USER1));
@@ -218,7 +228,7 @@ public class IdpRESTApiIT extends BaseIT {
         putMembership(GROUP1, new GroupMembershipChangeRequest(new String[] {USER1, USER2}, null));
     Assertions.assertEquals(Set.of(USER1, USER2), Set.copyOf(group.getGroup().users()));
 
-    assertError(405, deleteGroupResponse(GROUP1, false), ErrorConstants.UNSUPPORTED_OPERATION_CODE);
+    assertError(409, deleteGroupResponse(GROUP1, false), ErrorConstants.NON_EMPTY_CODE);
 
     group =
         putMembership(GROUP1, new GroupMembershipChangeRequest(null, new String[] {USER1, USER2}));
@@ -293,8 +303,7 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static void changePassword(String username, String password) throws Exception {
-    HttpResponse<String> response =
-        put("/idp/users/" + username, new ChangePasswordRequest(password));
+    HttpResponse<String> response = put("/idp/users/" + username, new UpdateUserRequest(password));
     Assertions.assertEquals(200, response.statusCode(), response.body());
   }
 
