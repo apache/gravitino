@@ -116,6 +116,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // fields into the properties map so the JDBC backend can connect.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
+<<<<<<< HEAD
       catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
     } else {
       catalogProperties = new HashMap<>(catalog.properties());
@@ -131,6 +132,26 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
                   catalogProperties.putIfAbsent(
                       IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
                 });
+=======
+      BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
+      Map<String, String> props =
+          new HashMap<>(
+              GravitinoEnv.getInstance()
+                  .secretManager()
+                  .toPlaintextProperties(baseCatalog.propertiesWithCredentialProviders()));
+      props.put(IcebergConstants.CATALOG_UUID, baseCatalog.entity().id().toString());
+      return props;
+    }
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    try {
+      SupportsSecrets supportsSecrets = catalog.supportsSecrets();
+      if (supportsSecrets != null) {
+        Map<String, String> secrets = supportsSecrets.getSecrets();
+        if (secrets != null) {
+          props.putAll(secrets);
+        }
+>>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
       }
     }
     return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));

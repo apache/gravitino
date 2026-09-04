@@ -24,6 +24,9 @@ public class IcebergConstants {
   public static final String CATALOG_BACKEND = "catalog-backend";
   public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
 
+  /** Internal property containing the unique identifier of a Gravitino catalog. */
+  public static final String CATALOG_UUID = "catalog_uuid";
+
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
 

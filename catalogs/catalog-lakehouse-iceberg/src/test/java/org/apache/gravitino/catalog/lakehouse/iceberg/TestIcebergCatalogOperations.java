@@ -29,6 +29,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.RESTException;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
+>>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -94,5 +101,27 @@ public class TestIcebergCatalogOperations {
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+  }
+
+  @Test
+  public void testCatalogDropRemovesInternedMemoryCatalog() {
+    String catalogUuid = "catalog-uuid";
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_UUID,
+                catalogUuid));
+    Object original = IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.catalogUuid = catalogUuid;
+    catalogOperations.onCatalogDropped();
+
+    Object replacement =
+        IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+    Assertions.assertNotSame(original, replacement);
+    IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
   }
 }

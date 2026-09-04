@@ -29,6 +29,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
@@ -390,7 +391,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } else {
       LOG.info("Closing IcebergCatalogWrapper before catalog is initialized");
     }
-    if (loadedCatalog instanceof AutoCloseable) {
+    boolean internedMemoryCatalog =
+        catalogBackend == IcebergCatalogBackend.MEMORY
+            && icebergConfig.getAllConfig().containsKey(IcebergConstants.CATALOG_UUID);
+    if (!internedMemoryCatalog && loadedCatalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
       ((AutoCloseable) loadedCatalog).close();

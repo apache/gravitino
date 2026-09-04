@@ -79,6 +79,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
@@ -1011,6 +1012,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+<<<<<<< HEAD
+=======
+              try {
+                catalogWrapper.doWithCatalogOps(
+                    operations -> {
+                      if (operations instanceof CatalogDropAware) {
+                        ((CatalogDropAware) operations).onCatalogDropped();
+                      }
+                      return null;
+                    });
+              } catch (Exception e) {
+                LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
+              }
+              // Unmanaged: schemas removed only via store cascade — clean secrets captured above.
+              if (!managedStorage) {
+                for (Map<String, String> schemaProperties : unmanagedSchemaSecrets) {
+                  secretManager.deleteSecretsFromProperties(schemaProperties);
+                }
+              }
+              secretManager.deleteSecretsFromProperties(catalogProperties);
+>>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
             }
             catalogCache.invalidate(ident);
             return deleted;
