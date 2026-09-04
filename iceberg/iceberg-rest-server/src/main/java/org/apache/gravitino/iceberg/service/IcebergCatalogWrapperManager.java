@@ -30,6 +30,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -87,6 +88,9 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
               ident -> {
                 if (ident.namespace().level(0).equals(metalakeName)) {
                   catalogWrapperCache.invalidate(ident.name());
+                  if (ident.name().equals(configProvider.getDefaultCatalogName())) {
+                    catalogWrapperCache.invalidate(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+                  }
                 }
               });
     }
