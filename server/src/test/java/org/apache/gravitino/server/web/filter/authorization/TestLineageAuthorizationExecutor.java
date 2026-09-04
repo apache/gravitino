@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.openlineage.server.OpenLineage.DatasetFacet;
@@ -60,7 +61,11 @@ import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
@@ -72,6 +77,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 class TestLineageAuthorizationExecutor {
@@ -130,6 +136,33 @@ class TestLineageAuthorizationExecutor {
   }
 
   @Test
+  void testRejectNonexistentDynamicMetalakeAsBadRequest() throws Throwable {
+    MethodInvocation invocation = invocation(event());
+
+    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
+        MockedStatic<AuthorizationUtils> authorizationUtils =
+            mockStatic(AuthorizationUtils.class)) {
+      principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal());
+      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      authorizationUtils
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      eq(METALAKE), eq("tester"), any(AuthorizationRequestContext.class)))
+          .thenThrow(new NoSuchMetalakeException("Metalake does not exist"));
+
+      Response response = (Response) lineageInterceptor().invoke(invocation);
+
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      Assertions.assertTrue(
+          errorResponse.getMessage().contains("job.namespace"),
+          "The response should identify the invalid field");
+      verify(invocation, never()).proceed();
+    }
+  }
+
+  @Test
   void testInterceptorRejectsUnheldActiveRoleForDynamicMetalake() throws Throwable {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.findUnheldRoles(any(), eq(METALAKE), any(), any()))
@@ -176,24 +209,86 @@ class TestLineageAuthorizationExecutor {
           index, new OutputDataset("anotherMetalake", outputs.get(index).getName(), null, null));
     }
 
-    assertBadRequestBeforeAuthorization(event(METALAKE, inputs, outputs));
+    assertBadRequest(event(METALAKE, inputs, outputs));
   }
 
-  @Test
-  void testRejectUnsupportedDatasetTypeAsBadRequest() throws Throwable {
-    assertBadRequestBeforeAuthorization(
-        event(METALAKE, List.of(dataset("UNKNOWN", METALAKE, DATASET_NAME)), List.of()));
+  @ParameterizedTest
+  @ValueSource(strings = {"UNKNOWN", "MODEL_VERSION"})
+  void testRejectUnsupportedDatasetTypeAsBadRequest(String datasetType) throws Throwable {
+    assertBadRequest(
+        event(METALAKE, List.of(dataset(datasetType, METALAKE, DATASET_NAME)), List.of()));
   }
 
   @Test
   void testRejectMalformedDatasetNameAsBadRequest() throws Throwable {
-    assertBadRequestBeforeAuthorization(
+    assertBadRequest(
         event(METALAKE, List.of(dataset(null, METALAKE, "catalog.object")), List.of()));
   }
 
   @Test
   void testRejectMalformedEventAsBadRequest() throws Throwable {
-    assertBadRequestBeforeAuthorization(null);
+    assertBadRequest(null);
+  }
+
+  @Test
+  void testResolveTargetsOnlyDuringExecution() throws Exception {
+    LineageAuthorizationExecutor executor =
+        executor(event(METALAKE, List.of(input("catalog.object")), List.of()));
+
+    Assertions.assertEquals(Optional.of(METALAKE), executor.getAuthorizationMetalake());
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> execute(executor, mock(GravitinoAuthorizer.class), principal()));
+  }
+
+  @Test
+  void testAllowDatasetlessEvent() throws Exception {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    LineageAuthorizationExecutor executor = executor(event(METALAKE, List.of(), List.of()));
+
+    Assertions.assertEquals(Optional.of(METALAKE), executor.getAuthorizationMetalake());
+    Assertions.assertTrue(execute(executor, authorizer, principal()));
+    verifyNoInteractions(authorizer);
+  }
+
+  @Test
+  void testOutputRequiresMetadataVisibilityOnly() throws Exception {
+    MetadataObject outputObject = MetadataObjects.parse(DATASET_NAME, MetadataObject.Type.TABLE);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.authorize(
+            any(),
+            eq(METALAKE),
+            any(),
+            eq(Privilege.Name.USE_CATALOG),
+            any(AuthorizationRequestContext.class)))
+        .thenReturn(true);
+    when(authorizer.authorize(
+            any(),
+            eq(METALAKE),
+            any(),
+            eq(Privilege.Name.USE_SCHEMA),
+            any(AuthorizationRequestContext.class)))
+        .thenReturn(true);
+    when(authorizer.authorize(
+            any(),
+            eq(METALAKE),
+            eq(outputObject),
+            eq(Privilege.Name.SELECT_TABLE),
+            any(AuthorizationRequestContext.class)))
+        .thenReturn(true);
+
+    Assertions.assertTrue(
+        execute(
+            executor(event(METALAKE, List.of(), List.of(output(DATASET_NAME)))),
+            authorizer,
+            principal()));
+    verify(authorizer)
+        .authorize(
+            any(),
+            eq(METALAKE),
+            eq(outputObject),
+            eq(Privilege.Name.SELECT_TABLE),
+            any(AuthorizationRequestContext.class));
   }
 
   @Test
@@ -258,7 +353,6 @@ class TestLineageAuthorizationExecutor {
     "FILE,FILESET",
     "Fileset,FILESET",
     "MODEL,MODEL",
-    "Model_Version,MODEL",
     "TOPIC,TOPIC"
   })
   void testResolveExactAuthorizationTarget(String datasetType, MetadataObject.Type expectedType)
@@ -279,7 +373,7 @@ class TestLineageAuthorizationExecutor {
     verify(authorizer).isOwner(any(), eq(METALAKE), eq(expected), any());
   }
 
-  private static void assertBadRequestBeforeAuthorization(RunEvent event) throws Throwable {
+  private static void assertBadRequest(RunEvent event) throws Throwable {
     MethodInvocation invocation = invocation(event);
     try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
         MockedStatic<AuthorizationUtils> authorizationUtils =
@@ -291,7 +385,14 @@ class TestLineageAuthorizationExecutor {
 
       Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
       verify(invocation, never()).proceed();
-      authorizationUtils.verifyNoInteractions();
+      if (event == null) {
+        authorizationUtils.verifyNoInteractions();
+      } else {
+        authorizationUtils.verify(
+            () ->
+                AuthorizationUtils.checkCurrentUser(
+                    eq(METALAKE), eq("tester"), any(AuthorizationRequestContext.class)));
+      }
     }
   }
 

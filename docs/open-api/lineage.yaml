@@ -26,8 +26,10 @@ paths:
         identifies the Gravitino metalake (organization), and every input and output
         dataset namespace must match it. Dataset names must be Gravitino metadata full
         names. The optional `datasetType` facet defaults to `TABLE`; supported values are
-        `TABLE`, `VIEW`, `FILE`, `FILESET`, `MODEL`, `MODEL_VERSION`, and `TOPIC`.
-        Inputs and outputs both require metadata visibility. Unsupported or external
+        `TABLE`, `VIEW`, `FILE`, `FILESET`, `MODEL`, and `TOPIC`.
+        Inputs and outputs both require metadata visibility because this endpoint records
+        producer-reported lineage rather than attesting underlying read or write execution.
+        RunEvents without datasets require only metalake membership. Unsupported or external
         dataset identifiers are rejected when authorization is enabled. When authorization
         is disabled, generic OpenLineage namespaces remain supported.
       operationId: postRunEvent

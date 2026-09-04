@@ -44,6 +44,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
@@ -174,6 +175,18 @@ public class GravitinoInterceptionService implements InterceptionService {
           NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
           if (metalakeIdent != null) {
             authorizationMetalake = Optional.of(metalakeIdent.name());
+            Optional<Response> validationFailure =
+                validateCurrentUserAndActiveRoles(
+                    metalakeIdent,
+                    authorizationRequestContext,
+                    expressionAnnotation,
+                    metadataContext,
+                    method,
+                    expression,
+                    false);
+            if (validationFailure.isPresent()) {
+              return validationFailure.get();
+            }
           }
 
           // If expression is empty, skip authorization check (method handles its own filtering)
@@ -195,8 +208,9 @@ public class GravitinoInterceptionService implements InterceptionService {
                     secondaryExpression,
                     secondaryExpressionCondition,
                     expressionAnnotation.allowCheckExistence());
+            Optional<String> dynamicMetalake;
             try {
-              Optional<String> dynamicMetalake = executor.getAuthorizationMetalake();
+              dynamicMetalake = executor.getAuthorizationMetalake();
               if (dynamicMetalake.isPresent()
                   && authorizationMetalake.isPresent()
                   && !dynamicMetalake.get().equals(authorizationMetalake.get())) {
@@ -205,31 +219,35 @@ public class GravitinoInterceptionService implements InterceptionService {
                         "Authorization request metalake '%s' does not match path metalake '%s'",
                         dynamicMetalake.get(), authorizationMetalake.get()));
               }
-              if (dynamicMetalake.isPresent()) {
-                authorizationMetalake = dynamicMetalake;
-              }
             } catch (IllegalArgumentException exception) {
               LOG.warn("Invalid authorization request", exception);
               return Utils.illegalArguments(exception.getMessage(), exception);
             }
-          }
 
-          if (authorizationMetalake.isPresent()) {
-            Optional<Response> validationFailure =
-                validateCurrentUserAndActiveRoles(
-                    NameIdentifier.of(authorizationMetalake.get()),
-                    authorizationRequestContext,
-                    expressionAnnotation,
-                    metadataContext,
-                    method,
-                    expression);
-            if (validationFailure.isPresent()) {
-              return validationFailure.get();
+            if (dynamicMetalake.isPresent() && authorizationMetalake.isEmpty()) {
+              Optional<Response> validationFailure =
+                  validateCurrentUserAndActiveRoles(
+                      NameIdentifier.of(dynamicMetalake.get()),
+                      authorizationRequestContext,
+                      expressionAnnotation,
+                      metadataContext,
+                      method,
+                      expression,
+                      true);
+              if (validationFailure.isPresent()) {
+                return validationFailure.get();
+              }
             }
           }
 
           if (executor != null) {
-            boolean authorizeResult = executor.execute(authorizationRequestContext);
+            boolean authorizeResult;
+            try {
+              authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (BadRequestException exception) {
+              LOG.warn("Invalid authorization request", exception);
+              return Utils.illegalArguments(exception.getMessage(), exception);
+            }
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
               NameIdentifier accessMetadataName =
@@ -264,13 +282,21 @@ public class GravitinoInterceptionService implements InterceptionService {
         AuthorizationExpression expressionAnnotation,
         Map<Entity.EntityType, NameIdentifier> metadataContext,
         Method method,
-        String expression) {
+        String expression,
+        boolean dynamicMetalake) {
       String currentUser = PrincipalUtils.getCurrentUserName();
       try {
         AuthorizationUtils.checkCurrentUser(
             metalakeIdent.name(), currentUser, authorizationRequestContext);
       } catch (NoSuchMetalakeException e) {
         LOG.warn("Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
+        if (dynamicMetalake) {
+          return Optional.of(
+              Utils.illegalArguments(
+                  String.format(
+                      "job.namespace must identify an existing metalake: %s", metalakeIdent.name()),
+                  e));
+        }
         // Not a real authz denial — metalake is absent, not forbidden. Skip event dispatch;
         // HttpAuditFilter will emit a generic HttpRequestFailureEvent for this 403.
         return Optional.of(

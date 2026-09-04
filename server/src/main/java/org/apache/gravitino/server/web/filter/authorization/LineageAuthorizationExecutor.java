@@ -38,6 +38,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.lineage.source.rest.LineageEventValidator;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -70,19 +71,27 @@ public class LineageAuthorizationExecutor implements AuthorizationExecutor {
   @Override
   public Optional<String> getAuthorizationMetalake() {
     RunEvent event = extractRunEvent();
-    resolveAuthorizationTargets(event);
+    Preconditions.checkArgument(event.getJob() != null, "job is required");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(event.getJob().getNamespace()), "job.namespace is required");
     return Optional.of(event.getJob().getNamespace());
   }
 
   @Override
   public boolean execute(AuthorizationRequestContext context) {
     if (!authorizationTargetsResolved) {
-      resolveAuthorizationTargets(extractRunEvent());
+      try {
+        resolveAuthorizationTargets(extractRunEvent());
+      } catch (IllegalArgumentException e) {
+        throw new BadRequestException(e, "%s", e.getMessage());
+      }
     }
 
     AuthorizationExpressionEvaluator evaluator = new AuthorizationExpressionEvaluator(expression);
     context.setOriginalAuthorizationExpression(expression);
 
+    // Dataset-less OpenLineage events are valid; the interceptor has already validated metalake
+    // membership before this executor runs.
     for (AuthorizationTarget target : authorizationTargets) {
       if (!evaluator.evaluate(
           target.metadataContext, Map.of(), context, Optional.of(target.entityType.name()))) {
@@ -112,7 +121,7 @@ public class LineageAuthorizationExecutor implements AuthorizationExecutor {
       case "TABLE" -> MetadataObject.Type.TABLE;
       case "VIEW" -> MetadataObject.Type.VIEW;
       case "FILE", "FILESET" -> MetadataObject.Type.FILESET;
-      case "MODEL", "MODEL_VERSION" -> MetadataObject.Type.MODEL;
+      case "MODEL" -> MetadataObject.Type.MODEL;
       case "TOPIC" -> MetadataObject.Type.TOPIC;
       default -> throw new IllegalArgumentException("Unsupported dataset type: " + datasetType);
     };
