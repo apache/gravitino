@@ -1136,6 +1136,9 @@ public class TestTagManager {
 
       Assertions.assertThrows(
           PolicyAlreadyAssociatedException.class,
+          () -> tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get()));
+      Assertions.assertThrows(
+          PolicyAlreadyAssociatedException.class,
           () ->
               tagManager.addPolicyForTag(
                   METALAKE, tagName, policyName, TagValueSelector.of("finance")));

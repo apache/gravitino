@@ -299,7 +299,8 @@ policy_tag_relation_meta
 Constraints and indexes:
 
 1. Active rows are unique by `(policy_id, tag_id)`. A policy can be associated with a tag at most
-   once, and updating `selector` updates that relation.
+   once. Adding an existing pair conflicts regardless of its selector. To change the selector,
+   clients must remove the existing relation and then create a new one.
 2. Index `tag_id` for object policy lookup from tags.
 3. Index `policy_id` for impact analysis from policies.
 4. Policy and tag must belong to the same metalake.
@@ -455,7 +456,7 @@ policy-to-tag relation. The caller must have `VIEW_TAG` on the requested tag. Re
 filtered by `VIEW_POLICY`; `APPLY_TAG` and `APPLY_POLICY` imply their corresponding view privileges.
 Returns `404 Not Found` if the tag does not exist.
 
-#### New: `PUT /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
+#### New: `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
 
 **Request:**
 
@@ -472,7 +473,7 @@ Returns `404 Not Found` if the tag does not exist.
 }
 ```
 
-**Response:** `200 OK`
+**Response:** `201 Created`
 
 ```json
 {
@@ -485,9 +486,9 @@ Returns `404 Not Found` if the tag does not exist.
 }
 ```
 
-**Behavior:** Creates one policy-to-tag relation or replaces the selector on the existing relation.
-The policy and tag must exist in the same metalake, and the selector must be valid for the tag.
-Repeating the same request is an idempotent no-op.
+**Behavior:** Creates one policy-to-tag relation. The policy and tag must exist in the same
+metalake, and the selector must be valid for the tag. If the relation already exists, the request
+returns `409 Conflict` regardless of whether the existing selector matches the requested selector.
 
 #### New: `DELETE /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
 
@@ -618,7 +619,7 @@ calls must be replaced with tag assignment calls.
 |------|---------|---------|
 | Object policy association | `SupportsPolicies.associatePolicies(String[] add, String[] remove)` | Removed from metadata object mixins in the target model |
 | Object policy listing | `SupportsPolicies.listPolicies()` | Reinterpreted as read-only derived object policy lookup |
-| Tag policy association | None | New single-relation APIs such as setPolicyForTag(tagName, policyName, selector) and removePolicyFromTag(tagName, policyName) |
+| Tag policy association | None | New single-relation APIs such as addPolicyForTag(tagName, policyName, selector) and removePolicyFromTag(tagName, policyName) |
 | Policy impact analysis | `Policy.associatedObjects()` | Replaced or supplemented by Policy.associatedTags() |
 
 The exact Java and Python method names can be finalized during implementation, but the API shape
@@ -705,12 +706,17 @@ assignment changes.
 
 ### Event Listener
 
-Policy-to-tag relation creation, selector update, and deletion must be exposed through the event
-listener framework, matching the existing policy and tag lifecycle event pattern. Each operation
-has pre-event, success-event, and failure-event types. Event payloads include the metalake, tag
-name, policy name, previous and requested selector as applicable, actor, and request context. A
-successful PUT event includes the resulting relation, and a successful DELETE event includes the
-removed relation.
+Policy-to-tag relation creation and deletion must be exposed through the event listener framework,
+matching the existing policy and tag lifecycle event pattern. Each operation has pre-event,
+success-event, and failure-event types. Pre-events describe only the mutation intent and run before
+business access. Add events include the metalake, tag name, policy name, requested selector, actor,
+and request context. Remove events include the metalake, tag name, policy name, actor, and request
+context; because removal is idempotent, a success event does not distinguish a deleted association
+from a missing-association no-op.
+
+The v2 audit payload includes `policyName` for both operations and the requested `selector` for
+add. The deprecated v1 audit format has no custom-information field and therefore identifies only
+the tag resource.
 
 Object policy lookup is a read-only derived operation and does not create policy-relation events. It
 may still be covered by normal REST access logs or audit logs if the project records read events.
@@ -865,7 +871,7 @@ objectTagMappings:
       resolution, and plan its removal according to the API evolution policy.
 - [ ] Implement `ObjectPolicyResolver` to resolve object policies from effective tags and value
       selectors.
-- [ ] Add single-relation PUT and DELETE endpoints for tag policy association, plus policy tag
+- [ ] Add single-relation POST and DELETE endpoints for tag policy association, plus policy tag
       listing with selector payloads.
 - [ ] Change object policy REST APIs to read-only derived lookup and remove direct object policy
       mutation behavior.
