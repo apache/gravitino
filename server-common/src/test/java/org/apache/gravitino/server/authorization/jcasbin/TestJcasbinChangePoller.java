@@ -103,6 +103,20 @@ public class TestJcasbinChangePoller {
   }
 
   @Test
+  void testPollEntityChangesInvalidatesFunctionByExactKey() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(List.of(change(1L, MetadataObject.Type.FUNCTION, "ml1.cat1.sch1.func1")));
+
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FUNCTION", "func1")),
+        metadataIdCache.invalidatedKeys);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedPrefixes);
+  }
+
+  @Test
   void testPollCursorAdvancementIsSynchronized() throws NoSuchMethodException {
     Method pollOwnerChanges = JcasbinChangeListener.class.getDeclaredMethod("pollOwnerChanges");
     Method onEntityChange =

@@ -98,8 +98,7 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier functionIdent) {
-    Capability capabilities = getCapability(functionIdent, catalogManager);
-    return applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, capabilities);
+    return applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, catalogManager);
   }
 
   private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] functionIdents) {

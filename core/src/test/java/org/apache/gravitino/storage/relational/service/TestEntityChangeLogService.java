@@ -19,6 +19,9 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -27,6 +30,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -37,9 +41,11 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -361,5 +367,57 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         Entity.EntityType.MODEL,
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model2").toString(),
         OperateType.DROP);
+
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function1",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    long maxIdBeforeFunctionDrop = maxEntityChangeId();
+    Assertions.assertTrue(
+        backend.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false));
+    assertEntityChange(
+        maxIdBeforeFunctionDrop,
+        METALAKE_NAME,
+        Entity.EntityType.FUNCTION,
+        NameIdentifierUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "function1")
+            .toString(),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testFunctionDropRollsBackWhenChangeLogInsertFails() throws Exception {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function_rolled_back",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    renameTable("entity_change_log", "entity_change_log_bak");
+    try {
+      Assertions.assertThrows(
+          Exception.class,
+          () -> backend.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false));
+    } finally {
+      renameTable("entity_change_log_bak", "entity_change_log");
+    }
+
+    FunctionEntity persistedFunction =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier());
+    Assertions.assertEquals(function.id(), persistedFunction.id());
+  }
+
+  private void renameTable(String from, String to) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("ALTER TABLE %s RENAME TO %s", from, to));
+    }
   }
 }
