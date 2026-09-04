@@ -2779,6 +2779,130 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testAlterTableSettings() {
+    String name = GravitinoITUtils.genRandomName("alter_settings");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        ident,
+        columns,
+        "alter settings",
+        createProperties(),
+        Distributions.NONE,
+        getSortOrders("id"));
+
+    tableCatalog.alterTable(
+        ident,
+        TableChange.setProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout", "3600"));
+    Table modified = tableCatalog.loadTable(ident);
+    Assertions.assertEquals(
+        "3600",
+        modified.properties().get(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    tableCatalog.alterTable(
+        ident,
+        TableChange.removeProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+    Table reset = tableCatalog.loadTable(ident);
+    Assertions.assertFalse(
+        reset.properties().containsKey(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    tableCatalog.alterTable(
+        ident,
+        TableChange.setProperty(TableConstants.SETTINGS_PREFIX + "storage_policy", "'default'"));
+    Table stringModified = tableCatalog.loadTable(ident);
+    Assertions.assertEquals(
+        "'default'",
+        stringModified.properties().get(TableConstants.SETTINGS_PREFIX + "storage_policy"));
+    tableCatalog.alterTable(
+        ident, TableChange.removeProperty(TableConstants.SETTINGS_PREFIX + "storage_policy"));
+    Table stringReset = tableCatalog.loadTable(ident);
+    Assertions.assertFalse(
+        stringReset.properties().containsKey(TableConstants.SETTINGS_PREFIX + "storage_policy"));
+
+    RuntimeException readOnlyException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    ident,
+                    TableChange.setProperty(
+                        TableConstants.SETTINGS_PREFIX + "index_granularity", "4096")));
+    Assertions.assertTrue(
+        readOnlyException.getMessage().contains("READONLY_SETTING"),
+        readOnlyException.getMessage());
+
+    RuntimeException unknownSettingException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    ident,
+                    TableChange.setProperty(
+                        TableConstants.SETTINGS_PREFIX + "gravitino_unknown_setting", "1")));
+    Assertions.assertTrue(
+        unknownSettingException.getMessage().contains("UNKNOWN_SETTING"),
+        unknownSettingException.getMessage());
+  }
+
+  @Test
+  void testAlterTableSettingReadOnlyConnectionError() throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("alter_settings_readonly");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        },
+        "alter settings privilege",
+        createProperties(),
+        Distributions.NONE,
+        getSortOrders("id"));
+
+    String restrictedCatalogName =
+        GravitinoITUtils.genRandomName("alter_settings_restricted_catalog");
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    String jdbcUrl =
+        StringUtils.substring(
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            CLICKHOUSE_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl + "?custom_settings=readonly%3D1");
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), CLICKHOUSE_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), CLICKHOUSE_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), CLICKHOUSE_CONTAINER.getPassword());
+
+    Catalog restrictedCatalog =
+        metalake.createCatalog(
+            restrictedCatalogName,
+            Catalog.Type.RELATIONAL,
+            provider,
+            "read-only alter settings catalog",
+            catalogProperties);
+    try {
+      RuntimeException readOnlyException =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  restrictedCatalog
+                      .asTableCatalog()
+                      .alterTable(
+                          tableIdentifier,
+                          TableChange.setProperty(
+                              TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout", "3600")));
+      Assertions.assertTrue(
+          readOnlyException.getMessage().contains("READONLY"), readOnlyException.getMessage());
+    } finally {
+      metalake.dropCatalog(restrictedCatalogName, true);
+    }
+  }
+
+  @Test
   void testLoadTableWithSettingsFromNativeSql() {
     String name = GravitinoITUtils.genRandomName("settings_native");
     clickhouseService.executeQuery(
