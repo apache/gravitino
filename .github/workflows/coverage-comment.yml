@@ -1,57 +1,63 @@
 name: Coverage Comment
 
+# Sidecar that posts the Jacoco coverage comment. It must stay a separate
+# workflow: a pull_request from a fork gets a read-only GITHUB_TOKEN, so the
+# Required CI / build run cannot comment. workflow_run runs on the base repo
+# with write permission and does not check out PR code.
+#
+# Listen for the PR entry point, not `build`. After Required CI aggregation,
+# build.yml is only workflow_call on PRs; GitHub does not emit workflow_run
+# for a called workflow. Artifacts uploaded inside that call belong to the
+# caller run, so download uses this workflow_run.id (the Required CI run).
+#
+# The workflow name below must match required-ci.yml `name: Required CI`.
+# workflow_run workflows are loaded from the default branch, so this retarget
+# takes effect after merge; this PR itself still uses main's old listener.
+#
+# Skip/post rules live in dev/ci/coverage_comment.py (same module jacoco_report.py
+# uses for the comment marker and commit SHA line). Do not trust a PR number
+# from the coverage artifact. Download the artifact into coverage-artifact/ so
+# a fork-controlled zip cannot overwrite the trusted sidecar script.
 on:
   workflow_run:
-    workflows: ["build"]
+    workflows: ["Required CI"]
     types: [completed]
 
 permissions:
+  actions: read
+  contents: read
   pull-requests: write
 
 jobs:
   comment:
     runs-on: ubuntu-latest
+    # Cheap filter matching coverage_comment.SKIPPED_CONCLUSIONS. The Python
+    # model still enforces the same skip so tests and the sidecar stay synced.
+    # Do not require conclusion == success: a red sibling suite must not hide
+    # a coverage report that build already uploaded.
     if: >
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      github.event.workflow_run.conclusion != 'skipped'
     steps:
+      # Default-branch SHA only. Never check out the PR head: this job has
+      # pull-requests: write, so skip/post logic must come from apache/main.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Download Coverage Report
         id: download
         uses: actions/download-artifact@v4
         with:
           name: coverage-report
+          path: coverage-artifact
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Post Coverage Comment
-        if: steps.download.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const prNumber = parseInt(fs.readFileSync('pr-number.txt', 'utf8').trim());
-            const body = fs.readFileSync('coverage-report.md', 'utf8');
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              per_page: 100,
-            });
-            const existing = comments.find(c => c.body.includes('<!-- coverage-report -->'));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body: body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: body,
-              });
-            }
+      - name: Post or skip coverage comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_REPORT_FILE: coverage-artifact/coverage-report.md
+        run: python3 dev/ci/coverage_comment.py

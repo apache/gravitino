@@ -2,13 +2,18 @@ name: Spark Integration Test
 
 # Controls when the workflow will run
 on:
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
   push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: required-spark-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

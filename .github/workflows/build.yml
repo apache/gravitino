@@ -2,20 +2,25 @@ name: build
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
+  # Triggered by the Required CI orchestrator (workflow_call) or by pushes.
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [ "main", "branch-*" ]
-    paths-ignore:
-      - 'docs/assets/**'
-      - 'web-v2/**'
-  pull_request:
-    branches: [ "main", "branch-*" ]
+    # Same ignore as the old pull_request trigger. PR runs go through
+    # workflow_call, which cannot paths-ignore, so build_relevant.py restores
+    # that skip for compile-check and build.
     paths-ignore:
       - 'docs/assets/**'
       - 'web-v2/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: required-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -63,6 +68,13 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
+            all_changes:
+              - '**'
+      - name: Determine build-relevant changes
+        id: build_relevant
+        env:
+          ALL_CHANGE_FILES: ${{ steps.filter.outputs.all_changes_files }}
+        run: python3 dev/ci/build_relevant.py
       - name: Determine maintenance-module-only changes
         id: maintenance_module_only
         env:
@@ -96,11 +108,16 @@ jobs:
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
       maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
+      build_relevant_changes: ${{ steps.build_relevant.outputs.build_relevant_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.source_changes != 'true'
+    # Light assemble for relevant non-source PRs. Skip when the PR is only
+    # docs/assets or web-v2 (old pull_request paths-ignore).
+    if: >
+      needs.changes.outputs.build_relevant_changes == 'true' &&
+      needs.changes.outputs.source_changes != 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -154,7 +171,9 @@ jobs:
         java-version: [ 17 ]
     timeout-minutes: 120
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
+    if: >
+      needs.changes.outputs.build_relevant_changes == 'true' &&
+      needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -233,18 +252,12 @@ jobs:
             --min-changed 60 \
             --output coverage-report.md
 
-      - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
-
       - name: Upload Coverage Report
         if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: |
-            coverage-report.md
-            pr-number.txt
+          path: coverage-report.md
 
       - name: Output Coverage Info
         if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
