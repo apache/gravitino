@@ -1,0 +1,67 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.catalog.fluss;
+
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
+import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.utils.ExceptionUtils;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+
+final class FlussAdminOps {
+
+  private final Admin admin;
+
+  FlussAdminOps(Admin admin) {
+    this.admin = Objects.requireNonNull(admin, "admin");
+  }
+
+  <T> T doAsAdmin(Function<Admin, CompletableFuture<T>> action) {
+    return doAsAdmin(
+        action, FlussExceptionConverter.generic("Failed to execute Fluss admin operation"));
+  }
+
+  <T> T doAsAdmin(
+      Function<Admin, CompletableFuture<T>> action,
+      Function<Throwable, RuntimeException> exceptionMapper) {
+    try {
+      CompletableFuture<T> cf = action.apply(admin);
+      return cf.get();
+    } catch (ExecutionException e) {
+      throw mapException(ExceptionUtils.stripExecutionException(e), exceptionMapper);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new GravitinoRuntimeException(e, "Interrupted during Fluss admin operation");
+    } catch (RuntimeException e) {
+      throw mapException(e, exceptionMapper);
+    }
+  }
+
+  private static RuntimeException mapException(
+      Throwable e, Function<Throwable, RuntimeException> exceptionMapper) {
+    Function<Throwable, RuntimeException> mapper =
+        exceptionMapper == null
+            ? FlussExceptionConverter.generic("Failed to execute Fluss admin operation")
+            : exceptionMapper;
+    return mapper.apply(e);
+  }
+}
