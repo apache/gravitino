@@ -79,6 +79,13 @@ import {
 } from '@/lib/api/models'
 import { getFunctionsApi, getFunctionDetailsApi } from '@/lib/api/functions'
 import { getViewsApi, getViewDetailsApi, deleteViewApi } from '@/lib/api/views'
+import {
+  getSemanticModelsApi,
+  getSemanticModelDetailsApi,
+  createSemanticModelApi,
+  updateSemanticModelApi,
+  deleteSemanticModelApi
+} from '@/lib/api/semanticModels'
 
 const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
   const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
@@ -95,8 +102,9 @@ const mergeWithFunctionNodes = ({ tree, key, entities }) => {
   const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
   const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
   const views = existingNode?.children?.filter(child => child?.node === 'view') || []
+  const semanticModels = existingNode?.children?.filter(child => child?.node === 'semanticModel') || []
 
-  return _.uniqBy([...subSchemas, ...entities, ...functions, ...views], 'key')
+  return _.uniqBy([...subSchemas, ...entities, ...functions, ...views, ...semanticModels], 'key')
 }
 
 const mergeWithViewNodes = ({ tree, key, entities }) => {
@@ -104,8 +112,19 @@ const mergeWithViewNodes = ({ tree, key, entities }) => {
   const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
   const tables = existingNode?.children?.filter(child => child?.node === 'table') || []
   const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
+  const semanticModels = existingNode?.children?.filter(child => child?.node === 'semanticModel') || []
 
-  return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities], 'key')
+  return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities, ...semanticModels], 'key')
+}
+
+const mergeWithSemanticModelNodes = ({ tree, key, entities }) => {
+  const existingNode = findInTree(tree, 'key', key)
+  const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
+  const tables = existingNode?.children?.filter(child => child?.node === 'table') || []
+  const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
+  const views = existingNode?.children?.filter(child => child?.node === 'view') || []
+
+  return _.uniqBy([...subSchemas, ...tables, ...functions, ...views, ...entities], 'key')
 }
 
 const isAuthReady = state => {
@@ -326,10 +345,16 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           ? getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' })
           : Promise.resolve(null)
 
-      const [funcResult, entityResult, viewResult, childSchemasResult] = await Promise.allSettled([
+      const semanticModelsPromise =
+        type === 'relational'
+          ? getSemanticModelsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' })
+          : Promise.resolve(null)
+
+      const [funcResult, entityResult, viewResult, semanticModelResult, childSchemasResult] = await Promise.allSettled([
         getFunctionsApi({ metalake, catalog, schema, details: false }),
         entityPromise,
         viewsPromise,
+        semanticModelsPromise,
         childSchemasPromise
       ])
 
@@ -383,6 +408,23 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
                 path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, view: viewItem.name }).toString()}`,
                 name: viewItem.name,
                 title: viewItem.name,
+                isLeaf: true,
+                children: []
+              }
+            })
+          : []
+
+      const semanticModels =
+        semanticModelResult.status === 'fulfilled' && semanticModelResult.value
+          ? (semanticModelResult.value?.identifiers || []).map(semanticModelItem => {
+              return {
+                ...semanticModelItem,
+                node: 'semanticModel',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, semanticModel: semanticModelItem.name }).toString()}`,
+                name: semanticModelItem.name,
+                title: semanticModelItem.name,
                 isLeaf: true,
                 children: []
               }
@@ -463,7 +505,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         }
       }
 
-      result.data = [...childSchemas, ...entities, ...functions, ...views]
+      result.data = [...childSchemas, ...entities, ...functions, ...views, ...semanticModels]
       result.entities = entities
     }
 
@@ -2332,6 +2374,136 @@ export const deleteView = createAsyncThunk(
   }
 )
 
+export const fetchSemanticModels = createAsyncThunk(
+  'appMetalakes/fetchSemanticModels',
+  async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
+    const [err, res] = await to(getSemanticModelsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
+
+    if (err || !res) {
+      // The catalog doesn't support semantic models (405), or the server predates the endpoint and
+      // has no route for it (404). Both mean "this schema has none" — return empty silently rather
+      // than failing every schema page against an older server.
+      if ([404, 405].includes(err?.response?.status)) {
+        return { semanticModels: [], init }
+      }
+      if (init) {
+        throw new Error(err)
+      }
+    }
+
+    const { identifiers = [] } = res || {}
+
+    const semanticModels = identifiers.map(semanticModelItem => {
+      return {
+        ...semanticModelItem,
+        node: 'semanticModel',
+        id: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+        path: `?${new URLSearchParams({
+          metalake,
+          catalog,
+          catalogType: 'relational',
+          schema,
+          semanticModel: semanticModelItem.name
+        }).toString()}`,
+        name: semanticModelItem.name,
+        title: semanticModelItem.name,
+        isLeaf: true,
+        children: []
+      }
+    })
+
+    if (
+      init &&
+      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
+    ) {
+      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
+      dispatch(
+        setIntoTreeNodes({
+          key: schemaKey,
+          data: mergeWithSemanticModelNodes({
+            tree: getState().metalakes.metalakeTree,
+            key: schemaKey,
+            entities: semanticModels
+          })
+        })
+      )
+    }
+
+    return { semanticModels, init }
+  }
+)
+
+export const getSemanticModelDetails = createAsyncThunk(
+  'appMetalakes/getSemanticModelDetails',
+  async ({ init, metalake, catalog, schema, semanticModel }) => {
+    const [err, res] = await to(
+      getSemanticModelDetailsApi({ metalake, catalog, schema, semanticModel }, { errorMessageMode: 'none' })
+    )
+
+    if (err || !res) {
+      // Catalog doesn't support semantic models (HTTP 405) — return empty result silently
+      if (err?.response?.status === 405) {
+        return { semanticModel: null, init }
+      }
+      throw new Error(err)
+    }
+
+    return { semanticModel: res.semanticModel || res, init }
+  }
+)
+
+export const createSemanticModel = createAsyncThunk(
+  'appMetalakes/createSemanticModel',
+  async ({ data, metalake, catalog, schema }, { dispatch }) => {
+    await dispatch(setTableLoading(true))
+    const [err, res] = await to(createSemanticModelApi({ data, metalake, catalog, schema }))
+    await dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))
+
+    return res.semanticModel
+  }
+)
+
+export const updateSemanticModel = createAsyncThunk(
+  'appMetalakes/updateSemanticModel',
+  async ({ metalake, catalog, schema, semanticModel, data }, { dispatch }) => {
+    await dispatch(setTableLoading(true))
+    const [err, res] = await to(updateSemanticModelApi({ metalake, catalog, schema, semanticModel, data }))
+    await dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))
+
+    return res.semanticModel
+  }
+)
+
+export const deleteSemanticModel = createAsyncThunk(
+  'appMetalakes/deleteSemanticModel',
+  async ({ metalake, catalog, schema, semanticModel }, { dispatch }) => {
+    await dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteSemanticModelApi({ metalake, catalog, schema, semanticModel }))
+    await dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))
+
+    return res
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
@@ -2345,6 +2517,7 @@ export const appMetalakesSlice = createSlice({
     tables: [],
     functions: [],
     views: [],
+    semanticModels: [],
     columns: [],
     filesets: [],
     topics: [],
@@ -2411,6 +2584,7 @@ export const appMetalakesSlice = createSlice({
       state.tables = []
       state.functions = []
       state.views = []
+      state.semanticModels = []
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2697,6 +2871,7 @@ export const appMetalakesSlice = createSlice({
       state.schemas = []
       state.tables = []
       state.views = []
+      state.semanticModels = []
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -3081,6 +3256,29 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(deleteView.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(fetchSemanticModels.fulfilled, (state, action) => {
+      state.semanticModels = action.payload.semanticModels
+    })
+    builder.addCase(fetchSemanticModels.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(getSemanticModelDetails.fulfilled, (state, action) => {
+      if (action.payload.init) {
+        state.activatedDetails = action.payload.semanticModel
+      }
+    })
+    builder.addCase(getSemanticModelDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteSemanticModel.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
