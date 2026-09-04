@@ -19,10 +19,10 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_EMPTY_SCHEMA_CHECKED_VERSION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -31,7 +31,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +66,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
 import org.lance.index.IndexOptions;
@@ -528,6 +529,111 @@ public class TestLanceTableOperations {
     Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
   }
 
+  @ParameterizedTest(name = "recordedVersion={0}")
+  @ValueSource(booleans = {false, true})
+  public void testAlterTableHydratesRegisteredSchemaBeforeRecordingVersion(boolean recordedVersion)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("alter-registered-table-" + recordedVersion).toString();
+    Map<String, String> properties =
+        recordedVersion
+            ? Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_REGISTER,
+                Boolean.TRUE.toString(),
+                LANCE_TABLE_VERSION,
+                "2")
+            : Map.of(
+                Table.PROPERTY_LOCATION, location, LANCE_TABLE_REGISTER, Boolean.TRUE.toString());
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    stubMutableTable(ident, storedTable);
+    when(idGenerator.nextId()).thenReturn(10L);
+
+    Dataset schemaDataset = mock(Dataset.class);
+    when(schemaDataset.version()).thenReturn(3L);
+    when(schemaDataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("embedding", new ArrowType.Utf8()))));
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doReturn(schemaDataset, alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    Table alteredTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertEquals(1, alteredTable.columns().length);
+    Assertions.assertEquals("embedding", alteredTable.columns()[0].name());
+    Assertions.assertEquals("4", alteredTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals(1, alteredTable.index().length);
+    Assertions.assertEquals("embedding_idx", alteredTable.index()[0].name());
+    Assertions.assertEquals(1, storedTable.get().columns().size());
+    Assertions.assertEquals("4", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+
+    InOrder inOrder = Mockito.inOrder(schemaDataset, alterDataset);
+    inOrder.verify(schemaDataset).getSchema();
+    inOrder.verify(alterDataset).createIndex(any(IndexOptions.class));
+    inOrder.verify(alterDataset).getVersion();
+    verify(store, Mockito.times(2))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testAlterTableStopsWhenRegisteredSchemaCannotBeHydrated() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("unavailable-registered-table").toString();
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_REGISTER,
+                    Boolean.TRUE.toString(),
+                    LANCE_TABLE_VERSION,
+                    "3")));
+    stubMutableTable(ident, storedTable);
+
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doThrow(new RuntimeException("storage unavailable"))
+        .doReturn(alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    IllegalStateException failure =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertTrue(failure.getMessage().contains("schema"));
+    Assertions.assertEquals("storage unavailable", failure.getCause().getMessage());
+    Assertions.assertTrue(storedTable.get().columns().isEmpty());
+    Assertions.assertEquals("3", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+    verify(lanceTableOps).openDataset(location, Map.of());
+    verify(alterDataset, never()).createIndex(any(IndexOptions.class));
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
   @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
@@ -598,39 +704,28 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckRepairsEmptyStoredColumnsWhenVersionUnchanged() throws Exception {
+  public void testVersionCheckSkipsSchemaReadForEmptySchemaWhenVersionUnchanged() throws Exception {
     lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-version-check").toString();
-    // A matching version must not hide incomplete stored column metadata.
+    // Table has empty columns but a known stored version (confirmed-empty state)
     TableEntity tableEntity =
         tableEntity(
             ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "5"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
-    when(idGenerator.nextId()).thenReturn(19L);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(tableEntity);
-            });
 
     Dataset dataset = mock(Dataset.class);
     when(dataset.version()).thenReturn(5L);
-    when(dataset.getSchema())
-        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
     Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
 
-    Table loaded =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+    Table loaded = lanceTableOps.loadTable(ident);
 
-    Assertions.assertEquals(1, loaded.columns().length);
-    Assertions.assertEquals("col_a", loaded.columns()[0].name());
-    Assertions.assertEquals("5", loaded.properties().get(LANCE_TABLE_VERSION));
-    verify(dataset).getSchema();
-    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+    Assertions.assertEquals(0, loaded.columns().length);
+    // version unchanged — schema read must be skipped even though columns are empty
+    verify(dataset, never()).getSchema();
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   @Test
@@ -659,98 +754,17 @@ public class TestLanceTableOperations {
 
     Assertions.assertEquals(0, loaded.columns().length);
     Assertions.assertEquals("3", loaded.properties().get(LANCE_TABLE_VERSION));
-    // The emptiness was confirmed against the dataset, so later loads can trust it.
-    Assertions.assertEquals("3", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
     verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   @Test
-  public void testEmptyStoredColumnsWithRecordedVersionAreRepaired() throws Exception {
+  public void testEmptyDatasetSkipsOpenWhenVersionAlreadyRecorded() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-dataset-second").toString();
-    // Simulate incomplete stored metadata: the dataset version was recorded, but its columns were
-    // not persisted. The version alone must not prevent schema repair.
+    // Simulate the table after first-load recorded lance.version=3 but columns still empty
     TableEntity tableEntity =
         tableEntity(
             ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
-    when(idGenerator.nextId()).thenReturn(20L);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(tableEntity);
-            });
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.getSchema())
-        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
-    when(dataset.version()).thenReturn(3L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
-
-    Table loaded =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-
-    Assertions.assertEquals(1, loaded.columns().length);
-    Assertions.assertEquals("col_a", loaded.columns()[0].name());
-    Assertions.assertEquals("3", loaded.properties().get(LANCE_TABLE_VERSION));
-    verify(dataset).getSchema();
-    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
-  }
-
-  @Test
-  public void testEmptyDatasetWithRecordedVersionIsConfirmedOnce() throws Exception {
-    // lance.version on its own is not a confirmation: it is also written by alterTable, which
-    // never reads the schema. The dataset is re-read and the confirmation marker recorded.
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("empty-dataset-recheck").toString();
-    TableEntity tableEntity =
-        tableEntity(
-            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(tableEntity);
-            });
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.getSchema()).thenReturn(new Schema(List.of()));
-    when(dataset.version()).thenReturn(3L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
-
-    Table loaded =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-
-    Assertions.assertEquals(0, loaded.columns().length);
-    Assertions.assertEquals("3", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
-    verify(dataset).getSchema();
-    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
-  }
-
-  @Test
-  public void testConfirmedEmptyTableSkipsDatasetOpen() throws Exception {
-    // A table whose empty column list was confirmed against the dataset at the version it still
-    // records costs no dataset read at all. This is what keeps a genuinely empty dataset from
-    // paying a remote open on every single load.
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("empty-dataset-confirmed").toString();
-    TableEntity tableEntity =
-        tableEntity(
-            ident,
-            List.of(),
-            Map.of(
-                Table.PROPERTY_LOCATION,
-                location,
-                LANCE_TABLE_VERSION,
-                "3",
-                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
-                "3"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
 
@@ -760,129 +774,6 @@ public class TestLanceTableOperations {
     verify(lanceTableOps, never()).openDataset(anyString(), any());
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
-  }
-
-  @Test
-  public void testStaleEmptyConfirmationIsInvalidatedByNewerVersion() throws Exception {
-    // An alterTable recorded lance.version=5 after the emptiness was confirmed at version 3. The
-    // marker no longer matches, so the dataset is read again and the real schema is picked up.
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("empty-dataset-stale-marker").toString();
-    TableEntity tableEntity =
-        tableEntity(
-            ident,
-            List.of(),
-            Map.of(
-                Table.PROPERTY_LOCATION,
-                location,
-                LANCE_TABLE_VERSION,
-                "5",
-                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
-                "3"));
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
-    when(idGenerator.nextId()).thenReturn(31L);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(tableEntity);
-            });
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.version()).thenReturn(5L);
-    when(dataset.getSchema())
-        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
-
-    Table loaded =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-
-    Assertions.assertEquals(1, loaded.columns().length);
-    Assertions.assertEquals("col_a", loaded.columns()[0].name());
-    // Real columns retire the confirmation.
-    Assertions.assertNull(loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
-  }
-
-  @Test
-  public void testRepairedTableStopsOpeningDatasetOnNextLoad() throws Exception {
-    // The repair must be a one-off cost: once the columns are stored, DECLARED_AND_EMPTY has no
-    // reason to touch the dataset again.
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("repair-then-skip").toString();
-    TableEntity stored =
-        tableEntity(
-            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
-    AtomicReference<TableEntity> current = new AtomicReference<>(stored);
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenAnswer(invocation -> current.get());
-    when(idGenerator.nextId()).thenReturn(32L);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              TableEntity updated = updater.apply(current.get());
-              current.set(updated);
-              return updated;
-            });
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.version()).thenReturn(3L);
-    when(dataset.getSchema())
-        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
-
-    PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-    Table second =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-
-    Assertions.assertEquals(1, second.columns().length);
-    verify(lanceTableOps, times(1)).openDataset(eq(location), any());
-    verify(store, times(1))
-        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
-  }
-
-  @Test
-  public void testMalformedStoredVersionIsTreatedAsChanged() throws Exception {
-    // A version property that is not a number cannot confirm anything: the dataset is read and the
-    // stored metadata is rewritten with a usable version.
-    NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("malformed-version").toString();
-    TableEntity tableEntity =
-        tableEntity(
-            ident,
-            List.of(),
-            Map.of(
-                Table.PROPERTY_LOCATION,
-                location,
-                LANCE_TABLE_VERSION,
-                "not-a-number",
-                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
-                "not-a-number"));
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
-    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(tableEntity);
-            });
-
-    Dataset dataset = mock(Dataset.class);
-    when(dataset.getSchema()).thenReturn(new Schema(List.of()));
-    when(dataset.version()).thenReturn(4L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
-
-    Table loaded =
-        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
-
-    Assertions.assertEquals(0, loaded.columns().length);
-    Assertions.assertEquals("4", loaded.properties().get(LANCE_TABLE_VERSION));
-    Assertions.assertEquals("4", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
-    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   // ---------------------------------------------------------------------------
@@ -938,42 +829,30 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(0, loaded.columns().length);
     // The new dataset version must be persisted so future VERSION_CHECK loads see the match.
     Assertions.assertEquals("9", loaded.properties().get(LANCE_TABLE_VERSION));
-    // The emptiness was observed directly, so it is recorded as confirmed at that version.
-    Assertions.assertEquals("9", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
   }
 
   @Test
   public void testVersionCheckStaleColumnsAreNotReturnedOnSubsequentLoad() throws Exception {
-    // Once stale columns are cleared and the emptiness is confirmed at version=9, the next
-    // loadTable must return the empty column list without reading the schema again.
+    // After the fix: once stale columns are cleared and version=9 is recorded, the next loadTable
+    // must early-return with empty columns (not re-open the dataset and not return stale data).
     lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("subsequent-empty-load").toString();
-    // Simulate the store state the previous test leaves behind: columns cleared, version and
-    // confirmation marker both at 9.
+    // Simulate the store state after the first load cleared stale columns.
     TableEntity tableEntity =
         tableEntity(
-            ident,
-            List.of(),
-            Map.of(
-                Table.PROPERTY_LOCATION,
-                location,
-                LANCE_TABLE_VERSION,
-                "9",
-                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
-                "9"));
+            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "9"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
 
     Dataset dataset = mock(Dataset.class);
     when(dataset.version()).thenReturn(9L);
-    when(dataset.getSchema()).thenReturn(new Schema(List.of()));
     Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
 
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
-    // Version matched and the empty column list is confirmed: no schema read, no metadata write.
+    // Version matched: schema read must be skipped entirely.
     verify(dataset, never()).getSchema();
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
@@ -1116,13 +995,11 @@ public class TestLanceTableOperations {
   @Test
   public void testLoadTableFallsBackToStoredMetadataWhenDatasetOpenFails() throws Exception {
     // If the Lance dataset cannot be opened (e.g. storage not accessible), loadTable must return
-    // the stored metadata rather than propagating the exception. A recorded version must not skip
-    // the open attempt or be lost from the fallback result.
+    // the stored metadata rather than propagating the exception.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("broken-dataset").toString();
     TableEntity tableEntity =
-        tableEntity(
-            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
+        tableEntity(ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
     Mockito.doThrow(new RuntimeException("storage unavailable"))
@@ -1132,8 +1009,6 @@ public class TestLanceTableOperations {
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
-    Assertions.assertEquals("3", loaded.properties().get(LANCE_TABLE_VERSION));
-    verify(lanceTableOps).openDataset(eq(location), any());
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
@@ -1239,6 +1114,21 @@ public class TestLanceTableOperations {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
+  }
+
+  private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)
+      throws IOException {
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> storedTable.get());
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(storedTable.get());
+              storedTable.set(updated);
+              return updated;
+            });
   }
 
   private NameIdentifier prepareDeclaredTableForRepair(String directoryName) throws Exception {
