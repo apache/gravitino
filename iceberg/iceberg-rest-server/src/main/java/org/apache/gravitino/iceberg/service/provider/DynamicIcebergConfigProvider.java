@@ -111,11 +111,14 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
     // then JdbcCredential overlays so credentials win.
     if (catalog instanceof BaseCatalog) {
-      return new HashMap<>(
-          GravitinoEnv.getInstance()
-              .secretManager()
-              .toPlaintextProperties(
-                  ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
+      BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
+      Map<String, String> props =
+          new HashMap<>(
+              GravitinoEnv.getInstance()
+                  .secretManager()
+                  .toPlaintextProperties(baseCatalog.propertiesWithCredentialProviders()));
+      props.put(IcebergConstants.CATALOG_UUID, baseCatalog.entity().id().toString());
+      return props;
     }
     Map<String, String> props =
         new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());

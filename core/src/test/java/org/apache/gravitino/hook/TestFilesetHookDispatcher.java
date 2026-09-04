@@ -109,7 +109,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     // Self-contained: use a fresh hook with a directly-mocked FilesetDispatcher and a case-
     // insensitive catalog so we can verify the helper passes a normalized ident to setOwner.
     CatalogManager savedCatalogManager = GravitinoEnv.getInstance().catalogManager();
-    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
@@ -125,7 +125,8 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
         .thenReturn(Mockito.mock(Fileset.class));
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
       FilesetHookDispatcher localHook = new FilesetHookDispatcher(mockFilesetDispatcher);
@@ -154,7 +155,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
       FieldUtils.writeField(
-          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     }
   }
 
@@ -162,7 +163,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
   public void testCreateFilesetThrowsWhenSetOwnerFails() throws IllegalAccessException {
     // Save the original ownerDispatcher so we can restore it in the finally block instead of
     // wiping it to null and leaking that into other tests in the suite.
-    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
 
     // Create the schema first with the existing (non-throwing) ownerDispatcher, then swap to the
     // throwing mock only for the fileset create we actually want to exercise. Otherwise the
@@ -175,7 +176,8 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
       NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_owner_fail");
@@ -188,7 +190,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       Assertions.assertEquals("Set owner failed", thrown.getMessage());
     } finally {
       FieldUtils.writeField(
-          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     }
   }
 

@@ -62,6 +62,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -1387,9 +1388,20 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+    CatalogOperations operations =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+              return function.apply(operations);
+            })
+        .when(catalogWrapper)
+        .doWithCatalogOps(any());
 
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     boolean dropped = catalogManager.dropCatalog(ident);
@@ -1397,6 +1409,7 @@ public class TestCatalogManager {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
   }
 
   @Test

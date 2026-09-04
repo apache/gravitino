@@ -81,7 +81,7 @@ public class BulkOperations {
   public BulkOperations() {
     this.bulkManager = GravitinoEnv.getInstance().bulkManager();
     this.accessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   /**
