@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjec
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -30,6 +31,11 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+>>>>>>> 3afc9f168 ([#12501][#12500] feat(core): Support FUNCTION and VIEW metadata object policies (#12503))
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetadataObjectRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -103,9 +109,16 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + " LEFT JOIN "
         + ModelMetaMapper.TABLE_NAME
         + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
+        + " LEFT JOIN "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt ON pe_alias.metadata_object_id = vt.view_id AND pe_alias.metadata_object_type = 'VIEW'"
+        + " LEFT JOIN "
+        + FunctionMetaMapper.TABLE_NAME
+        + " ft2 ON pe_alias.metadata_object_id = ft2.function_id AND pe_alias.metadata_object_type = 'FUNCTION'"
         + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
         + "   ct.catalog_id = #{catalogId} OR st.catalog_id = #{catalogId} OR tt.catalog_id = #{catalogId}"
         + "   OR tat.catalog_id = #{catalogId} OR ft.catalog_id = #{catalogId} OR mt.catalog_id = #{catalogId}"
+        + "   OR vt.catalog_id = #{catalogId} OR ft2.catalog_id = #{catalogId}"
         + " )";
   }
 
@@ -135,6 +148,12 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + " LEFT JOIN "
         + ModelMetaMapper.TABLE_NAME
         + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
+        + " LEFT JOIN "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt ON pe_alias.metadata_object_id = vt.view_id AND pe_alias.metadata_object_type = 'VIEW'"
+        + " LEFT JOIN "
+        + FunctionMetaMapper.TABLE_NAME
+        + " ft2 ON pe_alias.metadata_object_id = ft2.function_id AND pe_alias.metadata_object_type = 'FUNCTION'"
         + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
         + "   st.schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
@@ -153,6 +172,14 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + "#{schemaId}"
         + "</foreach>"
         + "   OR mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR ft2.schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
