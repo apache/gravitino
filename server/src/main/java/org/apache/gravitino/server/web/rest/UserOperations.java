@@ -75,7 +75,7 @@ public class UserOperations {
     // and Jersey injection doesn't support null value. So UserOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   @GET

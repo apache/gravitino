@@ -18,14 +18,35 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestMetadataObjectUtil {
 
@@ -203,6 +224,110 @@ public class TestMetadataObjectUtil {
         List.of(
             "TABLE:catalog.a:b.table", "SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
         describe(MetadataObjectUtil.getParentMetadataObjects(column, ":")));
+  }
+
+  @Test
+  public void testCheckMetadataObjectUsesInternalDispatchers() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+    CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
+    ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
+    FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
+    ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+    AccessControlDispatcher accessControlDispatcher = mock(AccessControlDispatcher.class);
+    TagDispatcher tagDispatcher = mock(TagDispatcher.class);
+    PolicyDispatcher policyDispatcher = mock(PolicyDispatcher.class);
+    JobOperationDispatcher jobDispatcher = mock(JobOperationDispatcher.class);
+
+    when(env.internalMetalakeDispatcher()).thenReturn(metalakeDispatcher);
+    when(env.internalCatalogDispatcher()).thenReturn(catalogDispatcher);
+    when(env.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(env.internalFilesetDispatcher()).thenReturn(filesetDispatcher);
+    when(env.internalTableDispatcher()).thenReturn(tableDispatcher);
+    when(env.internalTopicDispatcher()).thenReturn(topicDispatcher);
+    when(env.internalModelDispatcher()).thenReturn(modelDispatcher);
+    when(env.internalFunctionDispatcher()).thenReturn(functionDispatcher);
+    when(env.internalViewDispatcher()).thenReturn(viewDispatcher);
+    when(env.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    when(env.internalTagDispatcher()).thenReturn(tagDispatcher);
+    when(env.internalPolicyDispatcher()).thenReturn(policyDispatcher);
+    when(env.internalJobOperationDispatcher()).thenReturn(jobDispatcher);
+
+    NameIdentifier metalakeIdent = NameIdentifier.of("metalake");
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier schemaIdent = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier filesetIdent = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    NameIdentifier tableIdent = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier topicIdent = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    NameIdentifier modelIdent = NameIdentifier.of("metalake", "catalog", "schema", "model");
+    NameIdentifier functionIdent = NameIdentifier.of("metalake", "catalog", "schema", "function");
+    NameIdentifier viewIdent = NameIdentifier.of("metalake", "catalog", "schema", "view");
+
+    when(metalakeDispatcher.metalakeExists(metalakeIdent)).thenReturn(true);
+    when(catalogDispatcher.catalogExists(catalogIdent)).thenReturn(true);
+    when(schemaDispatcher.schemaExists(schemaIdent)).thenReturn(true);
+    when(filesetDispatcher.filesetExists(filesetIdent)).thenReturn(true);
+    when(tableDispatcher.tableExists(tableIdent)).thenReturn(true);
+    when(topicDispatcher.topicExists(topicIdent)).thenReturn(true);
+    when(modelDispatcher.modelExists(modelIdent)).thenReturn(true);
+    when(functionDispatcher.functionExists(functionIdent)).thenReturn(true);
+    when(viewDispatcher.viewExists(viewIdent)).thenReturn(true);
+
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "fileset", MetadataObject.Type.FILESET));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "topic", MetadataObject.Type.TOPIC));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "role", MetadataObject.Type.ROLE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "tag", MetadataObject.Type.TAG));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "policy", MetadataObject.Type.POLICY));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "job", MetadataObject.Type.JOB));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "template", MetadataObject.Type.JOB_TEMPLATE));
+    }
+
+    verify(metalakeDispatcher).metalakeExists(metalakeIdent);
+    verify(catalogDispatcher).catalogExists(catalogIdent);
+    verify(schemaDispatcher).schemaExists(schemaIdent);
+    verify(filesetDispatcher).filesetExists(filesetIdent);
+    verify(tableDispatcher, times(2)).tableExists(tableIdent);
+    verify(topicDispatcher).topicExists(topicIdent);
+    verify(modelDispatcher).modelExists(modelIdent);
+    verify(functionDispatcher).functionExists(functionIdent);
+    verify(viewDispatcher).viewExists(viewIdent);
+    verify(accessControlDispatcher).getRole("metalake", "role");
+    verify(tagDispatcher).getTag("metalake", "tag");
+    verify(policyDispatcher).getPolicy("metalake", "policy");
+    verify(jobDispatcher).getJob("metalake", "job");
+    verify(jobDispatcher).getJobTemplate("metalake", "template");
   }
 
   private static List<String> describe(List<MetadataObject> objects) {

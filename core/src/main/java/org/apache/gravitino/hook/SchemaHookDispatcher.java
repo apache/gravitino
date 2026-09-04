@@ -97,7 +97,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
           // mirrors IcebergNamespaceHookDispatcher.createNamespace so ownership-based
           // authorization -- which treats ownership of an ancestor schema as ownership of the
           // whole subtree -- behaves the same on the Gravitino and Iceberg REST surfaces.
-          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
           if (ownerManager != null) {
             List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
             for (NameIdentifier ancestor : newAncestors) {

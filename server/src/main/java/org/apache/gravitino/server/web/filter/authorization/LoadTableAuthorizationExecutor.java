@@ -65,6 +65,26 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
   }
 
+<<<<<<< HEAD
+=======
+  @Override
+  public boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception {
+    if (super.execute(authorizationRequestContext)) {
+      return true;
+    }
+
+    if (allowCheckExistenceEvaluator == null
+        || !allowCheckExistenceEvaluator.evaluate(
+            metadataContext, pathParams, authorizationRequestContext, entityType)) {
+      return false;
+    }
+
+    NameIdentifier tableIdentifier = metadataContext.get(Entity.EntityType.TABLE);
+    return tableIdentifier != null
+        && !GravitinoEnv.getInstance().internalTableDispatcher().tableExists(tableIdentifier);
+  }
+
+>>>>>>> b2067cd03 ([#12892] fix(audit): Suppress internal operation audit events (#12893))
   private static boolean shouldCheckModifyTablePrivilege(
       String secondaryExpression, ExpressionCondition secondaryExpressionCondition) {
     return StringUtils.isNotBlank(secondaryExpression)
