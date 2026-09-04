@@ -65,6 +65,9 @@ public class ContainerSuite implements Closeable {
   private static final String NETWORK_NAME = "gravitino-ci-network";
   private static final int CLICKHOUSE_CLUSTER_SIZE = 3;
   private static final String CLICKHOUSE_CLUSTER_HOST_PREFIX = "gravitino-ci-clickhouse-cluster-";
+  private static final int DIRECT_ROUTING_GATEWAY_MODE_DOCKER_MAJOR_VERSION = 28;
+  private static final String GATEWAY_MODE_OPTION = "com.docker.network.bridge.gateway_mode_ipv4";
+  private static final String GATEWAY_MODE_OPTION_VALUE = "nat-unprotected";
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
@@ -825,6 +828,8 @@ public class ContainerSuite implements Closeable {
   // refresh the configuration
   private static Network createDockerNetwork() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
+    String dockerServerVersion = dockerClient.infoCmd().exec().getServerVersion();
+    boolean supportsGatewayMode = supportsDirectRoutingGatewayMode(dockerServerVersion);
 
     // Remove the `gravitino-ci-network` if it exists
     boolean networkExists =
@@ -877,10 +882,31 @@ public class ContainerSuite implements Closeable {
     return closer.register(
         Network.builder()
             .createNetworkCmdModifier(
-                cmd ->
-                    cmd.withIpam(
-                        new com.github.dockerjava.api.model.Network.Ipam().withConfig(ipamConfig)))
+                cmd -> {
+                  cmd.withName(NETWORK_NAME)
+                      .withIpam(
+                          new com.github.dockerjava.api.model.Network.Ipam()
+                              .withConfig(ipamConfig));
+                  if (supportsGatewayMode) {
+                    cmd.withOptions(
+                        ImmutableMap.of(GATEWAY_MODE_OPTION, GATEWAY_MODE_OPTION_VALUE));
+                  }
+                })
             .build());
+  }
+
+  static boolean supportsDirectRoutingGatewayMode(String dockerServerVersion) {
+    if (dockerServerVersion == null || dockerServerVersion.isEmpty()) {
+      return false;
+    }
+    int separator = dockerServerVersion.indexOf('.');
+    String majorVersion =
+        separator < 0 ? dockerServerVersion : dockerServerVersion.substring(0, separator);
+    try {
+      return Integer.parseInt(majorVersion) >= DIRECT_ROUTING_GATEWAY_MODE_DOCKER_MAJOR_VERSION;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
   public static boolean ipRangesOverlap(String cidr1, String cidr2) throws Exception {

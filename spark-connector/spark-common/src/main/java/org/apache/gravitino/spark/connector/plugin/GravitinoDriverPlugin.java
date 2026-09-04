@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -61,6 +63,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.package$;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
@@ -74,6 +77,10 @@ import scala.Option;
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+  private static final Pattern SPARK_VERSION_PATTERN =
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:\\D.*)?$");
+  private static final String DORIS_SPARK_CATALOG_CLASS =
+      "org.apache.doris.spark.catalog.DorisTableCatalog";
 
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
@@ -94,6 +101,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableDorisSupport = false;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -114,6 +122,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableDorisSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, false);
     if (enablePaimonSupport) {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
@@ -141,8 +151,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -158,12 +168,60 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                   && !enablePaimonSupport) {
                 return;
               }
+              String registrationProvider = provider;
+              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))) {
+                if (!enableDorisSupport) {
+                  // Keep the existing generic JDBC behavior unless the specialized adapter is
+                  // explicitly enabled.
+                  registrationProvider = "jdbc";
+                } else {
+                  if (StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))
+                      || !isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION())) {
+                    throw new IllegalArgumentException(
+                        "Apache Doris Spark support requires Spark 3.5.3 or newer in the Spark 3.5 "
+                            + "line with Scala 2.12");
+                  }
+                  validateDorisDependency(Thread.currentThread().getContextClassLoader());
+                }
+              }
               try {
-                registerCatalog(sparkConf, catalogName, provider);
+                registerCatalog(sparkConf, catalogName, registrationProvider);
               } catch (Exception e) {
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
             });
+  }
+
+  @VisibleForTesting
+  void setDorisSupportEnabled(boolean enabled) {
+    this.enableDorisSupport = enabled;
+  }
+
+  @VisibleForTesting
+  static void validateDorisDependency(ClassLoader classLoader) {
+    ClassLoader effectiveClassLoader =
+        classLoader == null ? GravitinoDriverPlugin.class.getClassLoader() : classLoader;
+    try {
+      Class.forName(DORIS_SPARK_CATALOG_CLASS, false, effectiveClassLoader);
+    } catch (ClassNotFoundException | LinkageError e) {
+      throw new IllegalArgumentException(
+          "Apache Doris Spark Connector 26.0.0 must be available on the driver and executors", e);
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isDorisSparkVersionSupported(String version) {
+    Matcher matcher = SPARK_VERSION_PATTERN.matcher(version);
+    if (!matcher.matches()) {
+      return false;
+    }
+    try {
+      return Integer.parseInt(matcher.group(1)) == 3
+          && Integer.parseInt(matcher.group(2)) == 5
+          && Integer.parseInt(matcher.group(3)) >= 3;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
   private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
