@@ -186,6 +186,16 @@ public interface SupportsCatalogs {
   void testConnection(NameIdentifier ident) throws Exception;
 
   /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param ident The identifier of the existing catalog.
+   * @param changes The proposed changes to apply temporarily.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws Exception If the connection test fails.
+   */
+  void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception;
+
+  /**
    * Enable a catalog. If the catalog is already enabled, this method does nothing.
    *
    * @param ident The identifier of the catalog.
