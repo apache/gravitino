@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -322,6 +323,52 @@ public class TestCatalogEvent {
   }
 
   @Test
+  void testTestConnectionEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    Assertions.assertDoesNotThrow(
+        () ->
+            dispatcher.testConnection(
+                identifier,
+                catalog.type(),
+                catalog.provider(),
+                catalog.comment(),
+                catalog.properties()));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(TestConnectionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testTestConnectionFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.testConnection(
+                identifier,
+                catalog.type(),
+                catalog.provider(),
+                catalog.comment(),
+                catalog.properties()));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((TestConnectionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   @SuppressWarnings("deprecation")
   void testListCatalogEventDeprecatedConstructorReturnsNegativeCount() {
     Namespace namespace = Namespace.of("metalake");
@@ -398,6 +445,14 @@ public class TestCatalogEvent {
         .thenReturn(new Catalog[] {catalog, catalog, catalog});
     when(dispatcher.alterCatalog(any(NameIdentifier.class), any(CatalogChange.class)))
         .thenReturn(catalog);
+    doNothing()
+        .when(dispatcher)
+        .testConnection(
+            any(NameIdentifier.class),
+            any(Catalog.Type.class),
+            any(String.class),
+            any(String.class),
+            any(Map.class));
     return dispatcher;
   }
 
