@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -34,17 +36,25 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.server.web.HttpAuditFilter;
+import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHandler;
+import org.eclipse.jetty.servlet.ServletMapping;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -172,6 +182,62 @@ public class TestGravitinoServer {
     assertEquals("memory", providers.get(0).get("type"));
     assertEquals("https://secrets.example.com", providers.get(0).get("uri"));
     assertFalse(providers.get(0).containsKey("className"));
+  }
+
+  // Paths that legitimately have no HttpAuditFilter binding of their own, each with the reason
+  // it's still safe. GH-12760: extending this set is a deliberate, reviewed decision, not a
+  // default — everything else registered on the servlet context must be covered.
+  private static final Set<String> PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE =
+      ImmutableSet.of(
+          "/", // DefaultServlet / WebUIFilter: serves static UI assets, no server-side logic.
+          "/ui/*", // WebUIFilter: serves static UI assets, no server-side logic.
+          "/health/*", // HealthAliasServlet forwards into /api/health*, already covered via the
+          "/health.html" // FORWARD dispatcher type; binding again here would double-log probes.
+          );
+
+  @Test
+  public void testEveryServletPathIsCoveredByAuditFilter() throws Exception {
+    gravitinoServer.initialize();
+
+    ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
+
+    Set<String> auditedPathSpecs =
+        Arrays.stream(servletHandler.getFilterMappings())
+            .filter(
+                filterMapping ->
+                    HttpAuditFilter.class
+                        .getName()
+                        .equals(
+                            servletHandler.getFilter(filterMapping.getFilterName()).getClassName()))
+            .flatMap(filterMapping -> Arrays.stream(filterMapping.getPathSpecs()))
+            .collect(Collectors.toSet());
+
+    for (ServletMapping servletMapping : servletHandler.getServletMappings()) {
+      for (String pathSpec : servletMapping.getPathSpecs()) {
+        if (PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE.contains(pathSpec)) {
+          continue;
+        }
+        assertTrue(
+            auditedPathSpecs.contains(pathSpec),
+            "Servlet path '"
+                + pathSpec
+                + "' is registered without HttpAuditFilter coverage. See GH-12760: every "
+                + "servlet mounted outside /api/* must be wired into GravitinoServer's "
+                + "ROOT_MOUNTED_PATHS filter loop, or added to "
+                + "PATHS_EXEMPT_FROM_DIRECT_AUDIT_COVERAGE above with a documented reason.");
+      }
+    }
+  }
+
+  private static ServletContextHandler getServletContextHandler(GravitinoServer gravitinoServer)
+      throws Exception {
+    Field serverField = GravitinoServer.class.getDeclaredField("server");
+    serverField.setAccessible(true);
+    JettyServer jettyServer = (JettyServer) serverField.get(gravitinoServer);
+
+    Field handlerField = JettyServer.class.getDeclaredField("servletContextHandler");
+    handlerField.setAccessible(true);
+    return (ServletContextHandler) handlerField.get(jettyServer);
   }
 
   private static ServerConfig serverConfigWithMemoryProvider() throws IOException {
