@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import java.util.List;
+import javax.ws.rs.core.Response;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +54,54 @@ public class TestExceptionHandlers {
 
     String msg6 = ExceptionHandlers.BaseExceptionHandler.getErrorMsg(e6);
     Assertions.assertEquals("", msg6);
+  }
+
+  @Test
+  void testUnsupportedOperationReturnsNotImplemented() {
+    UnsupportedOperationException exception =
+        new UnsupportedOperationException("Operation is not supported");
+    List<Response> responses =
+        List.of(
+            ExceptionHandlers.handleTableException(
+                OperationType.ALTER, "table", "schema", exception),
+            ExceptionHandlers.handlePolicyException(
+                OperationType.LIST, "policy", "metalake", exception),
+            new ExceptionHandlers.BaseExceptionHandler()
+                .handle(OperationType.LIST, "object", "parent", exception));
+
+    responses.forEach(
+        response -> {
+          Assertions.assertEquals(
+              Response.Status.NOT_IMPLEMENTED.getStatusCode(), response.getStatus());
+          ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+          Assertions.assertEquals(
+              ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResponse.getCode());
+          Assertions.assertEquals(
+              UnsupportedOperationException.class.getSimpleName(), errorResponse.getType());
+        });
+  }
+
+  @Test
+  void testUnmodifiableOperationReturnsConflict() {
+    UnmodifiableStatisticException exception =
+        new UnmodifiableStatisticException("Statistic is unmodifiable");
+    List<Response> responses =
+        List.of(
+            ExceptionHandlers.handleStatisticException(
+                OperationType.ALTER, "statistic", "table", exception),
+            ExceptionHandlers.handlePartitionStatsException(
+                OperationType.ALTER, "partition", "table", exception),
+            new ExceptionHandlers.BaseExceptionHandler()
+                .handle(OperationType.ALTER, "statistic", "table", exception));
+
+    responses.forEach(
+        response -> {
+          Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+          ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+          Assertions.assertEquals(
+              ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResponse.getCode());
+          Assertions.assertEquals(
+              UnmodifiableStatisticException.class.getSimpleName(), errorResponse.getType());
+        });
   }
 }
