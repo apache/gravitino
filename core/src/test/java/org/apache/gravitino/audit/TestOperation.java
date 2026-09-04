@@ -127,7 +127,6 @@ import org.apache.gravitino.listener.api.event.view.LoadViewFailureEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.apache.gravitino.listener.api.info.FilesetInfo;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
-import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.TopicInfo;
@@ -614,24 +613,22 @@ public class TestOperation {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testPolicyTagOperation() {
-    PolicyTagAssociationInfo association =
-        new PolicyTagAssociationInfo("metalake", "tag", "policy", AllValuesSelector.get());
-    Event addEvent = new AddPolicyForTagEvent(USER, null, AllValuesSelector.get(), association);
+    Event addEvent =
+        new AddPolicyForTagEvent(USER, "metalake", "tag", "policy", AllValuesSelector.get());
     Event addFailureEvent =
         new AddPolicyForTagFailureEvent(
             USER,
             "metalake",
             "tag",
             "policy",
-            null,
             AllValuesSelector.get(),
             new Exception("add failed"));
-    Event removeEvent =
-        new RemovePolicyFromTagEvent(USER, "metalake", "tag", "policy", association);
+    Event removeEvent = new RemovePolicyFromTagEvent(USER, "metalake", "tag", "policy");
     Event removeFailureEvent =
         new RemovePolicyFromTagFailureEvent(
-            USER, "metalake", "tag", "policy", association, new Exception("remove failed"));
+            USER, "metalake", "tag", "policy", new Exception("remove failed"));
 
     Assertions.assertEquals(
         AuditLog.Operation.ADD_POLICY_FOR_TAG, AuditLog.Operation.fromEvent(addEvent));
@@ -642,6 +639,16 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.REMOVE_POLICY_FROM_TAG,
         AuditLog.Operation.fromEvent(removeFailureEvent));
+
+    // The deprecated v1 schema records the tag identifier but has no custom-info field for policy
+    // or selector details. The v2 formatter covers those relation-specific fields.
+    SimpleFormatter formatter = new SimpleFormatter();
+    SimpleAuditLog addLog = formatter.format(addEvent);
+    SimpleAuditLog removeLog = formatter.format(removeEvent);
+    Assertions.assertEquals(AuditLog.Operation.ADD_POLICY_FOR_TAG, addLog.operation());
+    Assertions.assertEquals(AuditLog.Operation.REMOVE_POLICY_FROM_TAG, removeLog.operation());
+    Assertions.assertEquals("metalake.system.tag.tag", addLog.identifier());
+    Assertions.assertEquals("metalake.system.tag.tag", removeLog.identifier());
   }
 
   /**

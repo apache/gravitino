@@ -18,55 +18,62 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Optional;
-import javax.annotation.Nullable;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after successfully adding a policy to a tag. */
 @DeveloperApi
 public final class AddPolicyForTagEvent extends TagEvent {
-  @Nullable private final PolicyTagAssociationInfo previousAssociation;
+  private final String metalake;
+  private final String tagName;
+  private final String policyName;
   private final PolicyAssociationSelector requestedSelector;
-  private final PolicyTagAssociationInfo resultingAssociation;
 
   /**
    * Constructs an event triggered after successfully adding a policy to a tag.
    *
    * @param user The user who initiated the operation.
-   * @param previousAssociation The previous association, or null if no association existed.
+   * @param metalake The metalake containing the tag and policy.
+   * @param tagName The tag name.
+   * @param policyName The policy name.
    * @param requestedSelector The requested policy association selector.
-   * @param resultingAssociation The resulting policy-to-tag association.
    */
   public AddPolicyForTagEvent(
       String user,
-      @Nullable PolicyTagAssociationInfo previousAssociation,
-      PolicyAssociationSelector requestedSelector,
-      PolicyTagAssociationInfo resultingAssociation) {
-    super(
-        user,
-        NameIdentifierUtil.ofTag(resultingAssociation.metalake(), resultingAssociation.tagName()));
-    this.previousAssociation = previousAssociation;
+      String metalake,
+      String tagName,
+      String policyName,
+      PolicyAssociationSelector requestedSelector) {
+    super(user, NameIdentifierUtil.ofTag(metalake, tagName));
+    this.metalake = metalake;
+    this.tagName = tagName;
+    this.policyName = policyName;
     this.requestedSelector = requestedSelector;
-    this.resultingAssociation = resultingAssociation;
   }
 
   /**
-   * @return The previous association, or empty when no association existed.
+   * @return The metalake containing the tag and policy.
    */
-  public Optional<PolicyTagAssociationInfo> previousAssociation() {
-    return Optional.ofNullable(previousAssociation);
+  public String metalake() {
+    return metalake;
   }
 
   /**
-   * @return The previous selector, or empty when no previous association exists.
+   * @return The tag name.
    */
-  public Optional<PolicyAssociationSelector> previousSelector() {
-    return previousAssociation == null
-        ? Optional.empty()
-        : Optional.of(previousAssociation.selector());
+  public String tagName() {
+    return tagName;
+  }
+
+  /**
+   * @return The policy name.
+   */
+  public String policyName() {
+    return policyName;
   }
 
   /**
@@ -76,11 +83,14 @@ public final class AddPolicyForTagEvent extends TagEvent {
     return requestedSelector;
   }
 
-  /**
-   * @return The resulting policy-to-tag association.
-   */
-  public PolicyTagAssociationInfo resultingAssociation() {
-    return resultingAssociation;
+  /** {@inheritDoc} */
+  @Override
+  public Map<String, String> customInfo() {
+    return ImmutableMap.of(
+        "policyName",
+        policyName,
+        "selector",
+        PolicyAssociationSelectorSerde.serialize(requestedSelector));
   }
 
   @Override

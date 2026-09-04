@@ -19,12 +19,10 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
-import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagPreEvent;
@@ -64,7 +62,6 @@ import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagPreEvent;
-import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
 import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.tag.Tag;
@@ -258,30 +255,15 @@ public class TagEventDispatcher implements TagDispatcher {
   public void addPolicyForTag(
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
     String user = PrincipalUtils.getCurrentUserName();
-    PolicyTagAssociationInfo previousAssociation;
-    try {
-      previousAssociation = findPolicyAssociation(metalake, tagName, policyName);
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new AddPolicyForTagPreEvent(user, metalake, tagName, policyName, null, selector));
-      eventBus.dispatchEvent(
-          new AddPolicyForTagFailureEvent(user, metalake, tagName, policyName, null, selector, e));
-      throw e;
-    }
-
     eventBus.dispatchEvent(
-        new AddPolicyForTagPreEvent(
-            user, metalake, tagName, policyName, previousAssociation, selector));
+        new AddPolicyForTagPreEvent(user, metalake, tagName, policyName, selector));
     try {
       dispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
-      PolicyTagAssociationInfo resultingAssociation =
-          new PolicyTagAssociationInfo(metalake, tagName, policyName, selector);
       eventBus.dispatchEvent(
-          new AddPolicyForTagEvent(user, previousAssociation, selector, resultingAssociation));
+          new AddPolicyForTagEvent(user, metalake, tagName, policyName, selector));
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new AddPolicyForTagFailureEvent(
-              user, metalake, tagName, policyName, previousAssociation, selector, e));
+          new AddPolicyForTagFailureEvent(user, metalake, tagName, policyName, selector, e));
       throw e;
     }
   }
@@ -289,27 +271,13 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public void removePolicyFromTag(String metalake, String tagName, String policyName) {
     String user = PrincipalUtils.getCurrentUserName();
-    PolicyTagAssociationInfo previousAssociation;
-    try {
-      previousAssociation = findPolicyAssociation(metalake, tagName, policyName);
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName, null));
-      eventBus.dispatchEvent(
-          new RemovePolicyFromTagFailureEvent(user, metalake, tagName, policyName, null, e));
-      throw e;
-    }
-
-    eventBus.dispatchEvent(
-        new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName, previousAssociation));
+    eventBus.dispatchEvent(new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName));
     try {
       dispatcher.removePolicyFromTag(metalake, tagName, policyName);
-      eventBus.dispatchEvent(
-          new RemovePolicyFromTagEvent(user, metalake, tagName, policyName, previousAssociation));
+      eventBus.dispatchEvent(new RemovePolicyFromTagEvent(user, metalake, tagName, policyName));
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new RemovePolicyFromTagFailureEvent(
-              user, metalake, tagName, policyName, previousAssociation, e));
+          new RemovePolicyFromTagFailureEvent(user, metalake, tagName, policyName, e));
       throw e;
     }
   }
@@ -463,26 +431,6 @@ public class TagEventDispatcher implements TagDispatcher {
         tag.properties(),
         allowedValuesForInfo(tag.valueConstraint()),
         tag.assignment().map(assignment -> assignment.values()).orElse(null));
-  }
-
-  @Nullable
-  private PolicyTagAssociationInfo findPolicyAssociation(
-      String metalake, String tagName, String policyName) {
-    for (RelationalEntity<?> association :
-        dispatcher.listPolicyAssociationsForTag(metalake, tagName)) {
-      if (association.targetEntity().name().equals(policyName)) {
-        return toInfo(metalake, association);
-      }
-    }
-    return null;
-  }
-
-  private static PolicyTagAssociationInfo toInfo(String metalake, RelationalEntity<?> association) {
-    return new PolicyTagAssociationInfo(
-        metalake,
-        association.source().name(),
-        association.targetEntity().name(),
-        PolicyAssociationSelectorSerde.deserialize(association.relationValue().orElseThrow()));
   }
 
   private static String[] allowedValuesForInfo(TagValueConstraint valueConstraint) {

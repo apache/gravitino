@@ -18,11 +18,9 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Optional;
-import javax.annotation.Nullable;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
-import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before removing a policy from a tag. */
@@ -31,7 +29,6 @@ public final class RemovePolicyFromTagPreEvent extends TagPreEvent {
   private final String metalake;
   private final String tagName;
   private final String policyName;
-  @Nullable private final PolicyTagAssociationInfo previousAssociation;
 
   /**
    * Constructs an event triggered before removing a policy from a tag.
@@ -40,19 +37,13 @@ public final class RemovePolicyFromTagPreEvent extends TagPreEvent {
    * @param metalake The metalake containing the tag and policy.
    * @param tagName The tag name.
    * @param policyName The policy name.
-   * @param previousAssociation The previous association, or null if no association exists.
    */
   public RemovePolicyFromTagPreEvent(
-      String user,
-      String metalake,
-      String tagName,
-      String policyName,
-      @Nullable PolicyTagAssociationInfo previousAssociation) {
+      String user, String metalake, String tagName, String policyName) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagName));
     this.metalake = metalake;
     this.tagName = tagName;
     this.policyName = policyName;
-    this.previousAssociation = previousAssociation;
   }
 
   /**
@@ -76,20 +67,10 @@ public final class RemovePolicyFromTagPreEvent extends TagPreEvent {
     return policyName;
   }
 
-  /**
-   * @return The previous association, or empty when no association exists.
-   */
-  public Optional<PolicyTagAssociationInfo> previousAssociation() {
-    return Optional.ofNullable(previousAssociation);
-  }
-
-  /**
-   * @return The previous selector, or empty when no previous association exists.
-   */
-  public Optional<PolicyAssociationSelector> previousSelector() {
-    return previousAssociation == null
-        ? Optional.empty()
-        : Optional.of(previousAssociation.selector());
+  /** {@inheritDoc} */
+  @Override
+  public Map<String, String> customInfo() {
+    return ImmutableMap.of("policyName", policyName);
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.gravitino.listener;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,8 +77,6 @@ public class TestPolicyTagDispatcherChain {
   @Test
   void testTagDispatcherChainDelegatesMutationsAndEmitsEvents() {
     TagDispatcher delegate = mock(TagDispatcher.class);
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[0]);
     DummyEventListener listener = new DummyEventListener();
     TagDispatcher dispatcher =
         new TagHookDispatcher(
@@ -88,7 +87,7 @@ public class TestPolicyTagDispatcherChain {
 
     verify(delegate).addPolicyForTag(METALAKE, TAG, POLICY, AllValuesSelector.get());
     verify(delegate).removePolicyFromTag(METALAKE, TAG, POLICY);
-    verify(delegate, times(2)).listPolicyAssociationsForTag(METALAKE, TAG);
+    verify(delegate, never()).listPolicyAssociationsForTag(METALAKE, TAG);
     Assertions.assertInstanceOf(AddPolicyForTagPreEvent.class, listener.getPreEvents().get(0));
     Assertions.assertInstanceOf(RemovePolicyFromTagPreEvent.class, listener.getPreEvents().get(1));
     Assertions.assertInstanceOf(AddPolicyForTagEvent.class, listener.getPostEvents().get(0));

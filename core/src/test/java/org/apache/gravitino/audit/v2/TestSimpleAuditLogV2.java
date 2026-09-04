@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
@@ -31,8 +32,10 @@ import org.apache.gravitino.listener.api.event.ListSchemaEvent;
 import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +79,30 @@ public class TestSimpleAuditLogV2 {
     Assertions.assertTrue(output.contains("LIST_TABLE"));
     Assertions.assertTrue(output.contains("metalake.catalog"));
     Assertions.assertTrue(output.contains("SUCCESS"));
+  }
+
+  @Test
+  public void testPolicyTagRelationEventFormatIncludesRelationTarget() {
+    AddPolicyForTagEvent addEvent =
+        new AddPolicyForTagEvent(
+            "alice", "metalake", "data_domain", "retention", AllValuesSelector.get());
+    SimpleAuditLogV2 addLog = new SimpleAuditLogV2(addEvent);
+
+    Assertions.assertEquals("metalake.system.tag.data_domain", addLog.identifier());
+    Assertions.assertEquals("retention", addLog.customInfo().get("policyName"));
+    Assertions.assertEquals("{\"type\":\"ALL_VALUES\"}", addLog.customInfo().get("selector"));
+    String addOutput = addLog.toString();
+    Assertions.assertTrue(addOutput.contains("policyName=retention"), addOutput);
+    Assertions.assertTrue(addOutput.contains("selector={\"type\":\"ALL_VALUES\"}"), addOutput);
+
+    RemovePolicyFromTagEvent removeEvent =
+        new RemovePolicyFromTagEvent("alice", "metalake", "data_domain", "retention");
+    SimpleAuditLogV2 removeLog = new SimpleAuditLogV2(removeEvent);
+
+    Assertions.assertEquals("metalake.system.tag.data_domain", removeLog.identifier());
+    Assertions.assertEquals("retention", removeLog.customInfo().get("policyName"));
+    Assertions.assertEquals(1, removeLog.customInfo().size());
+    Assertions.assertTrue(removeLog.toString().contains("policyName=retention"));
   }
 
   // ---- list event tests ----

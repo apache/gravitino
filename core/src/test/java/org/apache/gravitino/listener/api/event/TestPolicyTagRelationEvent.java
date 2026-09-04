@@ -18,30 +18,29 @@
  */
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.RelationalEntity;
-import org.apache.gravitino.SupportsRelationOperations;
+import java.util.Collections;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.TagEventDispatcher;
-import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 public class TestPolicyTagRelationEvent {
   private static final String METALAKE = "metalake";
@@ -51,140 +50,139 @@ public class TestPolicyTagRelationEvent {
   private DummyEventListener listener;
   private TagDispatcher delegate;
   private TagEventDispatcher dispatcher;
-  private PolicyEntity policy;
 
   @BeforeEach
   void setUp() {
     listener = new DummyEventListener();
     delegate = mock(TagDispatcher.class);
     dispatcher = new TagEventDispatcher(new EventBus(Arrays.asList(listener)), delegate);
-    policy = mock(PolicyEntity.class);
-    when(policy.name()).thenReturn(POLICY);
   }
 
   @Test
-  void testAddPolicyForTagEventsIncludeRequestedAndResultingAssociation() {
-    PolicyAssociationSelector requestedSelector = TagValueSelector.of("finance");
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[0]);
+  void testAddPolicyForTagEventsContainMutationIntent() {
+    PolicyAssociationSelector selector = TagValueSelector.of("finance");
 
-    dispatcher.addPolicyForTag(METALAKE, TAG, POLICY, requestedSelector);
+    dispatcher.addPolicyForTag(METALAKE, TAG, POLICY, selector);
 
     AddPolicyForTagPreEvent preEvent = (AddPolicyForTagPreEvent) listener.popPreEvent();
+    assertAddEventFields(preEvent.metalake(), preEvent.tagName(), preEvent.policyName());
     Assertions.assertEquals(OperationType.ADD_POLICY_FOR_TAG, preEvent.operationType());
-    Assertions.assertEquals(METALAKE, preEvent.metalake());
-    Assertions.assertEquals(TAG, preEvent.tagName());
-    Assertions.assertEquals(POLICY, preEvent.policyName());
-    Assertions.assertTrue(preEvent.previousAssociation().isEmpty());
-    Assertions.assertEquals(requestedSelector, preEvent.requestedSelector());
+    Assertions.assertEquals(selector, preEvent.requestedSelector());
 
     AddPolicyForTagEvent event = (AddPolicyForTagEvent) listener.popPostEvent();
+    assertAddEventFields(event.metalake(), event.tagName(), event.policyName());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
-    Assertions.assertTrue(event.previousAssociation().isEmpty());
-    Assertions.assertEquals(requestedSelector, event.requestedSelector());
-    Assertions.assertEquals(METALAKE, event.resultingAssociation().metalake());
-    Assertions.assertEquals(TAG, event.resultingAssociation().tagName());
-    Assertions.assertEquals(POLICY, event.resultingAssociation().policyName());
-    Assertions.assertEquals(requestedSelector, event.resultingAssociation().selector());
-    verify(delegate, times(1)).listPolicyAssociationsForTag(METALAKE, TAG);
+    Assertions.assertEquals(selector, event.requestedSelector());
+    Assertions.assertEquals(POLICY, event.customInfo().get("policyName"));
+    Assertions.assertEquals(
+        PolicyAssociationSelectorSerde.serialize(selector), event.customInfo().get("selector"));
+    verify(delegate).addPolicyForTag(METALAKE, TAG, POLICY, selector);
+    verify(delegate, never()).listPolicyAssociationsForTag(METALAKE, TAG);
   }
 
   @Test
   void testAddPolicyForTagFailureEvent() {
-    RelationalEntity<PolicyEntity> previous = association(AllValuesSelector.get());
-    PolicyAssociationSelector requestedSelector = TagValueSelector.of("finance");
+    PolicyAssociationSelector selector = TagValueSelector.of("finance");
     GravitinoRuntimeException exception = new GravitinoRuntimeException("add failed");
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[] {previous});
-    doThrow(exception).when(delegate).addPolicyForTag(METALAKE, TAG, POLICY, requestedSelector);
+    doThrow(exception).when(delegate).addPolicyForTag(METALAKE, TAG, POLICY, selector);
 
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> dispatcher.addPolicyForTag(METALAKE, TAG, POLICY, requestedSelector));
+    Assertions.assertSame(
+        exception,
+        Assertions.assertThrowsExactly(
+            GravitinoRuntimeException.class,
+            () -> dispatcher.addPolicyForTag(METALAKE, TAG, POLICY, selector)));
 
     AddPolicyForTagPreEvent preEvent = (AddPolicyForTagPreEvent) listener.popPreEvent();
-    Assertions.assertTrue(preEvent.previousAssociation().isPresent());
-    Assertions.assertSame(AllValuesSelector.get(), preEvent.previousSelector().orElseThrow());
+    Assertions.assertEquals(selector, preEvent.requestedSelector());
     AddPolicyForTagFailureEvent event = (AddPolicyForTagFailureEvent) listener.popPostEvent();
     Assertions.assertSame(exception, event.exception());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-    Assertions.assertTrue(event.previousAssociation().isPresent());
-    Assertions.assertSame(AllValuesSelector.get(), event.previousSelector().orElseThrow());
-    Assertions.assertEquals(requestedSelector, event.requestedSelector());
+    Assertions.assertEquals(selector, event.requestedSelector());
+    Assertions.assertEquals(POLICY, event.customInfo().get("policyName"));
+    verify(delegate, never()).listPolicyAssociationsForTag(METALAKE, TAG);
   }
 
   @Test
-  void testRemovePolicyFromTagEventsIncludeRemovedAssociation() {
-    PolicyAssociationSelector previousSelector = TagValueSelector.of("finance");
-    RelationalEntity<PolicyEntity> previous = association(previousSelector);
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[] {previous});
-
+  void testRemovePolicyFromTagEventsContainMutationIntent() {
     dispatcher.removePolicyFromTag(METALAKE, TAG, POLICY);
 
     RemovePolicyFromTagPreEvent preEvent = (RemovePolicyFromTagPreEvent) listener.popPreEvent();
+    assertRemoveEventFields(preEvent.metalake(), preEvent.tagName(), preEvent.policyName());
     Assertions.assertEquals(OperationType.REMOVE_POLICY_FROM_TAG, preEvent.operationType());
-    Assertions.assertEquals(previousSelector, preEvent.previousSelector().orElseThrow());
+
     RemovePolicyFromTagEvent event = (RemovePolicyFromTagEvent) listener.popPostEvent();
+    assertRemoveEventFields(event.metalake(), event.tagName(), event.policyName());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
-    Assertions.assertEquals(previousSelector, event.removedAssociation().orElseThrow().selector());
-  }
-
-  @Test
-  void testRemovePolicyFromTagIdempotentEvent() {
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[0]);
-
-    dispatcher.removePolicyFromTag(METALAKE, TAG, POLICY);
-
-    RemovePolicyFromTagPreEvent preEvent = (RemovePolicyFromTagPreEvent) listener.popPreEvent();
-    Assertions.assertTrue(preEvent.previousAssociation().isEmpty());
-    RemovePolicyFromTagEvent event = (RemovePolicyFromTagEvent) listener.popPostEvent();
-    Assertions.assertTrue(event.removedAssociation().isEmpty());
+    Assertions.assertEquals(POLICY, event.customInfo().get("policyName"));
+    verify(delegate).removePolicyFromTag(METALAKE, TAG, POLICY);
+    verify(delegate, never()).listPolicyAssociationsForTag(METALAKE, TAG);
   }
 
   @Test
   void testRemovePolicyFromTagFailureEvent() {
-    RelationalEntity<PolicyEntity> previous = association(TagValueSelector.of("finance"));
     GravitinoRuntimeException exception = new GravitinoRuntimeException("remove failed");
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG))
-        .thenReturn(new RelationalEntity<?>[] {previous});
     doThrow(exception).when(delegate).removePolicyFromTag(METALAKE, TAG, POLICY);
 
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> dispatcher.removePolicyFromTag(METALAKE, TAG, POLICY));
+    Assertions.assertSame(
+        exception,
+        Assertions.assertThrowsExactly(
+            GravitinoRuntimeException.class,
+            () -> dispatcher.removePolicyFromTag(METALAKE, TAG, POLICY)));
 
     RemovePolicyFromTagFailureEvent event =
         (RemovePolicyFromTagFailureEvent) listener.popPostEvent();
     Assertions.assertSame(exception, event.exception());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-    Assertions.assertTrue(event.previousAssociation().isPresent());
+    Assertions.assertEquals(POLICY, event.policyName());
+    verify(delegate, never()).listPolicyAssociationsForTag(METALAKE, TAG);
   }
 
   @Test
-  void testRelationSnapshotFailureStillEmitsPreAndFailureEvents() {
+  void testPreEventIsDispatchedBeforeMutation() {
+    EventListenerPlugin orderedListener = mock(EventListenerPlugin.class);
+    TagEventDispatcher orderedDispatcher =
+        new TagEventDispatcher(new EventBus(Collections.singletonList(orderedListener)), delegate);
     PolicyAssociationSelector selector = TagValueSelector.of("finance");
-    GravitinoRuntimeException exception = new GravitinoRuntimeException("list failed");
-    when(delegate.listPolicyAssociationsForTag(METALAKE, TAG)).thenThrow(exception);
 
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> dispatcher.addPolicyForTag(METALAKE, TAG, POLICY, selector));
+    orderedDispatcher.addPolicyForTag(METALAKE, TAG, POLICY, selector);
 
-    AddPolicyForTagPreEvent preEvent = (AddPolicyForTagPreEvent) listener.popPreEvent();
-    Assertions.assertTrue(preEvent.previousAssociation().isEmpty());
-    Assertions.assertEquals(selector, preEvent.requestedSelector());
-    AddPolicyForTagFailureEvent event = (AddPolicyForTagFailureEvent) listener.popPostEvent();
-    Assertions.assertSame(exception, event.exception());
+    InOrder ordered = inOrder(orderedListener, delegate);
+    ordered.verify(orderedListener).onPreEvent(any(AddPolicyForTagPreEvent.class));
+    ordered.verify(delegate).addPolicyForTag(METALAKE, TAG, POLICY, selector);
+    ordered.verify(orderedListener).onPostEvent(any(AddPolicyForTagEvent.class));
   }
 
-  private RelationalEntity<PolicyEntity> association(PolicyAssociationSelector selector) {
-    return new RelationalEntity<>(
-        SupportsRelationOperations.Type.POLICY_TAG_REL,
-        NameIdentifier.of(METALAKE, TAG),
-        Entity.EntityType.TAG,
-        policy,
-        PolicyAssociationSelectorSerde.serialize(selector));
+  @Test
+  void testPreEventVetoPreventsBusinessAccess() {
+    EventListenerPlugin vetoListener = mock(EventListenerPlugin.class);
+    ForbiddenException forbidden = new ForbiddenException("denied");
+    doThrow(forbidden).when(vetoListener).onPreEvent(any(AddPolicyForTagPreEvent.class));
+    TagEventDispatcher vetoDispatcher =
+        new TagEventDispatcher(new EventBus(Collections.singletonList(vetoListener)), delegate);
+
+    Assertions.assertSame(
+        forbidden,
+        Assertions.assertThrowsExactly(
+            ForbiddenException.class,
+            () ->
+                vetoDispatcher.addPolicyForTag(
+                    METALAKE, TAG, POLICY, TagValueSelector.of("finance"))));
+    verify(delegate, never())
+        .addPolicyForTag(
+            any(String.class),
+            any(String.class),
+            any(String.class),
+            any(PolicyAssociationSelector.class));
+    verify(delegate, never()).listPolicyAssociationsForTag(any(String.class), any(String.class));
+  }
+
+  private static void assertAddEventFields(String metalake, String tagName, String policyName) {
+    Assertions.assertEquals(METALAKE, metalake);
+    Assertions.assertEquals(TAG, tagName);
+    Assertions.assertEquals(POLICY, policyName);
+  }
+
+  private static void assertRemoveEventFields(String metalake, String tagName, String policyName) {
+    assertAddEventFields(metalake, tagName, policyName);
   }
 }

@@ -18,10 +18,9 @@
  */
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Optional;
-import javax.annotation.Nullable;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after successfully removing a policy from a tag. */
@@ -30,28 +29,23 @@ public final class RemovePolicyFromTagEvent extends TagEvent {
   private final String metalake;
   private final String tagName;
   private final String policyName;
-  @Nullable private final PolicyTagAssociationInfo removedAssociation;
 
   /**
    * Constructs an event triggered after successfully removing a policy from a tag.
+   *
+   * <p>A successful event means the idempotent remove operation completed. It does not indicate
+   * whether an association existed before the operation.
    *
    * @param user The user who initiated the operation.
    * @param metalake The metalake containing the tag and policy.
    * @param tagName The tag name.
    * @param policyName The policy name.
-   * @param removedAssociation The removed association, or null for an idempotent no-op.
    */
-  public RemovePolicyFromTagEvent(
-      String user,
-      String metalake,
-      String tagName,
-      String policyName,
-      @Nullable PolicyTagAssociationInfo removedAssociation) {
+  public RemovePolicyFromTagEvent(String user, String metalake, String tagName, String policyName) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagName));
     this.metalake = metalake;
     this.tagName = tagName;
     this.policyName = policyName;
-    this.removedAssociation = removedAssociation;
   }
 
   /**
@@ -75,11 +69,10 @@ public final class RemovePolicyFromTagEvent extends TagEvent {
     return policyName;
   }
 
-  /**
-   * @return The removed association, or empty for an idempotent no-op.
-   */
-  public Optional<PolicyTagAssociationInfo> removedAssociation() {
-    return Optional.ofNullable(removedAssociation);
+  /** {@inheritDoc} */
+  @Override
+  public Map<String, String> customInfo() {
+    return ImmutableMap.of("policyName", policyName);
   }
 
   @Override
