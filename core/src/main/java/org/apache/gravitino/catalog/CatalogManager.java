@@ -787,13 +787,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * properties, must use this method instead of casting the metadata snapshot returned by {@link
    * #loadCatalog(NameIdentifier)}.
    *
+   * <p><b>Note:</b> The callback must not retain the live catalog. Connector-backed metadata should
+   * be converted to a detached value before the callback returns.
+   *
    * @param ident The identifier of the catalog to use.
    * @param operation The operation to run against the live catalog instance.
    * @return The value returned by the operation.
    * @param <R> The result type of the operation.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
-   * @apiNote The callback must not retain the live catalog. Connector-backed metadata should be
-   *     converted to a detached value before the callback returns.
    */
   public <R> R doWithCatalog(NameIdentifier ident, ThrowableFunction<BaseCatalog, R> operation)
       throws NoSuchCatalogException {
