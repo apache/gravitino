@@ -1012,8 +1012,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
-<<<<<<< HEAD
-=======
               try {
                 catalogWrapper.doWithCatalogOps(
                     operations -> {
@@ -1025,14 +1023,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               } catch (Exception e) {
                 LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
               }
-              // Unmanaged: schemas removed only via store cascade — clean secrets captured above.
-              if (!managedStorage) {
-                for (Map<String, String> schemaProperties : unmanagedSchemaSecrets) {
-                  secretManager.deleteSecretsFromProperties(schemaProperties);
-                }
-              }
-              secretManager.deleteSecretsFromProperties(catalogProperties);
->>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
             }
             catalogCache.invalidate(ident);
             return deleted;

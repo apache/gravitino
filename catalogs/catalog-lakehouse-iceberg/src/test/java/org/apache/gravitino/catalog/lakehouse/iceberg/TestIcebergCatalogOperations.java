@@ -28,14 +28,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
-import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.exceptions.RESTException;
-import org.apache.iceberg.exceptions.ServiceUnavailableException;
->>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

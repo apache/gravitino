@@ -58,18 +58,9 @@ public class IcebergCatalogUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
-<<<<<<< HEAD
-=======
-  /**
-   * Column that Iceberg adds to the {@code iceberg_tables} control table in its V1 view-support
-   * migration (see {@code JdbcUtil} in iceberg-core).
-   */
-  private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
-
   private static final ConcurrentHashMap<String, InMemoryCatalog> MEMORY_CATALOGS =
       new ConcurrentHashMap<>();
 
->>>>>>> 30687f68f ([#12851] fix(iceberg-rest): Share the managed memory catalog in auxiliary mode (#12852))
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
     String catalogUuid = icebergConfig.getAllConfig().get(IcebergConstants.CATALOG_UUID);
     if (catalogUuid == null) {
