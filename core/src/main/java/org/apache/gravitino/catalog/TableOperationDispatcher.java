@@ -85,7 +85,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   public TableOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+    this(
+        catalogManager,
+        store,
+        idGenerator,
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher());
   }
 
   /**

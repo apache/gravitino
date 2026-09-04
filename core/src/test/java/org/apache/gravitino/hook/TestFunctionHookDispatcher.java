@@ -47,7 +47,8 @@ public class TestFunctionHookDispatcher {
   @Test
   public void testRegisterFunctionSetOwnerAfterRegister() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
     Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
 
     NameIdentifier functionIdentifier =
@@ -74,7 +75,7 @@ public class TestFunctionHookDispatcher {
                 Mockito.eq(definitions)))
         .thenReturn(registeredFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(gravitinoEnv, "catalogManager", catalogManager, true);
     try {
       FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher);
@@ -95,7 +96,7 @@ public class TestFunctionHookDispatcher {
       assertEquals(MetadataObject.Type.FUNCTION, metadataObjectCaptor.getValue().type());
       assertEquals("catalog1.schema1.func1", metadataObjectCaptor.getValue().fullName());
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
     }
   }
@@ -103,7 +104,8 @@ public class TestFunctionHookDispatcher {
   @Test
   public void testRegisterFunctionSucceedsWhenOwnerDispatcherIsDisabled() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
 
     NameIdentifier functionIdentifier =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
@@ -120,7 +122,7 @@ public class TestFunctionHookDispatcher {
                 Mockito.eq(definitions)))
         .thenReturn(registeredFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", null, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", null, true);
     try {
       FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher);
       Function result =
@@ -131,7 +133,7 @@ public class TestFunctionHookDispatcher {
       Mockito.verify(dispatcher)
           .registerFunction(functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
     }
   }
 
@@ -140,7 +142,8 @@ public class TestFunctionHookDispatcher {
     // Verifies the hook applies Capability.Scope.FUNCTION normalization before setOwner, so the
     // owner relation references the same identifier that NormalizeDispatcher persists under.
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
     Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
@@ -158,7 +161,7 @@ public class TestFunctionHookDispatcher {
         .thenReturn(mockFunction);
 
     FieldUtils.writeField(gravitinoEnv, "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
       FunctionHookDispatcher hook = new FunctionHookDispatcher(mockFunctionDispatcher);
@@ -179,7 +182,7 @@ public class TestFunctionHookDispatcher {
           "Function parent (catalog.schema) must have its schema component lowercased by"
               + " Capability.Scope.FUNCTION namespace normalization");
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
     }
   }
@@ -187,7 +190,8 @@ public class TestFunctionHookDispatcher {
   @Test
   public void testRegisterFunctionThrowsWhenSetOwnerFails() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
     Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
@@ -209,7 +213,7 @@ public class TestFunctionHookDispatcher {
                 any(), any(), any(), Mockito.anyBoolean(), any()))
         .thenReturn(mockFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(gravitinoEnv, "catalogManager", catalogManager, true);
 
     try {
@@ -223,7 +227,7 @@ public class TestFunctionHookDispatcher {
                   hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions));
       assertEquals("Set owner failed", thrown.getMessage());
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
     }
   }
