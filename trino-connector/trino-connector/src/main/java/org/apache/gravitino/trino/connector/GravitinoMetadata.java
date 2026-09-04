@@ -517,14 +517,8 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         .applyProjection(session, GravitinoHandle.unWrap(handle), projections, internalAssignments)
         .map(
             result -> {
-              // The internal connector may type an assignment from its own column handle, which
-              // can disagree with the type this connector declared for the column, for example an
-              // unbounded varchar here and a varchar(255) there for MySQL tinytext. Since Trino
-              // 444 a plan whose symbol and expression types differ is rejected, so restore the
-              // types the engine assigned to the projected variables. Note:
-              // this normalization must stay even if the type systems are unified elsewhere - the
-              // engine requires exact type equality in assignments, while for columns like MySQL
-              // text the two layers legitimately disagree on the varchar length.
+              // Restore the types the engine assigned to the projected variables; see
+              // resolveAssignmentType for why this is needed.
               Map<String, Type> engineTypes = collectVariableTypes(projections);
               return new ProjectionApplicationResult<>(
                   new GravitinoTableHandle(
@@ -923,9 +917,13 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   }
 
   /**
-   * Resolves the type for an assignment returned by the internal connector. The engine type is
-   * applied only when the assignment still refers to the column the engine passed in under that
-   * name; columns the internal connector synthesized keep their internal types.
+   * Resolves the type for an assignment returned by the internal connector. The internal connector
+   * may type an assignment from its own column handle, which can disagree with the type this
+   * connector declared for the same column, for example an unbounded varchar here and a
+   * varchar(65535) there for MySQL tinytext. Since Trino 444, a plan whose symbol and expression
+   * types differ is rejected, so the engine type is applied instead, but only when the assignment
+   * still refers to the column the engine passed in under that name; columns the internal connector
+   * synthesized keep their internal types.
    *
    * @param assignment the assignment returned by the internal connector
    * @param engineTypes the types the engine assigned to the projected variables, by variable name
