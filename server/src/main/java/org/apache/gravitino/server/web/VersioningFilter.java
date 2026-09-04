@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -36,6 +37,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,9 +106,17 @@ public class VersioningFilter implements Filter {
 
         if (!ApiVersion.isSupportedVersion(version)) {
           LOG.error("Unsupported version v{} in Request Header {}.", version, value);
+          String message = String.format("Unsupported version v%d in request header", version);
+          ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
 
+          // Write the JSON ErrorResponse directly instead of calling
+          // HttpServletResponse#sendError, so this filter -- which runs before Jersey ever sees
+          // the request -- doesn't fall through to Jetty's default HTML error page.
           HttpServletResponse resp = (HttpServletResponse) response;
-          resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+          resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+          resp.setContentType("application/json");
+          resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+          ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
         } else {
           chain.doFilter(request, response);
         }
