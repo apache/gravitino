@@ -20,6 +20,11 @@
 components:
   schemas:
     DataType:
+      description: >-
+        The general, read-compatible data type representation. UnparsedType
+        preserves types that the current server cannot resolve when reading
+        existing metadata. Endpoints that require resolved new metadata use
+        WritableDataType instead.
       oneOf:
         - $ref: "#/components/schemas/PrimitiveType"
         - $ref: "#/components/schemas/StructType"
@@ -28,6 +33,166 @@ components:
         - $ref: "#/components/schemas/UnionType"
         - $ref: "#/components/schemas/UnparsedType"
         - $ref: "#/components/schemas/ExternalType"
+
+    WritableDataType:
+      description: >-
+        A data type accepted when writing resolved metadata. Use a native
+        Gravitino type, including recursively nested native types, or an
+        explicit ExternalType for a catalog- or engine-specific type.
+        UnparsedType is reserved for read compatibility and is not accepted.
+        This schema does not guarantee that a particular catalog supports the
+        represented type.
+      oneOf:
+        - $ref: "#/components/schemas/WritablePrimitiveType"
+        - $ref: "#/components/schemas/WritableStructType"
+        - $ref: "#/components/schemas/WritableListType"
+        - $ref: "#/components/schemas/WritableMapType"
+        - $ref: "#/components/schemas/WritableUnionType"
+        - $ref: "#/components/schemas/WritableExternalType"
+
+    WritableExternalType:
+      type: object
+      description: >-
+        The explicit catalog- or engine-specific type form accepted when
+        writing resolved metadata.
+      required:
+        - type
+        - catalogString
+      properties:
+        type:
+          type: string
+          enum:
+            - "external"
+        catalogString:
+          type: string
+          minLength: 1
+          pattern: '.*\S.*'
+          description: The non-blank string representation of this type in the catalog
+
+    WritablePrimitiveType:
+      description: >-
+        The canonical string form of a Gravitino-recognized primitive type.
+        Parameters are validated by the server.
+      oneOf:
+        - type: string
+          enum:
+            - boolean
+            - byte
+            - byte unsigned
+            - short
+            - short unsigned
+            - integer
+            - integer unsigned
+            - long
+            - long unsigned
+            - float
+            - double
+            - date
+            - time
+            - timestamp
+            - timestamp_tz
+            - string
+            - binary
+            - uuid
+            - interval_day
+            - interval_year
+            - variant
+            - "null"
+            - geometry
+            - geography
+        - type: string
+          pattern: '^(decimal\(\s*[0-9]+\s*,\s*[0-9]+\s*\)|time\([0-9]+\)|timestamp\([0-9]+\)|timestamp_tz\([0-9]+\)|char\(\s*[0-9]+\s*\)|varchar\(\s*[0-9]+\s*\)|fixed\(\s*[0-9]+\s*\)|geometry\(\s*.+?\s*\)|geography\(\s*.+?\s*,\s*.+?\s*\))$'
+      example: "integer"
+
+    WritableUnionType:
+      type: object
+      required:
+        - type
+        - types
+      properties:
+        type:
+          type: string
+          enum:
+            - "union"
+        types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WritableDataType"
+
+    WritableMapType:
+      type: object
+      required:
+        - type
+        - keyType
+        - valueType
+      properties:
+        type:
+          type: string
+          enum:
+            - "map"
+        keyType:
+          $ref: "#/components/schemas/WritableDataType"
+        valueType:
+          $ref: "#/components/schemas/WritableDataType"
+        valueContainsNull:
+          type: boolean
+          description: Whether the value of the map contains null values
+          nullable: true
+          default: true
+
+    WritableListType:
+      type: object
+      required:
+        - type
+        - elementType
+      properties:
+        type:
+          type: string
+          enum:
+            - "list"
+        containsNull:
+          type: boolean
+          description: Whether the list contains null values
+          nullable: true
+          default: true
+        elementType:
+          $ref: "#/components/schemas/WritableDataType"
+
+    WritableStructType:
+      type: object
+      required:
+        - type
+        - fields
+      properties:
+        type:
+          type: string
+          enum:
+            - "struct"
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/WritableStructField"
+
+    WritableStructField:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: The name of the struct field
+        type:
+          $ref: "#/components/schemas/WritableDataType"
+        nullable:
+          type: boolean
+          description: Whether the struct field is nullable
+          nullable: true
+          default: true
+        comment:
+          type: string
+          description: The comment of the struct field
+          nullable: true
 
     PrimitiveType:
       type: string

@@ -65,6 +65,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FunctionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "409":
           description: Conflict - The target function already exists
           content:
@@ -208,6 +210,9 @@ components:
 
     FunctionDefinition:
       type: object
+      description: >-
+        A function definition returned by Gravitino. Its data types can include
+        UnparsedType when reading legacy or otherwise unresolved metadata.
       properties:
         parameters:
           type: array
@@ -260,6 +265,69 @@ components:
           description: The name of the return column
         dataType:
           $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The data type of the return column
+        comment:
+          type: string
+          description: The comment of the return column
+          nullable: true
+
+    WritableFunctionDefinition:
+      type: object
+      description: >-
+        A new function definition. Every parameter, return type, and return
+        column type must be a native Gravitino type or an explicit ExternalType.
+      properties:
+        parameters:
+          type: array
+          description: The parameters of the function definition
+          items:
+            $ref: "#/components/schemas/WritableFunctionParam"
+        returnType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+          description: The return type of the function (for SCALAR and AGGREGATE functions)
+        returnColumns:
+          type: array
+          description: The return columns of the function (for TABLE functions)
+          nullable: true
+          items:
+            $ref: "#/components/schemas/WritableFunctionColumn"
+        impls:
+          type: array
+          description: The implementations of the function definition
+          items:
+            $ref: "#/components/schemas/FunctionImpl"
+
+    WritableFunctionParam:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the parameter
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+          description: The data type of the parameter
+        comment:
+          type: string
+          description: The comment of the parameter
+          nullable: true
+        defaultValue:
+          $ref: "./expression.yaml#/components/schemas/FunctionArg"
+          description: The default value expression of the parameter
+
+    WritableFunctionColumn:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the return column
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
           description: The data type of the return column
         comment:
           type: string
@@ -427,7 +495,7 @@ components:
           description: The function definitions. Must contain at least one definition.
           minItems: 1
           items:
-            $ref: "#/components/schemas/FunctionDefinition"
+            $ref: "#/components/schemas/WritableFunctionDefinition"
 
     FunctionUpdatesRequest:
       type: object
@@ -487,7 +555,7 @@ components:
           enum:
             - "addDefinition"
         definition:
-          $ref: "#/components/schemas/FunctionDefinition"
+          $ref: "#/components/schemas/WritableFunctionDefinition"
       example: {
         "@type": "addDefinition",
         "definition": {
