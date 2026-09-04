@@ -179,13 +179,7 @@ public class StatisticOperations {
 
             Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
             for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
-              // Current we only support custom statistics
-              if (!entry.getKey().startsWith(Statistic.CUSTOM_PREFIX)) {
-                throw new IllegalStatisticNameException(
-                    "Statistic name must start with %s , but got: %s",
-                    Statistic.CUSTOM_PREFIX, entry.getKey());
-              }
-
+              validateStatisticName(entry.getKey());
               statisticMaps.put(entry.getKey(), entry.getValue());
             }
 
@@ -388,18 +382,7 @@ public class StatisticOperations {
 
             List<PartitionStatisticsUpdateDTO> updates = request.getUpdates();
             for (PartitionStatisticsUpdateDTO update : updates) {
-              update
-                  .statistics()
-                  .keySet()
-                  .forEach(
-                      statistic -> {
-                        if (!statistic.startsWith(Statistic.CUSTOM_PREFIX)) {
-                          // Current we only support custom statistics
-                          throw new IllegalStatisticNameException(
-                              "Statistic name must start with %s, but got: %s",
-                              Statistic.CUSTOM_PREFIX, statistic);
-                        }
-                      });
+              update.statistics().keySet().forEach(StatisticOperations::validateStatisticName);
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
@@ -527,7 +510,29 @@ public class StatisticOperations {
       return "";
     }
 
-    return StringUtils.join(request.getUpdates().keySet(), ",");
+    return request.getUpdates().keySet().stream()
+        .map(StatisticOperations::formatStatisticName)
+        .collect(Collectors.joining(","));
+  }
+
+  private static String formatStatisticName(String statisticName) {
+    if (statisticName != null && statisticName.length() > Statistic.MAX_NAME_LENGTH) {
+      return String.format("<statistic name exceeds %d characters>", Statistic.MAX_NAME_LENGTH);
+    }
+    return statisticName;
+  }
+
+  private static void validateStatisticName(String statisticName) {
+    if (statisticName.length() > Statistic.MAX_NAME_LENGTH) {
+      throw new IllegalStatisticNameException(
+          "Statistic name must not exceed %d characters", Statistic.MAX_NAME_LENGTH);
+    }
+
+    // Currently we only support custom statistics.
+    if (!statisticName.startsWith(Statistic.CUSTOM_PREFIX)) {
+      throw new IllegalStatisticNameException(
+          "Statistic name must start with %s, but got: %s", Statistic.CUSTOM_PREFIX, statisticName);
+    }
   }
 
   private static String getPartitionNames(PartitionStatisticsUpdateRequest request) {
