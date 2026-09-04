@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.lock.LockManager;
@@ -67,7 +68,7 @@ public class TestSchemaHookDispatcher {
   private SchemaDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
-  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  private BaseCatalog<?> mockCatalog;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
@@ -79,10 +80,9 @@ public class TestSchemaHookDispatcher {
     mockDispatcher = mock(SchemaDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
-    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockCatalogWrapper));
-    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    mockCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
     savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Tests in this class that rely on the singleton catalogManager always go through
     // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
@@ -141,7 +141,7 @@ public class TestSchemaHookDispatcher {
   public void testCreateSchemaSetsOwnerWithNormalizedIdentifier() throws Exception {
     // Use a case-insensitive capability so the schema name is normalized to lower case before
     // setOwners is called, mirroring what NormalizeDispatcher would do for the manager.
-    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
     Schema mockSchema = mock(Schema.class);
@@ -170,7 +170,7 @@ public class TestSchemaHookDispatcher {
   public void testCreateHierarchicalSchemaOwnsNewAncestors() throws Exception {
     // A capability that permits hierarchical (":"-separated) schema names so the hierarchical name
     // is not rejected during normalization.
-    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+    when(mockCatalog.capability()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
@@ -190,7 +190,7 @@ public class TestSchemaHookDispatcher {
 
   @Test
   public void testCreateHierarchicalSchemaKeepsExistingAncestorOwner() throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+    when(mockCatalog.capability()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);

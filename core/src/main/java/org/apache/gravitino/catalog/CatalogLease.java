@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -32,16 +31,10 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
  * invalidation, or remote change-log invalidation). The resources are released once the wrapper is
  * retired and its last lease is closed, so an operation can never observe a half-closed catalog.
  *
- * <p>Leases are obtained from {@link CatalogManager#acquireCatalogLease(NameIdentifier)} and must
- * be closed exactly once, ideally with try-with-resources:
- *
- * <pre>{@code
- * try (CatalogLease lease = catalogManager.acquireCatalogLease(ident)) {
- *   return lease.wrapper().doWithTableOps(ops -> ops.loadTable(tableIdent));
- * }
- * }</pre>
+ * <p>Lease acquisition and release stay internal to {@link CatalogManager}. Dispatchers use the
+ * manager's callback API so connector-backed results can be detached before the lease closes.
  */
-public final class CatalogLease implements AutoCloseable {
+final class CatalogLease implements AutoCloseable {
 
   private final CatalogWrapper wrapper;
   private final AtomicBoolean released = new AtomicBoolean(false);
@@ -55,7 +48,7 @@ public final class CatalogLease implements AutoCloseable {
    *
    * @return the leased catalog wrapper, guaranteed to stay usable until this lease is closed.
    */
-  public CatalogWrapper wrapper() {
+  CatalogWrapper wrapper() {
     return wrapper;
   }
 
@@ -64,7 +57,7 @@ public final class CatalogLease implements AutoCloseable {
    *
    * @return the leased catalog, guaranteed to stay usable until this lease is closed.
    */
-  public BaseCatalog catalog() {
+  BaseCatalog catalog() {
     return wrapper.catalog();
   }
 

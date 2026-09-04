@@ -1537,7 +1537,7 @@ public class TestCatalogManager {
     CountDownLatch writeLockAcquired = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
-    Mockito.doAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper))
+    Mockito.doAnswer(invocation -> new CatalogLease(wrapper))
         .when(catalogManager)
         .acquireCatalogLease(ident);
     Mockito.doReturn(catalog).when(wrapper).catalog();

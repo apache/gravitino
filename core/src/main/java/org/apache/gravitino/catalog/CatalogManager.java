@@ -57,6 +57,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -134,11 +135,6 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
-
-  // Bounds the retry loop in acquireCatalogLease() when the wrapper read from the cache is retired
-  // by a concurrent eviction before the lease can be taken. Each retry reloads a fresh wrapper, so
-  // exhausting the attempts means the catalog is being evicted continuously.
-  private static final int MAX_LEASE_ATTEMPTS = 5;
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -796,15 +792,30 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The value returned by the operation.
    * @param <R> The result type of the operation.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
+   * @apiNote The callback must not retain the live catalog. Connector-backed metadata should be
+   *     converted to a detached value before the callback returns.
    */
   public <R> R doWithCatalog(NameIdentifier ident, ThrowableFunction<BaseCatalog, R> operation)
       throws NoSuchCatalogException {
-    try (CatalogLease lease = acquireCatalogLease(ident)) {
-      return lease.wrapper().doWithCatalog(operation);
+    try {
+      return doWithCatalogWrapper(ident, wrapper -> operation.apply(wrapper.catalog()));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException("Failed to operate on catalog: " + ident, e);
+    }
+  }
+
+  /**
+   * Runs a callback with one leased wrapper and the catalog ClassLoader installed as the thread
+   * context ClassLoader. The lease is deliberately kept inside CatalogManager so callers cannot
+   * release it before they have detached connector-backed results.
+   */
+  <R> R doWithCatalogWrapper(NameIdentifier ident, ThrowableFunction<CatalogWrapper, R> operation)
+      throws Exception {
+    try (CatalogLease lease = acquireCatalogLease(ident)) {
+      CatalogWrapper wrapper = lease.wrapper();
+      return wrapper.classLoader.withClassLoader(ignored -> operation.apply(wrapper));
     }
   }
 
@@ -1533,24 +1544,46 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return A lease on the CatalogWrapper containing the loaded catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
-  public CatalogLease acquireCatalogLease(NameIdentifier ident) throws NoSuchCatalogException {
+  CatalogLease acquireCatalogLease(NameIdentifier ident) throws NoSuchCatalogException {
     lifecycleLock.readLock().lock();
     try {
       checkOpen();
-      for (int attempt = 0; attempt < MAX_LEASE_ATTEMPTS; attempt++) {
-        CatalogWrapper wrapper = loadCatalogAndWrapInternal(ident);
-        if (wrapper.tryAcquire()) {
-          return new CatalogLease(wrapper);
+      AtomicReference<CatalogLease> acquiredLease = new AtomicReference<>();
+      AtomicReference<CatalogWrapper> newlyLoadedWrapper = new AtomicReference<>();
+      try {
+        catalogCache
+            .asMap()
+            .compute(
+                ident,
+                (key, cachedWrapper) -> {
+                  CatalogWrapper wrapper = cachedWrapper;
+                  if (wrapper == null || !wrapper.tryAcquire()) {
+                    wrapper = loadCatalogInternal(key);
+                    newlyLoadedWrapper.set(wrapper);
+                    Preconditions.checkState(
+                        wrapper.tryAcquire(), "A newly loaded catalog wrapper cannot be retired");
+                  }
+
+                  CatalogLease lease = new CatalogLease(wrapper);
+                  if (!acquiredLease.compareAndSet(null, lease)) {
+                    lease.close();
+                    throw new IllegalStateException(
+                        "Catalog cache compute invoked its mapping function more than once");
+                  }
+                  return wrapper;
+                });
+      } catch (RuntimeException | Error e) {
+        CatalogWrapper newlyLoaded = newlyLoadedWrapper.get();
+        if (newlyLoaded != null) {
+          newlyLoaded.retire();
         }
-
-        // The cached wrapper was retired between the cache lookup and the lease attempt. Evict the
-        // stale entry and reload a fresh one. Use a conditional remove so we do not clobber a
-        // wrapper that another thread may have concurrently reloaded into the cache.
-        catalogCache.asMap().remove(ident, wrapper);
+        CatalogLease lease = acquiredLease.get();
+        if (lease != null) {
+          lease.close();
+        }
+        throw e;
       }
-
-      throw new GravitinoRuntimeException(
-          "Failed to acquire a lease on catalog %s after %d attempts", ident, MAX_LEASE_ATTEMPTS);
+      return Preconditions.checkNotNull(acquiredLease.get(), "Catalog lease was not acquired");
     } finally {
       lifecycleLock.readLock().unlock();
     }
@@ -1569,7 +1602,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The wrapped CatalogWrapper containing the loaded catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
-  public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
+  @VisibleForTesting
+  CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     lifecycleLock.readLock().lock();
     try {
       checkOpen();

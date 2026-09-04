@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.model.Model;
@@ -50,7 +51,7 @@ public class TestModelHookDispatcher {
   private ModelDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
-  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  private BaseCatalog<?> mockCatalog;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
@@ -61,10 +62,9 @@ public class TestModelHookDispatcher {
     mockDispatcher = mock(ModelDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
-    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockCatalogWrapper));
-    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    mockCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
     savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Read the catalogManager field directly via reflection because the public accessor
     // Preconditions-checks for non-null, which would fail when GravitinoEnv has not been
@@ -106,7 +106,7 @@ public class TestModelHookDispatcher {
 
   @Test
   public void testRegisterModelSetsOwnerWithNormalizedIdentifier() throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident =
         NameIdentifier.of("test_metalake", "test_catalog", "TEST_SCHEMA", "MY_MODEL");

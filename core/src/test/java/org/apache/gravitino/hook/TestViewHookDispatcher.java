@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.Column;
@@ -56,10 +57,9 @@ public class TestViewHookDispatcher {
   @Test
   public void testCreateViewSetsOwnerWithNormalizedIdentifier() throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
@@ -105,10 +105,9 @@ public class TestViewHookDispatcher {
         .when(ownerDispatcher)
         .setOwner(any(), any(), any(), any());
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
     Mockito.when(dispatcher.createView(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Mockito.mock(View.class));

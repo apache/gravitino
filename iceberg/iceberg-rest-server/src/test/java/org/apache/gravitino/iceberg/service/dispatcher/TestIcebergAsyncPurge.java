@@ -236,14 +236,11 @@ class TestIcebergAsyncPurge {
     MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
     GravitinoEnv env = mock(GravitinoEnv.class);
     CatalogManager catalogManager = mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     BaseCatalog<?> catalog = mock(BaseCatalog.class);
     CatalogEntity entity = mock(CatalogEntity.class);
     envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
     when(env.catalogManager()).thenReturn(catalogManager);
-    when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
-    when(wrapper.catalog()).thenReturn(catalog);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     when(catalog.entity()).thenReturn(entity);
     when(entity.id()).thenReturn(CATALOG_ID);
     return envStatic;

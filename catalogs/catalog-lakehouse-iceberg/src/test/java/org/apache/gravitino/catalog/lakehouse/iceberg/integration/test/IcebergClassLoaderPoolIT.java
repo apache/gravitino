@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -151,15 +150,11 @@ public class IcebergClassLoaderPoolIT extends BaseIT {
     return ITUtils.EMBEDDED_TEST_MODE.equals(testMode);
   }
 
-  private Object classLoaderOf(String metalake, String catalog) throws IllegalAccessException {
+  private Object classLoaderOf(String metalake, String catalog) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    // Use loadCatalogAndWrap (rather than the Caffeine cache directly) so this test module does not
-    // need caffeine on its compile classpath. The catalog was already loaded server-side above, so
-    // this returns the cached wrapper instance.
-    CatalogManager.CatalogWrapper wrapper =
-        catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog));
-    Assertions.assertNotNull(wrapper, "wrapper should be cached for " + metalake + "." + catalog);
-    return FieldUtils.readField(wrapper, "classLoader", true);
+    return catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        loadedCatalog -> loadedCatalog.getClass().getClassLoader());
   }
 
   @Test

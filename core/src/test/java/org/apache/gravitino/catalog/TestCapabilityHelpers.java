@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import java.util.Locale;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -150,7 +151,7 @@ public class TestCapabilityHelpers {
     NameIdentifier tableIdent =
         NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    Mockito.when(catalogManager.acquireCatalogLease(Mockito.any()))
+    Mockito.when(catalogManager.doWithCatalog(Mockito.any(), Mockito.any()))
         .thenThrow(new NoSuchCatalogException("Catalog %s does not exist", tableIdent));
 
     // A missing catalog must stay a NoSuchCatalogException (mapped to 404 by the REST layer)
@@ -161,14 +162,13 @@ public class TestCapabilityHelpers {
   }
 
   @Test
-  void testGetCapabilityWrapsCapabilityFailureAndReleasesLease() throws Exception {
+  void testGetCapabilityWrapsCapabilityFailure() throws Exception {
     NameIdentifier tableIdent =
         NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogManager.acquireCatalogLease(Mockito.any()))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
-    Mockito.when(wrapper.capabilities()).thenThrow(new IllegalStateException("boom"));
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.capability()).thenThrow(new IllegalStateException("boom"));
 
     RuntimeException e =
         Assertions.assertThrows(
@@ -176,7 +176,6 @@ public class TestCapabilityHelpers {
             () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
 
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
-    Mockito.verify(wrapper).release();
   }
 
   @Test

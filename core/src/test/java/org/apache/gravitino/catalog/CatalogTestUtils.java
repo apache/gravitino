@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.mockito.Mockito;
@@ -27,19 +26,6 @@ import org.mockito.Mockito;
 public final class CatalogTestUtils {
 
   private CatalogTestUtils() {}
-
-  /**
-   * Wraps a mocked {@link CatalogWrapper} into a {@link CatalogLease} without going through the
-   * wrapper's active-operation counting, for tests that stub {@link
-   * CatalogManager#acquireCatalogLease} on a mocked manager. Production code must obtain leases
-   * from {@link CatalogManager#acquireCatalogLease}.
-   *
-   * @param wrapper the (usually mocked) wrapper to hand out.
-   * @return a lease over the given wrapper.
-   */
-  public static CatalogLease unmanagedLease(CatalogWrapper wrapper) {
-    return new CatalogLease(wrapper);
-  }
 
   /**
    * Stubs a mocked manager so {@link CatalogManager#doWithCatalog} invokes its callback with the
