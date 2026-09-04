@@ -19,12 +19,12 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -116,9 +116,13 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
                     .build())
             .build();
     try {
-      store().put(schemaEntity, true /* overwrite */);
+      // Insert only. Overwriting used to hide a lost race: two servers creating the same schema
+      // name would both "succeed", and the second one silently replaced the first one's schema.
+      store().put(schemaEntity, false /* overwrite */);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to create schema " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new SchemaAlreadyExistsException(e, "Schema %s already exists", ident);
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(e, "Catalog %s does not exist", ident.namespace());
     }
@@ -198,37 +202,6 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {
-    Map<String, String> props =
-        schemaEntity.properties() == null
-            ? Maps.newHashMap()
-            : Maps.newHashMap(schemaEntity.properties());
-
-    for (SchemaChange change : changes) {
-      if (change instanceof SchemaChange.SetProperty) {
-        SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) change;
-        props.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (change instanceof SchemaChange.RemoveProperty) {
-        SchemaChange.RemoveProperty removeProperty = (SchemaChange.RemoveProperty) change;
-        props.remove(removeProperty.getProperty());
-      } else {
-        throw new IllegalArgumentException(
-            "Unsupported schema change: " + change.getClass().getSimpleName());
-      }
-    }
-
-    return SchemaEntity.builder()
-        .withName(schemaEntity.name())
-        .withNamespace(ident.namespace())
-        .withId(schemaEntity.id())
-        .withComment(schemaEntity.comment())
-        .withProperties(props)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(schemaEntity.auditInfo().creator())
-                .withCreateTime(schemaEntity.auditInfo().createTime())
-                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                .withLastModifiedTime(Instant.now())
-                .build())
-        .build();
+    return SchemaEntityChanges.apply(ident, schemaEntity, changes);
   }
 }

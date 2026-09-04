@@ -22,6 +22,7 @@ import static org.apache.gravitino.Catalog.Type.FILESET;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -57,8 +58,6 @@ class TestAuthorizationUtils {
     NameIdentifier user = AuthorizationUtils.ofUser(metalake, "user");
     NameIdentifier group = AuthorizationUtils.ofGroup(metalake, "group");
     NameIdentifier role = AuthorizationUtils.ofRole(metalake, "role");
-    NameIdentifier userExt = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
-    NameIdentifier groupExt = AuthorizationUtils.ofGroupExternalId(metalake, "ext-1");
 
     Assertions.assertEquals(AuthorizationUtils.ofUserNamespace(metalake), user.namespace());
     Assertions.assertEquals("user", user.name());
@@ -66,23 +65,6 @@ class TestAuthorizationUtils {
     Assertions.assertEquals("group", group.name());
     Assertions.assertEquals(AuthorizationUtils.ofRoleNamespace(metalake), role.namespace());
     Assertions.assertEquals("role", role.name());
-    Assertions.assertEquals(
-        AuthorizationUtils.ofUserExternalIdNamespace(metalake), userExt.namespace());
-    Assertions.assertEquals("ext-1", userExt.name());
-    Assertions.assertEquals(
-        AuthorizationUtils.ofGroupExternalIdNamespace(metalake), groupExt.namespace());
-    Assertions.assertEquals("ext-1", groupExt.name());
-    Assertions.assertNotEquals(user, userExt);
-    Assertions.assertNotEquals(group, groupExt);
-    Assertions.assertNotEquals(AuthorizationUtils.ofUser(metalake, "ext-1"), userExt);
-    assertInvalidExternalId(() -> AuthorizationUtils.ofUserExternalId(metalake, null));
-    assertInvalidExternalId(() -> AuthorizationUtils.ofUserExternalId(metalake, ""));
-    assertInvalidExternalId(() -> AuthorizationUtils.ofGroupExternalId(metalake, null));
-    assertInvalidExternalId(() -> AuthorizationUtils.ofGroupExternalId(metalake, ""));
-  }
-
-  private void assertInvalidExternalId(org.junit.jupiter.api.function.Executable executable) {
-    Assertions.assertThrows(IllegalNameIdentifierException.class, executable);
   }
 
   @Test
@@ -141,25 +123,17 @@ class TestAuthorizationUtils {
   @Test
   void testCheckNameIdentifier() {
     NameIdentifier user = AuthorizationUtils.ofUser(metalake, "user");
-    NameIdentifier userExternalId = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
     NameIdentifier group = AuthorizationUtils.ofGroup(metalake, "group");
-    NameIdentifier groupExternalId = AuthorizationUtils.ofGroupExternalId(metalake, "ext-1");
     NameIdentifier role = AuthorizationUtils.ofRole(metalake, "role");
 
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUser(user));
-    Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUserExternalId(userExternalId));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroup(group));
-    Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroupExternalId(groupExternalId));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRole(role));
 
     Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkUser(null));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkUserExternalId(null));
-    Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkGroup(null));
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkGroupExternalId(null));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkRole(null));
     Assertions.assertThrows(
@@ -167,13 +141,7 @@ class TestAuthorizationUtils {
         () -> AuthorizationUtils.checkUser(NameIdentifier.of("")));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
-        () -> AuthorizationUtils.checkUserExternalId(NameIdentifier.of("")));
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
         () -> AuthorizationUtils.checkGroup(NameIdentifier.of("")));
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
-        () -> AuthorizationUtils.checkGroupExternalId(NameIdentifier.of("")));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
         () -> AuthorizationUtils.checkRole(NameIdentifier.of("")));
@@ -182,29 +150,17 @@ class TestAuthorizationUtils {
   @Test
   void testCheckNamespace() {
     Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    Namespace userExternalIdNamespace = AuthorizationUtils.ofUserExternalIdNamespace(metalake);
     Namespace groupNamespace = AuthorizationUtils.ofGroupNamespace(metalake);
-    Namespace groupExternalIdNamespace = AuthorizationUtils.ofGroupExternalIdNamespace(metalake);
     Namespace roleNamespace = AuthorizationUtils.ofRoleNamespace(metalake);
 
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUserNamespace(userNamespace));
-    Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkUserExternalIdNamespace(userExternalIdNamespace));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroupNamespace(groupNamespace));
-    Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkGroupExternalIdNamespace(groupExternalIdNamespace));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRoleNamespace(roleNamespace));
 
     Assertions.assertThrows(
         IllegalNamespaceException.class, () -> AuthorizationUtils.checkUserNamespace(null));
     Assertions.assertThrows(
-        IllegalNamespaceException.class,
-        () -> AuthorizationUtils.checkUserExternalIdNamespace(null));
-    Assertions.assertThrows(
         IllegalNamespaceException.class, () -> AuthorizationUtils.checkGroupNamespace(null));
-    Assertions.assertThrows(
-        IllegalNamespaceException.class,
-        () -> AuthorizationUtils.checkGroupExternalIdNamespace(null));
     Assertions.assertThrows(
         IllegalNamespaceException.class, () -> AuthorizationUtils.checkRoleNamespace(null));
     Assertions.assertThrows(
@@ -212,13 +168,7 @@ class TestAuthorizationUtils {
         () -> AuthorizationUtils.checkUserNamespace(Namespace.of("a", "b")));
     Assertions.assertThrows(
         IllegalNamespaceException.class,
-        () -> AuthorizationUtils.checkUserExternalIdNamespace(Namespace.of("a", "b")));
-    Assertions.assertThrows(
-        IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkGroupNamespace(Namespace.of("a")));
-    Assertions.assertThrows(
-        IllegalNamespaceException.class,
-        () -> AuthorizationUtils.checkGroupExternalIdNamespace(Namespace.of("a", "b")));
     Assertions.assertThrows(
         IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkRoleNamespace(Namespace.of("a", "b", "c", "d")));
@@ -299,7 +249,10 @@ class TestAuthorizationUtils {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
@@ -322,33 +275,62 @@ class TestAuthorizationUtils {
     Catalog catalog = Mockito.mock(Catalog.class);
     Schema schema = Mockito.mock(Schema.class);
 
-    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", ""));
     Mockito.when(schema.name()).thenReturn("testSchema");
-    Mockito.when(catalog.properties()).thenReturn(ImmutableMap.of("location", "catalogLocation"));
     Mockito.when(catalog.provider()).thenReturn("fileset");
     Mockito.when(catalog.type()).thenReturn(FILESET);
     Mockito.when(schemaDispatcher.loadSchema(Mockito.any())).thenReturn(schema);
     Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
 
+    // Case 1: Schema has no location property (inherits catalog location)
+    Mockito.when(schema.properties()).thenReturn(Collections.emptyMap());
+    Mockito.when(catalog.properties()).thenReturn(ImmutableMap.of("location", "catalogLocation"));
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
 
+    // Case 2: Schema has null properties (inherits catalog location)
+    Mockito.when(schema.properties()).thenReturn(null);
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
+
+    // Case 3: Schema location is empty string (falls back to catalog location)
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", ""));
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
+
+    // Case 4: Schema has explicit location (takes precedence over catalog location)
     Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", "schemaLocation"));
     locations =
         AuthorizationUtils.getMetadataObjectLocation(
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("schemaLocation", locations.get(0));
+
+    // Case 5: Neither schema nor catalog has location property
+    Mockito.when(schema.properties()).thenReturn(Collections.emptyMap());
+    Mockito.when(catalog.properties()).thenReturn(Collections.emptyMap());
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(0, locations.size());
   }
 
   @Test
@@ -361,7 +343,7 @@ class TestAuthorizationUtils {
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
     Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
@@ -370,6 +352,31 @@ class TestAuthorizationUtils {
       NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
       AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.TABLE, "new_table");
+
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testRemovePrivilegesNotifiesEntityNameIdMappingChange() {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalogManager.loadCatalog(Mockito.any())).thenReturn(baseCatalog);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, Collections.emptyList());
 
       Mockito.verify(authorizer)
           .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
@@ -390,7 +397,7 @@ class TestAuthorizationUtils {
     Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
@@ -430,7 +437,7 @@ class TestAuthorizationUtils {
     Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
 
     GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
     Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {

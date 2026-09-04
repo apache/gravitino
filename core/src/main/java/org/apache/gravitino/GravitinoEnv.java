@@ -28,6 +28,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -46,6 +47,9 @@ import org.apache.gravitino.catalog.PartitionOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
@@ -69,6 +73,7 @@ import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.hook.ViewHookDispatcher;
 import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -99,6 +104,7 @@ import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -147,23 +153,32 @@ public class GravitinoEnv {
   private TopicDispatcher internalTopicDispatcher;
 
   private ModelDispatcher modelDispatcher;
+  private ModelDispatcher internalModelDispatcher;
 
   private FunctionDispatcher functionDispatcher;
+  private FunctionDispatcher internalFunctionDispatcher;
+
+  private SemanticModelDispatcher semanticModelDispatcher;
 
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
+  private MetalakeDispatcher internalMetalakeDispatcher;
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
   private KmsClientRegistry kmsClientRegistry;
 
   private SecretManager secretManager;
 
   private TagDispatcher tagDispatcher;
+  private TagDispatcher internalTagDispatcher;
 
   private PolicyDispatcher policyDispatcher;
+  private PolicyDispatcher internalPolicyDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
   private AccessControlDispatcher internalAccessControlDispatcher;
@@ -181,10 +196,12 @@ public class GravitinoEnv {
   private AuditLogManager auditLogManager;
 
   private JobOperationDispatcher jobOperationDispatcher;
+  private JobOperationDispatcher internalJobOperationDispatcher;
 
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
   private OwnerDispatcher internalOwnerDispatcher;
+  private BulkManager bulkManager;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
@@ -240,6 +257,15 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
+  }
+
+  /**
+   * Get the auxiliary service manager associated with the Gravitino environment.
+   *
+   * @return The auxiliary service manager instance.
+   */
+  public AuxiliaryServiceManager auxServiceManager() {
+    return auxServiceManager;
   }
 
   /**
@@ -328,12 +354,43 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal ModelDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission.
+   *
+   * @return The internal ModelDispatcher instance.
+   */
+  public ModelDispatcher internalModelDispatcher() {
+    return internalModelDispatcher;
+  }
+
+  /**
    * Get the FunctionDispatcher associated with the Gravitino environment.
    *
    * @return The FunctionDispatcher instance.
    */
   public FunctionDispatcher functionDispatcher() {
     return functionDispatcher;
+  }
+
+  /**
+   * Get the internal FunctionDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission.
+   *
+   * @return The internal FunctionDispatcher instance.
+   */
+  public FunctionDispatcher internalFunctionDispatcher() {
+    return internalFunctionDispatcher;
+  }
+
+  /**
+   * Get the Semantic Model dispatcher associated with the Gravitino environment.
+   *
+   * @return The Semantic Model dispatcher.
+   */
+  public SemanticModelDispatcher semanticModelDispatcher() {
+    return semanticModelDispatcher;
   }
 
   /**
@@ -417,12 +474,32 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal MetalakeDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission.
+   *
+   * @return The internal MetalakeDispatcher instance.
+   */
+  public MetalakeDispatcher internalMetalakeDispatcher() {
+    return internalMetalakeDispatcher;
+  }
+
+  /**
    * Get the {@link CredentialOperationDispatcher} associated with the Gravitino environment.
    *
    * @return The {@link CredentialOperationDispatcher} instance.
    */
   public CredentialOperationDispatcher credentialOperationDispatcher() {
     return credentialOperationDispatcher;
+  }
+
+  /**
+   * Get the {@link SecretPropertyOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link SecretPropertyOperationDispatcher} instance.
+   */
+  public SecretPropertyOperationDispatcher secretPropertyOperationDispatcher() {
+    return secretPropertyOperationDispatcher;
   }
 
   /**
@@ -527,6 +604,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the BulkManager associated with the Gravitino environment.
+   *
+   * @return The BulkManager instance.
+   */
+  public BulkManager bulkManager() {
+    return bulkManager;
+  }
+
+  /**
    * Get the tagDispatcher associated with the Gravitino environment.
    *
    * @return The tagDispatcher instance.
@@ -536,12 +622,34 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal TagDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher skips hooks and event emission.
+   *
+   * @return The internal TagDispatcher instance.
+   */
+  public TagDispatcher internalTagDispatcher() {
+    return internalTagDispatcher;
+  }
+
+  /**
    * Get the PolicyDispatcher associated with the Gravitino environment.
    *
    * @return The PolicyDispatcher instance.
    */
   public PolicyDispatcher policyDispatcher() {
     return policyDispatcher;
+  }
+
+  /**
+   * Get the internal PolicyDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher skips hooks and event emission.
+   *
+   * @return The internal PolicyDispatcher instance.
+   */
+  public PolicyDispatcher internalPolicyDispatcher() {
+    return internalPolicyDispatcher;
   }
 
   /**
@@ -609,6 +717,19 @@ public class GravitinoEnv {
   public JobOperationDispatcher jobOperationDispatcher() {
     Preconditions.checkArgument(jobOperationDispatcher != null, "GravitinoEnv is not initialized.");
     return jobOperationDispatcher;
+  }
+
+  /**
+   * Get the internal JobOperationDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves validation but skips hooks and event emission.
+   *
+   * @return The internal JobOperationDispatcher instance.
+   */
+  public JobOperationDispatcher internalJobOperationDispatcher() {
+    Preconditions.checkArgument(
+        internalJobOperationDispatcher != null, "GravitinoEnv is not initialized.");
+    return internalJobOperationDispatcher;
   }
 
   public StatisticDispatcher statisticDispatcher() {
@@ -718,22 +839,25 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
-    // Create and initialize metalake related modules, the operation chain is:
-    // MetalakeHookDispatcher -> MetalakeEventDispatcher -> MetalakeNormalizeDispatcher ->
-    // MetalakeManager
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeManager);
-    MetalakeEventDispatcher metalakeEventDispatcher =
-        new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
-    this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeEventDispatcher);
-
-    // Create and initialize Catalog related modules, the operation chain is:
+    // Create and initialize Catalog related modules first so MetalakeManager can force-drop
+    // child catalogs through CatalogManager.dropCatalog (same path as FilesetCatalogOperations).
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
     // CatalogManager registers its own change-log listener with the entity store (when the store
     // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
+
+    // Create and initialize metalake related modules, the operation chain is:
+    // MetalakeHookDispatcher -> MetalakeEventDispatcher -> MetalakeNormalizeDispatcher ->
+    // MetalakeManager
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator, catalogManager);
+    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
+        new MetalakeNormalizeDispatcher(metalakeManager);
+    this.internalMetalakeDispatcher = metalakeNormalizeDispatcher;
+    MetalakeEventDispatcher metalakeEventDispatcher =
+        new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
+    this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeEventDispatcher);
+
     this.internalCatalogDispatcher = catalogManager;
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
@@ -745,8 +869,23 @@ public class GravitinoEnv {
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
+    this.secretPropertyOperationDispatcher =
+        new SecretPropertyOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager);
+
+    // Fileset dispatcher is created before schema dispatcher so schema can take it directly.
+    FilesetOperationDispatcher filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
+    FilesetEventDispatcher filesetEventDispatcher =
+        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, filesetNormalizeDispatcher);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
@@ -772,7 +911,8 @@ public class GravitinoEnv {
     TableEventDispatcher tableEventDispatcher =
         new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
     this.tableDispatcher =
-        new TableHookDispatcher(tableEventDispatcher, this::ownerDispatcher, catalogManager);
+        new TableHookDispatcher(
+            tableEventDispatcher, this::internalOwnerDispatcher, catalogManager);
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
@@ -781,15 +921,6 @@ public class GravitinoEnv {
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
-
-    FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
-    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
-    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
-    FilesetEventDispatcher filesetEventDispatcher =
-        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
-    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
@@ -804,6 +935,7 @@ public class GravitinoEnv {
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
+    this.internalModelDispatcher = modelNormalizeDispatcher;
     ModelEventDispatcher modelEventDispatcher =
         new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
     this.modelDispatcher = new ModelHookDispatcher(modelEventDispatcher);
@@ -816,14 +948,15 @@ public class GravitinoEnv {
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
     FunctionNormalizeDispatcher functionNormalizeDispatcher =
         new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+    this.internalFunctionDispatcher = functionNormalizeDispatcher;
     FunctionEventDispatcher functionEventDispatcher =
         new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
-    this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
+    this.functionDispatcher =
+        new FunctionHookDispatcher(
+            functionEventDispatcher, this::internalOwnerDispatcher, catalogManager);
 
-    // View operation chain: ViewEventDispatcher -> ViewNormalizeDispatcher ->
-    // ViewOperationDispatcher.
-    // TODO(#11007): Add ViewHookDispatcher for view ownership and privilege hooks when view
-    // privilege support is finalized.
+    // View operation chain: ViewHookDispatcher -> ViewEventDispatcher -> ViewNormalizeDispatcher
+    // -> ViewOperationDispatcher.
     ViewOperationDispatcher viewOperationDispatcher =
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalViewDispatcher = viewOperationDispatcher;
@@ -840,7 +973,18 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(internalViewOperationDispatcher, catalogManager);
     ViewEventDispatcher viewEventDispatcher =
         new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
-    this.viewDispatcher = viewEventDispatcher;
+    this.viewDispatcher =
+        new ViewHookDispatcher(viewEventDispatcher, this::internalOwnerDispatcher, catalogManager);
+
+    // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
+    // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
+    // TODO(#12595): Add Semantic Model event dispatching before server integration.
+    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
+    SemanticModelOperationDispatcher semanticModelOperationDispatcher =
+        new SemanticModelOperationDispatcher(
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
+    this.semanticModelDispatcher =
+        new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(
@@ -858,12 +1002,14 @@ public class GravitinoEnv {
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);
       this.internalOwnerDispatcher = ownerManager;
       this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
+      this.bulkManager = new BulkManager(config);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.internalAccessControlDispatcher = null;
       this.ownerDispatcher = null;
       this.internalOwnerDispatcher = null;
+      this.bulkManager = null;
       this.futureGrantManager = null;
     }
 
@@ -872,16 +1018,20 @@ public class GravitinoEnv {
 
     // Create and initialize Tag related modules
     TagManager tagManager = new TagManager(idGenerator, entityStore);
+    this.internalTagDispatcher = tagManager;
     TagEventDispatcher tagEventDispatcher = new TagEventDispatcher(eventBus, tagManager);
     this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
 
+    PolicyManager policyManager = new PolicyManager(idGenerator, entityStore);
+    this.internalPolicyDispatcher = policyManager;
     PolicyEventDispatcher policyEventDispatcher =
-        new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
+        new PolicyEventDispatcher(eventBus, policyManager);
     this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
     JobManager jobManager = new JobManager(config, entityStore, idGenerator);
     JobTemplateValidationDispatcher validationDispatcher =
         new JobTemplateValidationDispatcher(jobManager);
+    this.internalJobOperationDispatcher = validationDispatcher;
     JobEventDispatcher jobEventDispatcher = new JobEventDispatcher(eventBus, validationDispatcher);
     this.jobOperationDispatcher = new JobHookDispatcher(jobEventDispatcher);
 

@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABL
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.ibatis.annotations.Param;
@@ -97,7 +98,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE view_id = #{viewId} AND deleted_at = 0";
   }
 
@@ -105,7 +107,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   public String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -113,7 +116,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   public String softDeleteViewMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -122,7 +126,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"

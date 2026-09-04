@@ -109,21 +109,26 @@ paths:
     put:
       tags:
         - IDP
-      summary: Change local user store user password
-      description: Updates the password of the specified local user store user and returns the user object with unchanged group membership.
-      operationId: changeIdpUserPassword
+      summary: Update local user store user
+      description: >
+        Updates the password and/or enabled flag of the specified local user store user and returns
+        the user object. At least one of `password` or `enabled` is required. Disabled users cannot
+        authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
+      operationId: updateIdpUser
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
+              $ref: "#/components/schemas/UpdateUserRequest"
             examples:
-              ChangePasswordRequest:
-                $ref: "#/components/examples/ChangePasswordRequest"
+              UpdateUserPasswordRequest:
+                $ref: "#/components/examples/UpdateUserPasswordRequest"
+              UpdateUserEnabledRequest:
+                $ref: "#/components/examples/UpdateUserEnabledRequest"
       responses:
         "200":
-          description: Returns the local user store user after the password change
+          description: Returns the local user store user after the update
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -139,7 +144,7 @@ paths:
                 $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 IllegalArgumentException:
-                  $ref: "#/components/examples/IdpChangePasswordIllegalArgumentException"
+                  $ref: "#/components/examples/IdpUpdateUserIllegalArgumentException"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -341,6 +346,10 @@ components:
           type: string
           maxLength: 128
           description: The username of the local user store user
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the local user store user is enabled. Disabled users cannot authenticate.
         groups:
           type: array
           items:
@@ -357,6 +366,10 @@ components:
           type: string
           maxLength: 128
           description: The name of the local user store group
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the local user store group
         users:
           type: array
           items:
@@ -383,11 +396,18 @@ components:
           maxLength: 64
           description: The password of the local user store user to add.
           writeOnly: true
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the user is enabled. Disabled users cannot authenticate.
 
-    ChangePasswordRequest:
+    UpdateUserRequest:
       type: object
-      required:
-        - password
+      anyOf:
+        - required:
+            - password
+        - required:
+            - enabled
       properties:
         password:
           type: string
@@ -396,6 +416,9 @@ components:
           maxLength: 64
           description: The new password of the local user store user.
           writeOnly: true
+        enabled:
+          type: boolean
+          description: Whether the local user store user should be enabled.
 
     AddGroupRequest:
       type: object
@@ -407,6 +430,10 @@ components:
           minLength: 1
           maxLength: 128
           description: The group name to add.
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the group.
 
     GroupMembershipChangeRequest:
       type: object
@@ -478,14 +505,20 @@ components:
         "password": "Passw0rd-1234"
       }
 
-    ChangePasswordRequest:
+    UpdateUserPasswordRequest:
       value: {
         "password": "Passw0rd-5678"
       }
 
+    UpdateUserEnabledRequest:
+      value: {
+        "enabled": false
+      }
+
     AddGroupRequest:
       value: {
-        "group": "engineers"
+        "group": "engineers",
+        "comment": "Platform engineering"
       }
 
     GroupMembershipChangeRequest:
@@ -499,6 +532,7 @@ components:
         "code": 0,
         "user": {
           "name": "alice",
+          "enabled": true,
           "groups": []
         }
       }
@@ -508,6 +542,7 @@ components:
         "code": 0,
         "user": {
           "name": "alice",
+          "enabled": true,
           "groups": ["engineers"]
         }
       }
@@ -517,6 +552,7 @@ components:
         "code": 0,
         "user": {
           "name": "alice",
+          "enabled": true,
           "groups": ["engineers"]
         }
       }
@@ -526,6 +562,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": []
         }
       }
@@ -535,6 +572,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }
@@ -544,6 +582,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }
@@ -555,11 +594,11 @@ components:
         "message": "Failed to operate local user store user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
       }
 
-    IdpChangePasswordIllegalArgumentException:
+    IdpUpdateUserIllegalArgumentException:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" field is required and cannot be empty]"
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" or \"enabled\" field is required]"
       }
 
     IdpAddGroupIllegalArgumentException:

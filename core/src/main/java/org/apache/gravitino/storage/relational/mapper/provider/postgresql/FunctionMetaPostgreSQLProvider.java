@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.ibatis.annotations.Param;
@@ -104,7 +105,8 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE function_id = #{functionId} AND deleted_at = 0";
   }
 
@@ -112,7 +114,8 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   public String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -120,7 +123,8 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   public String softDeleteFunctionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -129,7 +133,8 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
     return "<script>"
         + "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"

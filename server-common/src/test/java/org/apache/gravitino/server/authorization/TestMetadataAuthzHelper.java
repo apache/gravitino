@@ -23,10 +23,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -35,8 +39,10 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -45,17 +51,20 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.MockedStatic;
 
 /** Test of {@link MetadataAuthzHelper} */
 public class TestMetadataAuthzHelper {
 
   private static MockedStatic<GravitinoEnv> mockedStaticGravitinoEnv;
+  private static GravitinoEnv gravitinoEnv;
 
   @BeforeAll
   public static void setup() {
     mockedStaticGravitinoEnv = mockStatic(GravitinoEnv.class);
-    GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
+    gravitinoEnv = mock(GravitinoEnv.class);
     mockedStaticGravitinoEnv.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     Config configMock = mock(Config.class);
     when(gravitinoEnv.config()).thenReturn(configMock);
@@ -103,6 +112,33 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
+    }
+  }
+
+  @Test
+  public void testPreloadUsesInternalDispatchers() throws Exception {
+    AccessControlDispatcher accessControlDispatcher = mock(AccessControlDispatcher.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    NameIdentifier tableIdentifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier schemaIdentifier = NameIdentifier.of("metalake", "catalog", "schema");
+
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(schemaDispatcher.schemaExists(schemaIdentifier)).thenReturn(false);
+
+    Method preload =
+        MetadataAuthzHelper.class.getDeclaredMethod(
+            "preloadToCache", Entity.EntityType.class, NameIdentifier[].class);
+    preload.setAccessible(true);
+    try {
+      preload.invoke(
+          null, new Object[] {Entity.EntityType.TABLE, new NameIdentifier[] {tableIdentifier}});
+      verify(schemaDispatcher).schemaExists(schemaIdentifier);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
     }
   }
 
@@ -232,6 +268,61 @@ public class TestMetadataAuthzHelper {
   }
 
   /**
+   * Builds an authorizer with table privileges granted at the schema scope. Optional use grants
+   * satisfy the catalog and schema gates in the table-like list expression, while deny discovery
+   * reports a deny only when the short-circuit asks about one of {@code deniedPrivileges}.
+   */
+  private GravitinoAuthorizer mockTableListRouteAuthorizer(
+      Set<Privilege.Name> grantedPrivileges,
+      Set<Privilege.Name> deniedPrivileges,
+      boolean grantUsePrivileges) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    lenient()
+        .when(authorizer.authorize(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              Privilege.Name privilege = invocation.getArgument(3);
+              if (object.type() == MetadataObject.Type.CATALOG) {
+                return grantUsePrivileges && privilege == Privilege.Name.USE_CATALOG;
+              }
+              if (object.type() == MetadataObject.Type.SCHEMA) {
+                return grantedPrivileges.contains(privilege)
+                    || grantUsePrivileges && privilege == Privilege.Name.USE_SCHEMA;
+              }
+              return false;
+            });
+    lenient()
+        .when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenReturn(false);
+    lenient().when(authorizer.isOwner(any(), eq("testMetalake"), any(), any())).thenReturn(false);
+    lenient()
+        .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
+        .thenAnswer(
+            invocation -> {
+              Set<Privilege.Name> privileges = invocation.getArgument(2);
+              return privileges.stream().anyMatch(deniedPrivileges::contains);
+            });
+    return authorizer;
+  }
+
+  private void withAuthorizer(GravitinoAuthorizer authorizer, Runnable assertions) {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      assertions.run();
+    }
+  }
+
+  /**
    * Builds an authorizer that grants {@code grantPrivilege} at a single ancestor scope ({@code
    * grantType}) and reports no object-level deny, so a list of children under that ancestor is
    * fully visible via the parent-scope short-circuit.
@@ -318,6 +409,59 @@ public class TestMetadataAuthzHelper {
               catalogs);
 
       Assertions.assertEquals(2, filtered.length);
+    }
+  }
+
+  /**
+   * The verbose catalog listing hands this helper {@code Catalog} objects rather than identifiers,
+   * so it goes through the generic overload. That overload used to skip the short-circuit, which
+   * left every catalog in the metalake on the per-object path.
+   *
+   * <p>Proving which path ran needs care. Comparing the returned elements does not work, because
+   * the metalake-scope grant satisfies the per-object expression too and every catalog comes back
+   * either way. Counting authorizer calls does not work either: the per-request cache in {@link
+   * org.apache.gravitino.authorization.AuthorizationRequestContext} collapses the repeated
+   * metalake-scope check, so the count is the same for three catalogs and for thirty.
+   *
+   * <p>What does separate them is the array itself. The short-circuit hands back the caller's own
+   * array untouched, while the per-object path collects survivors into a new one, so identity says
+   * which branch produced the result.
+   */
+  @Test
+  public void testListShortCircuitAppliesToNonIdentifierResults() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer =
+          mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.USE_CATALOG);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      // Stands in for the Catalog objects the verbose listing carries: anything that is not a
+      // NameIdentifier and needs a mapper to become one.
+      String[] catalogNames = new String[] {"c1", "c2", "c3"};
+
+      String[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake",
+              AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+              Entity.EntityType.CATALOG,
+              catalogNames,
+              name -> NameIdentifierUtil.ofCatalog("testMetalake", name));
+
+      Assertions.assertSame(
+          catalogNames,
+          filtered,
+          "The parent-scope short-circuit must return the caller's array as is; a new array means "
+              + "the per-object authorization loop ran for every catalog");
+      // Only the short-circuit asks this, and it asks once, after the parent grant is confirmed.
+      verify(authorizer, times(1)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
     }
   }
 
@@ -502,6 +646,124 @@ public class TestMetadataAuthzHelper {
           Arrays.stream(filtered).noneMatch(id -> "t2".equals(id.name())),
           "t2 must be filtered out by its table-level deny");
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Privilege.Name.class,
+      names = {"PROBE_TABLE_LIKE", "SELECT_TABLE", "MODIFY_TABLE", "CREATE_TABLE", "CREATE_VIEW"})
+  public void testListTableLikeShortCircuitSupportsEveryParentPrivilege(Privilege.Name privilege) {
+    GravitinoAuthorizer authorizer =
+        mockTableListRouteAuthorizer(Set.of(privilege), Set.of(), true);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] tables = threeTables();
+          NameIdentifier[] filtered = filterTableLike(tables);
+
+          Assertions.assertSame(tables, filtered);
+          verify(authorizer, times(1))
+              .hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any());
+        });
+  }
+
+  @Test
+  public void testListTableLikeShortCircuitIgnoresDenyOnIndependentPath() {
+    GravitinoAuthorizer authorizer =
+        mockTableListRouteAuthorizer(
+            Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
+            Set.of(Privilege.Name.MODIFY_TABLE),
+            true);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] tables = threeTables();
+          NameIdentifier[] filtered = filterTableLike(tables);
+
+          Assertions.assertSame(
+              tables,
+              filtered,
+              "A MODIFY_TABLE deny must not disable the independent SELECT_TABLE access path");
+          verify(authorizer, times(1))
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.SELECT_TABLE)), any());
+          verify(authorizer, times(0))
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.MODIFY_TABLE)), any());
+        });
+  }
+
+  @Test
+  public void testListTableLikeShortCircuitTriesNextPathAfterDeny() {
+    GravitinoAuthorizer authorizer =
+        mockTableListRouteAuthorizer(
+            Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
+            Set.of(Privilege.Name.SELECT_TABLE),
+            true);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] tables = threeTables();
+          NameIdentifier[] filtered = filterTableLike(tables);
+
+          Assertions.assertSame(
+              tables,
+              filtered,
+              "A denied SELECT_TABLE path must not hide a deny-free MODIFY_TABLE path");
+          verify(authorizer, times(1))
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.SELECT_TABLE)), any());
+          verify(authorizer, times(1))
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.MODIFY_TABLE)), any());
+        });
+  }
+
+  @Test
+  public void testListTableLikeShortCircuitRequiresUsePrivileges() {
+    GravitinoAuthorizer authorizer =
+        mockTableListRouteAuthorizer(Set.of(Privilege.Name.SELECT_TABLE), Set.of(), false);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered = filterTableLike(threeTables());
+
+          verify(authorizer, times(0)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
+          Assertions.assertEquals(
+              0,
+              filtered.length,
+              "The short-circuit must not bypass the table-like expression's use privileges");
+        });
+  }
+
+  @Test
+  public void testListShortCircuitOwnerIgnoresPrivilegeDenies() {
+    GravitinoAuthorizer authorizer = mockTableListAuthorizer(true, true);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] tables = threeTables();
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.TABLE,
+                  tables);
+
+          Assertions.assertSame(
+              tables,
+              filtered,
+              "Privilege denies do not invalidate an independent ancestor-owner access path");
+          verify(authorizer, times(0)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
+        });
+  }
+
+  private static NameIdentifier[] filterTableLike(NameIdentifier[] tables) {
+    return MetadataAuthzHelper.filterByExpression(
+        "testMetalake",
+        AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+        Entity.EntityType.TABLE,
+        tables);
   }
 
   private static void makeCompletableFutureUseCurrentThread() {

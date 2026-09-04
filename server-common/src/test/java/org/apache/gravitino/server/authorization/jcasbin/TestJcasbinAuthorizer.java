@@ -72,6 +72,7 @@ import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -387,6 +388,17 @@ public class TestJcasbinAuthorizer {
   public void testIsMetalakeUserUsesUserInfoCache() {
     assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
     verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
+  public void testIsServiceAdminUsesInternalDispatcher() {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+
+    verify(dispatcher).isServiceAdmin(USERNAME);
   }
 
   @Test
@@ -2426,6 +2438,30 @@ public class TestJcasbinAuthorizer {
         jcasbinAuthorizer.hasMetadataPrivilegePermission(
             METALAKE, "CATALOG", "testCatalog", new AuthorizationRequestContext()),
         "Owner should be able to manage privileges without checking DENY MANAGE_GRANTS");
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionAllowsSchemaAndCatalogOwner() throws Exception {
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+        .thenReturn(Optional.of(USER_METALAKE_ID));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("SCHEMA")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    try {
+      assertTrue(
+          jcasbinAuthorizer.hasSetOwnerPermission(
+              METALAKE, "SCHEMA", "testCatalog.testSchema", new AuthorizationRequestContext()));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
   }
 
   @Test

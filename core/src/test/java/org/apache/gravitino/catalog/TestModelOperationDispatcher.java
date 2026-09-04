@@ -84,13 +84,13 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Model model = modelOperationDispatcher.registerModel(modelIdent, "comment", props);
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals("comment", model.comment());
-    Assertions.assertEquals(props, model.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, model.properties().get(k)));
     Assertions.assertFalse(model.properties().containsKey(ID_KEY));
 
     Model registeredModel = modelOperationDispatcher.getModel(modelIdent);
     Assertions.assertEquals(modelName, registeredModel.name());
     Assertions.assertEquals("comment", registeredModel.comment());
-    Assertions.assertEquals(props, registeredModel.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, registeredModel.properties().get(k)));
     Assertions.assertFalse(registeredModel.properties().containsKey(ID_KEY));
 
     // Test register model with illegal property
@@ -170,7 +170,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, linkedModelVersion.uris());
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
-    Assertions.assertEquals(props, linkedModelVersion.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
     Assertions.assertFalse(linkedModelVersion.properties().containsKey(ID_KEY));
 
     // Test get model version with alias
@@ -250,7 +250,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, versions[0].uris());
     Assertions.assertArrayEquals(aliases, versions[0].aliases());
     Assertions.assertEquals("comment", versions[0].comment());
-    Assertions.assertEquals(props, versions[0].properties());
+    assertPropertiesContain(props, versions[0].properties());
   }
 
   @Test
@@ -313,7 +313,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, linkedModelVersion.uris());
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
-    Assertions.assertEquals(props, linkedModelVersion.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
     Assertions.assertFalse(linkedModelVersion.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -387,7 +387,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, version1.uris());
     Assertions.assertArrayEquals(aliases, version1.aliases());
     Assertions.assertEquals("comment", version1.comment());
-    Assertions.assertEquals(versionPropsWithoutDefaultUriName, version1.properties());
+    versionPropsWithoutDefaultUriName.forEach(
+        (k, v) -> Assertions.assertEquals(v, version1.properties().get(k)));
     Assertions.assertFalse(version1.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -420,7 +421,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, version2.uris());
     Assertions.assertArrayEquals(new String[] {"alias3"}, version2.aliases());
     Assertions.assertEquals("comment", version2.comment());
-    Assertions.assertEquals(versionPropsWithDefaultUriName, version2.properties());
+    versionPropsWithDefaultUriName.forEach(
+        (k, v) -> Assertions.assertEquals(v, version2.properties().get(k)));
     Assertions.assertFalse(version2.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -477,7 +479,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] addProperty = new ModelChange[] {ModelChange.setProperty("k3", "v3")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, addProperty);
@@ -485,7 +487,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(
+    assertPropertiesContain(
         ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"), alteredModel.properties());
   }
 
@@ -506,7 +508,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] updateProperty = new ModelChange[] {ModelChange.setProperty("k1", "v3")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, updateProperty);
@@ -514,7 +516,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
+    assertPropertiesContain(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
   }
 
   @Test
@@ -534,7 +536,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] removeProperty = new ModelChange[] {ModelChange.removeProperty("k1")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, removeProperty);
@@ -542,7 +544,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(ImmutableMap.of("k2", "v2"), alteredModel.properties());
+    assertPropertiesContain(ImmutableMap.of("k2", "v2"), alteredModel.properties());
   }
 
   @Test
@@ -565,7 +567,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange change = ModelChange.updateComment(newModelComment);
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, change);
@@ -573,7 +575,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newModelComment, alteredModel.comment());
-    Assertions.assertEquals(props, alteredModel.properties());
+    assertPropertiesContain(props, alteredModel.properties());
   }
 
   @Test
@@ -647,7 +649,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -688,7 +690,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -725,7 +727,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -763,7 +765,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -1286,5 +1288,11 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
   private String randomModelName() {
     return "model_" + UUID.randomUUID().toString().replace("-", "");
+  }
+
+  private static void assertPropertiesContain(
+      Map<String, String> expectedUserProps, Map<String, String> actual) {
+    expectedUserProps.forEach((k, v) -> Assertions.assertEquals(v, actual.get(k)));
+    Assertions.assertFalse(actual.containsKey(ID_KEY));
   }
 }

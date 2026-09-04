@@ -19,16 +19,25 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import java.time.Instant;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.JobEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents information about a job, including its ID, template name, status, and audit details.
  */
 @DeveloperApi
 public final class JobInfo {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobInfo.class);
 
   private final String jobId;
 
@@ -38,11 +47,27 @@ public final class JobInfo {
 
   private final Audit audit;
 
-  private JobInfo(String jobId, String jobTemplateName, JobHandle.Status jobStatus, Audit audit) {
+  private final Instant startedAt;
+
+  private final Instant finishedAt;
+
+  private final JobTemplate runtimeJobTemplate;
+
+  private JobInfo(
+      String jobId,
+      String jobTemplateName,
+      JobHandle.Status jobStatus,
+      Audit audit,
+      Instant startedAt,
+      Instant finishedAt,
+      JobTemplate runtimeJobTemplate) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.jobStatus = jobStatus;
     this.audit = audit;
+    this.startedAt = startedAt;
+    this.finishedAt = finishedAt;
+    this.runtimeJobTemplate = runtimeJobTemplate;
   }
 
   /**
@@ -53,7 +78,37 @@ public final class JobInfo {
    */
   public static JobInfo fromJobEntity(JobEntity jobEntity) {
     return new JobInfo(
-        jobEntity.name(), jobEntity.jobTemplateName(), jobEntity.status(), jobEntity.auditInfo());
+        jobEntity.name(),
+        jobEntity.jobTemplateName(),
+        jobEntity.status(),
+        jobEntity.auditInfo(),
+        jobEntity.startedAtAsInstant(),
+        jobEntity.finishedAtAsInstant(),
+        toRuntimeJobTemplate(jobEntity));
+  }
+
+  /**
+   * Deserializes the job entity's stored runtime job template JSON, if any, back into a {@link
+   * JobTemplate}. This is called from inside the event dispatcher's try block for getJob/runJob/
+   * cancelJob, after the underlying operation has already succeeded (or, for cancelJob, after the
+   * external cancel call and entity update have already happened) - a malformed or
+   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
+   * turn that already-completed operation into a 500, so failures here are logged and swallowed
+   * rather than propagated.
+   */
+  private static JobTemplate toRuntimeJobTemplate(JobEntity jobEntity) {
+    try {
+      JobTemplateDTO runtimeJobTemplateDTO =
+          DTOConverters.fromRuntimeJobTemplateJson(
+              jobEntity.runtimeJobTemplate(), jobEntity.name());
+      return runtimeJobTemplateDTO == null ? null : DTOConverters.fromDTO(runtimeJobTemplateDTO);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to build the runtime job template for job {}, omitting it from the event",
+          jobEntity.name(),
+          e);
+      return null;
+    }
   }
 
   /**
@@ -90,5 +145,46 @@ public final class JobInfo {
    */
   public Audit auditInfo() {
     return audit;
+  }
+
+  /**
+   * Returns the time when the job was queued for execution. This is the same as the job's creation
+   * time.
+   *
+   * @return the queued time of the job
+   */
+  public Instant queuedAt() {
+    return audit.createTime();
+  }
+
+  /**
+   * Returns the time when the job started execution.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet
+   */
+  @Nullable
+  public Instant startedAt() {
+    return startedAt;
+  }
+
+  /**
+   * Returns the time when the job finished execution.
+   *
+   * @return the finished time of the job, or null if the job has not finished execution yet
+   */
+  @Nullable
+  public Instant finishedAt() {
+    return finishedAt;
+  }
+
+  /**
+   * Returns the resolved job template that was actually submitted for execution, with placeholders
+   * replaced and referenced files downloaded.
+   *
+   * @return the runtime job template, or null for jobs run before this field was introduced
+   */
+  @Nullable
+  public JobTemplate runtimeJobTemplate() {
+    return runtimeJobTemplate;
   }
 }

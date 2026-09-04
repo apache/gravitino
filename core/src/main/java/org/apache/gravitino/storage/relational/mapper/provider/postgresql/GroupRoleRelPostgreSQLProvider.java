@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.
 import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.GROUP_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupRoleRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,7 +31,8 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
   public String softDeleteGroupRoleRelByGroupId(Long groupId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
@@ -39,7 +41,8 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
     return "<script>"
         + "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id = #{groupId} "
         + "<choose>"
         + "<when test='roleIds != null and roleIds.size() > 0'>"
@@ -61,7 +64,8 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
   public String softDeleteGroupRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id IN (SELECT group_id FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -72,7 +76,8 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
   public String softDeleteGroupRoleRelByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

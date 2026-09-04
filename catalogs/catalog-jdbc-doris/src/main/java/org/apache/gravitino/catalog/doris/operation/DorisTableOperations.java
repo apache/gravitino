@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.operation;
 
 import static org.apache.gravitino.catalog.doris.DorisCatalog.DORIS_TABLE_PROPERTIES_META;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
@@ -179,9 +180,17 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>(properties);
     }
 
+    Preconditions.checkArgument(
+        !resultMap.containsKey(REPLICATION_FACTOR)
+            || !resultMap.containsKey(REPLICATION_ALLOCATION),
+        "Properties '%s' and '%s' cannot be set at the same time",
+        REPLICATION_FACTOR,
+        REPLICATION_ALLOCATION);
+
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
-    if (!resultMap.containsKey(REPLICATION_FACTOR)) {
+    if (!resultMap.containsKey(REPLICATION_FACTOR)
+        && !resultMap.containsKey(REPLICATION_ALLOCATION)) {
       // Try to check the number of backend servers using `show backends`, this SQL is supported by
       // all versions of Doris
       String query = "show backends";
@@ -335,25 +344,18 @@ public class DorisTableOperations extends JdbcTableOperations {
       return;
     }
 
-    nonKeyIndexes.forEach(
-        index -> {
-          if (index.fieldNames().length > 1) {
-            throw new IllegalArgumentException(
-                "Index '" + index.name() + "' does not support multi fields in Doris");
-          }
-        });
-
     String indexSql =
         nonKeyIndexes.stream()
             .map(
                 index -> {
+                  String fieldName =
+                      requireSingleTopLevelIndexField(index.name(), index.fieldNames());
                   String usingClause = mapIndexTypeToUsingClause(index.type());
                   if (usingClause.isEmpty()) {
-                    return String.format(
-                        "INDEX `%s` (`%s`)", index.name(), index.fieldNames()[0][0]);
+                    return String.format("INDEX `%s` (`%s`)", index.name(), fieldName);
                   }
                   return String.format(
-                      "INDEX `%s` (`%s`) %s", index.name(), index.fieldNames()[0][0], usingClause);
+                      "INDEX `%s` (`%s`) %s", index.name(), fieldName, usingClause);
                 })
             .collect(Collectors.joining(",\n"));
 
@@ -1003,14 +1005,13 @@ public class DorisTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException(
           "PRIMARY_KEY and UNIQUE_KEY cannot be added via ALTER TABLE ADD INDEX in Doris");
     }
+    String fieldName =
+        requireSingleTopLevelIndexField(addIndex.getName(), addIndex.getFieldNames());
     String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
     if (usingClause.isEmpty()) {
-      return String.format(
-          "ADD INDEX `%s` (`%s`)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+      return String.format("ADD INDEX `%s` (`%s`)", addIndex.getName(), fieldName);
     }
-    return String.format(
-        "ADD INDEX `%s` (`%s`) %s",
-        addIndex.getName(), addIndex.getFieldNames()[0][0], usingClause);
+    return String.format("ADD INDEX `%s` (`%s`) %s", addIndex.getName(), fieldName, usingClause);
   }
 
   static String deleteIndexDefinition(
@@ -1072,5 +1073,25 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     return null;
+  }
+
+  private static String requireSingleTopLevelIndexField(String indexName, String[][] fieldNames) {
+    Preconditions.checkArgument(
+        fieldNames != null && fieldNames.length == 1,
+        "Index '%s' supports exactly one top-level field in Doris, but got %s",
+        indexName,
+        fieldNames == null ? "null" : fieldNames.length);
+
+    String[] fieldPath = fieldNames[0];
+    Preconditions.checkArgument(
+        fieldPath != null && fieldPath.length == 1,
+        "Index '%s' supports exactly one top-level field in Doris, but got path %s",
+        indexName,
+        Arrays.toString(fieldPath));
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(fieldPath[0]),
+        "Index '%s' requires a non-blank top-level field in Doris",
+        indexName);
+    return fieldPath[0];
   }
 }

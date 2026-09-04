@@ -95,6 +95,8 @@ import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -128,6 +130,8 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -256,8 +260,52 @@ public class GravitinoMetalake extends MetalakeDTO
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  /**
+   * Create a new catalog with specified identifier, type, comment, properties, and optional secret
+   * maps.
+   *
+   * @param catalogName The identifier of the catalog.
+   * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
+   * @param comment The comment of the catalog.
+   * @param properties The properties of the catalog.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created {@link Catalog}.
+   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @throws CatalogAlreadyExistsException if the catalog with specified identifier already exists.
+   */
+  @Override
+  public Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogCreateRequest req =
-        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
+        new CatalogCreateRequest(
+            catalogName,
+            type,
+            provider,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     CatalogResponse resp =
@@ -426,6 +474,66 @@ public class GravitinoMetalake extends MetalakeDTO
     }
 
     // Throw the corresponding exception
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void testConnection(String catalogName) throws Exception {
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            null,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(catalogName);
+      return;
+    }
+
+    List<CatalogUpdateRequest> requests =
+        Arrays.stream(changes)
+            .map(DTOConverters::toCatalogUpdateRequest)
+            .collect(Collectors.toList());
+    CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(requests);
+    updatesRequest.validate();
+
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            updatesRequest,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
     ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
@@ -824,35 +932,6 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Adds a new User with an external identifier.
-   *
-   * @param user The name of the User.
-   * @param externalId The external identifier of the User.
-   * @param enabled Whether the User is enabled.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String user, String externalId, boolean enabled)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    UserAddRequest req = new UserAddRequest(user, externalId, enabled);
-    req.validate();
-
-    UserResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            UserResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.getUser();
-  }
-
-  /**
    * Removes a User.
    *
    * @param user The name of the User.
@@ -953,35 +1032,6 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     GroupAddRequest req = new GroupAddRequest(group);
-    req.validate();
-
-    GroupResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            GroupResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.groupErrorHandler());
-    resp.validate();
-
-    return resp.getGroup();
-  }
-
-  /**
-   * Adds a new Group with an external identifier.
-   *
-   * @param group The name of the Group.
-   * @param externalId The external identifier of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
-   *     exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String group, String externalId)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    GroupAddRequest req = new GroupAddRequest(group, externalId);
     req.validate();
 
     GroupResponse resp =

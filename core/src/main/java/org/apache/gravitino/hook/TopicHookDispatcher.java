@@ -68,7 +68,7 @@ public class TopicHookDispatcher implements TopicDispatcher {
     Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
 
     // Set the creator as the owner of the topic.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the topic name (and its schema namespace)
       // based on catalog capabilities, so the entity is stored under the normalized identifier.

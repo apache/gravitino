@@ -23,9 +23,13 @@ import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.Entity.EntityType.VIEW;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -65,12 +69,18 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
+import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
+import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestViewOperations extends BaseOperationsTest {
@@ -123,6 +133,9 @@ public class TestViewOperations extends BaseOperationsTest {
                 .to(HttpServletRequest.class);
           }
         });
+    resourceConfig.register(JsonProcessingExceptionMapper.class);
+    resourceConfig.register(JsonParseExceptionMapper.class);
+    resourceConfig.register(JsonMappingExceptionMapper.class);
 
     return resourceConfig;
   }
@@ -179,6 +192,40 @@ public class TestViewOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testListViewsFiltersUnauthorizedEntries() throws IllegalAccessException {
+    NameIdentifier visibleView = NameIdentifier.of(metalake, catalog, schema, "visible");
+    NameIdentifier hiddenView = NameIdentifier.of(metalake, catalog, schema, "hidden");
+    NameIdentifier[] listedViews = new NameIdentifier[] {visibleView, hiddenView};
+    NameIdentifier[] filteredViews = new NameIdentifier[] {visibleView};
+    ViewDispatcher localDispatcher = mock(ViewDispatcher.class);
+    when(localDispatcher.listViews(NamespaceUtil.ofView(metalake, catalog, schema)))
+        .thenReturn(listedViews);
+
+    ViewOperations operations = new ViewOperations(localDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
+        mockStatic(MetadataAuthzHelper.class)) {
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake, FILTER_VIEW_AUTHORIZATION_EXPRESSION, VIEW, listedViews))
+          .thenReturn(filteredViews);
+
+      Response response = operations.listViews(metalake, catalog, schema);
+
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      EntityListResponse listResponse = (EntityListResponse) response.getEntity();
+      Assertions.assertArrayEquals(filteredViews, listResponse.identifiers());
+      verify(localDispatcher).listViews(NamespaceUtil.ofView(metalake, catalog, schema));
+      metadataAuthzHelper.verify(
+          () ->
+              MetadataAuthzHelper.filterByExpression(
+                  metalake, FILTER_VIEW_AUTHORIZATION_EXPRESSION, VIEW, listedViews));
+    }
   }
 
   @Test
@@ -294,6 +341,49 @@ public class TestViewOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+  }
+
+  @Test
+  public void testCreateViewWithNullRequest() {
+    Response resp =
+        target(viewPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(VND_V1_JSON)
+            .post(Entity.entity(null, VND_V1_JSON));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
+  }
+
+  @Test
+  public void testCreateViewWithMalformedJson() {
+    Response resp =
+        target(viewPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(VND_V1_JSON)
+            .post(Entity.entity("{", VND_V1_JSON));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Malformed json request"));
+  }
+
+  @Test
+  public void testAlterViewWithNullRequest() {
+    Response resp =
+        target(viewPath(metalake, catalog, schema) + "/view1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(VND_V1_JSON)
+            .put(Entity.entity(new byte[0], VND_V1_JSON));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

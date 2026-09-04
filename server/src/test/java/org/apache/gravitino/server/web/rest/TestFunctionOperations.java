@@ -267,6 +267,17 @@ public class TestFunctionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRegisterFunctionWithNullRequest() {
+    Response resp =
+        target(functionPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRegisterScalarFunction() {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "test comment", FunctionType.SCALAR);
@@ -405,6 +416,18 @@ public class TestFunctionOperations extends BaseOperationsTest {
     FunctionResponse funcResp = resp.readEntity(FunctionResponse.class);
     Assertions.assertEquals(0, funcResp.getCode());
     Assertions.assertEquals(FunctionType.TABLE, funcResp.getFunction().functionType());
+  }
+
+  @Test
+  public void testAlterFunctionWithNullRequest() {
+    Response resp =
+        target(functionPath())
+            .path("func1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

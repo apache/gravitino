@@ -54,6 +54,7 @@ dependencies {
 
   testFixturesApi(project(":api"))
   testFixturesApi(libs.junit.jupiter.api)
+  testFixturesImplementation(libs.commons.lang3)
 }
 
 fun getGitCommitId(): String {

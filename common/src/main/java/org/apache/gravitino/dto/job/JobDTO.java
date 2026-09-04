@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -58,9 +59,21 @@ public class JobDTO {
   @JsonProperty("audit")
   private final AuditDTO audit;
 
+  @JsonProperty("queuedAt")
+  private final Instant queuedAt;
+
+  @JsonProperty("startedAt")
+  private final Instant startedAt;
+
+  @JsonProperty("finishedAt")
+  private final Instant finishedAt;
+
+  @JsonProperty("runtimeJobTemplate")
+  private final JobTemplateDTO runtimeJobTemplate;
+
   /** Default constructor for Jackson deserialization. */
   private JobDTO() {
-    this(null, null, null, null);
+    this(null, null, null, null, null, null, null, null);
   }
 
   /**
@@ -70,12 +83,32 @@ public class JobDTO {
    * @param jobTemplateName The name of the job template used for this job.
    * @param status The current status of the job.
    * @param audit The audit information associated with the job.
+   * @param queuedAt The time when the job was queued for execution.
+   * @param startedAt The time when the job started execution, or null if the job has not started
+   *     execution yet.
+   * @param finishedAt The time when the job finished execution, or null if the job has not finished
+   *     execution yet.
+   * @param runtimeJobTemplate The resolved job template that was actually submitted for execution,
+   *     with placeholders replaced and referenced files downloaded, or null for jobs run before
+   *     this field was introduced.
    */
-  public JobDTO(String jobId, String jobTemplateName, JobHandle.Status status, AuditDTO audit) {
+  public JobDTO(
+      String jobId,
+      String jobTemplateName,
+      JobHandle.Status status,
+      AuditDTO audit,
+      Instant queuedAt,
+      Instant startedAt,
+      Instant finishedAt,
+      JobTemplateDTO runtimeJobTemplate) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.status = status;
     this.audit = audit;
+    this.queuedAt = queuedAt;
+    this.startedAt = startedAt;
+    this.finishedAt = finishedAt;
+    this.runtimeJobTemplate = runtimeJobTemplate;
   }
 
   /**

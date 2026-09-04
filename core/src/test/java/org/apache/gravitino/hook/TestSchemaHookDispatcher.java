@@ -22,11 +22,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +81,7 @@ public class TestSchemaHookDispatcher {
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
     when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Tests in this class that rely on the singleton catalogManager always go through
     // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
     // because it Preconditions-checks for non-null and would fail when GravitinoEnv has not been
@@ -88,7 +90,8 @@ public class TestSchemaHookDispatcher {
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     savedLockManager =
         (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     // createSchema now acquires a catalog-level tree lock, so wire up a real LockManager.
     FieldUtils.writeField(
@@ -99,7 +102,7 @@ public class TestSchemaHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", savedLockManager, true);
   }
@@ -116,7 +119,7 @@ public class TestSchemaHookDispatcher {
   public void testCreateSchemaThrowsWhenSetOwnerFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -127,7 +130,9 @@ public class TestSchemaHookDispatcher {
             RuntimeException.class,
             () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).createSchema(any(), any(), any());
+    verify(mockDispatcher).createSchema(any(), any(), any(), any(), any());
+    // Align with FilesetHookDispatcher / #12366: do not drop the schema when setOwner fails.
+    verify(mockDispatcher, never()).dropSchema(any(), anyBoolean());
   }
 
   @Test
@@ -138,7 +143,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
@@ -167,7 +172,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // No ancestor exists yet, so creating "A:B:C" auto-creates "A" and "A:B".
     when(mockDispatcher.schemaExists(any())).thenReturn(false);
 
@@ -187,7 +192,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // "A" already exists (and has its own owner); only "A:B" and the leaf are newly created.
     NameIdentifier existingA = NameIdentifier.of("test_metalake", "test_catalog", "A");
     when(mockDispatcher.schemaExists(any())).thenReturn(false);

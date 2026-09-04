@@ -31,11 +31,15 @@ import com.google.common.collect.Maps;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -43,7 +47,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
+import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
@@ -64,6 +70,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -98,6 +105,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   private Catalog catalog;
   private ClickHouseService clickHouseService;
   private ClickHouseContainer clickHouseClusterContainer;
+  private List<ClickHouseContainer> clickHouseClusterContainers;
   private final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT;
 
   @BeforeAll
@@ -106,6 +114,8 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         Paths.get("src", "test", "resources", "remote_servers.xml").toAbsolutePath().toString();
     containerSuite.startClickHouseClusterContainer(TEST_DB_NAME, remoteServersConfig);
     clickHouseClusterContainer = containerSuite.getClickHouseClusterContainer();
+    clickHouseClusterContainers = containerSuite.getClickHouseClusterContainers();
+    Assertions.assertEquals(3, clickHouseClusterContainers.size());
 
     clickHouseService = new ClickHouseService(clickHouseClusterContainer, TEST_DB_NAME);
     createMetalake();
@@ -162,8 +172,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   private void createSchema() {
-    Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    properties.put(ON_CLUSTER, String.valueOf(true));
+    Schema createdSchema = catalog.asSchemas().createSchema(schemaName, null, properties);
     Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
   }
@@ -546,6 +558,96 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   @Test
+  public void testNgrambfAndTokenbfIndexesOnCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_skip_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> ngramProperties =
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0");
+    Map<String, String> tokenProperties =
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0",
+            "granularity", "4");
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{"col_3"}},
+              ngramProperties),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{"col_3"}},
+              tokenProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        loaded.index(), "idx_ngram", Index.IndexType.DATA_SKIPPING_NGRAMBFV1, ngramProperties);
+    assertIndexMetadata(
+        loaded.index(), "idx_token", Index.IndexType.DATA_SKIPPING_TOKENBFV1, tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+            "idx_ngram_alter",
+            new String[][] {{"col_3"}},
+            ngramProperties),
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+            "idx_token_alter",
+            new String[][] {{"col_3"}},
+            tokenProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_ngram_alter",
+        Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+        ngramProperties);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_token_alter",
+        Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+        tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_ngram", false),
+        TableChange.deleteIndex("idx_token", false),
+        TableChange.deleteIndex("idx_ngram_alter", false),
+        TableChange.deleteIndex("idx_token_alter", false));
+  }
+
+  private void assertIndexMetadata(
+      Index[] indexes, String name, Index.IndexType type, Map<String, String> properties) {
+    Index index =
+        Arrays.stream(indexes)
+            .filter(candidate -> Objects.equals(name, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + name));
+    Assertions.assertEquals(type, index.type());
+    Assertions.assertTrue(Arrays.deepEquals(new String[][] {{"col_3"}}, index.fieldNames()));
+    Assertions.assertEquals(properties, index.properties());
+  }
+
+  @Test
   public void testDropTableOnCluster() {
     String dropTableName = GravitinoITUtils.genRandomName("ck_cluster_drop_tbl");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
@@ -685,6 +787,57 @@ public class CatalogClickHouseClusterIT extends BaseIT {
           "loadTable must return the cluster name embedded in COMMENT at create time");
     } finally {
       tableCatalog.dropTable(tableIdent);
+    }
+  }
+
+  @Test
+  public void testRenameTableOnClusterPropagatesToEveryNode() throws SQLException {
+    String oldName = GravitinoITUtils.genRandomName("ck_cluster_rename_old");
+    String newName = GravitinoITUtils.genRandomName("ck_cluster_rename_new");
+    NameIdentifier oldIdent = NameIdentifier.of(schemaName, oldName);
+    NameIdentifier newIdent = NameIdentifier.of(schemaName, newName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    try {
+      tableCatalog.createTable(
+          oldIdent,
+          createColumns(),
+          "cluster rename comment",
+          clusterMergeTreeProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("col_3"),
+          Indexes.EMPTY_INDEXES);
+
+      Table renamed = tableCatalog.alterTable(oldIdent, TableChange.rename(newName));
+      Assertions.assertEquals(newName, renamed.name());
+      Assertions.assertEquals(String.valueOf(true), renamed.properties().get(ON_CLUSTER));
+      Assertions.assertEquals(
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME, renamed.properties().get(CLUSTER_NAME));
+      Assertions.assertFalse(renamed.properties().containsKey(StringIdentifier.ID_KEY));
+
+      awaitTableStateOnEveryNode(oldName, false, newName, true);
+      assertRenameQueryUsesOnCluster(oldName, newName);
+      for (ClickHouseContainer container : clickHouseClusterContainers) {
+        String storedComment = loadStoredComment(container, newName);
+        Assertions.assertNotNull(StringIdentifier.fromComment(storedComment));
+        Assertions.assertEquals(
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            ClickHouseClusterUtils.extractClusterFromComment(storedComment));
+      }
+
+      Assertions.assertTrue(tableCatalog.dropTable(newIdent));
+      awaitTableStateOnEveryNode(oldName, false, newName, false);
+    } finally {
+      try {
+        clickHouseService.executeQuery(
+            "DROP TABLE IF EXISTS `%s`.`%s` ON CLUSTER `%s` SYNC"
+                .formatted(schemaName, oldName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+      } finally {
+        clickHouseService.executeQuery(
+            "DROP TABLE IF EXISTS `%s`.`%s` ON CLUSTER `%s` SYNC"
+                .formatted(schemaName, newName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+      }
     }
   }
 
@@ -1102,5 +1255,82 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       tableCatalog.dropTable(distIdent);
       tableCatalog.dropTable(localIdent);
     }
+  }
+
+  private void awaitTableStateOnEveryNode(
+      String oldTableName, boolean oldTableExists, String newTableName, boolean newTableExists) {
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(250))
+        .untilAsserted(
+            () -> {
+              for (ClickHouseContainer container : clickHouseClusterContainers) {
+                Assertions.assertEquals(
+                    oldTableExists,
+                    tableExists(container, oldTableName),
+                    "Unexpected old-table state on " + container.getContainerIpAddress());
+                Assertions.assertEquals(
+                    newTableExists,
+                    tableExists(container, newTableName),
+                    "Unexpected new-table state on " + container.getContainerIpAddress());
+              }
+            });
+  }
+
+  private boolean tableExists(ClickHouseContainer container, String tableName) throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                container.getJdbcUrl(TEST_DB_NAME),
+                container.getUsername(),
+                container.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT count() FROM system.tables WHERE database = ? AND name = ?")) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1) == 1;
+      }
+    }
+  }
+
+  private String loadStoredComment(ClickHouseContainer container, String tableName)
+      throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                container.getJdbcUrl(TEST_DB_NAME),
+                container.getUsername(),
+                container.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT comment FROM system.tables WHERE database = ? AND name = ?")) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getString(1);
+      }
+    }
+  }
+
+  private void assertRenameQueryUsesOnCluster(String oldTableName, String newTableName) {
+    clickHouseService.executeQuery("SYSTEM FLUSH LOGS");
+    String query =
+        clickHouseService.executeQueryForResult(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND startsWith(query, 'RENAME TABLE') "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                oldTableName));
+
+    Assertions.assertNotNull(query, "The initiating RENAME query must be present in query_log");
+    Assertions.assertTrue(
+        query.contains("RENAME TABLE `%s` TO `%s`".formatted(oldTableName, newTableName)));
+    Assertions.assertTrue(
+        query.contains("ON CLUSTER `%s`".formatted(ClickHouseContainer.DEFAULT_CLUSTER_NAME)));
+    Assertions.assertEquals(1, StringUtils.countMatches(query, "ON CLUSTER"));
   }
 }

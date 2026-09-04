@@ -84,7 +84,7 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
 :::
 
 ## Schema
@@ -212,6 +212,7 @@ Only Doris built-in table properties are supported; user-defined properties are 
 | Property Name                      | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable |
 |------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
 | `replication_num`                  | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        |
+| `replication_allocation`           | The replication allocation policy for the table. It cannot be set together with `replication_num`.                                                                                          | (none)        | No       | No       | No        |
 | `compression`                      | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       |
 | `bloom_filter_columns`             | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        |
 | `storage_policy`                   | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        |

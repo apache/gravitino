@@ -1,0 +1,445 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /bulk/metalakes/{metalake}/users/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add users in bulk
+      operationId: bulkAddUsers
+      description: Adds users in best-effort mode. Failed items are returned in the top-level errors array. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUserAddRequest"
+            examples:
+              BulkUserAddRequest:
+                $ref: "#/components/examples/BulkUserAddRequest"
+      responses:
+        "200":
+          description: Returns successfully added users and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkUserResponse"
+              examples:
+                BulkUserResponse:
+                  $ref: "#/components/examples/BulkUserResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/users/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove users in bulk
+      operationId: bulkRemoveUsers
+      description: Removes users in best-effort mode. Failed items are returned in the top-level errors array. User names in the same request must be unique. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRemoveRequest"
+            examples:
+              BulkRemoveRequest:
+                $ref: "#/components/examples/BulkRemoveRequest"
+      responses:
+        "200":
+          description: Returns successfully removed names and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkRemoveResponse"
+              examples:
+                BulkRemoveResponse:
+                  $ref: "#/components/examples/BulkRemoveResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/groups/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add groups in bulk
+      operationId: bulkAddGroups
+      description: Adds groups in best-effort mode. Failed items are returned in the top-level errors array. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkGroupAddRequest"
+            examples:
+              BulkGroupAddRequest:
+                $ref: "#/components/examples/BulkGroupAddRequest"
+      responses:
+        "200":
+          description: Returns successfully added groups and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkGroupResponse"
+              examples:
+                BulkGroupResponse:
+                  $ref: "#/components/examples/BulkGroupResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/groups/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove groups in bulk
+      operationId: bulkRemoveGroups
+      description: Removes groups in best-effort mode. Failed items are returned in the top-level errors array. Group names in the same request must be unique. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRemoveRequest"
+            examples:
+              BulkRemoveRequest:
+                $ref: "#/components/examples/BulkRemoveGroupsRequest"
+      responses:
+        "200":
+          description: Returns successfully removed names and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkRemoveResponse"
+              examples:
+                BulkRemoveResponse:
+                  $ref: "#/components/examples/BulkRemoveGroupsResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    BulkUserAddRequest:
+      type: object
+      required:
+        - users
+      properties:
+        users:
+          type: array
+          minItems: 1
+          description: The maximum length is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+          items:
+            $ref: "./users.yaml#/components/schemas/UserAddRequest"
+
+    BulkGroupAddRequest:
+      type: object
+      required:
+        - groups
+      properties:
+        groups:
+          type: array
+          minItems: 1
+          description: The maximum length is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+          items:
+            $ref: "./groups.yaml#/components/schemas/GroupAddRequest"
+
+    BulkRemoveRequest:
+      type: object
+      required:
+        - names
+      properties:
+        names:
+          type: array
+          minItems: 1
+          description: The maximum length is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+          items:
+            type: string
+
+    BulkError:
+      type: object
+      required:
+        - index
+        - code
+        - type
+        - message
+      properties:
+        index:
+          type: integer
+          format: int32
+          description: The zero-based index of the failed request item
+        name:
+          type: string
+          description: The name of the failed request item
+        code:
+          type: integer
+          format: int32
+          description: Gravitino error code of the failed item
+        type:
+          type: string
+          description: Error type of the failed item
+        message:
+          type: string
+          description: Error message of the failed item
+
+    BulkSummary:
+      type: object
+      required:
+        - total
+        - succeeded
+        - failed
+      properties:
+        total:
+          type: integer
+          format: int32
+        succeeded:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+
+    BulkUserResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        users:
+          type: array
+          description: Successfully added users
+          items:
+            $ref: "./users.yaml#/components/schemas/User"
+        errors:
+          type: array
+          description: Item-level errors
+          items:
+            $ref: "#/components/schemas/BulkError"
+        summary:
+          $ref: "#/components/schemas/BulkSummary"
+
+    BulkGroupResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        groups:
+          type: array
+          description: Successfully added groups
+          items:
+            $ref: "./groups.yaml#/components/schemas/Group"
+        errors:
+          type: array
+          description: Item-level errors
+          items:
+            $ref: "#/components/schemas/BulkError"
+        summary:
+          $ref: "#/components/schemas/BulkSummary"
+
+    BulkRemoveResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        names:
+          type: array
+          description: Successfully removed names
+          items:
+            type: string
+        errors:
+          type: array
+          description: Item-level errors
+          items:
+            $ref: "#/components/schemas/BulkError"
+        summary:
+          $ref: "#/components/schemas/BulkSummary"
+
+  examples:
+    BulkUserAddRequest:
+      value: {
+        "users": [
+          {"name": "alice"},
+          {"name": "bob"}
+        ]
+      }
+
+    BulkRemoveRequest:
+      value: {
+        "names": ["alice", "bob", "ghost"]
+      }
+
+    BulkGroupAddRequest:
+      value: {
+        "groups": [
+          {"name": "engineers"},
+          {"name": "analysts"}
+        ]
+      }
+
+    BulkRemoveGroupsRequest:
+      value: {
+        "names": ["engineers", "analysts", "ghost"]
+      }
+
+    BulkUserResponse:
+      value: {
+        "code": 0,
+        "users": [
+          {
+            "name": "alice",
+            "roles": [],
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2026-07-28T10:00:00Z"
+            }
+          }
+        ],
+        "errors": [
+          {
+            "index": 1,
+            "name": "bob",
+            "code": 1004,
+            "type": "UserAlreadyExistsException",
+            "message": "User already exists: bob"
+          }
+        ],
+        "summary": {"total": 2, "succeeded": 1, "failed": 1}
+      }
+
+    BulkRemoveResponse:
+      value: {
+        "code": 0,
+        "names": ["alice", "bob"],
+        "errors": [
+          {
+            "index": 2,
+            "name": "ghost",
+            "code": 1003,
+            "type": "NoSuchUserException",
+            "message": "User does not exist: ghost"
+          }
+        ],
+        "summary": {"total": 3, "succeeded": 2, "failed": 1}
+      }
+
+    BulkGroupResponse:
+      value: {
+        "code": 0,
+        "groups": [
+          {
+            "name": "engineers",
+            "roles": [],
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2026-07-28T10:00:00Z"
+            }
+          }
+        ],
+        "errors": [
+          {
+            "index": 1,
+            "name": "analysts",
+            "code": 1004,
+            "type": "GroupAlreadyExistsException",
+            "message": "Group already exists: analysts"
+          }
+        ],
+        "summary": {"total": 2, "succeeded": 1, "failed": 1}
+      }
+
+    BulkRemoveGroupsResponse:
+      value: {
+        "code": 0,
+        "names": ["engineers", "analysts"],
+        "errors": [
+          {
+            "index": 2,
+            "name": "ghost",
+            "code": 1003,
+            "type": "NoSuchGroupException",
+            "message": "Group does not exist: ghost"
+          }
+        ],
+        "summary": {"total": 3, "succeeded": 2, "failed": 1}
+      }

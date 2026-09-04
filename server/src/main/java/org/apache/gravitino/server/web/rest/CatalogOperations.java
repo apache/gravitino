@@ -52,6 +52,8 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -141,6 +143,16 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create catalog request with null request body");
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String catalogName = request.getName();
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(
@@ -154,7 +166,9 @@ public class CatalogOperations {
                     request.getType(),
                     request.getProvider(),
                     request.getComment(),
-                    request.getProperties());
+                    request.getProperties(),
+                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
+                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;
@@ -162,7 +176,7 @@ public class CatalogOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, catalogName, metalake, e);
     }
   }
 
@@ -178,7 +192,15 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
-    LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
+    if (request == null) {
+      // Unlike a failed connection test, which handleTestConnectionException() reports inside an
+      // HTTP 200 response by design, a missing request body never reaches the connection test, so
+      // it is rejected with a regular HTTP 400.
+      return Utils.illegalArguments("Request body cannot be null");
+    }
+
+    String catalogName = request.getName();
+    LOG.info("Received test connection request for catalog: {}.{}", metalake, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -198,8 +220,50 @@ public class CatalogOperations {
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
+      LOG.info("Failed to test connection for catalog: {}.{}", metalake, catalogName);
       return ExceptionHandlers.handleTestConnectionException(e);
+    }
+  }
+
+  @POST
+  @Path("{catalog}/testConnection")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
+  @ResponseMetered(name = "test-existing-connection", absolute = true)
+  public Response testExistingConnection(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName,
+      CatalogUpdatesRequest request) {
+    LOG.info("Received test connection request for existing catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            if (request == null) {
+              catalogDispatcher.testConnection(ident);
+            } else {
+              request.validate();
+              CatalogChange[] changes =
+                  request.getUpdates().stream()
+                      .map(CatalogUpdateRequest::catalogChange)
+                      .toArray(CatalogChange[]::new);
+              catalogDispatcher.testConnection(ident, changes);
+            }
+            LOG.info(
+                "Successfully tested connection for existing catalog: {}.{}",
+                metalake,
+                catalogName);
+            return Utils.ok(new BaseResponse());
+          });
+    } catch (Exception e) {
+      LOG.info("Failed to test connection for existing catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleExistingCatalogTestConnectionException(e);
     }
   }
 
@@ -217,8 +281,15 @@ public class CatalogOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       CatalogSetRequest request) {
-    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.SET,
+          catalogName,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
+    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
@@ -293,6 +364,14 @@ public class CatalogOperations {
           String catalogName,
       CatalogUpdatesRequest request) {
     LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ALTER,
+          catalogName,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

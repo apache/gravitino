@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -239,6 +240,72 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     assertEquals(2, versions.size());
     assertTrue(versions.containsKey(1));
     assertTrue(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testUpdateFunctionFailsWhenSchemaIsDeletedConcurrently() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("test_function");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    NameIdentifier functionIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, functionName);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    FunctionEntity updatedFunction = copyFunctionWithComment(function, "updated comment");
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    functionIdent,
+                    ignored -> {
+                      // Reproduce the exact race deterministically: the update has already read the
+                      // function, then the schema cascade commits before the write transaction.
+                      assertTrue(SchemaMetaService.getInstance().deleteSchema(schemaIdent, true));
+                      return updatedFunction;
+                    }));
+
+    Map<Integer, Long> versions = listFunctionVersions(function.id());
+    assertEquals(1, versions.size());
+    assertVersionSoftDeleted(versions, 1);
+    assertFalse(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testUpdateFunctionRollsBackNewVersionAfterConcurrentDelete() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("test_function");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    NameIdentifier functionIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, functionName);
+    FunctionEntity updatedFunction = copyFunctionWithComment(function, "updated comment");
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    functionIdent,
+                    ignored -> {
+                      // Delete only the function so the parent-schema lock still succeeds. The
+                      // compare-and-set below must notice the missing function and roll version 2
+                      // back with the transaction.
+                      assertTrue(FunctionMetaService.getInstance().deleteFunction(functionIdent));
+                      return updatedFunction;
+                    }));
+
+    Map<Integer, Long> versions = listFunctionVersions(function.id());
+    assertEquals(1, versions.size());
+    assertVersionSoftDeleted(versions, 1);
+    assertFalse(versions.containsKey(2));
   }
 
   @TestTemplate
@@ -628,6 +695,19 @@ public class TestFunctionMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  private FunctionEntity copyFunctionWithComment(FunctionEntity function, String comment) {
+    return FunctionEntity.builder()
+        .withId(function.id())
+        .withName(function.name())
+        .withNamespace(function.namespace())
+        .withComment(comment)
+        .withFunctionType(function.functionType())
+        .withDeterministic(function.deterministic())
+        .withDefinitions(function.definitions())
+        .withAuditInfo(function.auditInfo())
+        .build();
   }
 
   private void assertVersionActive(Map<Integer, Long> versionDeletedMap, int version) {

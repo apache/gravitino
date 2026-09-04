@@ -41,6 +41,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -64,6 +66,17 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities, so
     // the entity is stored under the normalized identifier. Normalize here too so ownership is
@@ -91,13 +104,14 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
           // ancestor's owner is never overwritten.
           List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
 
-          Schema schema = dispatcher.createSchema(ident, comment, properties);
+          Schema schema =
+              dispatcher.createSchema(ident, comment, properties, secretBindings, secretReferences);
 
           // Set the creator as the owner of the new schema and of any ancestors it created. This
           // mirrors IcebergNamespaceHookDispatcher.createNamespace so ownership-based
           // authorization -- which treats ownership of an ancestor schema as ownership of the
           // whole subtree -- behaves the same on the Gravitino and Iceberg REST surfaces.
-          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
           if (ownerManager != null) {
             List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
             for (NameIdentifier ancestor : newAncestors) {

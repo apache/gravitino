@@ -23,11 +23,13 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -63,7 +65,19 @@ public class IcebergCatalogUtil {
    */
   private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
 
+  private static final ConcurrentHashMap<String, InMemoryCatalog> MEMORY_CATALOGS =
+      new ConcurrentHashMap<>();
+
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
+    String catalogUuid = icebergConfig.getAllConfig().get(IcebergConstants.CATALOG_UUID);
+    if (catalogUuid == null) {
+      return createMemoryCatalog(icebergConfig);
+    }
+    return MEMORY_CATALOGS.computeIfAbsent(
+        catalogUuid, ignored -> createMemoryCatalog(icebergConfig));
+  }
+
+  private static InMemoryCatalog createMemoryCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
     InMemoryCatalog memoryCatalog = new MemoryCatalogWithMetadataLocationSupport();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
@@ -73,6 +87,27 @@ public class IcebergCatalogUtil {
     applyDefaultResolvingFileIO(resultProperties);
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
+  }
+
+  /**
+   * Removes the in-memory Iceberg catalog associated with a permanently dropped Gravitino catalog.
+   *
+   * @param catalogUuid the unique Gravitino catalog identifier
+   */
+  public static void removeMemoryCatalog(String catalogUuid) {
+    InMemoryCatalog memoryCatalog = MEMORY_CATALOGS.remove(catalogUuid);
+    if (memoryCatalog != null) {
+      try {
+        memoryCatalog.close();
+      } catch (IOException e) {
+        LOG.warn("Failed to close dropped in-memory Iceberg catalog {}", catalogUuid, e);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  static void clearMemoryCatalogs() {
+    MEMORY_CATALOGS.clear();
   }
 
   private static HiveCatalog loadHiveCatalog(IcebergConfig icebergConfig) {
@@ -127,6 +162,14 @@ public class IcebergCatalogUtil {
     // matching the Iceberg REST spec and the memory backend behavior. Can be overridden by
     // explicit config.
     properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "true");
+
+    // Add SQLSTATE 08S01 (Communication link failure) to retryable status codes so that
+    // idle connections dropped by MySQL wait_timeout are automatically retried instead of
+    // failing with CommunicationsException.
+    String existing = properties.putIfAbsent("retryable_status_codes", "08S01");
+    if (existing != null && !existing.contains("08S01")) {
+      properties.put("retryable_status_codes", existing + ",08S01");
+    }
 
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);

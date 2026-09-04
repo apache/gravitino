@@ -97,6 +97,8 @@ public class Configs {
 
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
+  public static final int DEFAULT_BULK_MAX_ITEMS = 100;
+
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
@@ -345,6 +347,14 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
+
+  public static final ConfigEntry<Integer> BULK_MAX_ITEMS =
+      new ConfigBuilder("gravitino.server.bulk.maxItems")
+          .doc("The maximum number of items allowed in a single bulk request")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_BULK_MAX_ITEMS);
 
   public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS = 3600L;
 

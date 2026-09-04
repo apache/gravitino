@@ -24,64 +24,39 @@ import org.junit.jupiter.api.Test;
 public class TestKmsReference {
 
   @Test
-  void testStoresExactApiAndPreservesProviderKey() {
-    KmsReference reference = new KmsReference("aws-kms", " production ", " alias/Customer-Key ");
+  void testTrimsProviderAndPreservesKeyId() {
+    KmsReference reference = new KmsReference(" production ", " alias/Customer-Key ");
 
-    Assertions.assertEquals("aws-kms", reference.api());
-    Assertions.assertEquals("production", reference.source());
+    Assertions.assertEquals("production", reference.provider());
     Assertions.assertEquals(" alias/Customer-Key ", reference.keyId());
   }
 
   @Test
   void testRejectsMissingFields() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new KmsReference(null, "key"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new KmsReference("", "key"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new KmsReference(" ", "key"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference(null, "production", "key"));
+        IllegalArgumentException.class, () -> new KmsReference("production", null));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("", "production", "key"));
+        IllegalArgumentException.class, () -> new KmsReference("production", ""));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference(" ", "production", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", null, "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", "production", null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", "", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", " ", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", "production", ""));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms", "production", " "));
-  }
-
-  @Test
-  void testRejectsInvalidApiIdentifiers() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference(" aws-kms", "production", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws-kms ", "production", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("AWS-KMS", "production", "key"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new KmsReference("aws_kms", "production", "key"));
+        IllegalArgumentException.class, () -> new KmsReference("production", " "));
   }
 
   @Test
   void testValueSemantics() {
-    KmsReference first = new KmsReference("aws-kms", "production", "key");
-    KmsReference same = new KmsReference("aws-kms", "production", "key");
-    KmsReference differentApi = new KmsReference("google-cloud-kms", "production", "key");
-    KmsReference differentSource = new KmsReference("aws-kms", "recovery", "key");
-    KmsReference differentKey = new KmsReference("aws-kms", "production", "another-key");
+    KmsReference first = new KmsReference("production", "key");
+    KmsReference same = new KmsReference("production", "key");
+    KmsReference differentProvider = new KmsReference("recovery", "key");
+    KmsReference differentKey = new KmsReference("production", "another-key");
 
     Assertions.assertEquals(first, same);
     Assertions.assertEquals(first.hashCode(), same.hashCode());
-    Assertions.assertNotEquals(first, differentApi);
-    Assertions.assertNotEquals(first, differentSource);
+    Assertions.assertNotEquals(first, differentProvider);
     Assertions.assertNotEquals(first, differentKey);
     Assertions.assertNotEquals(first, null);
     Assertions.assertNotEquals(first, "key");
-    Assertions.assertEquals(
-        "KmsReference{api='aws-kms', source='production', keyId='key'}", first.toString());
+    Assertions.assertEquals("KmsReference{provider='production', keyId='key'}", first.toString());
   }
 }

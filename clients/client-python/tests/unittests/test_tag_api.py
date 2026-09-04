@@ -25,7 +25,10 @@ from gravitino.api.tag import Tag
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.generic_tag import GenericTag
-from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.exceptions.base import (
+    IllegalArgumentException,
+    UnsupportedOperationException,
+)
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.name_identifier import NameIdentifier
 from gravitino.dto.responses.tag_response import (
@@ -39,6 +42,46 @@ from tests.unittests import mock_base
 @mock_base.mock_data
 class TestTagAPI(unittest.TestCase):
     _metalake_name: str = "metalake_demo"
+
+    def test_new_tag_api_compatibility_defaults(self, *mock_method) -> None:
+        class LegacyTag(Tag):
+            def name(self) -> str:
+                return "tagA"
+
+            def comment(self) -> str:
+                return "comment"
+
+            def properties(self) -> dict[str, str]:
+                return {}
+
+            def audit_info(self):
+                return None
+
+            def inherited(self):
+                return None
+
+        class LegacySupportsTags(SupportsTags):
+            def list_tags(self) -> list[str]:
+                return []
+
+            def list_tags_info(self) -> list[Tag]:
+                return []
+
+            def get_tag(self, name: str) -> Tag:
+                return LegacyTag()
+
+            def associate_tags(
+                self, tags_to_add: list[str], tags_to_remove: list[str]
+            ) -> list[str]:
+                return []
+
+        tag = LegacyTag()
+        self.assertIsNone(tag.allowed_values())
+        self.assertIsNone(tag.assignment_values())
+
+        supports_tags = LegacySupportsTags()
+        with self.assertRaises(UnsupportedOperationException):
+            supports_tags.assign_tags([], [])
 
     def test_client_get_tag(self, *mock_method) -> None:
         with mock_base.mock_tag_methods():
@@ -109,6 +152,25 @@ class TestTagAPI(unittest.TestCase):
             self.assertEqual(1, len(retrieved_tags))
             self.assertTrue("tagA" not in retrieved_tags)
             self.assertTrue("tagB" in retrieved_tags)
+
+    def test_client_create_tag_with_allowed_values(self, *mock_method) -> None:
+        with mock_base.mock_tag_methods():
+            client = GravitinoClient(
+                uri="http://localhost:8090",
+                metalake_name=self._metalake_name,
+                check_version=False,
+            )
+
+            tag = client.create_tag(
+                "data_domain",
+                "Business data domain",
+                None,
+                ["finance", "risk"],
+            )
+
+            self.assertEqual("data_domain", tag.name())
+            self.assertEqual(["finance", "risk"], tag.allowed_values())
+            self.assertIsNone(tag.assignment_values())
 
     def test_client_create_tag(self, *mock_method) -> None:
         with mock_base.mock_tag_methods():

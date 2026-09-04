@@ -24,7 +24,8 @@
 #
 #   A. metadataIdCache / ownerRelCache are eventually consistent across instances
 #      via the JcasbinChangePoller (default poll interval = 3s).
-#      → set owner on A, read it back on B.
+#      → warm the old owner through an owner-gated operation on B, set a new
+#        owner on A, then verify the new owner on B.
 #
 #   B. The new owner can actually exercise owner privileges on the *other* instance
 #      after the poll cycle, and the old owner is rejected.
@@ -44,18 +45,21 @@
 #      → grant CREATE_ROLE on the same role on A; user can immediately use it on B.
 #
 #   S. ownerRelCache handles GROUP-type owners, not just USER-type.
-#      → setOwner(TAG, type=GROUP) on A; B reads back the GROUP owner after poll.
+#      → warm a USER owner on B, setOwner(TAG, type=GROUP) on A, then verify
+#        that the former USER owner is rejected and B reads back the GROUP.
 #
-#   T. metadataIdCache is invalidated when an entity is deleted and re-created
-#      under the same name (new entity ID in the DB).
+#   T. metadataIdCache / ownerRelCache are invalidated when an entity is deleted
+#      and re-created under the same name (new entity ID in the DB).
 #      → set owner of tag T to bob; delete T on A; re-create T on A (new ID,
 #        owner = alice); B must NOT return bob as the owner of the new T.
 #
-#   U. User role-list metadata read-back (not just enforcement).
-#      → grant/revoke a role on A; GET /users/{user} on B immediately shows the
-#        updated role list (userRoleCache is version-validated per request).
+#   U. User-role grant/revoke with explicit target-cache prewarming plus
+#      metadata read-back.
+#      → a denied operation first warms B's empty userRoleCache; grant/revoke
+#        on A changes enforcement immediately, and GET /users/{user} on B
+#        independently shows the updated role list.
 #
-#   V. Role privilege metadata read-back (not just enforcement).
+#   V. Role privilege metadata read-back (Phase E covers loadedRoles enforcement).
 #      → swap privileges on a role on A; GET /roles/{role} on B shows the new
 #        set and no longer shows the removed privilege.
 #
@@ -282,10 +286,17 @@ EOF
 )"
 expect "create role $ROLE_NAME with MANAGE_USERS on metalake" 200
 
-# ---- A. owner read-back propagates (eventual ~3s) --------------------------
+# ---- A. warm owner-cache invalidation (eventual ~3s) -----------------------
 
-section "A. Owner read-back propagates from A → B (eventual, ~${POLL_WAIT_SECS}s)"
-# admin is current owner → admin transfers to jack
+section "A. Warm owner cache invalidates from A → B (eventual, ~${POLL_WAIT_SECS}s)"
+# PUT /owners is owner-gated and therefore resolves both the metadata ID and
+# owner through JcasbinAuthorizer. GET /owners alone would read live metadata
+# and would not prove that either authorizer cache was warm.
+api "$INSTANCE_B" "$ADMIN_USER" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$ADMIN_USER\",\"type\":\"USER\"}"
+expect "B: admin re-asserts ownership (explicitly warms B's old owner cache)" 200
+
+# admin is current owner → admin transfers to jack on A.
 api "$INSTANCE_A" "$ADMIN_USER" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
   "{\"name\":\"$USER_JACK\",\"type\":\"USER\"}"
 expect "A: admin (owner) → setOwner = $USER_JACK" 200
@@ -293,10 +304,20 @@ expect "A: admin (owner) → setOwner = $USER_JACK" 200
 echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller on B"
 sleep "$POLL_WAIT_SECS"
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE"
-expect "B: GET owner now reports $USER_JACK" 200 "\"name\"[^}]*\"$USER_JACK\""
+api "$INSTANCE_B" "$USER_JACK" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_JACK\",\"type\":\"USER\"}"
+expect "B: $USER_JACK is accepted after invalidating cached admin ownership" 200
 
-# jack is now owner → jack transfers to alice
+api "$INSTANCE_B" "$ADMIN_USER" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$ADMIN_USER\",\"type\":\"USER\"}"
+expect "B: admin (former owner cached before the change) is rejected" 403
+
+# Explicitly warm jack immediately before the next mutation.
+api "$INSTANCE_B" "$USER_JACK" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_JACK\",\"type\":\"USER\"}"
+expect "B: $USER_JACK re-asserts ownership (warms B before jack → alice)" 200
+
+# jack is now owner → jack transfers to alice on A.
 api "$INSTANCE_A" "$USER_JACK" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
   "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
 expect "A: $USER_JACK (owner) → setOwner = $USER_ALICE" 200
@@ -304,16 +325,19 @@ expect "A: $USER_JACK (owner) → setOwner = $USER_ALICE" 200
 echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller on B"
 sleep "$POLL_WAIT_SECS"
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE"
-expect "B: GET owner now reports $USER_ALICE" 200 "\"name\"[^}]*\"$USER_ALICE\""
+api "$INSTANCE_B" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
+expect "B: $USER_ALICE is accepted after invalidating cached jack ownership" 200
+
+api "$INSTANCE_B" "$USER_JACK" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_JACK\",\"type\":\"USER\"}"
+expect "B: $USER_JACK (the explicitly cached former owner) is rejected" 403
 
 # ---- B. enforcement on B reflects the owner change -------------------------
 
 section "B. Authz enforcement on B reflects the new owner (no extra wait)"
-# alice is the current owner — re-setting (alice → alice) is a no-op write that requires
-# the caller to be the current owner. If B's ownerRelCache is invalidated, this works.
-# Note: this is also B's *first* isOwner check for $METALAKE, so its ownerRelCache
-# entry is being populated cold from the DB here.
+# Alice is the current owner. This is a post-propagation sanity check; Phase A
+# already proved invalidation from an explicitly warm old entry.
 api "$INSTANCE_B" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
   "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
 expect "B: $USER_ALICE (current owner) re-asserts ownership" 200
@@ -325,19 +349,19 @@ expect "B: $USER_JACK (former owner) is rejected with 403" 403
 
 # ---- B'. WARM-cache invalidation: critical scenario ------------------------
 #
-# Phases A/B above only exercise *cold* cache fills on B: when B's first
-# isOwner check happens, the new owner is already in the DB, so the cache
-# is correctly populated. They do NOT prove that an already-cached entry on
-# B (with the stale owner) gets invalidated when A changes the owner.
-#
-# This phase forces that scenario:
-#   1. B's ownerRelCache currently holds alice (warmed by Phase B above).
+# This phase repeats the critical scenario with a prewarm immediately adjacent
+# to the mutation, so the test does not depend on state left by another phase:
+#   1. Explicitly warm alice in B's metadataIdCache / ownerRelCache.
 #   2. Change owner on A back to jack.
 #   3. Wait one poll cycle.
 #   4. On B, do an isOwner-gated operation as jack — must succeed if and
 #      only if the poller invalidated B's alice entry. As alice — must fail.
 #
 section "B'. Warm-cache invalidation on owner change (eventual, ~${POLL_WAIT_SECS}s)"
+api "$INSTANCE_B" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
+expect "B: $USER_ALICE re-asserts ownership (explicit prewarm before A changes it)" 200
+
 api "$INSTANCE_A" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
   "{\"name\":\"$USER_JACK\",\"type\":\"USER\"}"
 expect "A: $USER_ALICE (owner) transfers owner back to $USER_JACK" 200
@@ -384,6 +408,11 @@ expect "B: $USER_BOB addUser succeeds immediately after grant" 200
 # ---- D. revoke role on A → user denied on B IMMEDIATELY --------------------
 
 section "D. Revoke role on A — effective on B without poll wait"
+# Do not rely on Phase C's final assertion as an implicit warm-up.
+api "$INSTANCE_B" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"revoke_prewarm_${SUFFIX}\"}"
+expect "B: $USER_BOB addUser succeeds (explicitly warms userRoleCache before revoke)" 200
+
 api "$INSTANCE_A" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/permissions/users/$USER_BOB/revoke/" \
   "{\"roleNames\":[\"$ROLE_NAME\"]}"
@@ -642,7 +671,7 @@ api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/groups" \
   "{\"name\":\"$GROUP_NAME\"}"
 expect "A: create group $GROUP_NAME" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
+api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
 expect "B: GET group $GROUP_NAME visible immediately" 200 "\"name\"[^}]*\"$GROUP_NAME\""
 
 api "$INSTANCE_A" "$USER_ALICE" PUT \
@@ -650,7 +679,7 @@ api "$INSTANCE_A" "$USER_ALICE" PUT \
   "{\"roleNames\":[\"$ROLE_ALLOW\"]}"
 expect "A: grant $ROLE_ALLOW to group $GROUP_NAME" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
+api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
 expect "B: GET group shows $ROLE_ALLOW in roles" 200 "\"roles\"[^]]*\"$ROLE_ALLOW\""
 
 api "$INSTANCE_A" "$USER_ALICE" PUT \
@@ -661,7 +690,7 @@ expect "A: revoke $ROLE_ALLOW from group $GROUP_NAME" 200
 api "$INSTANCE_A" "$USER_ALICE" DELETE "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
 expect "A: delete group $GROUP_NAME" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
+api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
 expect "B: GET group returns 404 after deletion" 404
 
 # ---- N. setOwner propagation for non-METALAKE entities (TAG) ---------------
@@ -673,7 +702,14 @@ api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/tags" \
   "{\"name\":\"$TAG_NAME\",\"comment\":\"phase N tag\",\"properties\":{}}"
 expect "A: $USER_ALICE creates tag $TAG_NAME (alice = metalake owner)" 200
 
-# Transfer tag ownership to bob on A. alice is metalake owner so this is allowed.
+# Warm B's authorizer caches with the old tag owner. This owner-gated PUT loads
+# both metadataIdCache(TAG name → ID) and ownerRelCache(ID → alice).
+api "$INSTANCE_B" "$USER_ALICE" PUT \
+  "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME" \
+  "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
+expect "B: $USER_ALICE re-asserts tag ownership (explicit prewarm)" 200
+
+# Transfer tag ownership to bob on A. Alice is metalake owner, so this is allowed.
 api "$INSTANCE_A" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME" \
   "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
@@ -682,10 +718,15 @@ expect "A: setOwner(TAG $TAG_NAME) = $USER_BOB" 200
 echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller"
 sleep "$POLL_WAIT_SECS"
 
-# GET owner on a TAG requires LOAD_TAG (METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG),
-# so the GET is done as $USER_ALICE (metalake owner) rather than admin.
+# If B retained cached alice ownership, bob would be rejected. Bob's success
+# therefore proves that the owner-gated path reloaded the new owner.
+api "$INSTANCE_B" "$USER_BOB" PUT \
+  "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME" \
+  "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
+expect "B: $USER_BOB (new tag owner) is accepted after B invalidates alice" 200
+
 api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME"
-expect "B: GET owner(TAG $TAG_NAME) = $USER_BOB" 200 "\"name\"[^}]*\"$USER_BOB\""
+expect "B: metadata read-back also reports $USER_BOB" 200 "\"name\"[^}]*\"$USER_BOB\""
 
 # Enforcement: bob (now TAG owner) can DELETE the tag on B (TAG::OWNER required).
 api "$INSTANCE_B" "$USER_BOB" DELETE "/api/metalakes/$METALAKE/tags/$TAG_NAME"
@@ -791,6 +832,11 @@ expect "B: metalake owner $USER_ALICE still has METALAKE-scope privileges (cache
 # ---- Q. several setOwner calls within one poll window — convergence --------
 
 section "Q. Burst of setOwner calls on A — B converges to the final state"
+# Explicitly warm alice as the old owner on B before the first mutation.
+api "$INSTANCE_B" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
+  "{\"name\":\"$USER_ALICE\",\"type\":\"USER\"}"
+expect "B: $USER_ALICE re-asserts ownership (prewarms B before owner burst)" 200
+
 # Sequence (no inter-step wait so the poller batches them in one cycle):
 #   alice → bob → jack → alice
 api "$INSTANCE_A" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/METALAKE/$METALAKE" \
@@ -823,6 +869,10 @@ expect "B: $USER_JACK (intermediate owner during burst) rejected" 403
 
 section "R. Re-granting an already-held role is idempotent"
 # bob still holds $ROLE_ALLOW from K (we revoked the other role in O).
+api "$INSTANCE_B" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"r_prewarm_${SUFFIX}\"}"
+expect "B: $USER_BOB addUser succeeds (prewarms existing $ROLE_ALLOW binding)" 200
+
 api "$INSTANCE_A" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/permissions/users/$USER_BOB/grant/" \
   "{\"roleNames\":[\"$ROLE_ALLOW\"]}"
@@ -844,12 +894,10 @@ expect "B: $USER_BOB addUser denied after single revoke (no duplicate binding le
 
 # ---- S. GROUP-type owner: ownerRelCache with GROUP principal ---------------
 
-section "S. GROUP as owner type — tag owned by a group propagates to B (eventual, ~${POLL_WAIT_SECS}s)"
-# ownerRelCache stores both USER and GROUP owners. Only USER-type has been
-# tested in the phases above. This phase confirms GROUP-type entries are also
-# propagated correctly by the JcasbinChangePoller.
-# (Simple authenticator cannot enforce group-derived requests, so we verify the
-# metadata read-back only — the owner is stored and visible on B as a GROUP.)
+section "S. GROUP owner invalidates a warm USER owner on B (eventual, ~${POLL_WAIT_SECS}s)"
+# Simple authenticator cannot submit group-derived principals, but it can prove
+# invalidation: warm bob as the USER owner on B, replace bob with a GROUP on A,
+# then require B to reject the formerly cached USER owner.
 api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/groups" \
   "{\"name\":\"$GROUP_S\"}"
 expect "A: create group $GROUP_S for owner test" 200
@@ -859,14 +907,29 @@ api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/tags" \
 expect "A: $USER_ALICE creates tag $TAG_S" 200
 
 api "$INSTANCE_A" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_S" \
+  "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
+expect "A: setOwner(TAG $TAG_S) = USER $USER_BOB" 200
+
+echo "  ...sleeping ${POLL_WAIT_SECS}s before explicitly warming B"
+sleep "$POLL_WAIT_SECS"
+
+api "$INSTANCE_B" "$USER_BOB" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_S" \
+  "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
+expect "B: $USER_BOB re-asserts tag ownership (explicit USER-owner prewarm)" 200
+
+api "$INSTANCE_A" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_S" \
   "{\"name\":\"$GROUP_S\",\"type\":\"GROUP\"}"
 expect "A: setOwner(TAG $TAG_S) = GROUP $GROUP_S" 200
 
 echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller"
 sleep "$POLL_WAIT_SECS"
 
+api "$INSTANCE_B" "$USER_BOB" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_S" \
+  "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
+expect "B: cached former USER owner $USER_BOB is rejected after GROUP change" 403
+
 api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_S"
-expect "B: GET owner(TAG $TAG_S) = GROUP $GROUP_S (type GROUP propagated)" 200 \
+expect "B: metadata read-back reports GROUP $GROUP_S" 200 \
   "\"name\"[^}]*\"$GROUP_S\""
 
 # alice is metalake owner and can delete the tag regardless of its object owner.
@@ -883,14 +946,10 @@ section "T. Stale-owner safety on tag delete+re-create (eventual, ~${POLL_WAIT_S
 # allow the old owner (bob) to exercise ownership on the new entity.
 #
 # Two separate paths are exercised:
-#  1. GET /owners (OwnerManager.getOwner) does a live DB lookup — bypasses
-#     the JcasbinAuthorizer caches — so it always returns the new owner (alice).
-#  2. Enforcement (isOwner inside hasSetOwnerPermission) reads metadataIdCache
-#     → ownerRelCache. Tags do not write to entity_change_log, so
-#     metadataIdCache[name] may still hold the old entity ID. However, the
-#     owner_meta soft-delete IS propagated via the owner_meta poll path, so
-#     ownerRelCache[old_id] is invalidated → live DB returns no owner for the
-#     deleted entity → bob is correctly denied.
+#  1. An owner-gated PUT on B explicitly warms metadataIdCache and ownerRelCache
+#     with the old tag ID and bob owner before the mutation.
+#  2. After delete plus same-name re-create on A, enforcement must reject bob;
+#     GET /owners is retained only as an independent live-metadata sanity check.
 api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/tags" \
   "{\"name\":\"$TAG_T\",\"comment\":\"phase T\",\"properties\":{}}"
 expect "A: create tag $TAG_T (owner = alice as creator)" 200
@@ -899,12 +958,12 @@ api "$INSTANCE_A" "$USER_ALICE" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_T"
   "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
 expect "A: setOwner(TAG $TAG_T) = $USER_BOB" 200
 
-echo "  ...sleeping ${POLL_WAIT_SECS}s so B caches bob as owner of $TAG_T"
+echo "  ...sleeping ${POLL_WAIT_SECS}s before explicitly warming B"
 sleep "$POLL_WAIT_SECS"
 
-api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_T"
-expect "B: GET owner(TAG $TAG_T) = $USER_BOB (pre-delete baseline)" 200 \
-  "\"name\"[^}]*\"$USER_BOB\""
+api "$INSTANCE_B" "$USER_BOB" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_T" \
+  "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
+expect "B: $USER_BOB re-asserts old tag ownership (explicit cache prewarm)" 200
 
 # Delete the tag on A — should signal the poller to invalidate B's metadataIdCache.
 api "$INSTANCE_A" "$USER_ALICE" DELETE "/api/metalakes/$METALAKE/tags/$TAG_T"
@@ -918,13 +977,13 @@ expect "A: re-create tag $TAG_T (new entity ID, new owner = alice)" 200
 echo "  ...sleeping ${POLL_WAIT_SECS}s for poller to propagate delete+re-create"
 sleep "$POLL_WAIT_SECS"
 
-# B's ownerRelCache had bob for the OLD tag ID. After invalidation the new
-# tag (different ID) must be resolved fresh from the DB → owner = alice.
+# Live metadata read-back must show the re-created tag's owner.
 api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_T"
 expect "B: GET owner(re-created TAG $TAG_T) = $USER_ALICE (no stale bob owner)" 200 \
   "\"name\"[^}]*\"$USER_ALICE\""
 
-# Enforcement: bob was owner of the old tag; must be rejected for the new one.
+# Enforcement is the cache assertion: bob was loaded as owner of the old tag
+# immediately before deletion and must be rejected for the new entity ID.
 api "$INSTANCE_B" "$USER_BOB" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_T" \
   "{\"name\":\"$USER_BOB\",\"type\":\"USER\"}"
 expect "B: $USER_BOB (old tag owner, stale) rejected for re-created $TAG_T" 403
@@ -935,9 +994,9 @@ expect "A: delete re-created tag $TAG_T" 200
 # ---- U. user role-list metadata read-back on B -----------------------------
 
 section "U. User role-list read-back on B — GET /users/{user} reflects grant/revoke from A"
-# Phases C/D verify enforcement (can the user DO X?). This phase verifies the
-# metadata layer: GET /users/{user} on B returns the up-to-date role list.
-# userRoleCache is per-request version-validated so no poll wait is needed.
+# This phase verifies both paths: an explicit denied operation warms B's empty
+# userRoleCache before the grant, while GET /users/{user} checks metadata
+# read-back. Version validation makes both grant and revoke immediate.
 api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
 {"name":"$ROLE_U","properties":{},"securableObjects":[
   {"fullName":"$METALAKE","type":"METALAKE",
@@ -946,10 +1005,21 @@ EOF
 )"
 expect "A: create role $ROLE_U" 200
 
+api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/users/$USER_BOB"
+expect_absent "B: pre-grant role list does not contain $ROLE_U" 200 "\"$ROLE_U\""
+
+api "$INSTANCE_B" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"u_before_grant_${SUFFIX}\"}"
+expect "B: $USER_BOB denied before $ROLE_U grant (explicit userRoleCache prewarm)" 403
+
 api "$INSTANCE_A" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/permissions/users/$USER_BOB/grant/" \
   "{\"roleNames\":[\"$ROLE_U\"]}"
 expect "A: grant $ROLE_U to $USER_BOB" 200
+
+api "$INSTANCE_B" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"u_after_grant_${SUFFIX}\"}"
+expect "B: $USER_BOB addUser succeeds immediately after $ROLE_U grant" 200
 
 api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/users/$USER_BOB"
 expect "B: GET user $USER_BOB — $ROLE_U appears in roles list after grant" 200 \
@@ -959,6 +1029,10 @@ api "$INSTANCE_A" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/permissions/users/$USER_BOB/revoke/" \
   "{\"roleNames\":[\"$ROLE_U\"]}"
 expect "A: revoke $ROLE_U from $USER_BOB" 200
+
+api "$INSTANCE_B" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"u_after_revoke_${SUFFIX}\"}"
+expect "B: $USER_BOB denied immediately after $ROLE_U revoke" 403
 
 api "$INSTANCE_B" "$USER_ALICE" GET "/api/metalakes/$METALAKE/users/$USER_BOB"
 expect_absent "B: GET user $USER_BOB — $ROLE_U absent from roles list after revoke" 200 \
@@ -970,9 +1044,8 @@ expect "A: delete role $ROLE_U" 200
 # ---- V. role privilege metadata read-back on B -----------------------------
 
 section "V. Role privilege read-back on B — GET /roles/{role} reflects privilege changes from A"
-# Complements Phase E (enforcement) with a metadata-layer check: after the
-# privilege set on a role changes on A, GET /roles/{role} on B must show the
-# updated list. loadedRoles is per-request version-validated, so this is immediate.
+# Complements Phase E's explicitly warm enforcement check with a metadata-layer
+# check: GET /roles/{role} on B must show the updated privilege list.
 api "$INSTANCE_A" "$USER_ALICE" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
 {"name":"$ROLE_V","properties":{},"securableObjects":[
   {"fullName":"$METALAKE","type":"METALAKE",
@@ -1015,6 +1088,11 @@ api "$INSTANCE_B" "$USER_ALICE" POST "/api/metalakes/$METALAKE/roles" "$(cat <<E
 EOF
 )"
 expect "B: $USER_ALICE creates role $ROLE_W on B" 200
+
+# Warm A's empty userRoleCache entry immediately before B grants the role.
+api "$INSTANCE_A" "$USER_BOB" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"w_bi_prewarm_${SUFFIX}\"}"
+expect "A: $USER_BOB denied before reverse-direction grant (prewarms A)" 403
 
 api "$INSTANCE_B" "$USER_ALICE" PUT \
   "/api/metalakes/$METALAKE/permissions/users/$USER_BOB/grant/" \
