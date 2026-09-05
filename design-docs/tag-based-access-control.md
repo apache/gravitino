@@ -178,60 +178,97 @@ whether any access rule is satisfied. That requires three things:
 2. the `system_access_control` policies bound to those tags;
 3. for each, whether any of `applicable_roles` is among the caller's expanded roles.
 
-The question is *when* steps 1 and 2 happen. Two options, presented without preference.
+Access rules only allow — `content` carries no condition field — so neither option below lets a tag
+restrict or deny. An RBAC `DENY` is unaffected; see [Allow and deny](#allow-and-deny).
 
-### Option 1 — expand when roles load
+The question is *where* steps 1 and 2 happen.
 
-When a role's policies are loaded into the authorizer, walk the tags reachable for that role and
-write one permission row per (role, object), alongside the rows already produced from RBAC grants.
+### Proposed: check tags at the privilege leaf
 
-- At decision time, tag permissions look exactly like RBAC ones. Everything the authorizer already
-  does applies unchanged — including deny, which narrows across all of a caller's roles rather than
-  only the active ones — and no new expression is needed.
-- The decision itself costs nothing extra; the work moves to load time.
-- Because tags are inherited, a role's rows depend on the tags of every ancestor of every object it
-  can reach. Applying a tag anywhere in the hierarchy can change them, not just changing the role.
-- Miss one of those invalidations and stale rows keep granting. The failure leaves people with more
-  access than they should have, not less.
+Every privilege check bottoms out in `GravitinoAuthorizer.authorize`. The expression converter
+expands each `ANY_*` macro mechanically —
 
-### Option 2 — evaluate as a second stage at request time
+```
+ANY_USE_CATALOG → ANY(USE_CATALOG, METALAKE, CATALOG) && !ANY(DENY_USE_CATALOG, METALAKE, CATALOG)
+```
 
-Leave the loaded rows as they are. When the RBAC decision does not already allow the request,
-resolve the object's effective tags, load the access policies bound to them, and test them against
-the caller's roles.
+— and `hasAuthorizeWithoutDeny` walks the object's ancestor chain calling `authorize` and `deny` at
+each level. Tag evaluation goes inside `authorize`: when the RBAC rows do not allow, resolve the
+effective tags of the object being decided, load the access policies bound to them, and test those
+against the caller's roles.
 
-- Two additional lookups on the request path, both cacheable, for requests RBAC did not already
-  allow.
-- Composition must be written explicitly rather than inherited:
+Three properties follow from the surrounding code rather than from a rule this design has to write:
 
-  ```
-  (rbacAllow || tagAllow) && !rbacDeny
-  ```
+- **RBAC deny still wins.** The `!ANY(DENY_…)` conjunct is built from `deny`, which the tag path
+  never touches, so an allow-only tag cannot reach it. See
+  [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
+- **Traversal stays RBAC.** Each conjunct consults tags independently, so a tag granting
+  `SELECT_TABLE` still cannot bypass `USE_CATALOG`.
+- **A denial stays attributable.** The tag check is a distinct step, so the information needed to
+  explain a decision stays separable from the grant that would otherwise have produced it.
 
-  so how deny interacts with a tag allow becomes a rule someone writes down, rather than something
-  the row set gives for free. See [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
-- A stale cache decides from older tag state. Whether that errs towards more access or less depends
-  on the cache design, not on invalidation coverage.
+One rule does not come for free. Role assumption narrows a request to the roles the caller
+activated, but that narrowing lives inside `enforceNarrowed`, on the jCasbin path the tag check
+does not take. The tag check therefore applies it itself: `applicable_roles` is tested against the
+caller's *active* roles, and an `ActiveRoles.none()` request grants nothing. Otherwise a caller who
+narrowed would silently keep tag-derived access they had asked to drop.
+
+Inheritance is the one thing the walk does not supply. `authorize` resolves the object's effective
+tags once ([tag-assignment-values.md](tag-assignment-values.md)) rather than asking each level in
+turn. Different tag names still union down the chain; nearest-wins settles only the same name
+assigned at two levels, where the nearer assignment wins and the farther one is dropped:
+
+```
+catalog lakehouse        certified = gold      pii = true
+table   finance.orders   certified = bronze
+
+effective on the table   certified = bronze    pii = true
+```
+
+`pii` is inherited; `certified=gold` is gone because the table overrode it. So a rule bound with
+`TAG_VALUE("gold")` does not match, while asking level by level would still find `gold` on the
+catalog and grant. The two readings agree under `ALL_VALUES`, where only the presence of the name
+matters, and diverge as soon as a rule reads the value.
+
+The cost lands on the request path. Per-request memoisation in `AuthorizationRequestContext`
+collapses repeated checks within one expression; list endpoints need the batch preload described
+below.
+
+### Rejected: expand tag rows when roles load
+
+The alternative writes one permission row per (role, object) when a role's policies load, so tag
+permissions are indistinguishable from RBAC ones at decision time.
+
+It fails on cardinality. The jCasbin matcher compares `metadataId` for equality with no prefix
+form, so a tag on a catalog grants on a table only if a row exists for that table. Tagging one
+catalog materialises a row per descendant per affected role, and every later `CREATE TABLE` beneath
+it has to add rows — a write-path dependency on the authorizer that does not exist today. Miss one
+and stale rows keep granting, which errs towards more access rather than less.
 
 ### Freshness
 
-Either option has to answer how a tag change becomes visible on a node that has already loaded the
-affected roles.
+A node that has already loaded the affected roles still has to learn that tag state changed.
 
 Today the authorizer keeps role policies fresh by version-checking on read: `loadedRoles` maps role
 id to `updated_at`, and a newer `role_meta.updated_at` in the database evicts and reloads that
 role's policies. `groupRoleCache` is validated the same way against `group_meta.updated_at`. Write
 paths additionally call `handleRolePrivilegeChange`, `handleUserRoleRelChange` and
 `handleGroupRoleRelChange` in-process on the node that performed the write, and TTL bounds the rest.
+`JcasbinChangeListener` covers two further surfaces: entity changes through `onEntityChange`, and a
+poll of `owner_meta`.
 
-`JcasbinChangeListener` covers two other surfaces: it receives entity changes through
-`onEntityChange` and invalidates the metadata name-to-id cache, and it polls `owner_meta` for
-ownership changes.
+Tag state reaches none of that, and the transport differs by what changed:
 
-Neither a tag assignment nor a policy-to-tag bind touches `role_meta.updated_at`, and neither
-appears on the two surfaces the listener covers. Whichever evaluation option is chosen, tag-derived
-state needs a freshness signal of its own — a version column consulted on read, a new poll, or an
-explicit TTL accepted as the bound.
+| Change | Reaches other nodes today |
+|---|---|
+| Tag or policy entity created, altered, dropped | Yes — `entity_change_log` carries `TAG` and `POLICY`, but `JcasbinChangeListener` discards both as virtual-namespace types |
+| Tag applied to or removed from an object | No — relation changes emit no change-log rows |
+| Policy bound to or unbound from a tag | No — same |
+
+The first needs the existing filter relaxed. The second and third need a transport that does not
+exist yet: relation changes emitted into `entity_change_log`, a poll of the relation tables, or a
+TTL accepted as the bound. The rejected option needs the same three signals, and reacts to each by
+rewriting rows rather than by dropping a cache entry.
 
 See [OQ-1](#oq-1--where-tags-are-evaluated).
 
@@ -239,8 +276,8 @@ See [OQ-1](#oq-1--where-tags-are-evaluated).
 
 List endpoints filter their results through the same authorizer, so tag-derived permissions must be
 visible to filtering as well as to point decisions. Resolving tags per candidate object would turn
-one listing into N lookups. Both options need a batch preload of tag and policy state for the
-candidate set, alongside the existing `preloadToCache` and `preloadOwner` paths.
+one listing into N walks of the ancestor chain. Filtering needs a batch preload of tag and policy
+state for the candidate set, alongside the existing `preloadToCache` and `preloadOwner` paths.
 
 ---
 
@@ -355,23 +392,68 @@ no additional payload. The bind and unbind operations emit the existing policy-t
 
 ---
 
+## Prior art
+
+Three systems solve this problem, and the shape proposed here matches them. The table records only
+what current vendor documentation states; `—` means not verified rather than absent.
+
+| | Apache Ranger | AWS Lake Formation | Databricks Unity Catalog |
+|---|---|---|---|
+| Feature | Tag-based policies | LF-TBAC | ABAC `GRANT` policies |
+| Rule attaches to | A tag, within a tag service | An LF-Tag expression | A catalog or schema, with a tag condition |
+| Evaluated | At request time; `RangerTagEnricher` adds the resource's tags to the request context | At request time, against the resource's tags | At request time, on each access attempt |
+| Inheritance | From the tag source | Table from database, column from table; override allowed | From parent catalog or schema; override allowed |
+| Can a tag rule deny? | Yes | No — grant only | No — adds access only |
+| Authority to apply a tag | — | A distinct grant to assign LF-Tags | `ASSIGN` on the tag **and** `APPLY TAG` on the object |
+
+Four points of agreement, each corresponding to a decision made above:
+
+- **Rules attach to a tag, not to the object.** The premise of the feature.
+- **Tags are resolved on the request path**, not pre-expanded into a grant per object. No system
+  surveyed does the expansion, which is the option [Evaluation](#evaluation) rejects.
+- **Tags inherit down the hierarchy**, and both Lake Formation and Unity Catalog let a nearer
+  assignment override an inherited one — the nearest-wins rule this design already assumes
+  ([tag-assignment-values.md](tag-assignment-values.md)).
+- **Applying a tag is authority in its own right.** Unity Catalog requires a tag permission *and*
+  an object permission, which is the two-clause structure proposed in
+  [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Databricks gives the reason directly:
+  if a user can change tags on an asset, they can change which policies apply to it.
+
+Two divergences are worth naming.
+
+Ranger tag policies can deny; the policies here cannot. Lake Formation and Unity Catalog are both
+allow-only, and Databricks states that GRANT policies cannot revoke access granted directly, so the
+restriction in [Allow and deny](#allow-and-deny) is the majority position rather than an unusual
+one.
+
+Ranger is also the only one of the three that documents an answer to [Freshness](#freshness): the
+plugin caches tags locally, polls the tag store for changes, and falls back to the cache file when
+the store is unreachable. It accepts a staleness window rather than eliminating one — which is the
+shape of answer OQ-1 is likely to need.
+
+---
+
 ## Open questions
 
 None of these are settled. Where this revision has a preference, the option is marked **Proposed**.
 
 | | Question | Discussed in | Proposal |
 |---|---|---|---|
-| OQ-1 | Where tags are evaluated | [Evaluation](#evaluation) | — |
+| OQ-1 | Where tags are evaluated | [Evaluation](#evaluation) | Inside `authorize`, at the privilege leaf |
 | OQ-2 | Composition when a tag allows and RBAC denies | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins |
 | OQ-3 | What happens when a referenced role is deleted | [below](#oq-3--deleting-a-referenced-role) | Refuse the deletion |
 | OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag) | Grant authority on the object, and an explicit tag grant |
 
 ### OQ-1 — where tags are evaluated
 
-Options and their consequences are set out in [Evaluation](#evaluation). Option 1 reuses the
-existing permission engine, but its cache must be cleared whenever any tag changes anywhere, and a
-missed clear leaves access in place that should have been removed. Option 2 avoids that by checking
-tags on each request, at the cost of extra lookups.
+Both placements and the reasoning are set out in [Evaluation](#evaluation). Checking at the leaf
+inherits deny and traversal from the surrounding code, keeps a denial attributable, and reaches
+inherited tags through one nearest-wins resolution per object; expanding rows at load time reuses
+the permission engine but, because the matcher compares ids for equality, needs a row per
+descendant object and a write-path dependency to maintain them.
+
+What stays open is not the placement but the freshness transport: two of the three signals in
+[Freshness](#freshness) have no carrier today, and both placements need all three.
 
 ### OQ-2 — composition when a tag allows and RBAC denies
 
@@ -384,9 +466,9 @@ Justification: deny already wins elsewhere in Gravitino, so this is the behaviou
 Refusing the overlap instead blocks requests that RBAC alone would have allowed, and every such
 request then needs an operator to intervene.
 
-Option 1 of [Evaluation](#evaluation) gets this for free: tag permissions become ordinary
-permission rows, and the existing engine already applies deny to them. Option 2 has to state the
-rule in its own combining logic.
+The placement proposed in [Evaluation](#evaluation) gives this without a combining rule of its own.
+The `!ANY(DENY_…)` conjunct is generated by the expression converter and built from `deny`, which
+the tag path never touches, so an allow-only tag cannot reach past it.
 
 ### OQ-3 — deleting a referenced role
 
