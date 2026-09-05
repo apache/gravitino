@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -69,7 +70,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.MODEL,
           Entity.EntityType.COLUMN,
           Entity.EntityType.FUNCTION,
-          Entity.EntityType.VIEW);
+          Entity.EntityType.VIEW,
+          Entity.EntityType.SEMANTIC_MODEL);
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
@@ -234,6 +236,17 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getViewIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new NamespacedEntityId(
             viewId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
+      case SEMANTIC_MODEL:
+        long semanticModelId =
+            SemanticModelMetaService.getInstance()
+                .getSemanticModelIdBySchemaIdAndName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            semanticModelId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
 
       case FUNCTION:
         long functionId =
