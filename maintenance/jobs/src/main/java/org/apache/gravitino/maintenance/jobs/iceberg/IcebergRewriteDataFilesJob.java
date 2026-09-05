@@ -31,6 +31,8 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for rewriting Iceberg table data files.
@@ -39,6 +41,8 @@ import org.apache.spark.sql.SparkSession;
  * binpack or sort strategies. Z-order is a type of sort order, not a strategy.
  */
 public class IcebergRewriteDataFilesJob implements BuiltInJob {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRewriteDataFilesJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
@@ -174,30 +178,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
       // Print results
       if (results.length > 0) {
-        Row result = results[0];
-        // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
-        if (result.size() >= 5) {
-          System.out.printf(
-              "Rewrite Data Files Results:%n"
-                  + "  Rewritten data files: %d%n"
-                  + "  Added data files: %d%n"
-                  + "  Rewritten bytes: %d%n"
-                  + "  Failed data files: %d%n"
-                  + "  Removed delete files: %d%n",
-              result.getInt(0),
-              result.getInt(1),
-              result.getLong(2),
-              result.getInt(3),
-              result.getInt(4));
-        } else {
-          System.out.printf(
-              "Rewrite Data Files Results:%n"
-                  + "  Rewritten data files: %d%n"
-                  + "  Added data files: %d%n"
-                  + "  Rewritten bytes: %d%n"
-                  + "  Failed data files: %d%n",
-              result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
-        }
+        LOG.info(formatResult(results[0]));
       }
 
       System.out.println("Rewrite data files job completed successfully");
@@ -208,6 +189,25 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     } finally {
       spark.stop();
     }
+  }
+
+  /** Formats the statistics returned by the rewrite_data_files procedure. */
+  static String formatResult(Row result) {
+    String summary =
+        String.format(
+            "Rewrite Data Files Results:%n"
+                + "  Rewritten data files: %d%n"
+                + "  Added data files: %d%n"
+                + "  Rewritten bytes: %d%n",
+            result.getInt(0), result.getInt(1), result.getLong(2));
+    // Older Iceberg versions return only the three required statistics.
+    if (result.size() >= 4) {
+      summary += String.format("  Failed data files: %d%n", result.getInt(3));
+    }
+    if (result.size() >= 5) {
+      summary += String.format("  Removed delete files: %d%n", result.getInt(4));
+    }
+    return summary;
   }
 
   /**
