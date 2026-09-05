@@ -508,16 +508,18 @@ schema.
 
 ---
 
-## Implementation phases
+## Implementation milestones
 
-1. `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO.
-2. The derived policy-to-role record, written on policy create and update.
-3. Evaluation, per the resolution of [OQ-1](#oq-1--where-tags-are-evaluated), including the
-   freshness signal.
-4. List filtering with batch preload.
-5. Role deletion behaviour, per [OQ-3](#oq-3--deleting-a-referenced-role).
-6. Documentation, including the traversal requirement described in
-   [Composition with RBAC](#composition-with-rbac).
+Each milestone names the open questions it rests on. Those are proposals, not decisions — if one
+resolves differently, the milestones marked against it change shape.
 
-A task breakdown is deferred until the open questions are resolved, since the shape of steps 3 and 4
-depends on OQ-1.
+| Milestone | What lands | Rests on |
+|---|---|---|
+| M1 — model and storage | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet. | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist. |
+| M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked. | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated. |
+| M3 — enforcement, single node | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no work of its own under the proposed placement, and a combining rule under the other. |
+| M4 — freshness | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment. | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way. |
+| M5 — list filtering | [List filtering](#list-filtering), with the tags for a page of objects preloaded in one batch. | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3. |
+| M6 — lifecycle and documentation | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac). | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour. |
+
+M1, M2 and M4 hold whichever way OQ-1 is answered. M3 and M5 are the two that change with it.
