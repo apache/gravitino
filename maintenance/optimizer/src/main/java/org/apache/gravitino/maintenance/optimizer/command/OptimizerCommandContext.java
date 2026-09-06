@@ -26,6 +26,7 @@ import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticsInputContent;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /** Context shared by optimizer command executors. */
 public final class OptimizerCommandContext {
@@ -80,6 +81,16 @@ public final class OptimizerCommandContext {
 
   public List<NameIdentifier> parsedIdentifiers() {
     return OptimizerCommandUtils.parseIdentifiers(identifiers);
+  }
+
+  /**
+   * Parses table identifiers, applying the configured default catalog to schema-qualified names.
+   *
+   * @return normalized table identifiers
+   */
+  public List<NameIdentifier> parsedTableIdentifiers() {
+    return OptimizerCommandUtils.parseTableIdentifiers(
+        identifiers, optimizerEnv.config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG));
   }
 
   public boolean hasIdentifiers() {

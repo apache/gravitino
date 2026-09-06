@@ -31,7 +31,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 | Option | Meaning | Used by |
 | --- | --- | --- |
-| `--identifiers` | Comma-separated identifiers. Table format supports `catalog.schema.table` (or `schema.table` when default catalog is configured). | Most commands |
+| `--identifiers` | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands |
 | `--strategy-name` | Policy name to evaluate, for example `iceberg_compaction_default`. | `submit-strategy-jobs` |
 | `--dry-run` | Preview mode. Prints recommendations or job configs without submitting jobs. | `submit-strategy-jobs`, `submit-update-stats-job` |
 | `--limit` | Maximum number of strategy jobs to process. Must be `> 0`. | `submit-strategy-jobs` |
@@ -79,7 +79,10 @@ job scopes with multiple metric/statistic fields:
 ## Identifier Rules
 
 - Table and partition records: `catalog.schema.table`
-- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted
+- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted by
+  `submit-strategy-jobs`, `update-statistics`, `monitor-metrics`, `list-table-metrics`, and
+  `submit-update-stats-job`
+- `append-metrics` accepts both table and job identifiers, so it does not apply the default catalog
 - Job records: parsed as a regular Gravitino `NameIdentifier`
 
 ## CLI Workflow Examples
