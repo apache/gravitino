@@ -28,6 +28,8 @@ class TestViewMetaBaseSQLProvider {
   @Test
   void testUpdateUsesVersionCas() {
     String sql = PROVIDER.updateViewMeta(null, null);
+    Assertions.assertTrue(sql.contains("metalake_id = #{newViewMeta.metalakeId}"));
+    Assertions.assertTrue(sql.contains("catalog_id = #{newViewMeta.catalogId}"));
     String whereClause = sql.substring(sql.indexOf(" WHERE"));
 
     Assertions.assertEquals(

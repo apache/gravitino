@@ -193,6 +193,8 @@ public class ViewMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET view_name = #{newViewMeta.viewName}, "
+        + " metalake_id = #{newViewMeta.metalakeId}, "
+        + " catalog_id = #{newViewMeta.catalogId}, "
         + " schema_id = #{newViewMeta.schemaId}, "
         + " current_version = #{newViewMeta.currentVersion}, "
         + " last_version = #{newViewMeta.lastVersion}, "
