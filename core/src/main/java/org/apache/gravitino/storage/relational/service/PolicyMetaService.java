@@ -356,6 +356,97 @@ public class PolicyMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deletePolicyAndVersionMetasByLegacyTimeline")
+  public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int policyDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyMetaMapper.class,
+            mapper -> mapper.deletePolicyMetasByLegacyTimeline(legacyTimeline, limit));
+
+    int policyVersionDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyVersionMapper.class,
+            mapper -> mapper.deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit));
+
+    return policyDeletedCount + policyVersionDeletedCount;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deletePolicyVersionsByRetentionCount")
+  public int deletePolicyVersionsByRetentionCount(Long versionRetentionCount, int limit) {
+    // get the current version of all policies.
+    List<PolicyMaxVersionPO> policyMaxVersions =
+        SessionUtils.getWithoutCommit(
+            PolicyVersionMapper.class,
+            mapper -> mapper.selectPolicyVersionsByRetentionCount(versionRetentionCount));
+
+    // soft delete old versions that are smaller than or equal to (maxVersion -
+    // versionRetentionCount).
+    int totalDeletedCount = 0;
+    for (PolicyMaxVersionPO policyMaxVersion : policyMaxVersions) {
+      long versionRetentionLine = policyMaxVersion.getVersion() - versionRetentionCount;
+      int deletedCount =
+          SessionUtils.doWithCommitAndFetchResult(
+              PolicyVersionMapper.class,
+              mapper ->
+                  mapper.softDeletePolicyVersionsByRetentionLine(
+                      policyMaxVersion.getPolicyId(), versionRetentionLine, limit));
+      totalDeletedCount += deletedCount;
+
+      // log the deletion by max policy version.
+      LOG.info(
+          "Soft delete policyVersions count: {} which versions are smaller than or equal to"
+              + " versionRetentionLine: {}, the current policyId and maxVersion is: <{}, {}>.",
+          deletedCount,
+          versionRetentionLine,
+          policyMaxVersion.getPolicyId(),
+          policyMaxVersion.getVersion());
+    }
+    return totalDeletedCount;
+  }
+
+  /**
+   * Get policy id by policy name
+   *
+   * @param metalakeId metalake id
+   * @param policyName policy name
+   * @return policy id
+   */
+  public long getPolicyIdByPolicyName(long metalakeId, String policyName) {
+    PolicyPO policyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper -> mapper.selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName));
+    if (policyPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.POLICY.name().toLowerCase(),
+          policyName);
+    }
+    return policyPO.getPolicyId();
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetPolicyByIdentifier")
+  public List<PolicyEntity> batchGetPolicyByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> policyNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        PolicyMetaMapper.class,
+        mapper -> {
+          List<PolicyPO> policyPOs =
+              mapper.batchSelectPolicyByIdentifier(metalakeName, policyNames);
+          return POConverters.fromPolicyPOs(policyPOs, firstIdent.namespace());
+        });
+  }
+
   private List<PolicyEntity> associatePoliciesWithMetadataObjectWithoutCommit(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
@@ -421,58 +512,6 @@ public class PolicyMetaService {
     return policyPOs.stream()
         .map(policyPO -> POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake)))
         .collect(Collectors.toList());
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deletePolicyAndVersionMetasByLegacyTimeline")
-  public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
-    int policyDeletedCount =
-        SessionUtils.doWithCommitAndFetchResult(
-            PolicyMetaMapper.class,
-            mapper -> mapper.deletePolicyMetasByLegacyTimeline(legacyTimeline, limit));
-
-    int policyVersionDeletedCount =
-        SessionUtils.doWithCommitAndFetchResult(
-            PolicyVersionMapper.class,
-            mapper -> mapper.deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit));
-
-    return policyDeletedCount + policyVersionDeletedCount;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deletePolicyVersionsByRetentionCount")
-  public int deletePolicyVersionsByRetentionCount(Long versionRetentionCount, int limit) {
-    // get the current version of all policies.
-    List<PolicyMaxVersionPO> policyMaxVersions =
-        SessionUtils.getWithoutCommit(
-            PolicyVersionMapper.class,
-            mapper -> mapper.selectPolicyVersionsByRetentionCount(versionRetentionCount));
-
-    // soft delete old versions that are smaller than or equal to (maxVersion -
-    // versionRetentionCount).
-    int totalDeletedCount = 0;
-    for (PolicyMaxVersionPO policyMaxVersion : policyMaxVersions) {
-      long versionRetentionLine = policyMaxVersion.getVersion() - versionRetentionCount;
-      int deletedCount =
-          SessionUtils.doWithCommitAndFetchResult(
-              PolicyVersionMapper.class,
-              mapper ->
-                  mapper.softDeletePolicyVersionsByRetentionLine(
-                      policyMaxVersion.getPolicyId(), versionRetentionLine, limit));
-      totalDeletedCount += deletedCount;
-
-      // log the deletion by max policy version.
-      LOG.info(
-          "Soft delete policyVersions count: {} which versions are smaller than or equal to"
-              + " versionRetentionLine: {}, the current policyId and maxVersion is: <{}, {}>.",
-          deletedCount,
-          versionRetentionLine,
-          policyMaxVersion.getPolicyId(),
-          policyMaxVersion.getVersion());
-    }
-    return totalDeletedCount;
   }
 
   /**
@@ -554,6 +593,21 @@ public class PolicyMetaService {
         mapper -> mapper.insertPolicyVersion(policyPO.getPolicyVersionPO()));
   }
 
+  /**
+   * Resolves and exclusively locks the row an overwrite replaces, or returns null when the name and
+   * the ID are both free.
+   *
+   * <p>The name is the primary key of the search: an overwrite claims the row that currently holds
+   * the target name, and the caller-supplied policy ID is dropped in that case so the row keeps the
+   * stable ID its version snapshots and relation rows point at. A caller that supplies the ID of
+   * one policy together with the name of another therefore replaces the content of the policy that
+   * holds the name, not the one the ID identifies. This matches {@code
+   * TagMetaService.findAndLockTagForOverwrite} and is only reachable through tests today: {@link
+   * org.apache.gravitino.policy.PolicyManager} always writes with {@code overwritten = false}.
+   *
+   * <p>The lookup by ID is the fallback for a rename-by-overwrite, where the new name is free and
+   * the row is found by its stable ID.
+   */
   private PolicyPO findAndLockPolicyForOverwrite(PolicyPO initializedPolicyPO) {
     PolicyPO sameNamePolicyPO =
         SessionUtils.getWithoutCommit(
@@ -706,44 +760,5 @@ public class PolicyMetaService {
     return SessionUtils.getWithoutCommit(
         PolicyMetaMapper.class,
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
-  }
-
-  /**
-   * Get policy id by policy name
-   *
-   * @param metalakeId metalake id
-   * @param policyName policy name
-   * @return policy id
-   */
-  public long getPolicyIdByPolicyName(long metalakeId, String policyName) {
-    PolicyPO policyPO =
-        SessionUtils.getWithoutCommit(
-            PolicyMetaMapper.class,
-            mapper -> mapper.selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName));
-    if (policyPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.POLICY.name().toLowerCase(),
-          policyName);
-    }
-    return policyPO.getPolicyId();
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "batchGetPolicyByIdentifier")
-  public List<PolicyEntity> batchGetPolicyByIdentifier(List<NameIdentifier> identifiers) {
-    NameIdentifier firstIdent = identifiers.get(0);
-    String metalakeName = firstIdent.namespace().level(0);
-    List<String> policyNames =
-        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
-
-    return SessionUtils.doWithCommitAndFetchResult(
-        PolicyMetaMapper.class,
-        mapper -> {
-          List<PolicyPO> policyPOs =
-              mapper.batchSelectPolicyByIdentifier(metalakeName, policyNames);
-          return POConverters.fromPolicyPOs(policyPOs, firstIdent.namespace());
-        });
   }
 }

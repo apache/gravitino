@@ -171,38 +171,12 @@ public class PolicyMetaBaseSQLProvider {
    */
   public String listPolicyPOsByPolicyIdsForUpdate(@Param("policyIds") List<Long> policyIds) {
     return "<script>"
-        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
-        + " pm.deleted_at"
-        + " FROM "
-        + POLICY_META_TABLE_NAME
-        + " pm"
-        + " WHERE pm.deleted_at = 0"
-        + " AND pm.policy_id IN ("
-        + "<foreach collection='policyIds' item='policyId' separator=','>"
-        + "#{policyId}"
-        + "</foreach>"
-        + ")"
-        + " ORDER BY pm.policy_id"
-        + " FOR UPDATE"
-        + "</script>";
+        + selectPolicyPOsByPolicyIdsBody()
+        + " ORDER BY pm.policy_id FOR UPDATE</script>";
   }
 
   public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
-    return "<script>"
-        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
-        + " pm.deleted_at"
-        + " FROM "
-        + POLICY_META_TABLE_NAME
-        + " pm"
-        + " WHERE pm.deleted_at = 0"
-        + " AND pm.policy_id IN ("
-        + "<foreach collection='policyIds' item='policyId' separator=','>"
-        + "#{policyId}"
-        + "</foreach>"
-        + ")"
-        + "</script>";
+    return "<script>" + selectPolicyPOsByPolicyIdsBody() + "</script>";
   }
 
   public String selectPolicyMetaByMetalakeIdAndName(
@@ -249,5 +223,24 @@ public class PolicyMetaBaseSQLProvider {
         + " )"
         + " AND pm.deleted_at = 0 AND pv.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+
+  /**
+   * Returns the shared body of the by-ID list queries, without the enclosing {@code <script>} tag,
+   * so the plain and the locking variant cannot drift apart when the selected columns change.
+   */
+  private String selectPolicyPOsByPolicyIdsBody() {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm"
+        + " WHERE pm.deleted_at = 0"
+        + " AND pm.policy_id IN ("
+        + "<foreach collection='policyIds' item='policyId' separator=','>"
+        + "#{policyId}"
+        + "</foreach>"
+        + ")";
   }
 }
