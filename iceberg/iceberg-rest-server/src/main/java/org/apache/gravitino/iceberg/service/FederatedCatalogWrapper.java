@@ -120,7 +120,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    return createTableViaRest(namespace, request, requestCredential);
+    return createTableViaREST(namespace, request, requestCredential);
   }
 
   /**
@@ -140,7 +140,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTableViaRest(identifier, requestCredential);
+    return loadTableViaREST(identifier, requestCredential);
   }
 
   /**
@@ -159,7 +159,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTableViaRest(namespace, request, requestCredential);
+    return registerTableViaREST(namespace, request, requestCredential);
   }
 
   @Override
@@ -506,21 +506,21 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         : Collections.emptyMap();
   }
 
-  private LoadTableResponse createTableViaRest(
+  private LoadTableResponse createTableViaREST(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
     LoadTableResponse upstream =
         getRESTCreateTable((RESTCatalog) getCatalog(), namespace, request, requestCredential);
     return rewriteRemoteLoadTable(TableIdentifier.of(namespace, request.name()), upstream);
   }
 
-  private LoadTableResponse loadTableViaRest(
+  private LoadTableResponse loadTableViaREST(
       TableIdentifier identifier, boolean requestCredential) {
     LoadTableResponse upstream =
         getRESTLoadTable((RESTCatalog) getCatalog(), identifier, requestCredential);
     return rewriteRemoteLoadTable(identifier, upstream);
   }
 
-  private LoadTableResponse registerTableViaRest(
+  private LoadTableResponse registerTableViaREST(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
     LoadTableResponse upstream =
         getRESTRegisterTable((RESTCatalog) getCatalog(), namespace, request, requestCredential);
