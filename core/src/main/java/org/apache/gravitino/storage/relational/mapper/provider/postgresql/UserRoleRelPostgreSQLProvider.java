@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserRoleRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,8 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByUserId(Long userId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
@@ -41,7 +43,8 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE user_id = #{userId} "
         + "<choose>"
         + "<when test='roleIds != null and roleIds.size() > 0'>"
@@ -63,7 +66,8 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -74,7 +78,8 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByRoleId(Long roleId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

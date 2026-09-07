@@ -42,10 +42,11 @@ public final class IdpPOConverters {
   public static IdpUser fromIdpUserWithGroupsPO(IdpUserWithGroupsPO userPO) {
     Preconditions.checkNotNull(userPO, "userPO must not be null");
     List<String> groupNames = parseJsonStringList(userPO.getGroupNames());
+    boolean enabled = userPO.getEnabled() == null || userPO.getEnabled();
     if (StringUtils.isBlank(userPO.getPasswordHash())) {
-      return new IdpUser(userPO.getName(), groupNames);
+      return new IdpUser(userPO.getName(), groupNames, enabled);
     }
-    return new IdpUser(userPO.getName(), userPO.getPasswordHash(), groupNames);
+    return new IdpUser(userPO.getName(), userPO.getPasswordHash(), groupNames, enabled);
   }
 
   /**

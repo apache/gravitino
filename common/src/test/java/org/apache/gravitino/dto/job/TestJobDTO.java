@@ -19,9 +19,11 @@
 package org.apache.gravitino.dto.job;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,7 +43,8 @@ public class TestJobDTO {
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
             queuedAt,
             startedAt,
-            finishedAt);
+            finishedAt,
+            null);
 
     Assertions.assertDoesNotThrow(jobDTO::validate);
 
@@ -67,6 +70,7 @@ public class TestJobDTO {
             JobHandle.Status.QUEUED,
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
             queuedAt,
+            null,
             null,
             null);
 
@@ -94,7 +98,8 @@ public class TestJobDTO {
             AuditDTO.builder().withCreator("test").withCreateTime(createTime).build(),
             queuedAt,
             startedAt,
-            finishedAt);
+            finishedAt,
+            null);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
 
@@ -146,5 +151,60 @@ public class TestJobDTO {
     Assertions.assertEquals(Instant.parse("2024-01-01T00:00:00Z"), jobDTO.queuedAt());
     Assertions.assertNull(jobDTO.startedAt());
     Assertions.assertNull(jobDTO.finishedAt());
+  }
+
+  @Test
+  public void testSerDeWithRuntimeJobTemplate() throws JsonProcessingException {
+    JobTemplateDTO runtimeJobTemplate =
+        ShellJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.SHELL)
+            .withName("resolved-template")
+            .withComment("A resolved job template")
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("resolved-arg"))
+            .withScripts(Lists.newArrayList("/path/to/script.sh"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    JobDTO jobDTO =
+        new JobDTO(
+            "job-1001",
+            "testTemplate",
+            JobHandle.Status.SUCCEEDED,
+            AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            Instant.now(),
+            Instant.now(),
+            Instant.now(),
+            runtimeJobTemplate);
+
+    Assertions.assertDoesNotThrow(jobDTO::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
+    Assertions.assertTrue(serJson.contains("\"runtimeJobTemplate\""));
+
+    JobDTO deserJobDTO = JsonUtils.objectMapper().readValue(serJson, JobDTO.class);
+    Assertions.assertEquals(jobDTO, deserJobDTO);
+    Assertions.assertEquals(runtimeJobTemplate, deserJobDTO.runtimeJobTemplate());
+    Assertions.assertInstanceOf(ShellJobTemplateDTO.class, deserJobDTO.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testSerDeWithNullRuntimeJobTemplate() throws JsonProcessingException {
+    JobDTO jobDTO =
+        new JobDTO(
+            "job-1002",
+            "testTemplate",
+            JobHandle.Status.QUEUED,
+            AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            Instant.now(),
+            null,
+            null,
+            null);
+
+    Assertions.assertDoesNotThrow(jobDTO::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
+    JobDTO deserJobDTO = JsonUtils.objectMapper().readValue(serJson, JobDTO.class);
+    Assertions.assertEquals(jobDTO, deserJobDTO);
+    Assertions.assertNull(deserJobDTO.runtimeJobTemplate());
   }
 }

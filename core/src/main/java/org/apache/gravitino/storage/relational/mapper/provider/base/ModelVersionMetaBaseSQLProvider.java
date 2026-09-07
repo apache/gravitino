@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -130,8 +131,8 @@ public class ModelVersionMetaBaseSQLProvider {
   public String softDeleteModelVersionsByModelId(@Param("modelId") Long modelId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
@@ -139,8 +140,8 @@ public class ModelVersionMetaBaseSQLProvider {
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -148,8 +149,8 @@ public class ModelVersionMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -161,16 +162,16 @@ public class ModelVersionMetaBaseSQLProvider {
   public String softDeleteModelVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
   public String softDeleteModelVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

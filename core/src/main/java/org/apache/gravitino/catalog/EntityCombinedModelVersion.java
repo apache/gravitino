@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.ModelVersion;
@@ -33,7 +34,10 @@ public final class EntityCombinedModelVersion implements ModelVersion {
 
   private final ModelVersionEntity modelVersionEntity;
 
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedModelVersion(
       ModelVersion modelVersion, ModelVersionEntity modelVersionEntity) {
@@ -50,8 +54,10 @@ public final class EntityCombinedModelVersion implements ModelVersion {
     return new EntityCombinedModelVersion(modelVersion, null);
   }
 
-  public EntityCombinedModelVersion withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedModelVersion withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -69,7 +75,8 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   public Map<String, String> properties() {
     return modelVersion.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(modelVersion.properties(), hiddenProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(
+            modelVersion.properties(), keysToMask, keysToOmit);
   }
 
   @Override

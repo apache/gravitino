@@ -271,6 +271,57 @@ public class TestModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testModelLinkAndAlterOperationsWithNullRequests() {
+    Response linkVersionResponse =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(null, MediaType.APPLICATION_JSON_TYPE));
+    assertNullRequestBodyRejected(linkVersionResponse);
+
+    Response alterModelResponse =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+    assertNullRequestBodyRejected(alterModelResponse);
+
+    Response alterVersionResponse =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+    assertNullRequestBodyRejected(alterVersionResponse);
+
+    Response alterVersionByAliasResponse =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path("alias1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+    assertNullRequestBodyRejected(alterVersionByAliasResponse);
+  }
+
+  @Test
+  public void testRegisterModelWithNullRequest() {
+    Response resp =
+        target(modelPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRegisterModel() {
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
     Model mockModel = mockModel("model1", "comment1", 0);

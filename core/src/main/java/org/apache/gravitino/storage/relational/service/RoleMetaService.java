@@ -45,10 +45,12 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -154,8 +156,17 @@ public class RoleMetaService {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakeId);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalake);
+      }
+
+      RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakePO.getMetalakeId());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
@@ -168,7 +179,21 @@ public class RoleMetaService {
         securableObjectPOs.add(objectBuilder.build());
       }
 
+      // The role row is written before its securable objects. Concurrent overwrites then contend
+      // on the role row first and replace the child rows only after they are serialized. The role
+      // and its securable objects therefore change atomically, with the last overwrite winning.
       SessionUtils.doMultipleWithCommit(
+          () -> lockMetalakeForRoleCreate(metalakePO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
+                    } else {
+                      mapper.insertRoleMeta(rolePO);
+                    }
+                  }),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
@@ -178,16 +203,6 @@ public class RoleMetaService {
                     }
                     if (!securableObjectPOs.isEmpty()) {
                       mapper.batchInsertSecurableObjects(securableObjectPOs);
-                    }
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
-                    } else {
-                      mapper.insertRoleMeta(rolePO);
                     }
                   }));
 
@@ -225,10 +240,10 @@ public class RoleMetaService {
       Set<SecurableObject> insertObjects = Sets.difference(newObjects, oldObjects);
       Set<SecurableObject> deleteObjects = Sets.difference(oldObjects, newObjects);
 
-      if (insertObjects.isEmpty() && deleteObjects.isEmpty()) {
-        return newRoleEntity;
-      }
-
+      // Every update runs the compare-and-set, including one that leaves the securable objects
+      // untouched. The short-circuit that used to return early here would skip the version check,
+      // so a caller whose snapshot was already stale would be told the update succeeded. It also
+      // has to run because a metadata-only change, such as the audit info, still has to be written.
       List<SecurableObjectPO> deleteSecurableObjectPOs =
           toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalake);
 
@@ -236,12 +251,17 @@ public class RoleMetaService {
           toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
 
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper ->
-                      mapper.updateRoleMeta(
-                          POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class,
+                    mapper ->
+                        mapper.updateRoleMeta(
+                            POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO));
+            if (updated == 0) {
+              throw roleWriteFailure(identifier, rolePO);
+            }
+          },
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -308,12 +328,32 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
 
+    deleteRoleWithVersion(identifier, rolePO);
+    return true;
+  }
+
+  /**
+   * Deletes the role whose version matches {@code observedRolePO}, together with its role and owner
+   * relations. Package-private so tests can hand in a deliberately stale PO; callers outside this
+   * class go through {@link #deleteRole(NameIdentifier)}, which reads the row first.
+   *
+   * @param identifier the role being deleted, used only to build the error
+   * @param observedRolePO the role row the caller observed, carrying the version to match
+   */
+  void deleteRoleWithVersion(NameIdentifier identifier, RolePO observedRolePO) {
+    Long roleId = observedRolePO.getRoleId();
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        RoleMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteRoleMetaByRoleId(
+                                roleId, observedRolePO.getCurrentVersion())),
+                () -> roleWriteFailure(identifier, observedRolePO)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
@@ -330,7 +370,6 @@ public class RoleMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         roleId, MetadataObject.Type.ROLE.name())));
-    return true;
   }
 
   @Monitored(
@@ -453,6 +492,55 @@ public class RoleMetaService {
           roleName);
     }
     return rolePO;
+  }
+
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so the role cannot be created
+   * under a metalake that is going away.
+   *
+   * <p>The lock is shared, not exclusive: many roles can be created under the same metalake at the
+   * same time. Dropping a metalake takes an exclusive lock on this row, so a drop and a create
+   * cannot overlap. Whoever gets the row first wins, and the loser either sees the metalake gone or
+   * inserts under a metalake that is still there.
+   *
+   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
+   * looked the metalake up by name, so a renamed row means the name in the request no longer
+   * exists.
+   *
+   * <p>The metalake's version is deliberately not compared, matching {@code CatalogMetaService}.
+   * Holding the row is what makes the create safe. An unrelated metalake edit that commits in
+   * between bumps the version without making this create wrong, so comparing it would reject the
+   * create for no reason.
+   */
+  private void lockMetalakeForRoleCreate(MetalakePO observedMetalakePO) {
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  private RuntimeException roleWriteFailure(NameIdentifier identifier, RolePO observedRolePO) {
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a rename or
+    // delete that has not committed yet is classified as not-found instead of as a stale-version
+    // conflict. The lock is taken on the error path of a transaction that is about to roll back.
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.ROLE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleMetaByIdForUpdate(observedRolePO.getRoleId())),
+        null,
+        current ->
+            Objects.equals(current.getRoleName(), observedRolePO.getRoleName())
+                && Objects.equals(current.getMetalakeId(), observedRolePO.getMetalakeId()));
   }
 
   private static MetadataObject.Type getType(String type) {

@@ -42,8 +42,9 @@ public class OccWriteSupport {
   /**
    * Classifies a write-failure for an entity during an optimistic concurrency control operation.
    *
-   * <p>Executes a locking lookup to re-read the target entity. If the entity no longer exists or
-   * its natural key fields do not match the expected identity, returns a {@link
+   * <p>Executes a lookup to re-read the target entity. The caller is responsible for choosing the
+   * lookup semantics needed by its transaction, usually a locking read by stable ID. If the entity
+   * no longer exists or its natural key fields do not match the expected identity, returns a {@link
    * NoSuchEntityException}. Otherwise, returns an {@link
    * org.apache.gravitino.exceptions.OptimisticLockException} via {@link
    * ExceptionUtils#concurrentModification(Entity.EntityType, NameIdentifier)}.
@@ -51,7 +52,7 @@ public class OccWriteSupport {
    * @param <T> the persistent object (PO) type of the entity
    * @param identifier the name identifier of the entity
    * @param type the entity type
-   * @param lockingLookup a supplier that retrieves the current entity while locking its row
+   * @param currentLookup a supplier that retrieves the current entity
    * @param poMapper an optional function to transform the retrieved PO (e.g. physical to logical)
    * @param sameIdentity a predicate comparing the retrieved PO against expected natural key values
    * @return the classified RuntimeException to be thrown
@@ -59,10 +60,35 @@ public class OccWriteSupport {
   public static <T> RuntimeException writeFailure(
       NameIdentifier identifier,
       Entity.EntityType type,
-      Supplier<T> lockingLookup,
+      Supplier<T> currentLookup,
       @Nullable Function<T, T> poMapper,
       @Nullable Predicate<T> sameIdentity) {
-    T currentPO = lockingLookup.get();
+    return writeFailure(identifier, type, identifier.name(), currentLookup, poMapper, sameIdentity);
+  }
+
+  /**
+   * Classifies a write-failure while preserving a caller-specific entity name in not-found errors.
+   *
+   * <p>This overload is useful for services whose existing error contract reports a fully qualified
+   * name rather than {@link NameIdentifier#name()}.
+   *
+   * @param <T> the persistent object (PO) type of the entity
+   * @param identifier the name identifier used for an optimistic-lock error
+   * @param type the entity type
+   * @param entityName the entity name used for a not-found error
+   * @param currentLookup a supplier that retrieves the current entity
+   * @param poMapper an optional function to transform the retrieved PO (e.g. physical to logical)
+   * @param sameIdentity a predicate comparing the retrieved PO against expected natural key values
+   * @return the classified RuntimeException to be thrown
+   */
+  public static <T> RuntimeException writeFailure(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      String entityName,
+      Supplier<T> currentLookup,
+      @Nullable Function<T, T> poMapper,
+      @Nullable Predicate<T> sameIdentity) {
+    T currentPO = currentLookup.get();
     if (currentPO != null && poMapper != null) {
       currentPO = poMapper.apply(currentPO);
     }
@@ -70,7 +96,7 @@ public class OccWriteSupport {
       return new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           type.name().toLowerCase(Locale.ROOT),
-          identifier.name());
+          entityName);
     }
     return ExceptionUtils.concurrentModification(type, identifier);
   }

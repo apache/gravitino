@@ -162,8 +162,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
@@ -171,7 +169,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_mid_us_del` (`metalake_id`, `user_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_ueid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
@@ -221,7 +218,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
@@ -229,7 +225,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`group_id`),
     UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_geid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_group_meta_name_del_upd` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
@@ -250,6 +245,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
+    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',
@@ -478,6 +474,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
     `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at',
     `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT 'job run runtime job template',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job run audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',

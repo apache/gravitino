@@ -17,16 +17,6 @@
 -- under the License.
 --
 
-ALTER TABLE `user_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`,
-    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `external_id`;
-
-ALTER TABLE `group_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`;
-
-CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
-
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
@@ -38,6 +28,9 @@ ALTER TABLE `tag_relation_meta`
 
 ALTER TABLE `tag_relation_meta`
     ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
+
+ALTER TABLE `idp_user_meta`
+    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
 
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
@@ -117,6 +110,9 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
+
+ALTER TABLE `job_run_meta`
+    ADD COLUMN `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',

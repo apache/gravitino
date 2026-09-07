@@ -40,6 +40,7 @@ import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.types.Types;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +48,91 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestIcebergCatalogUtil {
 
   @TempDir private Path warehouse;
+
+  @AfterEach
+  void tearDown() {
+    IcebergCatalogUtil.clearMemoryCatalogs();
+  }
+
+  @Test
+  void testMemoryCatalogIsInternedByCatalogUuid() {
+    Map<String, String> properties =
+        Map.of(
+            IcebergConstants.CATALOG_BACKEND, "memory", IcebergConstants.CATALOG_UUID, "catalog-1");
+    IcebergConfig config = new IcebergConfig(properties);
+
+    InMemoryCatalog first =
+        (InMemoryCatalog)
+            IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+    Namespace namespace = Namespace.of("shared");
+    first.createNamespace(namespace);
+    InMemoryCatalog second =
+        (InMemoryCatalog)
+            IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+
+    Assertions.assertSame(first, second);
+    Assertions.assertTrue(second.namespaceExists(namespace));
+  }
+
+  @Test
+  void testMemoryCatalogsWithDifferentUuidsAreIsolated() {
+    IcebergConfig firstConfig =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_UUID,
+                "catalog-1"));
+    IcebergConfig secondConfig =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_UUID,
+                "catalog-2"));
+
+    Catalog first =
+        IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, firstConfig);
+    Catalog second =
+        IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, secondConfig);
+
+    Assertions.assertNotSame(first, second);
+  }
+
+  @Test
+  void testMemoryCatalogWithoutUuidIsNotInterned() {
+    IcebergConfig config = new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+
+    Catalog first = IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+    Catalog second = IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+
+    Assertions.assertNotSame(first, second);
+  }
+
+  @Test
+  void testDroppedMemoryCatalogIsRemoved() {
+    String catalogUuid = "catalog-1";
+    IcebergConfig config =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_UUID,
+                catalogUuid));
+    InMemoryCatalog original =
+        (InMemoryCatalog)
+            IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+    Namespace namespace = Namespace.of("removed");
+    original.createNamespace(namespace);
+
+    IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    InMemoryCatalog replacement =
+        (InMemoryCatalog)
+            IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
+
+    Assertions.assertNotSame(original, replacement);
+    Assertions.assertFalse(replacement.namespaceExists(namespace));
+  }
 
   @Test
   void testLoadCatalog() {
@@ -337,5 +423,27 @@ public class TestIcebergCatalogUtil {
   private static UncheckedSQLException migrationError(String causeMessage) {
     return new UncheckedSQLException(
         new SQLSyntaxErrorException(causeMessage), "Cannot check and eventually update SQL schema");
+  }
+
+  @Test
+  void testJdbcRetryableStatusCodes() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
+
+    // Verify that calling loadCatalogBackend again does not throw
+    Catalog catalog2 =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog2);
   }
 }

@@ -23,6 +23,7 @@ import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupMetaBaseSQLProvider {
@@ -83,6 +84,6 @@ public class IdpGroupMetaBaseSQLProvider {
   }
 
   protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 }

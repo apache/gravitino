@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -146,8 +147,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE tag_id IN "
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"
@@ -164,8 +165,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
         + " AND ("
@@ -180,8 +181,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " te SET te.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -193,8 +194,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String softDeleteTagMetadataObjectRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " te SET te.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
@@ -206,8 +207,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND metadata_object_type = #{metadataObjectType}";
   }
@@ -215,8 +216,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -270,8 +271,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -343,8 +344,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME

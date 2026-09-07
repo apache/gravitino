@@ -227,4 +227,151 @@ public class TestFunctionRegisterRequest {
     // This should succeed - different definitions can have different return types
     Assertions.assertDoesNotThrow(request::validate);
   }
+
+  @Test
+  public void testValidateNativeAndExternalDataTypes() {
+    FunctionParamDTO nativeParam =
+        FunctionParamDTO.builder()
+            .withName("native_param")
+            .withDataType(Types.IntegerType.get())
+            .build();
+    FunctionParamDTO externalParam =
+        FunctionParamDTO.builder()
+            .withName("external_param")
+            .withDataType(Types.ExternalType.of("engine_specific_param"))
+            .build();
+    FunctionDefinitionDTO scalarDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {nativeParam, externalParam})
+            .withReturnType(Types.ExternalType.of("engine_specific_result"))
+            .build();
+    FunctionRegisterRequest scalarRequest =
+        FunctionRegisterRequest.builder()
+            .withName("external_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDefinitions(new FunctionDefinitionDTO[] {scalarDefinition})
+            .build();
+
+    Assertions.assertDoesNotThrow(scalarRequest::validate);
+
+    FunctionColumnDTO externalColumn =
+        FunctionColumnDTO.builder()
+            .withName("external_column")
+            .withDataType(Types.ExternalType.of("engine_specific_column"))
+            .build();
+    FunctionDefinitionDTO tableDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnColumns(new FunctionColumnDTO[] {externalColumn})
+            .build();
+    FunctionRegisterRequest tableRequest =
+        FunctionRegisterRequest.builder()
+            .withName("external_table_func")
+            .withFunctionType(FunctionType.TABLE)
+            .withDefinitions(new FunctionDefinitionDTO[] {tableDefinition})
+            .build();
+
+    Assertions.assertDoesNotThrow(tableRequest::validate);
+  }
+
+  @Test
+  public void testRejectBlankExternalDataTypeWithFieldPath() {
+    FunctionDefinitionDTO definition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnType(Types.ExternalType.of(" "))
+            .build();
+    FunctionRegisterRequest request =
+        FunctionRegisterRequest.builder()
+            .withName("invalid_external_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertTrue(
+        exception.getMessage().contains("definitions[0].returnType.catalogString"));
+  }
+
+  @Test
+  public void testRejectUnknownParameterTypeWithFieldPath() throws JsonProcessingException {
+    assertInvalidDataType(
+        """
+        {
+          "name": "test_func",
+          "functionType": "SCALAR",
+          "definitions": [{
+            "parameters": [
+              {"name": "known", "dataType": "integer"},
+              {"name": "unknown", "dataType": "future_type"}
+            ],
+            "returnType": "integer"
+          }]
+        }
+        """,
+        "definitions[0].parameters[1].dataType");
+  }
+
+  @Test
+  public void testRejectPrimitiveTypeEncodedAsObjectWithFieldPath() throws JsonProcessingException {
+    assertInvalidDataType(
+        """
+        {
+          "name": "test_func",
+          "functionType": "SCALAR",
+          "definitions": [{
+            "parameters": [],
+            "returnType": {"type": "integer"}
+          }]
+        }
+        """,
+        "definitions[0].returnType");
+  }
+
+  @Test
+  public void testRejectExplicitUnparsedReturnColumnWithFieldPath() throws JsonProcessingException {
+    assertInvalidDataType(
+        """
+        {
+          "name": "test_func",
+          "functionType": "TABLE",
+          "definitions": [{
+            "parameters": [],
+            "returnColumns": [{
+              "name": "result",
+              "dataType": {"type": "unparsed", "unparsedType": "legacy_type"}
+            }]
+          }]
+        }
+        """,
+        "definitions[0].returnColumns[0].dataType");
+  }
+
+  @Test
+  public void testRejectNestedUnparsedTypeWithFieldPath() throws JsonProcessingException {
+    assertInvalidDataType(
+        """
+        {
+          "name": "test_func",
+          "functionType": "SCALAR",
+          "definitions": [{
+            "parameters": [],
+            "returnType": {"type": "list", "elementType": "future_type"}
+          }]
+        }
+        """,
+        "definitions[0].returnType.elementType");
+  }
+
+  private static void assertInvalidDataType(String json, String expectedFieldPath)
+      throws JsonProcessingException {
+    FunctionRegisterRequest request =
+        JsonUtils.objectMapper().readValue(json, FunctionRegisterRequest.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertTrue(exception.getMessage().contains('"' + expectedFieldPath + '"'));
+    Assertions.assertTrue(exception.getMessage().contains("UnparsedType is not allowed"));
+  }
 }

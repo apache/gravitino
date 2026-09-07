@@ -214,6 +214,26 @@ public class TestClassLoaderPool {
   }
 
   @Test
+  public void testCloseWhenIdleDefersActiveEntryCleanup() throws Exception {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      ClassLoaderKey key = simpleKey("iceberg");
+      PooledClassLoaderEntry entry = pool.acquire(key, this::createDummyClassLoader);
+      entry.classLoader().withClassLoader(classLoader -> null);
+
+      pool.closeWhenIdle();
+
+      Assertions.assertEquals(1, pool.size());
+      Assertions.assertNotNull(entry.classLoader().getInternalClassLoader());
+      Assertions.assertThrows(
+          IllegalStateException.class, () -> pool.acquire(key, this::createDummyClassLoader));
+
+      pool.release(entry);
+      Assertions.assertEquals(0, pool.size());
+      Assertions.assertNull(entry.classLoader().getInternalClassLoader());
+    }
+  }
+
+  @Test
   public void testKeyWithPackageProperty() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
       ClassLoaderKey key1 = new ClassLoaderKey("iceberg", ImmutableMap.of("package", "/path/a"));

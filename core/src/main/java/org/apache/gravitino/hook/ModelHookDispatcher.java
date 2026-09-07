@@ -71,7 +71,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
       // so the entity is stored under the normalized identifier. Apply the same normalization
@@ -165,7 +165,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
       // so the entity is stored under the normalized identifier. Apply the same normalization

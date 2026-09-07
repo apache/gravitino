@@ -76,6 +76,16 @@ public class TestOccWriteSupport {
   }
 
   @Test
+  void testWriteFailureUsesExplicitEntityName() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
+    RuntimeException ex =
+        OccWriteSupport.writeFailure(
+            ident, Entity.EntityType.MODEL, ident.toString(), () -> null, null, po -> true);
+
+    assertEquals("No such model entity: metalake.catalog.schema.model", ex.getMessage());
+  }
+
+  @Test
   void testWriteFailureReturnsOptimisticLockExceptionWhenMatch() {
     NameIdentifier ident = NameIdentifier.of("metalake_test");
     DummyPO current = new DummyPO("metalake_test", 1L);

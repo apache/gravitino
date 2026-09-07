@@ -107,7 +107,7 @@ public class BulkOperations {
   public BulkOperations() {
     this.bulkManager = GravitinoEnv.getInstance().bulkManager();
     this.accessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   /**
@@ -127,6 +127,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkUserAddRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -138,10 +146,7 @@ public class BulkOperations {
                 accessControlDispatcher.addUsers(
                     metalake,
                     Arrays.stream(request.getUsers())
-                        .map(
-                            user ->
-                                new UserAdd(
-                                    user.getName(), user.getExternalId(), user.getEnabled()))
+                        .map(user -> new UserAdd(user.getName()))
                         .collect(Collectors.toList()));
             UserDTO[] users =
                 results.stream()
@@ -179,6 +184,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkRemoveRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserException(
+          OperationType.REMOVE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -228,6 +241,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkGroupAddRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -239,7 +260,7 @@ public class BulkOperations {
                 accessControlDispatcher.addGroups(
                     metalake,
                     Arrays.stream(request.getGroups())
-                        .map(group -> new GroupAdd(group.getName(), group.getExternalId()))
+                        .map(group -> new GroupAdd(group.getName()))
                         .collect(Collectors.toList()));
             GroupDTO[] groups =
                 results.stream()
@@ -277,6 +298,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkRemoveRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.REMOVE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

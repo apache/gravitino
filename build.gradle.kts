@@ -212,7 +212,7 @@ allprojects {
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.7")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_FE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_FE_IMAGE") ?: "")
       param.environment("GRAVITINO_CI_DORIS_BE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_BE_IMAGE") ?: "")

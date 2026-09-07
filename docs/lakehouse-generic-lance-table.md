@@ -135,8 +135,9 @@ Gravitino. It adds a dataset version check to every `loadTable` call.
 :::note Zero-column Lance dataset
 If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
 version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
-as long as the stored version is unchanged. Once columns are written to the dataset, the next
-`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
+as long as the stored version is unchanged. Before recording a new version, Lance table
+alterations recheck an empty stored schema and abort if it cannot be loaded, so incomplete column
+metadata is not associated with the latest dataset version.
 :::
 
 ### Table Operations

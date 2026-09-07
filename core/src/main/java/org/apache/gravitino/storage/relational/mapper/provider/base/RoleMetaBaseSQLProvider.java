@@ -25,6 +25,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -40,6 +41,16 @@ public class RoleMetaBaseSQLProvider {
         + ROLE_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
         + " AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return "SELECT role_id as roleId, role_name as roleName, metalake_id as metalakeId,"
+        + " properties, audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE role_id = #{roleId} AND deleted_at = 0 FOR UPDATE";
   }
 
   public String selectRoleIdByMetalakeIdAndName(
@@ -147,8 +158,10 @@ public class RoleMetaBaseSQLProvider {
         + " metalake_id = #{roleMeta.metalakeId},"
         + " properties = #{roleMeta.properties},"
         + " audit_info = #{roleMeta.auditInfo},"
-        + " current_version = #{roleMeta.currentVersion},"
-        + " last_version = #{roleMeta.lastVersion},"
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{roleMeta.deletedAt}";
   }
 
@@ -164,26 +177,25 @@ public class RoleMetaBaseSQLProvider {
         + " last_version = #{newRoleMeta.lastVersion},"
         + " deleted_at = #{newRoleMeta.deletedAt}"
         + " WHERE role_id = #{oldRoleMeta.roleId}"
-        + " AND role_name = #{oldRoleMeta.roleName}"
-        + " AND metalake_id = #{oldRoleMeta.metalakeId}"
         + " AND current_version = #{oldRoleMeta.currentVersion}"
-        + " AND last_version = #{oldRoleMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
+  public String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE role_id = #{roleId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -197,8 +209,8 @@ public class RoleMetaBaseSQLProvider {
   public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

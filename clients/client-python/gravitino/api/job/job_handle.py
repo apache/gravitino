@@ -20,6 +20,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from gravitino.api.job.job_template import JobTemplate
+
 
 class JobHandle(ABC):
     class Status(Enum):
@@ -70,3 +72,10 @@ class JobHandle(ABC):
         execution yet.
         """
         raise NotImplementedError("finished_at is not implemented")
+
+    def runtime_job_template(self) -> Optional[JobTemplate]:
+        """Returns the resolved job template that was actually submitted for execution, with
+        placeholders replaced and referenced files downloaded, or ``None`` for jobs run before
+        this field was introduced.
+        """
+        raise NotImplementedError("runtime_job_template is not implemented")

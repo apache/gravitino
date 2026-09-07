@@ -403,6 +403,42 @@ public class JobIT extends BaseIT {
   }
 
   @Test
+  public void testRunJobPopulatesRuntimeJobTemplate() {
+    JobTemplate template = builder.withName("test_run_runtime_template").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    JobHandle jobHandle =
+        metalake.runJob(
+            template.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+
+    // The resolved runtime template is set at submission time, before the job even starts
+    // executing, and must carry the actual substituted values rather than the original
+    // template's raw {{placeholder}} strings.
+    JobTemplate runtimeJobTemplate = jobHandle.runtimeJobTemplate();
+    Assertions.assertNotNull(runtimeJobTemplate);
+    Assertions.assertEquals(template.name(), runtimeJobTemplate.name());
+    Assertions.assertEquals(template.comment(), runtimeJobTemplate.comment());
+    Assertions.assertEquals(
+        Lists.newArrayList("value1", "success"), runtimeJobTemplate.arguments());
+    Assertions.assertEquals(
+        ImmutableMap.of("ENV_VAR", "value2"), runtimeJobTemplate.environments());
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(
+            () -> {
+              JobHandle updatedJob = metalake.getJob(jobHandle.jobId());
+              return updatedJob.jobStatus() == JobHandle.Status.SUCCEEDED;
+            });
+
+    // The runtime job template is fixed at submission time, so it must be unchanged once the job
+    // reaches a terminal status and its entity has gone through the status-poll update path.
+    JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
+    Assertions.assertEquals(runtimeJobTemplate, retrievedJob.runtimeJobTemplate());
+  }
+
+  @Test
   public void testRunAndCancelJob() {
     JobTemplate template = builder.withName("test_run_cancel").build();
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));

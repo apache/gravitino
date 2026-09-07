@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -218,6 +219,17 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateSchemaWithNullRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateSchema() {
     SchemaCreateRequest req =
         new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
@@ -350,6 +362,17 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testAlterSchemaWithNullRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

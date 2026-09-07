@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobTemplateMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,8 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
       @Param("jobTemplateName") String jobTemplateName) {
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -44,7 +46,8 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

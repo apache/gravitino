@@ -35,14 +35,8 @@ const DISABLED_SENTINEL = Number.MAX_SAFE_INTEGER
 
 /**
  * Default idle timeout: 15 minutes in milliseconds.
- * Overridable via NEXT_PUBLIC_IDLE_TIMEOUT_MS environment variable.
  */
-const DEFAULT_IDLE_TIMEOUT_MS = (() => {
-  const envVal = process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS
-  const parsed = envVal ? Number(envVal) : NaN
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15 * 60 * 1000
-})()
+const DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000
 
 /**
  * Throttle interval for activity events in milliseconds.

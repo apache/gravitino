@@ -286,24 +286,19 @@ CREATE TABLE IF NOT EXISTS user_meta (
     user_id BIGINT NOT NULL,
     user_name VARCHAR(128) NOT NULL,
     metalake_id BIGINT NOT NULL,
-    external_id VARCHAR(256) DEFAULT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id),
-    UNIQUE (metalake_id, user_name, deleted_at),
-    UNIQUE (metalake_id, external_id, deleted_at)
+    UNIQUE (metalake_id, user_name, deleted_at)
 );
 COMMENT ON TABLE user_meta IS 'user metadata';
 
 COMMENT ON COLUMN user_meta.user_id IS 'user id';
 COMMENT ON COLUMN user_meta.user_name IS 'username';
 COMMENT ON COLUMN user_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN user_meta.external_id IS 'external identifier from an upstream identity system';
-COMMENT ON COLUMN user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
 COMMENT ON COLUMN user_meta.audit_info IS 'user audit info';
 COMMENT ON COLUMN user_meta.current_version IS 'user current version';
 COMMENT ON COLUMN user_meta.last_version IS 'user last version';
@@ -392,22 +387,19 @@ CREATE TABLE IF NOT EXISTS group_meta (
     group_id BIGINT NOT NULL,
     group_name VARCHAR(128) NOT NULL,
     metalake_id BIGINT NOT NULL,
-    external_id VARCHAR(256) DEFAULT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (group_id),
-    UNIQUE (metalake_id, group_name, deleted_at),
-    UNIQUE (metalake_id, external_id, deleted_at)
+    UNIQUE (metalake_id, group_name, deleted_at)
 );
 COMMENT ON TABLE group_meta IS 'group metadata';
 
 COMMENT ON COLUMN group_meta.group_id IS 'group id';
 COMMENT ON COLUMN group_meta.group_name IS 'group name';
 COMMENT ON COLUMN group_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstream identity system';
 COMMENT ON COLUMN group_meta.audit_info IS 'group audit info';
 COMMENT ON COLUMN group_meta.current_version IS 'group current version';
 COMMENT ON COLUMN group_meta.last_version IS 'group last version';
@@ -441,6 +433,7 @@ CREATE TABLE IF NOT EXISTS idp_user_meta (
     user_id BIGINT NOT NULL,
     user_name VARCHAR(128) NOT NULL,
     password_hash VARCHAR(1024) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -452,6 +445,7 @@ COMMENT ON TABLE idp_user_meta IS 'local IdP user metadata';
 COMMENT ON COLUMN idp_user_meta.user_id IS 'idp user id';
 COMMENT ON COLUMN idp_user_meta.user_name IS 'idp username';
 COMMENT ON COLUMN idp_user_meta.password_hash IS 'idp user password hash';
+COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
 COMMENT ON COLUMN idp_user_meta.current_version IS 'idp user current version';
 COMMENT ON COLUMN idp_user_meta.last_version IS 'idp user last version';
 COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
@@ -843,6 +837,7 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     job_run_status VARCHAR(64) NOT NULL,
     job_started_at BIGINT NOT NULL DEFAULT 0,
     job_finished_at BIGINT NOT NULL DEFAULT 0,
+    runtime_job_template TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -861,6 +856,7 @@ COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
 COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
 COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';
 COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
 COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
 COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';

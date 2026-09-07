@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
     return "INSERT INTO "
         + JobMetaMapper.TABLE_NAME
         + " (job_run_id, job_template_id, metalake_id,"
-        + " job_execution_id, job_run_status, job_started_at, job_finished_at, audit_info,"
+        + " job_execution_id, job_run_status, job_started_at, job_finished_at,"
+        + " runtime_job_template, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
@@ -41,8 +43,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobStartedAt}, #{jobMeta.jobFinishedAt},"
-        + " #{jobMeta.auditInfo}, #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
-        + " #{jobMeta.deletedAt})"
+        + " #{jobMeta.runtimeJobTemplate}, #{jobMeta.auditInfo}, #{jobMeta.currentVersion},"
+        + " #{jobMeta.lastVersion}, #{jobMeta.deletedAt})"
         + " ON CONFLICT (job_run_id) DO UPDATE SET"
         + " job_template_id = (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
@@ -53,6 +55,7 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " job_run_status = #{jobMeta.jobRunStatus},"
         + " job_started_at = #{jobMeta.jobStartedAt},"
         + " job_finished_at = #{jobMeta.jobFinishedAt},"
+        + " runtime_job_template = #{jobMeta.runtimeJobTemplate},"
         + " audit_info = #{jobMeta.auditInfo},"
         + " current_version = #{jobMeta.currentVersion},"
         + " last_version = #{jobMeta.lastVersion},"
@@ -65,7 +68,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
       @Param("jobTemplateName") String jobTemplateName) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -81,14 +85,16 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
   }
 
@@ -96,7 +102,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
   }
 

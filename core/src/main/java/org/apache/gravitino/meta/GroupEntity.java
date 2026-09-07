@@ -39,9 +39,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   public static final Field NAME =
       Field.required("name", String.class, "The name of the group entity.");
 
-  public static final Field EXTERNAL_ID =
-      Field.optional("external_id", String.class, "The external id of the group entity.");
-
   public static final Field ROLE_NAMES =
       Field.optional("role_names", List.class, "The role names of the group entity.");
 
@@ -53,7 +50,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
   private Long id;
   private String name;
-  private String externalId;
   private AuditInfo auditInfo;
   private List<String> roleNames;
   private List<Long> roleIds;
@@ -71,7 +67,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(EXTERNAL_ID, externalId);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ROLE_NAMES, roleNames);
     fields.put(ROLE_IDS, roleIds);
@@ -87,11 +82,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
-  }
-
-  @Override
-  public String externalId() {
-    return externalId;
   }
 
   /**
@@ -172,14 +162,13 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(externalId, that.externalId)
         && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
         && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, externalId, roleNames, roleIds);
+    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -212,17 +201,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
      */
     public Builder withName(String name) {
       groupEntity.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the external id of the group entity.
-     *
-     * @param externalId The external id of the group entity.
-     * @return The builder instance.
-     */
-    public Builder withExternalId(String externalId) {
-      groupEntity.externalId = externalId;
       return this;
     }
 
