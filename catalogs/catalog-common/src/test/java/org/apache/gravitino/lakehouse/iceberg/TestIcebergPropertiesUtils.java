@@ -23,10 +23,17 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
+import org.apache.gravitino.storage.AzureProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergPropertiesUtils {
+
+  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER = "adls.token-credential-provider";
+  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
+      ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
+  private static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
+      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
 
   @Test
   void testJdbcSchemaVersionPropertyIsMapped() {
@@ -55,6 +62,85 @@ public class TestIcebergPropertiesUtils {
         "1000", icebergProps.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
     Assertions.assertEquals(
         "2000", icebergProps.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testAzureServicePrincipalPropertiesAreMapped() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(
+            AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            "account",
+            AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+            "tenant",
+            AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+            "client",
+            AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+            "secret");
+
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+
+    Assertions.assertFalse(
+        icebergProps.containsKey(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
+    Assertions.assertFalse(
+        icebergProps.containsKey(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY));
+    Assertions.assertEquals(
+        AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER,
+        icebergProps.get(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+    Assertions.assertEquals(
+        "tenant",
+        icebergProps.get(
+            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
+    Assertions.assertEquals(
+        "client",
+        icebergProps.get(
+            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID));
+    Assertions.assertEquals(
+        "secret",
+        icebergProps.get(
+            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+  }
+
+  @Test
+  void testAzureSharedKeyTakesPrecedenceOverServicePrincipal() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(
+            AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            "account",
+            AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+            "account-key",
+            AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+            "tenant",
+            AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+            "client",
+            AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+            "secret");
+
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+
+    Assertions.assertEquals(
+        "account", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
+    Assertions.assertEquals(
+        "account-key", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY));
+    Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+  }
+
+  @Test
+  void testIncompleteAzureServicePrincipalPreservesSharedKeyValidation() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(
+            AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+            "account",
+            AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+            "tenant");
+
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+
+    Assertions.assertEquals(
+        "account", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
+    Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
   }
 
   @Test

@@ -23,11 +23,18 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergPropertiesUtils {
+
+  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER = "adls.token-credential-provider";
+  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
+      ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
+  private static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
+      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
@@ -113,7 +120,40 @@ public class IcebergPropertiesUtils {
             icebergProperties.put(GRAVITINO_CONFIG_TO_ICEBERG.get(key), value);
           }
         });
+    configureAzureAuthentication(gravitinoProperties, icebergProperties);
     return icebergProperties;
+  }
+
+  private static void configureAzureAuthentication(
+      Map<String, String> gravitinoProperties, Map<String, String> icebergProperties) {
+    String storageAccountName =
+        gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+    String storageAccountKey =
+        gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    boolean hasSharedKey = StringUtils.isNoneBlank(storageAccountName, storageAccountKey);
+
+    String tenantId = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_TENANT_ID);
+    String clientId = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_CLIENT_ID);
+    String clientSecret = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET);
+    boolean hasServicePrincipal = StringUtils.isNoneBlank(tenantId, clientId, clientSecret);
+
+    if (hasSharedKey || !hasServicePrincipal) {
+      return;
+    }
+
+    icebergProperties.remove(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME);
+    icebergProperties.remove(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
+    icebergProperties.put(
+        ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
+    icebergProperties.put(
+        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+        tenantId);
+    icebergProperties.put(
+        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+        clientId);
+    icebergProperties.put(
+        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+        clientSecret);
   }
 
   /**
