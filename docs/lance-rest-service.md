@@ -57,7 +57,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 ```
 
 **Key Features:**
-- Full compliance with Lance REST API specification
+- Support for the Lance REST operations listed below
 - Can run standalone or integrated with Gravitino server
 - Support for namespace and table management
 - Metadata stored in Gravitino for unified governance
@@ -67,7 +67,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 The Lance REST service provides comprehensive support for namespace management and table management. Index operations are not supported yet. The table below lists all supported operations:
 
 | Operation         | Description                                                               | HTTP Method | Endpoint Pattern                      |
-|-------------------|---------------------------------------------------------------------------|-------------|---------------------------------------|
+| ----------------- | ------------------------------------------------------------------------- | ----------- | ------------------------------------- |
 | CreateNamespace   | Create a new Lance namespace                                              | POST        | `/lance/v1/namespace/{id}/create`     |
 | ListNamespaces    | List all namespaces under a parent namespace                              | GET         | `/lance/v1/namespace/{parent}/list`   |
 | DescribeNamespace | Retrieve detailed information about a specific namespace                  | POST        | `/lance/v1/namespace/{id}/describe`   |
@@ -99,17 +99,24 @@ REST-style canonical form.
 - `overwrite`: Replaces existing namespace
 
 **DropNamespace** behavior:
-- Recursively deletes all child namespaces and tables
-- Deletes both metadata and Lance data files
-- Operation is irreversible
+- Defaults to `behavior=restrict`; non-empty namespaces cannot be dropped in this mode
+- `behavior=cascade` removes child metadata recursively
+- Cascading a schema drop uses table drop semantics: external Lance datasets are preserved
+- Use `DropTable` explicitly to delete a table's data; namespace deletion is not a storage purge
 
 #### Table Operations
 
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
-- **CreateTable**: Creates new Lance table with schema and write metadata files
+- **CreateTable**: Creates an empty Lance dataset using the schema from the Arrow IPC stream
 :::note
-The `version` field of `CreateTable` response is always null, which stands for the latest version. 
+The current `CreateTable` implementation reads the Arrow stream schema but does not ingest its
+record batches. Send a schema-only stream and write records through a Lance client or engine
+after creation.
+
+The `version` field of `CreateTable` reports the stored Lance dataset version when available.
+`DescribeTable` currently returns the latest metadata even when a historical `version` is requested;
+versioned metadata reads are not implemented.
 :::
 
 **DropTable vs DeregisterTable**:
@@ -124,7 +131,7 @@ The `version` field of `CreateTable` response is always null, which stands for t
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
 | Configuration Property                    | Description                                                                  | Default Value           | Required |
-|-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|
+| ----------------------------------------- | ---------------------------------------------------------------------------- | ----------------------- | -------- |
 | `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      |
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
@@ -141,7 +148,7 @@ Auxiliary mode uses internal APIs and preserves the authenticated caller instead
 user name below is only the fallback for requests accepted as anonymous.
 
 | Configuration Property                             | Description                                                                        | Default Value       | Required          |
-|----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------- | ----------------- |
 | `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                |
 | `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                |
 | `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` |
@@ -176,7 +183,7 @@ To run Lance REST service independently without Gravitino server (You need to st
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
 | Configuration Property                    | Description                | Default Value         | Required |
-|-------------------------------------------|----------------------------|-----------------------|----------|
+| ----------------------------------------- | -------------------------- | --------------------- | -------- |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend | gravitino             | Yes      |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI       | http://localhost:8090 | Yes      |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
@@ -205,7 +212,7 @@ Access the service at `http://localhost:9101`.
 **Environment Variables:**
 
 | Environment Variable                 | Configuration Property                    | Required | Default Value           |
-|--------------------------------------|-------------------------------------------|----------|-------------------------|
+| ------------------------------------ | ----------------------------------------- | -------- | ----------------------- |
 | `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | Yes      | `gravitino`             |
 | `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino-metalake` | Yes      | (none)                  |
 | `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | Yes      | `http://localhost:8090` |
@@ -260,7 +267,7 @@ URL encoded:        lance_catalog%24schema%24table01
 - Supports only **two levels of namespaces** before tables
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
-- Namespace deletion is recursive and irreversible
+- Namespace deletion defaults to `restrict`; use `cascade` to remove child metadata
 :::
 
 ## Authentication and authorization
@@ -272,10 +279,10 @@ both auxiliary and standalone mode. See [Authentication](./security/how-to-authe
 configuring the authenticators and their credentials. Health check endpoints bypass authentication.
 Authentication errors use the Lance JSON error format; unsupported credentials return HTTP `401`.
 
-| Mode | Identity used for Gravitino metadata operations | Metadata authorization |
-|------|------------------------------------------------|------------------------|
-| Auxiliary (running with Gravitino) | Authenticated caller, including active roles; anonymous requests fall back to `gravitino.lance-rest.gravitino-simple.user-name` (default `lance-rest-server`) | Enabled by `gravitino.authorization.enable=true` with a configured metalake |
-| Standalone | Configured service credentials (`gravitino.lance-rest.gravitino-auth-type` and its simple/OAuth2 settings) | No Lance REST per-user metadata authorization; the remote Gravitino server checks the service identity if its authorization is enabled |
+| Mode                               | Identity used for Gravitino metadata operations                                                                                                               | Metadata authorization                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Auxiliary (running with Gravitino) | Authenticated caller, including active roles; anonymous requests fall back to `gravitino.lance-rest.gravitino-simple.user-name` (default `lance-rest-server`) | Enabled by `gravitino.authorization.enable=true` with a configured metalake                                                            |
+| Standalone                         | Configured service credentials (`gravitino.lance-rest.gravitino-auth-type` and its simple/OAuth2 settings)                                                    | No Lance REST per-user metadata authorization; the remote Gravitino server checks the service identity if its authorization is enabled |
 
 The auxiliary fallback applies only after authentication accepts an anonymous request. It does
 not recover a rejected authentication attempt. Authenticated callers keep their own privileges,
@@ -289,7 +296,7 @@ must be verified; `simple` is not password authentication.
 
 Standalone authenticates incoming requests, but does not forward their identities or active roles
 to its Gravitino backend. All callers use the configured backend service identity. Standalone
-per-user authorization and storage credential vending are outside the supported scope. The
+per-user authorization and scoped temporary credential vending are outside the supported scope. The
 backend service identity needs privileges for all underlying Gravitino calls, including existence
 checks performed before mutations (for example, catalog access before creating a namespace).
 
@@ -326,27 +333,27 @@ can operate throughout the metalake; catalog owners can operate within their cat
 Schema owners additionally need `USE_CATALOG`, and table owners need `USE_CATALOG` and
 `USE_SCHEMA`. The ownership alternatives below include these ancestor owners.
 
-| Namespace operation | Required privileges or ownership |
-|---------------------|----------------------------------|
-| `ListNamespaces` at root | Membership in the metalake; returns only accessible catalogs |
-| `ListNamespaces` under a catalog; `DescribeNamespace` for a catalog; `NamespaceExists` for a catalog | `USE_CATALOG`, or ownership |
-| `ListNamespaces` under a schema; `DescribeNamespace` for a schema; `ListTables` | `USE_CATALOG` and `USE_SCHEMA`, or ownership |
-| `NamespaceExists` for a schema | `USE_CATALOG` and either `USE_SCHEMA` or `CREATE_SCHEMA`, or ownership |
-| `CreateNamespace` for a catalog (`create`, `exist_ok`) | `CREATE_CATALOG` on the metalake, or metalake ownership |
-| `CreateNamespace` for a schema (`create`, `exist_ok`) | `USE_CATALOG` and `CREATE_SCHEMA`, or catalog/metalake ownership |
-| `CreateNamespace` (`overwrite`); `DropNamespace` | Ownership of the namespace or an ancestor |
+| Namespace operation                                                                                  | Required privileges or ownership                                       |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `ListNamespaces` at root                                                                             | Membership in the metalake; returns only accessible catalogs           |
+| `ListNamespaces` under a catalog; `DescribeNamespace` for a catalog; `NamespaceExists` for a catalog | `USE_CATALOG`, or ownership                                            |
+| `ListNamespaces` under a schema; `DescribeNamespace` for a schema; `ListTables`                      | `USE_CATALOG` and `USE_SCHEMA`, or ownership                           |
+| `NamespaceExists` for a schema                                                                       | `USE_CATALOG` and either `USE_SCHEMA` or `CREATE_SCHEMA`, or ownership |
+| `CreateNamespace` for a catalog (`create`, `exist_ok`)                                               | `CREATE_CATALOG` on the metalake, or metalake ownership                |
+| `CreateNamespace` for a schema (`create`, `exist_ok`)                                                | `USE_CATALOG` and `CREATE_SCHEMA`, or catalog/metalake ownership       |
+| `CreateNamespace` (`overwrite`); `DropNamespace`                                                     | Ownership of the namespace or an ancestor                              |
 
-| Table operation | Required privileges or ownership |
-|-----------------|----------------------------------|
-| `DescribeTable` | `USE_CATALOG`, `USE_SCHEMA`, and either `SELECT_TABLE` or `MODIFY_TABLE`, or ownership |
-| `TableExists` | Same as `DescribeTable`, or `USE_CATALOG`, `USE_SCHEMA`, and either `PROBE_TABLE_LIKE` or `CREATE_TABLE` |
-| `CreateTable` (`create`, `exist_ok`); `RegisterTable` (`create`); `DeclareTable` | `USE_CATALOG`, `USE_SCHEMA`, and `CREATE_TABLE`, or schema/ancestor ownership |
-| `CreateTable` or `RegisterTable` (`overwrite`); `AlterColumns`; `DropColumns` | `USE_CATALOG`, `USE_SCHEMA`, and `MODIFY_TABLE`, or ownership |
-| `DropTable`; `DeregisterTable` | Ownership of the table or an ancestor |
+| Table operation                                                                  | Required privileges or ownership                                                                         |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DescribeTable`                                                                  | `USE_CATALOG`, `USE_SCHEMA`, and either `SELECT_TABLE` or `MODIFY_TABLE`, or ownership                   |
+| `TableExists`                                                                    | Same as `DescribeTable`, or `USE_CATALOG`, `USE_SCHEMA`, and either `PROBE_TABLE_LIKE` or `CREATE_TABLE` |
+| `CreateTable` (`create`, `exist_ok`); `RegisterTable` (`create`); `DeclareTable` | `USE_CATALOG`, `USE_SCHEMA`, and `CREATE_TABLE`, or schema/ancestor ownership                            |
+| `CreateTable` or `RegisterTable` (`overwrite`); `AlterColumns`; `DropColumns`    | `USE_CATALOG`, `USE_SCHEMA`, and `MODIFY_TABLE`, or ownership                                            |
+| `DropTable`; `DeregisterTable`                                                   | Ownership of the table or an ancestor                                                                    |
 
-`CREATE_TABLE` and `PROBE_TABLE_LIKE` can authorize an existence probe without granting table
-metadata reads. `CREATE_TABLE` alone cannot overwrite another owner's table, and `MODIFY_TABLE`
-alone cannot drop or deregister it. Similarly, namespace creation privileges do not authorize
+`CREATE_TABLE` and `PROBE_TABLE_LIKE` authorize `TableExists` without authorizing
+`DescribeTable`. `CREATE_TABLE` alone does not authorize overwrite requests. The `DropTable`
+and `DeregisterTable` endpoints require ownership rather than `MODIFY_TABLE`. Similarly, namespace creation privileges do not authorize
 overwriting or dropping another owner's namespace. Successful creation assigns ownership to
 the effective caller.
 
@@ -356,14 +363,17 @@ Namespace listings omit inaccessible catalogs and schemas. Table listings omit t
 the caller has neither ownership nor `SELECT_TABLE`/`MODIFY_TABLE`. Filtering happens before
 pagination; hidden entries do not consume page slots. Access to the parent is checked separately.
 
-Direct operations on objects the caller cannot access return `403`, whether or not the target
-exists, without returning its stored metadata or location. An authorized caller can distinguish
-an existing object from a missing one (`404`). Concealment therefore does not mean that every
+When a caller lacks an endpoint's required privileges, the request returns `403`, whether or not
+the target exists, without returning its stored metadata or location. An authorized caller can
+distinguish an existing object from a missing one (`404`). Concealment therefore does not mean that every
 inaccessible object returns `404`.
 
-Authorization governs metadata requests. Engines access Lance data files directly using their
-own storage configuration and credentials; these metadata privileges do not enforce data-file
-access or provide storage credentials.
+Authorization governs metadata requests; engines access Lance data files directly. Responses can
+include configured storage credentials: namespace descriptions resolve secret properties, and
+table descriptions, creation and declaration responses return effective `storage_options` from
+catalog defaults and table overrides. These are shared configured credentials, not temporary
+credentials restricted to the caller's table privileges. Access to data files depends on the
+permissions of those credentials. Per-user, scoped credential vending is not implemented.
 
 ## Examples
 

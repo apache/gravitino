@@ -21,7 +21,7 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
-|--------------------------------|--------------------------------|-----------------------------------------------|
+| ------------------------------ | ------------------------------ | --------------------------------------------- |
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
 | 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
 
@@ -135,8 +135,9 @@ identity even when an engine supplies its own incoming credentials.
 Engines that probe before creating need the corresponding creation privileges. Reading table
 metadata requires `SELECT_TABLE` or `MODIFY_TABLE` with parent access, while overwriting requires
 `MODIFY_TABLE` and dropping requires ownership. Metadata authorization does not authorize direct
-reads or writes to object storage: configure storage access independently. Lance REST does not
-vend per-user storage credentials.
+reads or writes to object storage: configure storage access independently. Lance REST responses
+can return shared storage credentials configured on the catalog or table; it does not issue
+per-user, scoped storage credentials.
 
 ### Verify authentication and authorization locally
 
