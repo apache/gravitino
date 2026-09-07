@@ -554,12 +554,14 @@ public class TestResponses {
   void testSecretProviderListResponse() throws JsonProcessingException {
     SecretProviderListResponse response =
         new SecretProviderListResponse(
-            new SecretProviderDTO[] {new SecretProviderDTO("memory", "memory")});
+            new SecretProviderDTO[] {
+              SecretProviderDTO.builder().withName("memory").withType("memory").build()
+            });
     response.validate();
     assertEquals(0, response.getCode());
     assertEquals(1, response.getProviders().length);
-    assertEquals("memory", response.getProviders()[0].name());
-    assertEquals("memory", response.getProviders()[0].type());
+    assertEquals("memory", response.getProviders()[0].getName());
+    assertEquals("memory", response.getProviders()[0].getType());
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     assertFalse(serJson.contains("uri"));

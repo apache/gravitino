@@ -42,7 +42,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestSecretProviderOperations extends JerseyTest {
+public class TestProviderOperations extends JerseyTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -63,7 +63,7 @@ public class TestSecretProviderOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(SecretProviderOperations.class);
+    resourceConfig.register(ProviderOperations.class);
     resourceConfig.register(WebApplicationExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {
@@ -77,7 +77,7 @@ public class TestSecretProviderOperations extends JerseyTest {
   }
 
   @Test
-  public void testListProvidersEmpty() {
+  public void testListSecretProvidersEmpty() {
     when(secretProviderRegistry.listProviders()).thenReturn(List.of());
 
     Response response =
@@ -90,7 +90,7 @@ public class TestSecretProviderOperations extends JerseyTest {
   }
 
   @Test
-  public void testListProvidersOmitsUri() {
+  public void testListSecretProvidersOmitsUri() {
     when(secretProviderRegistry.listProviders())
         .thenReturn(List.of(new SecretProviderInfo("vault", "vault", "https://vault.example.com")));
 
@@ -109,8 +109,8 @@ public class TestSecretProviderOperations extends JerseyTest {
             .get()
             .readEntity(SecretProviderListResponse.class);
     Assertions.assertEquals(1, body.getProviders().length);
-    Assertions.assertEquals("vault", body.getProviders()[0].name());
-    Assertions.assertEquals("vault", body.getProviders()[0].type());
+    Assertions.assertEquals("vault", body.getProviders()[0].getName());
+    Assertions.assertEquals("vault", body.getProviders()[0].getType());
   }
 
   @Test

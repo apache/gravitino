@@ -66,9 +66,9 @@ public class SecretProviderListResponse extends BaseResponse {
         .forEach(
             provider -> {
               Preconditions.checkArgument(
-                  StringUtils.isNotBlank(provider.name()), "provider 'name' must not be blank");
+                  StringUtils.isNotBlank(provider.getName()), "provider 'name' must not be blank");
               Preconditions.checkArgument(
-                  StringUtils.isNotBlank(provider.type()), "provider 'type' must not be blank");
+                  StringUtils.isNotBlank(provider.getType()), "provider 'type' must not be blank");
             });
   }
 }

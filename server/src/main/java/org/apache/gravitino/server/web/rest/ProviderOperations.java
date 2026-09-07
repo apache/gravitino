@@ -44,10 +44,10 @@ import org.slf4j.LoggerFactory;
  * <p>The provider registry is server configuration, not a metalake resource, so the path has no
  * metalake segment. Access is restricted to service administrators.
  */
-@Path("/secrets/providers")
-public class SecretProviderOperations {
+@Path("/")
+public class ProviderOperations {
 
-  private static final Logger LOG = LoggerFactory.getLogger(SecretProviderOperations.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ProviderOperations.class);
 
   private final SecretProviderRegistry secretProviderRegistry;
 
@@ -59,7 +59,7 @@ public class SecretProviderOperations {
    * @param secretProviderRegistry the process-owned provider registry
    */
   @Inject
-  public SecretProviderOperations(SecretProviderRegistry secretProviderRegistry) {
+  public ProviderOperations(SecretProviderRegistry secretProviderRegistry) {
     this.secretProviderRegistry = secretProviderRegistry;
   }
 
@@ -69,13 +69,14 @@ public class SecretProviderOperations {
    * @return a list of provider names and types
    */
   @GET
+  @Path("/secrets/providers")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-secret-providers." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-secret-providers", absolute = true)
   @AuthorizationExpression(
       expression = "SERVICE_ADMIN",
       errorMessage = "Only service admins can list secrets providers")
-  public Response listProviders() {
+  public Response listSecretProviders() {
     LOG.info("Received list secrets providers request.");
     try {
       return Utils.doAs(
@@ -84,7 +85,12 @@ public class SecretProviderOperations {
             List<SecretProviderInfo> infos = secretProviderRegistry.listProviders();
             SecretProviderDTO[] providers =
                 infos.stream()
-                    .map(info -> new SecretProviderDTO(info.name(), info.type()))
+                    .map(
+                        info ->
+                            SecretProviderDTO.builder()
+                                .withName(info.name())
+                                .withType(info.type())
+                                .build())
                     .toArray(SecretProviderDTO[]::new);
             Response response = Utils.ok(new SecretProviderListResponse(providers));
             LOG.info("Listed {} secrets providers", providers.length);

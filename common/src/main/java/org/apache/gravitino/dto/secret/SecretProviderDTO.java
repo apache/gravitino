@@ -19,72 +19,26 @@
 package org.apache.gravitino.dto.secret;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import java.util.Objects;
-import org.apache.commons.lang3.StringUtils;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 /** Discovery metadata for a configured secrets-provider instance. */
-public final class SecretProviderDTO {
+@Getter
+@EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
+@Builder(setterPrefix = "with")
+@ToString
+public class SecretProviderDTO {
 
   @JsonProperty("name")
   private String name;
 
   @JsonProperty("type")
   private String type;
-
-  /** Default constructor for Jackson deserialization. */
-  public SecretProviderDTO() {}
-
-  /**
-   * Creates provider discovery metadata.
-   *
-   * @param name the configured provider instance name
-   * @param type the provider type identifier
-   */
-  public SecretProviderDTO(String name, String type) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
-    Preconditions.checkArgument(StringUtils.isNotBlank(type), "type must not be blank");
-    this.name = name;
-    this.type = type;
-  }
-
-  /**
-   * Returns the configured provider instance name.
-   *
-   * @return the provider name
-   */
-  public String name() {
-    return name;
-  }
-
-  /**
-   * Returns the provider type identifier.
-   *
-   * @return the provider type
-   */
-  public String type() {
-    return type;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof SecretProviderDTO)) {
-      return false;
-    }
-    SecretProviderDTO that = (SecretProviderDTO) o;
-    return Objects.equals(name, that.name) && Objects.equals(type, that.type);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(name, type);
-  }
-
-  @Override
-  public String toString() {
-    return "SecretProviderDTO{name='" + name + "', type='" + type + "'}";
-  }
 }
