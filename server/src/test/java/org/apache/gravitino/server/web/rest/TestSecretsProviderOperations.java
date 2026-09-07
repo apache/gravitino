@@ -42,7 +42,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestProviderOperations extends JerseyTest {
+public class TestSecretsProviderOperations extends JerseyTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -63,7 +63,7 @@ public class TestProviderOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(ProviderOperations.class);
+    resourceConfig.register(SecretsProviderOperations.class);
     resourceConfig.register(WebApplicationExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {

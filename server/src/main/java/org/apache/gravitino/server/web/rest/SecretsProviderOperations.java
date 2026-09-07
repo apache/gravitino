@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
  * metalake segment. Access is restricted to service administrators.
  */
 @Path("/")
-public class ProviderOperations {
+public class SecretsProviderOperations {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ProviderOperations.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SecretsProviderOperations.class);
 
   private final SecretProviderRegistry secretProviderRegistry;
 
@@ -59,7 +59,7 @@ public class ProviderOperations {
    * @param secretProviderRegistry the process-owned provider registry
    */
   @Inject
-  public ProviderOperations(SecretProviderRegistry secretProviderRegistry) {
+  public SecretsProviderOperations(SecretProviderRegistry secretProviderRegistry) {
     this.secretProviderRegistry = secretProviderRegistry;
   }
 

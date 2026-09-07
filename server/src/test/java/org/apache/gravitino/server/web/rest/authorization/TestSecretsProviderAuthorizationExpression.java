@@ -25,15 +25,15 @@ import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Method;
 import ognl.OgnlException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.web.rest.ProviderOperations;
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.junit.jupiter.api.Test;
 
-public class TestProviderAuthorizationExpression {
+public class TestSecretsProviderAuthorizationExpression {
 
   @Test
   public void testListSecretProvidersRequiresServiceAdmin()
       throws NoSuchMethodException, OgnlException {
-    Method method = ProviderOperations.class.getMethod("listSecretProviders");
+    Method method = SecretsProviderOperations.class.getMethod("listSecretProviders");
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     MockAuthorizationExpressionEvaluator mockEvaluator =
