@@ -227,11 +227,19 @@ Authorization itself is always enforced by Gravitino: the MCP server forwards th
 
 ### Per-request metalake (HTTP)
 
-When the server runs with HTTP transport, a request may name the metalake to operate on with the `X-Gravitino-Metalake` header, taking priority over the `--metalake` default configured at startup. This lets one server instance serve more than one metalake: each request independently resolves its own metalake from its own header, so the server holds no per-connection or per-session metalake state and stays correct regardless of how many replicas it runs as.
+`--metalake` is **required for stdio transport and optional for HTTP transport**. It is the default metalake: the one used by any request that does not name a metalake itself.
 
-Falls back to `--metalake` when the header is absent. If neither is set, the call fails with an error naming the missing argument. Authorization is unchanged — the caller's identity (see above) determines what it may see in the requested metalake exactly as it would through the REST API.
+When the server runs with HTTP transport, a request may name the metalake to operate on with the `X-Gravitino-Metalake` header, taking priority over the `--metalake` default. This lets one server instance serve more than one metalake: each request independently resolves its own metalake from its own header, so the server holds no per-connection or per-session metalake state and stays correct regardless of how many replicas it runs as.
 
-stdio transport has no per-request header, so `--metalake` remains the only source there; switching metalake means starting another stdio process with a different `--metalake`.
+The metalake for a call is resolved in this order:
+
+1. The `X-Gravitino-Metalake` header, when the request carries one.
+2. The `--metalake` startup default, when it is configured.
+3. Otherwise the call fails with an error naming the missing argument.
+
+Authorization is unchanged — the caller's identity (see above) determines what it may see in the requested metalake exactly as it would through the REST API.
+
+stdio transport has no per-request header, so `--metalake` is required there and remains the only source; switching metalake means starting another stdio process with a different `--metalake`.
 
 ### Serving over HTTPS (TLS)
 
