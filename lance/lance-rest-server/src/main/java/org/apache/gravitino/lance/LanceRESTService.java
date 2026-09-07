@@ -21,6 +21,12 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
+<<<<<<< HEAD
+=======
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+>>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -98,9 +104,38 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     // request's query parameters and remote address, exactly as on the main server.
     server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
     server.addFilter(
+<<<<<<< HEAD
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+=======
+        new HttpAuditFilter(
+            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
+        LANCE_SPEC);
+    server.addSystemFilters(LANCE_SPEC);
+    if (auxMode) {
+      server.addFilter(
+          new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
+          LANCE_SPEC);
+    }
+
+    // Root-level aliases for health checks to improve compatibility with various monitoring
+    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
+    server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
+    server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
+>>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
+
+    registerMetricsPathFilters(server, eventBus);
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
+    customFilterPaths.add(LANCE_SPEC);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode",
@@ -133,7 +168,31 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
+<<<<<<< HEAD
   private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
+=======
+  /**
+   * Registers request-context tracking and audit-on-failure coverage on {@link
+   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
+   * receive no such coverage at all, with nothing in the build catching it; {@code
+   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
+   * {@link #LANCE_SPEC}. Package-private and static so a unit test can exercise it directly against
+   * a plain {@link JettyServer}, without booting the rest of {@link #serviceInit}. See GH-12760.
+   *
+   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
+   *     coverage
+   * @param eventBus the event bus audit events are dispatched through
+   */
+  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
+    }
+  }
+
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
+>>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
 
