@@ -109,6 +109,53 @@ Before proceeding, ensure the following requirements are met:
     - For Spark integration: `pyspark`
     - For Ray integration: `ray`, `lance-namespace`, `lance-ray`
 
+## Authentication and authorization
+
+For per-user metadata authorization, connect engines to the auxiliary Lance REST service with
+`gravitino.authorization.enable=true`. Configure each engine's REST client to send the caller's
+`Authorization` header on every namespace and table request. If supported by that client version,
+`X-Gravitino-Active-Roles` can restrict the active roles. See the
+[Lance REST authentication and privilege matrix](./lance-rest-service.md#authentication-and-authorization).
+
+For example, with development-only `simple` authentication, this request lists only tables that
+`user1` may access (the password is not validated):
+
+```shell
+curl --user 'user1:unused' \
+  -H 'X-Gravitino-Active-Roles: ALL' \
+  'http://localhost:9101/lance/v1/namespace/lance_catalog.sales/table/list?delimiter=.'
+```
+
+Connector header configuration depends on the connector version. The Spark and Ray examples
+below omit credentials and assume the default simple-authentication setup; in auxiliary mode
+such requests use the configured Lance service identity. They do not demonstrate per-user
+access control. In standalone mode, all metadata requests to Gravitino use the backend service
+identity even when an engine supplies its own incoming credentials.
+
+Engines that probe before creating need the corresponding creation privileges. Reading table
+metadata requires `SELECT_TABLE` or `MODIFY_TABLE` with parent access, while overwriting requires
+`MODIFY_TABLE` and dropping requires ownership. Metadata authorization does not authorize direct
+reads or writes to object storage: configure storage access independently. Lance REST does not
+vend per-user storage credentials.
+
+### Verify authentication and authorization locally
+
+The HTTP integration suites start Gravitino with the Lance auxiliary service and exercise
+caller identity, service identity fallback, active roles, namespace and table privileges,
+filtered listings, and denied mutations. They also start a separate Lance listener in standalone
+mode to verify its outbound service identity against the Gravitino HTTP API.
+
+```shell
+./gradlew :lance:lance-rest-server:test \
+  --tests '*LanceRESTServiceAuthIT' \
+  --tests '*LanceNamespaceAuthorizationIT' \
+  --tests '*LanceTableAuthorizationIT' \
+  -PskipDockerTests=true
+```
+
+These suites use `simple` authentication and local storage. They do not validate an external
+OAuth2/Kerberos provider or object-store access policies.
+
 ## Spark Integration
 
 ### Configuration
