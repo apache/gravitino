@@ -630,7 +630,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testFederatedLoadTableForwardsAccessDelegationHeader() throws Exception {
+  void testFederatedLoadTableDelegatesToRemote() throws Exception {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     String expectedPath = "/v1/upstream/namespaces/db/tables/tbl";
 
@@ -728,7 +728,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testFederatedLoadTableOmitsAccessDelegationHeaderWithoutVending() throws Exception {
+  void testFederatedLoadTableNoCredentials() throws Exception {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     AtomicBoolean remoteHit = new AtomicBoolean(false);
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
