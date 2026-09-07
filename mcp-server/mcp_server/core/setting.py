@@ -28,7 +28,11 @@ class DefaultSetting:
 
 @dataclass
 class Setting:  # pylint: disable=too-many-instance-attributes
-    metalake: str
+    # Default metalake used when a request names none. Optional for HTTP
+    # transport, where each request can instead name a metalake via the
+    # X-Gravitino-Metalake header; required for stdio, which has no
+    # per-request channel to name one.
+    metalake: str = ""
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
@@ -56,6 +60,12 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     # --token is configured instead of falling back to the service identity.
     no_service_identity_fallback: bool = False
 
+    def __post_init__(self) -> None:
+        # A whitespace-only --metalake (e.g. a shell-quoting mistake) must be
+        # treated as "no default configured", the same as an empty string,
+        # rather than silently used as a nonsensical metalake name.
+        self.metalake = self.metalake.strip()
+
     def has_oauth_client(self) -> bool:
         """Return True when client-credentials is fully configured."""
         return bool(
@@ -67,6 +77,19 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     def has_service_identity(self) -> bool:
         """Return True when a static token or OAuth client-credentials is set."""
         return bool(self.token.strip()) or self.has_oauth_client()
+
+    def validate_metalake(self) -> None:
+        """Reject stdio transport with no default metalake configured.
+
+        stdio has no per-request channel to name a metalake, so --metalake is
+        the only source there. HTTP transport can rely on the per-request
+        X-Gravitino-Metalake header instead, so an empty default is legitimate.
+        """
+        if self.transport == "stdio" and not self.metalake:
+            raise ValueError(
+                "--metalake is required for stdio transport (stdio has no "
+                "per-request way to select a metalake)."
+            )
 
     def validate_oauth(self) -> None:
         """Reject a partial OAuth client-credentials configuration."""

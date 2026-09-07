@@ -50,6 +50,10 @@ _CANONICAL_AUTH_SCHEMES = {
     "negotiate": "Negotiate",
 }
 
+# HTTP header a request uses to name the metalake it wants to operate on.
+# Headers are matched case-insensitively by the underlying request object.
+METALAKE_HEADER = "X-Gravitino-Metalake"
+
 
 class ServiceIdentityFallbackDisabled(RuntimeError):
     """HTTP omitted Authorization while service-identity fallback is disabled."""
@@ -84,6 +88,24 @@ def _get_request_authorization() -> str:
     except (LookupError, RuntimeError):
         # No active HTTP request: stdio mode (get_http_request raises
         # RuntimeError) or missing request context (LookupError).
+        return ""
+
+
+def _get_request_metalake() -> str:
+    """Return the ``X-Gravitino-Metalake`` header of the current HTTP request.
+
+    Returns an empty string in stdio mode or when the header is absent, in
+    which case the caller falls back to the configured startup default.
+    """
+    try:
+        # Imported lazily: only available within an HTTP request context.
+        # pylint: disable=import-outside-toplevel
+        from fastmcp.server.dependencies import get_http_request
+
+        # Stripped so a whitespace-only header (e.g. an empty templated
+        # value) is treated as absent, not as a literal metalake name.
+        return get_http_request().headers.get(METALAKE_HEADER, "").strip()
+    except (LookupError, RuntimeError):
         return ""
 
 
@@ -147,38 +169,64 @@ def _service_auth(setting: Setting):
 
 class GravitinoContext:
     def __init__(self, setting: Setting):
+        # Enforced here (not only in do_main()) so any path that constructs a
+        # GravitinoContext directly - not just the CLI entrypoint - fails
+        # fast on an invalid Setting, matching the pre-per-request-metalake
+        # behavior where a bad Setting couldn't be constructed at all.
+        setting.validate_metalake()
+        setting.validate_oauth()
         self._setting = setting
-        self._default_client = RESTClientFactory.create_rest_client(
-            setting.metalake,
-            setting.gravitino_uri,
-            startup_authorization(setting),
-            auth=_service_auth(setting),
+        # Eagerly built only when a startup default is configured, so the
+        # common single-metalake deployment pays no extra cost. Left unset
+        # (None) when metalake resolution must come from a per-request header
+        # on every call (HTTP transport with no --metalake default).
+        self._default_client = (
+            RESTClientFactory.create_rest_client(
+                setting.metalake,
+                setting.gravitino_uri,
+                startup_authorization(setting),
+                auth=_service_auth(setting),
+            )
+            if setting.metalake
+            else None
         )
-        # LRU cache of per-principal clients keyed by the raw Authorization header.
-        # Safe without locking: rest_client() runs on the single asyncio event
-        # loop and never awaits between lookup and insert.
-        self._clients_by_auth: "OrderedDict[str, object]" = OrderedDict()
+        # LRU cache of per-principal clients keyed by (Authorization header,
+        # metalake). Safe without locking: rest_client() runs on the single
+        # asyncio event loop and never awaits between lookup and insert.
+        self._clients_by_auth: "OrderedDict[tuple, object]" = OrderedDict()
+        # LRU cache of service-identity clients (static token / OAuth) keyed by
+        # metalake, for requests that name a non-default metalake but carry no
+        # per-request Authorization header. The startup default metalake is
+        # served by _default_client instead and never enters this cache.
+        self._service_clients: "OrderedDict[str, object]" = OrderedDict()
         # Strong references to in-flight background close tasks; the event loop
         # only keeps weak references, so without this they could be GC'd before
         # running. Entries are discarded when each task completes.
         self._pending_closes: "set[asyncio.Task]" = set()
 
     def rest_client(self):
-        """Return a REST client carrying the correct identity for this request.
+        """Return a REST client carrying the correct identity and metalake.
 
-        In HTTP transport mode the incoming request's ``Authorization`` header is
-        forwarded verbatim to Gravitino, taking priority over the static startup
-        token. This keeps concurrent sessions with different principals fully
-        isolated — one principal's identity never leaks into another's calls.
+        The metalake is resolved per request: an HTTP request's
+        ``X-Gravitino-Metalake`` header takes priority, falling back to the
+        configured startup default (``--metalake``). Raises ``ValueError``
+        when neither is available.
 
-        Falls back to the shared default client (static token or OAuth
+        Identity resolution is unchanged: in HTTP transport mode the incoming
+        request's ``Authorization`` header is forwarded verbatim to Gravitino,
+        taking priority over the static startup token. This keeps concurrent
+        sessions with different principals and/or metalakes fully isolated —
+        one caller's identity or metalake never leaks into another's calls.
+
+        Falls back to a service-identity client (static token or OAuth
         client-credentials) when:
         - running in stdio mode (no HTTP request context), or
         - the incoming request carries no Authorization header.
 
-        Per-principal clients are cached (and their connection pools reused) so a
-        new pool is not opened on every tool call.
+        Clients are cached per (identity, metalake) combination (and their
+        connection pools reused) so a new pool is not opened on every call.
         """
+        metalake = self._resolve_metalake()
         authorization = _get_request_authorization()
         if not authorization:
             if (
@@ -190,23 +238,67 @@ class GravitinoContext:
                     "HTTP request omitted Authorization and "
                     "--no-service-identity-fallback is set"
                 )
-            return self._default_client
+            return self._service_client(metalake)
 
-        cached = self._clients_by_auth.get(authorization)
+        key = (authorization, metalake)
+        cached = self._clients_by_auth.get(key)
         if cached is not None:
-            self._clients_by_auth.move_to_end(authorization)
+            self._clients_by_auth.move_to_end(key)
             return cached
 
         client = RESTClientFactory.create_rest_client(
-            self._setting.metalake,
+            metalake,
             self._setting.gravitino_uri,
             authorization,
         )
-        self._clients_by_auth[authorization] = client
-        if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
-            _, evicted = self._clients_by_auth.popitem(last=False)
-            self._schedule_close(evicted)
+        self._cache_put(self._clients_by_auth, key, client)
         return client
+
+    def _resolve_metalake(self) -> str:
+        """Resolve the metalake for the current call, header first.
+
+        Raises ``ValueError`` (an invalid/missing request parameter, mapped
+        by FastMCP's error middleware to a client-facing "Invalid params"
+        error rather than an internal-error code) when the request names
+        none and no startup default (``--metalake``) is configured.
+        """
+        metalake = _get_request_metalake() or self._setting.metalake
+        if not metalake:
+            raise ValueError(
+                f"No metalake specified: the request omitted the "
+                f"{METALAKE_HEADER!r} header and no --metalake default is "
+                "configured."
+            )
+        return metalake
+
+    def _service_client(self, metalake: str):
+        """Return the service-identity client (static token / OAuth) for ``metalake``."""
+        if (
+            metalake == self._setting.metalake
+            and self._default_client is not None
+        ):
+            return self._default_client
+
+        cached = self._service_clients.get(metalake)
+        if cached is not None:
+            self._service_clients.move_to_end(metalake)
+            return cached
+
+        client = RESTClientFactory.create_rest_client(
+            metalake,
+            self._setting.gravitino_uri,
+            startup_authorization(self._setting),
+            auth=_service_auth(self._setting),
+        )
+        self._cache_put(self._service_clients, metalake, client)
+        return client
+
+    def _cache_put(self, cache: "OrderedDict", key, client) -> None:
+        """Insert into an LRU cache, evicting (and closing) the oldest past the cap."""
+        cache[key] = client
+        if len(cache) > _MAX_CACHED_CLIENTS:
+            _, evicted = cache.popitem(last=False)
+            self._schedule_close(evicted)
 
     def _schedule_close(self, client) -> None:
         """Best-effort close of an evicted client's connection pool.

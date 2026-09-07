@@ -144,7 +144,7 @@ You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows
 
 | Argument                         | Description                                                                                                                     | Default value               | Required |
 |----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`                     | The Gravitino metalake name.                                                                                                    | none                        | Yes      |
+| `--metalake`                     | Default Gravitino metalake, used when a request names none. Required for `stdio`; optional for HTTP, where each request may instead name a metalake via the `X-Gravitino-Metalake` header. | none                        | stdio only |
 | `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
 | `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
 | `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
@@ -224,6 +224,14 @@ When the server runs with HTTP transport, the `Authorization` header of each inc
 For exposed or multi-caller HTTP deployments, set `--no-service-identity-fallback` (or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK=1`) so requests without `Authorization` are rejected instead of using the service identity. The flag is ignored for stdio transport.
 
 Authorization itself is always enforced by Gravitino: the MCP server forwards the identity but does not make access-control decisions of its own.
+
+### Per-request metalake (HTTP)
+
+When the server runs with HTTP transport, a request may name the metalake to operate on with the `X-Gravitino-Metalake` header, taking priority over the `--metalake` default configured at startup. This lets one server instance serve more than one metalake: each request independently resolves its own metalake from its own header, so the server holds no per-connection or per-session metalake state and stays correct regardless of how many replicas it runs as.
+
+Falls back to `--metalake` when the header is absent. If neither is set, the call fails with an error naming the missing argument. Authorization is unchanged — the caller's identity (see above) determines what it may see in the requested metalake exactly as it would through the REST API.
+
+stdio transport has no per-request header, so `--metalake` remains the only source there; switching metalake means starting another stdio process with a different `--metalake`.
 
 ### Serving over HTTPS (TLS)
 

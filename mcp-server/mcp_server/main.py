@@ -22,6 +22,7 @@ import os
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import (
     GravitinoMCPServer,
+    log_metalake_policy,
     log_service_identity_fallback_policy,
 )
 from mcp_server.tools import SUPPORTED_TOOL_TAGS
@@ -50,10 +51,12 @@ def do_main():
     )
     _init_logging(setting)
     try:
+        setting.validate_metalake()
         setting.validate_oauth()
     except ValueError as exc:
         logging.error("%s", exc)
         raise SystemExit(1) from None
+    log_metalake_policy(setting)
     log_service_identity_fallback_policy(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
@@ -90,8 +93,11 @@ def _parse_args():
     parser.add_argument(
         "--metalake",
         type=str,
-        required=True,
-        help="Gravitino metalake name.",
+        default="",
+        help="Default Gravitino metalake name, used when a request names "
+        "none. Required for stdio transport. Optional for HTTP transport, "
+        "where each request can instead name a metalake via the "
+        "X-Gravitino-Metalake header.",
     )
     parser.add_argument(
         "--gravitino-uri",

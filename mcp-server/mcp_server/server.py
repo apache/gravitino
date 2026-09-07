@@ -37,6 +37,7 @@ from fastmcp.tools.base import ToolResult
 
 from mcp_server.core import audit
 from mcp_server.core.context import (
+    METALAKE_HEADER,
     GravitinoContext,
     _get_request_authorization,
     service_fallback_authorization,
@@ -150,6 +151,26 @@ def log_service_identity_fallback_policy(setting: Setting) -> None:
             "this endpoint to untrusted callers.",
             setting.oauth_client_id.strip(),
         )
+
+
+def log_metalake_policy(setting: Setting) -> None:
+    """Log how the metalake is resolved for requests at startup."""
+    if setting.metalake:
+        if setting.transport != "stdio":
+            logging.info(
+                "Default metalake '%s' configured; HTTP requests may "
+                "override it with the %s header.",
+                setting.metalake,
+                METALAKE_HEADER,
+            )
+        return
+    # No default: only reachable for HTTP transport (validate_metalake
+    # rejects an empty metalake for stdio before this runs).
+    logging.info(
+        "No default --metalake configured; every request must name one "
+        "via the %s header.",
+        METALAKE_HEADER,
+    )
 
 
 def _parse_mcp_url(url: str) -> tuple[str, int, str]:
