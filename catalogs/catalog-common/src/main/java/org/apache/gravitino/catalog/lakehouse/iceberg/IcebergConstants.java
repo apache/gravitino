@@ -65,6 +65,20 @@ public class IcebergConstants {
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
+  /** Iceberg GCSFileIO OAuth2 access token property. */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
+
+  /** Iceberg GCSFileIO OAuth2 token expiry property (epoch millis). */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  /**
+   * Whether Iceberg GCSFileIO should refresh OAuth2 tokens via a credentials endpoint. Defaults to
+   * true in Iceberg; Gravitino disables it when minting a token from {@code
+   * gcs-service-account-file} because that path has no table credentials refresh endpoint.
+   */
+  public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED =
+      "gcs.oauth2.refresh-credentials-enabled";
+
   // Iceberg Table properties constants
 
   public static final String COMMENT = "comment";

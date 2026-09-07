@@ -19,9 +19,12 @@
 
 package org.apache.gravitino.iceberg.common.utils;
 
+import com.google.auth.oauth2.AccessToken;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
+import java.time.Instant;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
@@ -29,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
@@ -335,6 +339,73 @@ public class TestIcebergCatalogUtil {
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsInjectsOauth2Token() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+
+    IcebergCatalogUtil.applyGcsServiceAccountCredentials(
+        properties,
+        path -> new AccessToken("test-token", Date.from(Instant.ofEpochMilli(1_700_000_000_000L))));
+
+    Assertions.assertEquals(
+        "test-token", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+    Assertions.assertEquals(
+        "1700000000000", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT));
+    Assertions.assertEquals(
+        "false", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED));
+    Assertions.assertEquals(
+        "/tmp/gcs-key.json", properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsSkipsWhenTokenAlreadyPresent() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
+
+    IcebergCatalogUtil.applyGcsServiceAccountCredentials(
+        properties,
+        path -> {
+          throw new AssertionError("token loader should not be called");
+        });
+
+    Assertions.assertEquals(
+        "existing-token", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsNoOpWithoutServiceAccountFile() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
+
+    IcebergCatalogUtil.applyGcsServiceAccountCredentials(
+        properties,
+        path -> {
+          throw new AssertionError("token loader should not be called");
+        });
+
+    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+  }
+
+  @Test
+  void testApplyDefaultResolvingFileIOInjectsGcsToken() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.WAREHOUSE, "gs://bucket/warehouse");
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+
+    // Exercise the public entry that wires credential injection; use the overload via a
+    // pre-injected token path to avoid network calls in unit tests.
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "pre-set");
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        org.apache.iceberg.io.ResolvingFileIO.class.getName(),
+        properties.get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals("pre-set", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
   }
 
   @Test
