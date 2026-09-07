@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -301,13 +300,7 @@ public class IcebergCatalogUtil {
    * @param properties Iceberg catalog properties, mutated in place
    */
   @VisibleForTesting
-  public static void applyGcsServiceAccountCredentials(Map<String, String> properties) {
-    applyGcsServiceAccountCredentials(properties, IcebergCatalogUtil::loadAccessTokenFromFile);
-  }
-
-  @VisibleForTesting
-  static void applyGcsServiceAccountCredentials(
-      Map<String, String> properties, Function<String, AccessToken> tokenLoader) {
+  static void applyGcsServiceAccountCredentials(Map<String, String> properties) {
     String serviceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
     if (StringUtils.isBlank(serviceAccountFile)) {
       return;
@@ -316,7 +309,7 @@ public class IcebergCatalogUtil {
       return;
     }
 
-    AccessToken accessToken = tokenLoader.apply(serviceAccountFile);
+    AccessToken accessToken = loadAccessTokenFromFile(serviceAccountFile);
     if (accessToken == null || StringUtils.isBlank(accessToken.getTokenValue())) {
       throw new IllegalStateException(
           "Failed to obtain GCS access token from service account file: " + serviceAccountFile);
