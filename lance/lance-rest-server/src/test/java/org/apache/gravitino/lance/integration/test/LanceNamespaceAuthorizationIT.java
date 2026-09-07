@@ -18,16 +18,21 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
+import java.io.Writer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
@@ -35,13 +40,16 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.lance.LanceRESTService;
+import org.apache.gravitino.integration.test.util.HttpUtils;
+import org.apache.gravitino.lance.server.GravitinoLanceRESTServer;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DescribeNamespaceResponse;
 import org.lance.namespace.model.DropNamespaceRequest;
@@ -287,7 +295,7 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
 
   /** Verifies standalone HTTP backend calls use service credentials rather than caller roles. */
   @Test
-  public void testStandaloneUsesBackendServiceIdentity() throws Exception {
+  public void testStandaloneUsesBackendServiceIdentity(@TempDir Path directory) throws Exception {
     int port = RESTUtils.findAvailablePort(10000, 11000);
     String catalog = "lance_authz_standalone_catalog";
     String serviceUser = "lance_authz_standalone_user";
@@ -302,22 +310,47 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
                 new ArrayList<>(
                     List.of(Privileges.UseCatalog.allow(), Privileges.CreateCatalog.allow())))));
     metalake.grantRolesToUser(List.of("lance_authz_standalone_role"), serviceUser);
-    LanceRESTService standalone = new LanceRESTService();
+    Properties config = new Properties();
+    config.setProperty(Configs.AUTHENTICATORS.getKey(), "simple");
+    config.setProperty("gravitino.lance-rest.httpPort", String.valueOf(port));
+    config.setProperty(
+        "gravitino.lance-rest.gravitino-uri", "http://localhost:" + getGravitinoServerPort());
+    config.setProperty("gravitino.lance-rest.gravitino-metalake", getLanceRESTServerMetalakeName());
+    config.setProperty("gravitino.lance-rest.gravitino-auth-type", "simple");
+    config.setProperty("gravitino.lance-rest.gravitino-simple.user-name", serviceUser);
+    Path configFile = directory.resolve("standalone.conf");
+    try (Writer writer = Files.newBufferedWriter(configFile)) {
+      config.store(writer, "Standalone Lance REST integration test");
+    }
+    Path logFile = directory.resolve("standalone.log");
+    // Use the production bootstrap in its own JVM: deploy mode has no local GravitinoEnv,
+    // while embedded mode must not share its backend environment with the standalone service.
+    ProcessBuilder builder =
+        new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "-cp",
+                System.getProperty("lance.test.runtimeClasspath"),
+                GravitinoLanceRESTServer.class.getName(),
+                configFile.toString())
+            .redirectErrorStream(true)
+            .redirectOutput(logFile.toFile());
+    builder.environment().put("GRAVITINO_TEST", "true");
+    Process standalone = builder.start();
     try {
-      standalone.serviceInit(
-          Map.of(
-              "httpPort",
-              String.valueOf(port),
-              "gravitino-uri",
-              "http://localhost:" + getGravitinoServerPort(),
-              "gravitino-metalake",
-              getLanceRESTServerMetalakeName(),
-              "gravitino-auth-type",
-              "simple",
-              "gravitino-simple.user-name",
-              serviceUser),
-          false);
-      standalone.serviceStart();
+      try {
+        Awaitility.await()
+            .atMost(60, TimeUnit.SECONDS)
+            .until(
+                () -> {
+                  Assertions.assertTrue(standalone.isAlive(), "Standalone process exited");
+                  // Namespace initialization is lazy and occurs on the first metadata request.
+                  return HttpUtils.isHttpServerUp(
+                      "http://localhost:" + port + "/lance/health/live");
+                });
+      } catch (Exception | AssertionError e) {
+        throw new AssertionError("Standalone startup failed:\n" + Files.readString(logFile), e);
+      }
       CreateNamespaceRequest body = new CreateNamespaceRequest();
       body.addIdItem(catalog);
       HttpRequest request =
@@ -366,7 +399,12 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
       Assertions.assertTrue(error.getError().contains(serviceUser), error.getError());
       assertStatus(200, drop(serviceUser, catalog, null, "cascade"));
     } finally {
-      standalone.serviceStop();
+      standalone.destroy();
+      if (!standalone.waitFor(10, TimeUnit.SECONDS)) {
+        standalone.destroyForcibly();
+        Assertions.assertTrue(
+            standalone.waitFor(10, TimeUnit.SECONDS), "Standalone process did not stop");
+      }
     }
   }
 

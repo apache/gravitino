@@ -144,8 +144,9 @@ per-user, scoped storage credentials.
 The HTTP integration suites start Gravitino with the Lance auxiliary service and exercise
 caller identity, service identity fallback, active roles, namespace and table privileges,
 filtered listings, denied mutations, and rejection of non-empty Arrow creates without side effects.
-They also start a separate Lance listener in standalone mode to verify its outbound service
-identity and propagation of backend authorization denials through the Gravitino HTTP API.
+They also start standalone Lance REST through its production entry point in a separate JVM to verify
+its outbound service identity and propagation of backend authorization denials through the Gravitino
+HTTP API.
 
 ```shell
 ./gradlew :lance:lance-rest-server:test \
