@@ -30,6 +30,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -110,13 +111,13 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testListPartitions() {
     Partition[] partitions = partitionOperationDispatcher.listPartitions(TABLE_IDENT);
-    Assertions.assertTrue(Arrays.asList(partitions).contains(PARTITION));
+    Assertions.assertTrue(Arrays.asList(partitions).contains(DTOConverters.toDTO(PARTITION)));
   }
 
   @Test
   public void testGetPartition() {
     Partition p = partitionOperationDispatcher.getPartition(TABLE_IDENT, PARTITION.name());
-    Assertions.assertEquals(PARTITION, p);
+    Assertions.assertEquals(DTOConverters.toDTO(PARTITION), p);
   }
 
   @Test

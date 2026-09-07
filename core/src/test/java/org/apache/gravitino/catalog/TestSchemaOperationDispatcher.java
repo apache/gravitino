@@ -370,6 +370,28 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testDropMissingSchemaPreservesStoredEntity() throws IOException {
+    reset(entityStore);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_renamed_out_of_band");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+          return null;
+        });
+
+    Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
+    Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+  }
+
+  @Test
+>>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
   public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);

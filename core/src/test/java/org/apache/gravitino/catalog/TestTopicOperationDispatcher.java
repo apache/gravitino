@@ -265,7 +265,8 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic61");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.createSchema(
         NameIdentifier.of(topicNs.levels()), "", Collections.emptyMap());

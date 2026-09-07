@@ -36,6 +36,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
@@ -221,16 +222,15 @@ public class TestFunctionHookDispatcher {
       // mock represents that integration boundary and must not receive a removal callback.
       Mockito.verifyNoInteractions(catalogAuthorizationPlugin);
       Mockito.verify(catalogManager, Mockito.never()).loadCatalog(any());
-      Mockito.verify(catalogManager, Mockito.times(1)).loadCatalogAndWrap(any());
+      Mockito.verify(catalogManager, Mockito.times(1)).doWithCatalog(any(), any());
     }
   }
 
   private static CatalogManager catalogManagerWith(Capability capability) throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper catalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogWrapper.capabilities()).thenReturn(capability);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     return catalogManager;
   }
 

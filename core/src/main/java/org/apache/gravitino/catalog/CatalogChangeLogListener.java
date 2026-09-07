@@ -33,6 +33,30 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
+<<<<<<< HEAD
+=======
+ *
+ * <p>The poller hands each batch to a listener only once, so a listener has to clean up after
+ * itself when it fails. This one does what {@code EntityCacheChangeLogListener} and {@code
+ * JcasbinChangeListener} do: if removing one catalog from the cache fails, it clears the whole
+ * catalog cache, which also covers the entry it failed to remove and the rest of the batch. A row
+ * that cannot be parsed is simply skipped, because it does not point at any catalog and so cannot
+ * leave anything stale.
+ *
+ * <p>Before removing anything, the listener first goes through the whole batch and marks off the
+ * changes this node made itself. Doing it in that order means a later failure cannot leave one of
+ * those marks behind, which would otherwise make a future change from another node look like a
+ * local one. If the clear itself fails, the exception goes up to the poller, which logs it at
+ * {@code ERROR} and moves on, and the catalog stays stale until it expires.
+ *
+ * <p><b>What clearing costs:</b> dropping a catalog from the cache retires its {@code
+ * CatalogWrapper}. Idle wrappers release their connection pools and {@code IsolatedClassLoader}s
+ * immediately; wrappers with an active operation lease defer cleanup until their last lease is
+ * closed, so an operation is never torn down mid-flight. Connector-backed metadata returned by an
+ * operation is converted to a detached snapshot before the lease closes; later hooks and REST
+ * serialization therefore do not depend on the retired wrapper. The clear only happens when a
+ * normal removal failed, never during normal operation.
+>>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -68,6 +92,7 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
           continue;
         }
 
+<<<<<<< HEAD
         LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
@@ -75,6 +100,31 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
             "Failed to process catalog change log record: fullName={}, entityType={}",
             change.getFullName(),
             change.getEntityType(),
+=======
+    for (CatalogInvalidation invalidation : remoteInvalidations) {
+      EntityChangeRecord change = invalidation.change;
+      NameIdentifier ident = invalidation.ident;
+      // INFO on purpose: dropping the catalog from the cache retires its wrapper and eventually
+      // closes the connection pool and isolated classloader, either immediately or after active
+      // leases finish. This is the main thing the change log does across nodes.
+      LOG.info(
+          "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+          ident,
+          change.getOperateType(),
+          change.getId());
+
+      try {
+        catalogManager.getCatalogCache().invalidate(ident);
+      } catch (RuntimeException e) {
+        // This batch will never be sent again, so giving up here would keep serving the old
+        // catalog until it expires on its own. Clear the whole cache instead; active operation
+        // leases defer resource cleanup until those operations finish.
+        LOG.error(
+            "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
+                + "avoid serving it stale; resources in use are retired after their leases close",
+            ident,
+            change.getId(),
+>>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
             e);
       }
     }

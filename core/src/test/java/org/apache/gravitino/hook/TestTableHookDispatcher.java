@@ -35,7 +35,9 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.Column;
@@ -82,9 +84,9 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableSetsOwnerWithNormalizedIdentifier() throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
@@ -148,9 +150,9 @@ public class TestTableHookDispatcher {
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Mockito.mock(Table.class));
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     TableHookDispatcher hook =
         new TableHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
 
