@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewVersionInfoBaseSQLProvider;
@@ -42,11 +43,13 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ") AND deleted_at = 0"
+        + ")) AND deleted_at = 0"
         + "</script>";
   }
 
@@ -56,7 +59,9 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
   }
 
   @Override
@@ -65,7 +70,9 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
   }
 
   @Override

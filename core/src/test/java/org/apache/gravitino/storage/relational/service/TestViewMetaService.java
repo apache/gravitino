@@ -81,6 +81,22 @@ public class TestViewMetaService extends TestJDBCBackend {
     createAndInsertSchema(metalakeName, catalogName, schemaName);
   }
 
+  /** Dropping the old parent after a move must preserve every historical version. */
+  @TestTemplate
+  public void testMovedViewHistorySurvivesSourceCascade() throws IOException {
+    for (String parent : new String[] {"schema", "catalog", "metalake"}) {
+      assertMovedViewHistoryCascade(parent, true);
+    }
+  }
+
+  /** Dropping the current parent must delete versions created under previous parents too. */
+  @TestTemplate
+  public void testMovedViewHistoryIsDeletedWithDestination() throws IOException {
+    for (String parent : new String[] {"schema", "catalog", "metalake"}) {
+      assertMovedViewHistoryCascade(parent, false);
+    }
+  }
+
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
@@ -1051,6 +1067,71 @@ public class TestViewMetaService extends TestJDBCBackend {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
+    }
+  }
+
+  private void assertMovedViewHistoryCascade(String parent, boolean sourceFirst)
+      throws IOException {
+    String sourceMetalake = "source_view_" + parent + "_" + sourceFirst;
+    String destinationMetalake = "destination_view_" + parent + "_" + sourceFirst;
+    String catalog = "history_catalog";
+    String schema = "history_schema";
+    for (String metalake : new String[] {sourceMetalake, destinationMetalake}) {
+      createAndInsertMakeLake(metalake);
+      createAndInsertCatalog(metalake, catalog);
+      createAndInsertSchema(metalake, catalog, schema);
+    }
+    ViewMetaService service = ViewMetaService.getInstance();
+    ViewEntity original =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofView(sourceMetalake, catalog, schema),
+            "moved_history",
+            AUDIT_INFO);
+    service.insertView(original, false);
+    ViewEntity moved =
+        copyView(
+            original,
+            original.name(),
+            NamespaceUtil.ofView(destinationMetalake, catalog, schema),
+            "moved");
+    service.updateView(original.nameIdentifier(), ignored -> moved);
+    assertEquals(2, listViewVersions(original.id()).size());
+
+    if (sourceFirst) {
+      deleteHistoryParent(parent, sourceMetalake, catalog, schema);
+      assertEquals(original.id(), service.getViewByIdentifier(moved.nameIdentifier()).id());
+      assertEquals(2, listViewVersions(original.id()).size());
+      listViewVersions(original.id())
+          .values()
+          .forEach(deletedAt -> assertEquals(0L, deletedAt.longValue()));
+    }
+
+    deleteHistoryParent(parent, destinationMetalake, catalog, schema);
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getViewByIdentifier(moved.nameIdentifier()));
+    assertEquals(2, listViewVersions(original.id()).size());
+    listViewVersions(original.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+  }
+
+  private void deleteHistoryParent(String parent, String metalake, String catalog, String schema) {
+    switch (parent) {
+      case "schema":
+        assertTrue(
+            SchemaMetaService.getInstance()
+                .deleteSchema(NameIdentifier.of(metalake, catalog, schema), true));
+        break;
+      case "catalog":
+        assertTrue(
+            CatalogMetaService.getInstance()
+                .deleteCatalog(NameIdentifier.of(metalake, catalog), true));
+        break;
+      case "metalake":
+        assertTrue(
+            MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(metalake), true));
+        break;
+      default:
+        throw new AssertionError("Unexpected parent: " + parent);
     }
   }
 

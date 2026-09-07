@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
@@ -68,11 +69,15 @@ public class ViewVersionInfoBaseSQLProvider {
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
+        // History follows the stable entity ID, not the parent recorded in each snapshot.
+        // Include deleted roots: cascade cleanup soft-deletes roots before their versions.
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ") AND deleted_at = 0"
+        + ")) AND deleted_at = 0"
         + "</script>";
   }
 
@@ -81,7 +86,9 @@ public class ViewVersionInfoBaseSQLProvider {
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
   }
 
   public String softDeleteViewVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -89,7 +96,9 @@ public class ViewVersionInfoBaseSQLProvider {
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE view_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
   }
 
   public String deleteViewVersionsByLegacyTimeline(
