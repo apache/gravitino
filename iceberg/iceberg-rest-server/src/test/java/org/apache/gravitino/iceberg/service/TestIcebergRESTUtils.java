@@ -404,4 +404,49 @@ public class TestIcebergRESTUtils {
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         credential.config().get("client.refresh-credentials-endpoint"));
   }
+
+  @Test
+  void testRewriteLoadTableCredentialsDropsConfigRefreshWithoutTokens() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(NestedField.required(1, "id", IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+    // Upstream put the refresh URL in top-level config while the session token lives only in
+    // storage-credentials. The config refresh key must be dropped, not left pointing upstream.
+    LoadTableResponse upstream =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "io-impl",
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .addCredential(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadTableResponse rewritten =
+        IcebergRESTUtils.rewriteLoadTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", rewritten.config().get("io-impl"));
+    Assertions.assertFalse(
+        rewritten.config().containsKey("client.refresh-credentials-endpoint"),
+        "Top-level config must not keep an upstream refresh endpoint when tokens are absent");
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+  }
 }
