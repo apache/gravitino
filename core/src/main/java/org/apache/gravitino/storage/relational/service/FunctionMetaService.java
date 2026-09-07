@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -127,8 +128,18 @@ public class FunctionMetaService {
                       po.metalakeId()),
           () -> insertFunctionWithoutCommit(functionEntity, po, overwrite));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.FUNCTION, functionEntity.nameIdentifier().toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            re, Entity.EntityType.FUNCTION, functionEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwrite) {
+          // A missing-row locking read cannot fence a concurrent insert at READ_COMMITTED.
+          // The transaction has rolled back; let the caller retry against the winning row.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.FUNCTION, functionEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw re;
     }
   }
@@ -373,28 +384,19 @@ public class FunctionMetaService {
   }
 
   private FunctionPO findAndLockFunctionForOverwrite(FunctionPO initializedFunctionPO) {
-    FunctionPO sameNameFunctionPO =
-        SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper ->
-                mapper.selectFunctionMetaBySchemaIdAndNameForUpdate(
-                    initializedFunctionPO.schemaId(), initializedFunctionPO.functionName()));
-    if (sameNameFunctionPO != null) {
-      return sameNameFunctionPO;
-    }
-
-    FunctionPO sameIdFunctionPO =
-        SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper -> mapper.selectFunctionMetaByIdForUpdate(initializedFunctionPO.functionId()));
-    // Only a function that already lives under the target schema can be replaced by ID. A stored
-    // function with the same ID under another schema belongs to a different parent: adopting it
-    // here would move it without ever fencing its own schema.
-    if (sameIdFunctionPO == null
-        || !Objects.equals(sameIdFunctionPO.schemaId(), initializedFunctionPO.schemaId())) {
-      return null;
-    }
-    return sameIdFunctionPO;
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper ->
+                    mapper.selectFunctionMetaBySchemaIdAndNameForUpdate(
+                        initializedFunctionPO.schemaId(), initializedFunctionPO.functionName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper ->
+                    mapper.selectFunctionMetaByIdForUpdate(initializedFunctionPO.functionId())),
+        current -> Objects.equals(current.schemaId(), initializedFunctionPO.schemaId()));
   }
 
   /**

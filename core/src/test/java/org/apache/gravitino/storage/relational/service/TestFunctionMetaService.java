@@ -1110,6 +1110,81 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
   }
 
+  /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */
+  @TestTemplate
+  public void testConcurrentOverwriteOfMissingFunction() throws Exception {
+    String name = GravitinoITUtils.genRandomName("function_first_overwrite");
+    Namespace ns = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity first =
+        createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, name, AUDIT_INFO);
+    FunctionEntity second =
+        copyFunction(
+            createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, name, AUDIT_INFO),
+            name,
+            ns,
+            "second overwrite");
+    CountDownLatch firstWritten = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> firstResult =
+        executor.submit(
+            () -> {
+              SessionUtils.beginTransaction();
+              try {
+                FunctionMetaService.getInstance().insertFunction(first, true);
+                firstWritten.countDown();
+                await(allowCommit);
+                SessionUtils.commitTransaction();
+                return null;
+              } catch (Throwable failure) {
+                SessionUtils.rollbackTransaction();
+                return failure;
+              }
+            });
+    try {
+      assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                try {
+                  FunctionMetaService.getInstance().insertFunction(second, true);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      assertTrue(secondStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> secondResult.get(500, TimeUnit.MILLISECONDS));
+      allowCommit.countDown();
+      assertNull(firstResult.get(30, TimeUnit.SECONDS));
+      Throwable failure = secondResult.get(30, TimeUnit.SECONDS);
+      // H2 may serialize at the parent lock; MySQL/PostgreSQL can reach the missing-row INSERT.
+      if (failure != null) {
+        assertTrue(
+            failure instanceof OptimisticLockException, () -> "Unexpected failure: " + failure);
+        assertEquals(1, listFunctionVersions(first.id()).size());
+        assertTrue(listFunctionVersions(second.id()).isEmpty());
+        FunctionMetaService.getInstance().insertFunction(second, true);
+      }
+      FunctionEntity stored =
+          FunctionMetaService.getInstance().getFunctionByIdentifier(first.nameIdentifier());
+      assertEquals(first.id(), stored.id());
+      assertEquals("second overwrite", stored.comment());
+      assertEquals(
+          2,
+          FunctionMetaService.getInstance()
+              .getFunctionPOByIdentifier(first.nameIdentifier())
+              .functionCurrentVersion());
+      assertEquals(2, listFunctionVersions(first.id()).size());
+      assertTrue(listFunctionVersions(second.id()).isEmpty());
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   @TestTemplate
   public void testNaturalKeyOverwriteWaitsForConcurrentRename() throws Exception {
     String functionName = GravitinoITUtils.genRandomName("function_overwrite_rename_race");

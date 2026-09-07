@@ -759,25 +759,18 @@ public class TagMetaService {
   }
 
   private TagPO findAndLockTagForOverwrite(TagPO initializedTagPO) {
-    TagPO sameNameTagPO =
-        SessionUtils.getWithoutCommit(
-            TagMetaMapper.class,
-            mapper ->
-                mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
-                    initializedTagPO.getMetalakeId(), initializedTagPO.getTagName()));
-    if (sameNameTagPO != null) {
-      return sameNameTagPO;
-    }
-
-    TagPO sameIdTagPO =
-        SessionUtils.getWithoutCommit(
-            TagMetaMapper.class,
-            mapper -> mapper.selectTagByTagIdForUpdate(initializedTagPO.getTagId()));
-    if (sameIdTagPO == null
-        || !Objects.equals(sameIdTagPO.getMetalakeId(), initializedTagPO.getMetalakeId())) {
-      return null;
-    }
-    return sameIdTagPO;
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper ->
+                    mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+                        initializedTagPO.getMetalakeId(), initializedTagPO.getTagName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper -> mapper.selectTagByTagIdForUpdate(initializedTagPO.getTagId())),
+        current -> Objects.equals(current.getMetalakeId(), initializedTagPO.getMetalakeId()));
   }
 
   private void updateTagRootWithVersion(NameIdentifier identifier, TagPO oldTagPO, TagPO newTagPO) {
