@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -46,13 +47,12 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
-import org.apache.gravitino.utils.ClassLoaderPool;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -110,8 +110,7 @@ public class TestCatalogWrapperLease {
 
   @BeforeEach
   public void beforeEach() {
-    catalogManager =
-        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
+    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
   }
 
   @AfterEach
@@ -160,11 +159,7 @@ public class TestCatalogWrapperLease {
     expiringConfig.set(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS, 1L);
 
     CatalogManager expiringManager =
-        new CatalogManager(
-            expiringConfig,
-            entityStore,
-            new RandomIdGenerator(),
-            new SecretManager(expiringConfig));
+        new CatalogManager(expiringConfig, entityStore, new RandomIdGenerator());
     try {
       NameIdentifier ident = NameIdentifier.of(METALAKE, "expiring_catalog");
       expiringManager.createCatalog(ident, Catalog.Type.RELATIONAL, PROVIDER, "comment", PROPS);
@@ -306,21 +301,17 @@ public class TestCatalogWrapperLease {
 
   @Test
   public void testCleanupRunsExactlyOnceForRepeatedRetireAndRelease() throws Exception {
-    // Two catalogs of the same provider share one pooled ClassLoader, so the pool entry survives
-    // as long as exactly one reference is released per wrapper. A double cleanup would drop the
-    // reference count to zero and destroy the ClassLoader the second catalog is still using.
-    NameIdentifier ident1 = createCatalog("exactly_once_1");
-    createCatalog("exactly_once_2");
-
-    ClassLoaderPool pool =
-        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
-    Assertions.assertEquals(1, pool.size(), "same-provider catalogs share one pooled entry");
-
-    CatalogLease lease = catalogManager.acquireCatalogLease(ident1);
-    CatalogWrapper wrapper = lease.wrapper();
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    IsolatedClassLoader classLoader =
+        Mockito.spy(
+            new IsolatedClassLoader(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+    Assertions.assertTrue(wrapper.tryAcquire());
+    CatalogLease lease = new CatalogLease(wrapper);
 
     // Repeated retirements (eviction + explicit invalidation + close) and a lease release must
-    // together release the pooled ClassLoader reference exactly once.
+    // together close the catalog and its dedicated ClassLoader exactly once.
     wrapper.retire();
     wrapper.retire();
     wrapper.close();
@@ -328,8 +319,8 @@ public class TestCatalogWrapperLease {
     wrapper.retire();
 
     Assertions.assertNull(wrapper.catalog());
-    Assertions.assertEquals(
-        1, pool.size(), "the pooled ClassLoader of the second catalog must stay alive");
+    Mockito.verify(catalog).close();
+    Mockito.verify(classLoader).close();
   }
 
   @Test
@@ -438,16 +429,12 @@ public class TestCatalogWrapperLease {
 
     CatalogLease lease = catalogManager.acquireCatalogLease(ident);
     CatalogWrapper wrapper = lease.wrapper();
-    ClassLoaderPool pool =
-        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
 
     catalogManager.close();
 
     Assertions.assertTrue(wrapper.isRetired());
     Assertions.assertNotNull(
         wrapper.catalog(), "manager shutdown must not close a catalog with an active lease");
-    Assertions.assertEquals(
-        1, pool.size(), "manager shutdown must retain an actively leased ClassLoader");
     Assertions.assertDoesNotThrow(
         () ->
             wrapper.doWithSchemaOps(ops -> ops.listSchemas(Namespace.of(METALAKE, ident.name()))));
@@ -457,7 +444,6 @@ public class TestCatalogWrapperLease {
     lease.close();
 
     Assertions.assertNull(wrapper.catalog());
-    Assertions.assertEquals(0, pool.size());
   }
 
   @Test
@@ -488,28 +474,22 @@ public class TestCatalogWrapperLease {
 
   @Test
   public void testCleanupClearsCatalogEvenWhenCloseFails() throws Exception {
-    NameIdentifier ident = createCatalog("failing_close");
-
-    ClassLoaderPool pool =
-        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
-    Assertions.assertEquals(1, pool.size());
-
-    CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
-    Assertions.assertNotNull(wrapper);
-
     BaseCatalog<?> failingCatalog = Mockito.mock(BaseCatalog.class);
     Mockito.doThrow(new IOException("close failed")).when(failingCatalog).close();
-    FieldUtils.writeField(wrapper, "catalog", failingCatalog, true);
+    IsolatedClassLoader classLoader =
+        Mockito.spy(
+            new IsolatedClassLoader(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+    CatalogWrapper wrapper = new CatalogWrapper(failingCatalog, classLoader);
 
     // Cleanup runs exactly once, so a close() failure must not leave the reference behind: there
     // is no second chance to clear it.
     wrapper.retire();
 
     Mockito.verify(failingCatalog).close();
+    Mockito.verify(classLoader).close();
     Assertions.assertNull(
         wrapper.catalog(), "a failing close must still drop the catalog reference");
-    Assertions.assertEquals(
-        0, pool.size(), "a failing close must still release the pooled ClassLoader");
   }
 
   @Test
@@ -603,10 +583,9 @@ public class TestCatalogWrapperLease {
   }
 
   @Test
-  public void testManagerCloseReleasesThePoolEvenIfRetiringAWrapperFails() throws Exception {
-    createCatalog("failing_retire");
-    ClassLoaderPool pool =
-        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+  public void testManagerCloseRetiresOtherWrappersEvenIfRetiringAWrapperFails() throws Exception {
+    NameIdentifier ident = createCatalog("failing_retire");
+    CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
 
     CatalogWrapper failingWrapper = Mockito.mock(CatalogWrapper.class);
     Mockito.doThrow(new RuntimeException("retire failed")).when(failingWrapper).retire();
@@ -616,8 +595,8 @@ public class TestCatalogWrapperLease {
 
     // The cache's removal listener retires the wrapper as well, asynchronously.
     Mockito.verify(failingWrapper, Mockito.atLeastOnce()).retire();
-    Assertions.assertEquals(
-        0, pool.size(), "a failing retirement must not keep the ClassLoader pool open");
+    Assertions.assertTrue(wrapper.isRetired());
+    Assertions.assertNull(wrapper.catalog());
   }
 
   private Future<?> submitCloseAndAssertBlocked(ExecutorService executor)

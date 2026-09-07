@@ -66,11 +66,7 @@ public class TestDynamicIcebergConfigProvider {
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv and IcebergRESTServerContext state after each test
     FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
-<<<<<<< HEAD
-=======
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
->>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
     resetServerContext();
   }
 
@@ -299,18 +295,6 @@ public class TestDynamicIcebergConfigProvider {
     Mockito.when(mockCatalogEntity.id()).thenReturn(7L);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-<<<<<<< HEAD
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
-    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
-        .thenReturn(
-            new HashMap<String, String>() {
-              {
-                put(IcebergConstants.CATALOG_BACKEND, "custom");
-                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
-              }
-            });
-=======
     mockDoWithCatalog(mockCatalogManager, mockCatalog);
     Map<String, String> catalogProperties =
         new HashMap<String, String>() {
@@ -321,13 +305,8 @@ public class TestDynamicIcebergConfigProvider {
         };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.propertiesWithCredentialProviders()).thenReturn(catalogProperties);
-    SecretManager mockSecretManager = Mockito.mock(SecretManager.class);
-    Mockito.when(mockSecretManager.toPlaintextProperties(catalogProperties))
-        .thenReturn(catalogProperties);
->>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", mockSecretManager, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -530,18 +509,6 @@ public class TestDynamicIcebergConfigProvider {
     Mockito.when(mockCatalogEntity.id()).thenReturn(7L);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-<<<<<<< HEAD
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
-    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
-        .thenReturn(
-            new HashMap<String, String>() {
-              {
-                put(IcebergConstants.CATALOG_BACKEND, "custom");
-                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
-              }
-            });
-=======
     mockDoWithCatalog(mockCatalogManager, mockCatalog);
     Map<String, String> catalogProperties =
         new HashMap<String, String>() {
@@ -552,13 +519,8 @@ public class TestDynamicIcebergConfigProvider {
         };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.propertiesWithCredentialProviders()).thenReturn(catalogProperties);
-    SecretManager mockSecretManager = Mockito.mock(SecretManager.class);
-    Mockito.when(mockSecretManager.toPlaintextProperties(catalogProperties))
-        .thenReturn(catalogProperties);
->>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", mockSecretManager, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();

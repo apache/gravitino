@@ -51,7 +51,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
-import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
@@ -215,11 +214,7 @@ class TestOperationDispatcherSnapshots {
   private static final class SnapshotDispatcher extends OperationDispatcher {
 
     private SnapshotDispatcher(CatalogManager catalogManager) {
-      super(
-          catalogManager,
-          mock(EntityStore.class),
-          mock(IdGenerator.class),
-          mock(SecretManager.class));
+      super(catalogManager, mock(EntityStore.class), mock(IdGenerator.class));
     }
 
     private Table returnTable(Table table) {

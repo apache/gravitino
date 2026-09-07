@@ -77,8 +77,8 @@ public final class EntityCombinedTable implements Table {
     return this;
   }
 
-  MaskAndOmitKeys hiddenProperties() {
-    return MaskAndOmitKeys.of(keysToMask, keysToOmit);
+  Set<String> hiddenProperties() {
+    return hiddenProperties;
   }
 
   @Override

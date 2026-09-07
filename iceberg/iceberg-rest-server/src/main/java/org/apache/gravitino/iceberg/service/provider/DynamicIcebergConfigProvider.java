@@ -99,24 +99,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     } catch (NoSuchCatalogException e) {
       return Optional.empty();
     }
-<<<<<<< HEAD
-
-    Preconditions.checkArgument(
-        "lakehouse-iceberg".equals(catalog.provider()),
-        String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
-
-    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
-    // filtered out of catalog.properties(). We need two different strategies to recover them:
-    //
-    // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
-    // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
-    // including all hidden fields.
-    //
-    // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
-    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
-    // fields into the properties map so the JDBC backend can connect.
-    Map<String, String> catalogProperties;
-=======
     return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
   }
 
@@ -125,9 +107,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("Catalog %s is not an Iceberg catalog", catalog.name()));
 
-    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
-    // then JdbcCredential overlays so credentials win.
->>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
+    // Copy properties while the internal catalog lease is active.
+    Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
       BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
       catalogProperties = new HashMap<>(baseCatalog.propertiesWithCredentialProviders());
@@ -148,7 +129,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
                 });
       }
     }
-    return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+    return catalogProperties;
   }
 
   /**

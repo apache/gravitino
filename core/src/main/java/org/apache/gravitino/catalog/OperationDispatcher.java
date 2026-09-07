@@ -137,18 +137,7 @@ public abstract class OperationDispatcher {
       Map<String, String> properties) {
     return doWithCatalog(
         catalogIdent,
-<<<<<<< HEAD
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  PropertiesMetadata propertiesMetadata = provider.apply(p);
-                  return properties.keySet().stream()
-                      .filter(propertiesMetadata::isHiddenProperty)
-                      .collect(Collectors.toSet());
-                }),
-=======
-        c -> getMaskAndOmitKeys(c, provider, properties),
->>>>>>> 157a6f650 ([#12403] fix(core): defer catalog wrapper cleanup with an operation lease (#12404))
+        c -> getHiddenPropertyNames(c, provider, properties),
         IllegalArgumentException.class);
   }
 
@@ -158,17 +147,19 @@ public abstract class OperationDispatcher {
    * @param catalog the leased catalog wrapper
    * @param provider the metadata provider for the entity type
    * @param properties the properties to classify
-   * @return the keys to mask and omit
+   * @return the hidden property keys
    * @throws Exception if reading the connector metadata fails
    */
-  protected MaskAndOmitKeys getMaskAndOmitKeys(
+  protected Set<String> getHiddenPropertyNames(
       CatalogManager.CatalogWrapper catalog,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties)
       throws Exception {
     return catalog.doWithPropertiesMeta(
         metadata ->
-            HiddenPropertyMaskUtils.classifyHiddenProperties(properties, provider.apply(metadata)));
+            properties.keySet().stream()
+                .filter(provider.apply(metadata)::isHiddenProperty)
+                .collect(Collectors.toSet()));
   }
 
   protected <T> void validateAlterProperties(
