@@ -84,6 +84,22 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     createAndInsertSchema(metalakeName, catalogName, schemaName);
   }
 
+  /** Dropping the old parent after a move must preserve every historical version. */
+  @TestTemplate
+  public void testMovedFunctionHistorySurvivesSourceCascade() throws IOException {
+    for (String parent : new String[] {"schema", "catalog", "metalake"}) {
+      assertMovedFunctionHistoryCascade(parent, true);
+    }
+  }
+
+  /** Dropping the current parent must delete versions created under previous parents too. */
+  @TestTemplate
+  public void testMovedFunctionHistoryIsDeletedWithDestination() throws IOException {
+    for (String parent : new String[] {"schema", "catalog", "metalake"}) {
+      assertMovedFunctionHistoryCascade(parent, false);
+    }
+  }
+
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     FunctionEntity function =
@@ -1361,6 +1377,71 @@ public class TestFunctionMetaService extends TestJDBCBackend {
       throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private void assertMovedFunctionHistoryCascade(String parent, boolean sourceFirst)
+      throws IOException {
+    String sourceMetalake = "source_function_" + parent + "_" + sourceFirst;
+    String destinationMetalake = "destination_function_" + parent + "_" + sourceFirst;
+    String catalog = "history_catalog";
+    String schema = "history_schema";
+    for (String metalake : new String[] {sourceMetalake, destinationMetalake}) {
+      createAndInsertMakeLake(metalake);
+      createAndInsertCatalog(metalake, catalog);
+      createAndInsertSchema(metalake, catalog, schema);
+    }
+    FunctionMetaService service = FunctionMetaService.getInstance();
+    FunctionEntity original =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(sourceMetalake, catalog, schema),
+            "moved_history",
+            AUDIT_INFO);
+    service.insertFunction(original, false);
+    FunctionEntity moved =
+        copyFunction(
+            original,
+            original.name(),
+            NamespaceUtil.ofFunction(destinationMetalake, catalog, schema),
+            "moved");
+    service.updateFunction(original.nameIdentifier(), ignored -> moved);
+    assertEquals(2, listFunctionVersions(original.id()).size());
+
+    if (sourceFirst) {
+      deleteHistoryParent(parent, sourceMetalake, catalog, schema);
+      assertEquals(original.id(), service.getFunctionByIdentifier(moved.nameIdentifier()).id());
+      assertEquals(2, listFunctionVersions(original.id()).size());
+      listFunctionVersions(original.id())
+          .values()
+          .forEach(deletedAt -> assertEquals(0L, deletedAt.longValue()));
+    }
+
+    deleteHistoryParent(parent, destinationMetalake, catalog, schema);
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getFunctionByIdentifier(moved.nameIdentifier()));
+    assertEquals(2, listFunctionVersions(original.id()).size());
+    listFunctionVersions(original.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+  }
+
+  private void deleteHistoryParent(String parent, String metalake, String catalog, String schema) {
+    switch (parent) {
+      case "schema":
+        assertTrue(
+            SchemaMetaService.getInstance()
+                .deleteSchema(NameIdentifier.of(metalake, catalog, schema), true));
+        break;
+      case "catalog":
+        assertTrue(
+            CatalogMetaService.getInstance()
+                .deleteCatalog(NameIdentifier.of(metalake, catalog), true));
+        break;
+      case "metalake":
+        assertTrue(
+            MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(metalake), true));
+        break;
+      default:
+        throw new AssertionError("Unexpected parent: " + parent);
     }
   }
 

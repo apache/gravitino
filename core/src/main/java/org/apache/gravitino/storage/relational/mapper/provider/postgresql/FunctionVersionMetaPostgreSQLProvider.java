@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionVersionMetaBaseSQLProvider;
@@ -34,11 +35,13 @@ public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBa
         + FunctionVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ") AND deleted_at = 0"
+        + ")) AND deleted_at = 0"
         + "</script>";
   }
 
@@ -48,7 +51,9 @@ public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBa
         + FunctionVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
   }
 
   @Override
@@ -57,7 +62,9 @@ public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBa
         + FunctionVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
   }
 
   @Override
