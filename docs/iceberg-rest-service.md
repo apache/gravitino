@@ -577,10 +577,10 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 Supports using static GCS credential file or generating GCS token to access GCS data.
 
-| Configuration item                              | Description                                                                                                                  | Default value                           | Required |
-|-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
-| `gravitino.iceberg-rest.io-impl`                | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
-| `gravitino.iceberg-rest.gcs-service-account-file` | Path of the GCS service account JSON file. Used for server-side FileIO and for `gcs-token` credential vending.             | GCS Application default credential.     | No       |
+| Configuration item                                | Description                                                                                                                  | Default value                           | Required |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `gravitino.iceberg-rest.gcs-service-account-file` | Path of the GCS service account JSON file. Used for server-side FileIO and for `gcs-token` credential vending.               | GCS Application default credential.     | No       |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
