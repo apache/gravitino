@@ -84,6 +84,7 @@ dependencies {
   testImplementation(project(":bundles:iceberg-azure-bundle"))
   testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(project(":server"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
