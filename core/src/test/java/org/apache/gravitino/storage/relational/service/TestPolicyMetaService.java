@@ -619,6 +619,120 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(2, listPolicyVersions(policy.id()).size());
   }
 
+  /** A deleted primary key must not be classified as a retryable overwrite race. */
+  @TestTemplate
+  public void testOverwriteRejectsDeletedPolicyId() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    Namespace ns = NamespaceUtil.ofPolicy(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(RandomIdGenerator.INSTANCE.nextId(), ns, "deleted_policy_id", AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    assertTrue(service.deletePolicy(policy.nameIdentifier()));
+    EntityAlreadyExistsException failure =
+        assertThrows(EntityAlreadyExistsException.class, () -> service.insertPolicy(policy, true));
+    assertTrue(failure.getMessage().contains("use a new ID"));
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getPolicyByIdentifier(policy.nameIdentifier()));
+    listPolicyVersions(policy.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+
+    PolicyEntity replacement =
+        createPolicy(RandomIdGenerator.INSTANCE.nextId(), ns, policy.name(), AUDIT_INFO);
+    service.insertPolicy(replacement, true);
+    assertEquals(replacement.id(), service.getPolicyByIdentifier(policy.nameIdentifier()).id());
+  }
+
+  /** An overwrite cannot adopt a stable ID from a metalake it has not locked. */
+  @TestTemplate
+  public void testOverwriteRejectsPolicyIdInAnotherMetalake() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertMakeLake("foreign_policy_metalake");
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity foreign =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy("foreign_policy_metalake"),
+            "foreign_policy",
+            AUDIT_INFO);
+    service.insertPolicy(foreign, false);
+    PolicyEntity incoming =
+        createPolicy(
+            foreign.id(), NamespaceUtil.ofPolicy(METALAKE_NAME), foreign.name(), AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> service.insertPolicy(incoming, true));
+    assertEquals(foreign.id(), service.getPolicyByIdentifier(foreign.nameIdentifier()).id());
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> service.getPolicyByIdentifier(incoming.nameIdentifier()));
+  }
+
+  /** Two first-time overwrites must serialize or expose a retryable insert conflict. */
+  @TestTemplate
+  public void testConcurrentOverwriteOfMissingPolicy() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    Namespace ns = NamespaceUtil.ofPolicy(METALAKE_NAME);
+    PolicyEntity first =
+        createPolicy(RandomIdGenerator.INSTANCE.nextId(), ns, "first_overwrite", AUDIT_INFO);
+    PolicyEntity second =
+        copyPolicy(
+            createPolicy(RandomIdGenerator.INSTANCE.nextId(), ns, first.name(), AUDIT_INFO),
+            first.name(),
+            "second overwrite");
+    CountDownLatch firstWritten = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> firstResult =
+        executor.submit(
+            () -> {
+              SessionUtils.beginTransaction();
+              try {
+                service.insertPolicy(first, true);
+                firstWritten.countDown();
+                await(allowCommit);
+                SessionUtils.commitTransaction();
+                return null;
+              } catch (Throwable failure) {
+                SessionUtils.rollbackTransaction();
+                return failure;
+              }
+            });
+    try {
+      assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                try {
+                  service.insertPolicy(second, true);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      assertTrue(secondStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> secondResult.get(500, TimeUnit.MILLISECONDS));
+      allowCommit.countDown();
+      Assertions.assertNull(firstResult.get(30, TimeUnit.SECONDS));
+      Throwable failure = secondResult.get(30, TimeUnit.SECONDS);
+      if (failure != null) {
+        Assertions.assertInstanceOf(OptimisticLockException.class, failure);
+        assertEquals(1, listPolicyVersions(first.id()).size());
+        assertTrue(listPolicyVersions(second.id()).isEmpty());
+        service.insertPolicy(second, true);
+      }
+      PolicyEntity stored = service.getPolicyByIdentifier(first.nameIdentifier());
+      assertEquals(first.id(), stored.id());
+      assertEquals("second overwrite", stored.comment());
+      assertEquals(2L, getPolicyPO(first.nameIdentifier()).getCurrentVersion());
+      assertEquals(2, listPolicyVersions(first.id()).size());
+      assertTrue(listPolicyVersions(second.id()).isEmpty());
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   @TestTemplate
   public void testPolicyOverwriteByNameDoesNotRevertConcurrentRename() throws Exception {
     createAndInsertMakeLake(METALAKE_NAME);

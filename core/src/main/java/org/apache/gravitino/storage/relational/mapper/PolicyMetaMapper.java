@@ -25,11 +25,24 @@ import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface PolicyMetaMapper {
   String POLICY_META_TABLE_NAME = "policy_meta";
+
+  /**
+   * Checks whether a soft-deleted policy still owns the requested primary key.
+   *
+   * @param policyId the policy ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select(
+      "SELECT COUNT(*) FROM "
+          + POLICY_META_TABLE_NAME
+          + " WHERE policy_id = #{policyId} AND deleted_at > 0")
+  int countDeletedPolicyMetasById(@Param("policyId") Long policyId);
 
   @Results({
     @Result(property = "policyId", column = "policy_id"),

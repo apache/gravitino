@@ -120,7 +120,18 @@ public class PolicyMetaService {
           () -> lockMetalakeForPolicyCreate(metalakePO),
           () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyEntity.toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            e, Entity.EntityType.POLICY, policyEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwritten) {
+          // A missing-row locking read does not fence a concurrent insert at READ_COMMITTED.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.POLICY, policyEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw e;
     }
   }
@@ -497,9 +508,8 @@ public class PolicyMetaService {
    * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
    * the replacement is written as the next version of that row, so the snapshot history survives
    * the overwrite instead of being reset. When no row is there to replace, the overwrite inserts
-   * like a plain create; a create of the same name that commits in between then surfaces as an
-   * already-exists failure that the caller retries, which is the same outcome the caller would see
-   * had the two requests arrived in the other order.
+   * like a plain create. If another create wins the unique key after the locking lookup misses, the
+   * caller receives a retryable optimistic-lock failure after the transaction is rolled back.
    *
    * <p>An overwrite no longer revives a soft-deleted row that happens to carry the same policy ID.
    * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
@@ -514,6 +524,14 @@ public class PolicyMetaService {
 
     PolicyPO existingPolicyPO = findAndLockPolicyForOverwrite(initializedPolicyPO);
     if (existingPolicyPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              PolicyMetaMapper.class,
+              mapper -> mapper.countDeletedPolicyMetasById(initializedPolicyPO.getPolicyId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The policy ID %s is reserved by a deleted policy; use a new ID",
+            initializedPolicyPO.getPolicyId());
+      }
       insertNewPolicyWithoutCommit(initializedPolicyPO);
       return;
     }
@@ -551,9 +569,11 @@ public class PolicyMetaService {
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
             mapper -> mapper.selectPolicyByPolicyIdForUpdate(initializedPolicyPO.getPolicyId()));
-    if (sameIdPolicyPO == null
-        || !Objects.equals(sameIdPolicyPO.getMetalakeId(), initializedPolicyPO.getMetalakeId())) {
-      return null;
+    if (sameIdPolicyPO != null
+        && !Objects.equals(sameIdPolicyPO.getMetalakeId(), initializedPolicyPO.getMetalakeId())) {
+      throw new EntityAlreadyExistsException(
+          "The policy ID %s already belongs to a different metalake",
+          initializedPolicyPO.getPolicyId());
     }
     return sameIdPolicyPO;
   }
