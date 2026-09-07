@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.Preconditions;
@@ -68,7 +69,7 @@ public abstract class JdbcPropertiesConverter
     // already recognizes, so it survives that factory's strict option validation.
     String gravitinoJdbcDatabase =
         gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE);
-    if (gravitinoJdbcDatabase != null) {
+    if (StringUtils.isNotBlank(gravitinoJdbcDatabase)) {
       flinkCatalogProperties.putIfAbsent(
           JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, gravitinoJdbcDatabase);
     }
