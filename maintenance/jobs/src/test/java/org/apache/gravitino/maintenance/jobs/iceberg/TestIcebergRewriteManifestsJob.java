@@ -77,7 +77,7 @@ public class TestIcebergRewriteManifestsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(8, template.arguments().size()); // 4 flags * 2 (flag + value)
+    assertEquals(10, template.arguments().size()); // 5 flags * 2 (flag + value)
 
     // Verify all expected arguments are present
     assertTrue(template.arguments().contains("--catalog"));
@@ -86,6 +86,8 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--use-caching"));
     assertTrue(template.arguments().contains("{{use_caching}}"));
+    assertTrue(template.arguments().contains("--spec-id"));
+    assertTrue(template.arguments().contains("{{spec_id}}"));
     assertTrue(template.arguments().contains("--spark-conf"));
     assertTrue(template.arguments().contains("{{spark_conf}}"));
   }
@@ -218,7 +220,8 @@ public class TestIcebergRewriteManifestsJob {
   public void testProcedureCallOmitsUseCachingWhenPlaceholderUnresolved() {
     String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{use_caching}}");
     String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", useCaching);
+        IcebergRewriteManifestsJob.buildProcedureCall(
+            "iceberg_prod", "db.sample", useCaching, null);
 
     // Without filtering, Boolean.parseBoolean("{{use_caching}}") would silently emit
     // use_caching => false instead of leaving Iceberg's default in place.
@@ -250,18 +253,53 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(e.getMessage().contains("yes"));
   }
 
+  // Test validateSpecId method
+
+  @Test
+  public void testValidateSpecIdAcceptsNonNegativeIntegers() {
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateSpecId("0"));
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateSpecId("2"));
+  }
+
+  @Test
+  public void testValidateSpecIdAcceptsAbsentValue() {
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateSpecId(null));
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateSpecId(""));
+  }
+
+  @Test
+  public void testValidateSpecIdRejectsNegativeValue() {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class, () -> IcebergRewriteManifestsJob.validateSpecId("-1"));
+
+    assertTrue(e.getMessage().contains("-1"));
+  }
+
+  @Test
+  public void testValidateSpecIdRejectsNonNumericValue() {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRewriteManifestsJob.validateSpecId("latest"));
+
+    assertTrue(e.getMessage().contains("latest"));
+  }
+
   // Test buildProcedureCall method
 
   @Test
   public void testBuildProcedureCallMinimal() {
-    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null);
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null, null);
 
     assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
   }
 
   @Test
   public void testBuildProcedureCallWithCachingTrue() {
-    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "true");
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "true", null);
 
     assertEquals(
         "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', use_caching => true)",
@@ -271,7 +309,7 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testBuildProcedureCallWithCachingFalse() {
     String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "false");
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "false", null);
 
     assertEquals(
         "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', use_caching => false)",
@@ -280,8 +318,39 @@ public class TestIcebergRewriteManifestsJob {
 
   @Test
   public void testBuildProcedureCallWithEmptyCaching() {
-    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "");
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "", null);
 
+    assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
+  }
+
+  @Test
+  public void testBuildProcedureCallWithSpecId() {
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null, "2");
+
+    assertEquals(
+        "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', spec_id => 2)", sql);
+  }
+
+  @Test
+  public void testBuildProcedureCallWithCachingAndSpecId() {
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "false", "0");
+
+    assertEquals(
+        "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', "
+            + "use_caching => false, spec_id => 0)",
+        sql);
+  }
+
+  @Test
+  public void testProcedureCallOmitsSpecIdWhenPlaceholderUnresolved() {
+    String specId = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{spec_id}}");
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null, specId);
+
+    // An unresolved placeholder must not reach Integer.parseInt as a SQL literal.
     assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
   }
 
@@ -290,7 +359,8 @@ public class TestIcebergRewriteManifestsJob {
     // Test SQL injection attempt in table name
     String maliciousTable = "db.table' OR '1'='1";
     String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_catalog", maliciousTable, null);
+        IcebergRewriteManifestsJob.buildProcedureCall(
+            "iceberg_catalog", maliciousTable, null, null);
 
     // Verify single quotes are escaped (becomes '')
     assertTrue(sql.contains("db.table'' OR ''1''=''1"));
@@ -298,7 +368,7 @@ public class TestIcebergRewriteManifestsJob {
 
     // Test SQL injection attempt in catalog name
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
-    sql = IcebergRewriteManifestsJob.buildProcedureCall(maliciousCatalog, "db.table", null);
+    sql = IcebergRewriteManifestsJob.buildProcedureCall(maliciousCatalog, "db.table", null, null);
 
     // Verify backticks are escaped and the whole identifier stays quoted
     assertTrue(sql.startsWith("CALL `catalog``; DROP TABLE users; --`.system.rewrite_manifests("));
