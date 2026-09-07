@@ -24,8 +24,22 @@ ALTER TABLE `user_meta`
 ALTER TABLE `group_meta`
     ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`;
 
-CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
+-- Use prepared statements to make CREATE [UNIQUE] INDEX idempotent (MySQL
+-- does not support CREATE INDEX IF NOT EXISTS). Re-running the upgrade
+-- script will skip indexes that already exist instead of raising ER_DUP_KEYNAME.
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND index_name = 'uk_mid_ueid_del');
+SET @sql := IF(@idx = 0,
+    'CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`)',
+    'SELECT ''uk_mid_ueid_del already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_meta' AND index_name = 'uk_mid_geid_del');
+SET @sql := IF(@idx = 0,
+    'CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`)',
+    'SELECT ''uk_mid_geid_del already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
@@ -42,8 +56,19 @@ ALTER TABLE `tag_relation_meta`
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
 
-CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
-CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'uk_ti_mi_mo_tv_del');
+SET @sql := IF(@idx = 0,
+    'CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`)',
+    'SELECT ''uk_ti_mi_mo_tv_del already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_tid_value');
+SET @sql := IF(@idx = 0,
+    'CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`)',
+    'SELECT ''idx_tid_value already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Index names are only scoped per-table in MySQL, so the same name could be
 -- reused across tables. Prefix each reused name with its table name so that

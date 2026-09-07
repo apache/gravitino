@@ -33,12 +33,29 @@ ALTER TABLE `group_meta`
     ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
     COMMENT 'updated at';
 
-CREATE INDEX idx_user_meta_name_del_upd
-    ON user_meta (metalake_id, user_name, deleted_at, updated_at);
-CREATE INDEX idx_owner_meta_del_upd_obj
-    ON owner_meta (deleted_at, updated_at, metadata_object_id);
-CREATE INDEX idx_group_meta_name_del_upd
-    ON group_meta (metalake_id, group_name, deleted_at, updated_at);
+-- Use prepared statements to make CREATE INDEX idempotent (MySQL does not
+-- support CREATE INDEX IF NOT EXISTS). Re-running the upgrade script will
+-- skip indexes that already exist instead of raising ER_DUP_KEYNAME.
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND index_name = 'idx_user_meta_name_del_upd');
+SET @sql := IF(@idx = 0,
+    'CREATE INDEX idx_user_meta_name_del_upd ON user_meta (metalake_id, user_name, deleted_at, updated_at)',
+    'SELECT ''idx_user_meta_name_del_upd already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'owner_meta' AND index_name = 'idx_owner_meta_del_upd_obj');
+SET @sql := IF(@idx = 0,
+    'CREATE INDEX idx_owner_meta_del_upd_obj ON owner_meta (deleted_at, updated_at, metadata_object_id)',
+    'SELECT ''idx_owner_meta_del_upd_obj already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_meta' AND index_name = 'idx_group_meta_name_del_upd');
+SET @sql := IF(@idx = 0,
+    'CREATE INDEX idx_group_meta_name_del_upd ON group_meta (metalake_id, group_name, deleted_at, updated_at)',
+    'SELECT ''idx_group_meta_name_del_upd already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
