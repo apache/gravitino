@@ -652,6 +652,51 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertEquals(2, listViewVersions(view.id()).size());
   }
 
+  /** Moving a view must persist every parent ID used by catalog cascade cleanup. */
+  @TestTemplate
+  public void testMoveAcrossMetalakesPreservesOwnership() throws IOException {
+    String targetMetalake = "moved_view_metalake";
+    String targetCatalog = "moved_view_catalog";
+    String targetSchema = "moved_view_schema";
+    long targetMetalakeId = createAndInsertMakeLake(targetMetalake).id();
+    long targetCatalogId = createAndInsertCatalog(targetMetalake, targetCatalog).id();
+    createAndInsertSchema(targetMetalake, targetCatalog, targetSchema);
+
+    ViewMetaService service = ViewMetaService.getInstance();
+    ViewEntity original =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofView(metalakeName, catalogName, schemaName),
+            "moved_view",
+            AUDIT_INFO);
+    service.insertView(original, false);
+    ViewEntity moved =
+        copyView(
+            original,
+            original.name(),
+            NamespaceUtil.ofView(targetMetalake, targetCatalog, targetSchema),
+            "moved");
+    service.updateView(original.nameIdentifier(), ignored -> moved);
+    ViewPO persisted = service.getViewPOByIdentifier(moved.nameIdentifier());
+    assertEquals(targetMetalakeId, persisted.getMetalakeId());
+    assertEquals(targetCatalogId, persisted.getCatalogId());
+    assertEquals(targetMetalakeId, persisted.getViewVersionInfoPO().metalakeId());
+    assertEquals(targetCatalogId, persisted.getViewVersionInfoPO().catalogId());
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getViewByIdentifier(original.nameIdentifier()));
+
+    assertTrue(
+        CatalogMetaService.getInstance()
+            .deleteCatalog(NameIdentifier.of(metalakeName, catalogName), true));
+    assertEquals(original.id(), service.getViewByIdentifier(moved.nameIdentifier()).id());
+    assertTrue(
+        CatalogMetaService.getInstance()
+            .deleteCatalog(NameIdentifier.of(targetMetalake, targetCatalog), true));
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getViewByIdentifier(moved.nameIdentifier()));
+    listViewVersions(original.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+  }
+
   @TestTemplate
   public void testCascadingSchemaDeleteCleansViewVersions() throws IOException {
     String cascadeSchemaName = GravitinoITUtils.genRandomName("tst_view_schema_cascade");
@@ -747,6 +792,29 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertThrows(
         NoSuchEntityException.class,
         () -> ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()));
+  }
+
+  /** A deleted ID is a permanent conflict until GC, rather than a retryable concurrent write. */
+  @TestTemplate
+  public void testOverwriteRejectsDeletedViewId() throws IOException {
+    Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "deleted_view_id", AUDIT_INFO);
+    ViewMetaService service = ViewMetaService.getInstance();
+    service.insertView(view, false);
+    assertTrue(service.deleteView(view.nameIdentifier()));
+
+    EntityAlreadyExistsException failure =
+        assertThrows(EntityAlreadyExistsException.class, () -> service.insertView(view, true));
+    assertTrue(failure.getMessage().contains("use a new ID"));
+    assertThrows(
+        NoSuchEntityException.class, () -> service.getViewByIdentifier(view.nameIdentifier()));
+    listViewVersions(view.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+
+    ViewEntity replacement =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, view.name(), AUDIT_INFO);
+    service.insertView(replacement, true);
+    assertEquals(replacement.id(), service.getViewByIdentifier(view.nameIdentifier()).id());
   }
 
   /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */

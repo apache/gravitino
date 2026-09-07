@@ -129,6 +129,15 @@ public interface ViewMetaMapper {
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewMetaByIdForUpdate")
   ViewPO selectViewMetaByIdForUpdate(@Param("viewId") Long viewId);
 
+  /**
+   * Checks whether a soft-deleted view still owns the requested primary key.
+   *
+   * @param viewId the view ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE view_id = #{viewId} AND deleted_at > 0")
+  int countDeletedViewMetasById(@Param("viewId") Long viewId);
+
   @ResultMap("viewPOResultMap")
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewByFullQualifiedName")
   ViewPO selectViewByFullQualifiedName(

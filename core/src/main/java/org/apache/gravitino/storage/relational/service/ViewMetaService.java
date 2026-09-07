@@ -126,7 +126,7 @@ public class ViewMetaService {
       } catch (EntityAlreadyExistsException duplicate) {
         if (overwrite) {
           // A missing-row locking read cannot fence a concurrent insert at READ_COMMITTED.
-          // The transaction has rolled back; let the caller retry against the winning row.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
           throw ExceptionUtils.concurrentModification(
               Entity.EntityType.VIEW, viewEntity.nameIdentifier());
         }
@@ -305,6 +305,14 @@ public class ViewMetaService {
 
     ViewPO existingViewPO = findAndLockViewForOverwrite(initializedViewPO);
     if (existingViewPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              ViewMetaMapper.class,
+              mapper -> mapper.countDeletedViewMetasById(initializedViewPO.getViewId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The view ID %s is reserved by a deleted view; use a new ID",
+            initializedViewPO.getViewId());
+      }
       insertNewViewWithoutCommit(initializedViewPO);
       return;
     }
