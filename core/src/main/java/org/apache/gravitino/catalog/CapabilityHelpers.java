@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -52,10 +53,11 @@ public class CapabilityHelpers {
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
     try {
-      return c.capabilities();
-    } catch (Exception e) {
+      return catalogManager.doWithCatalog(catalogIdent, catalog -> catalog.capability());
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
   }
