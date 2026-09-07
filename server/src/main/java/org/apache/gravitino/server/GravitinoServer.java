@@ -47,6 +47,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
@@ -57,7 +58,6 @@ import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.RequestContextFilter;
-import org.apache.gravitino.server.web.SecretProvidersConfigServlet;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
@@ -163,6 +163,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.secretPropertyOperationDispatcher())
                 .to(SecretPropertyOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.secretProviderRegistry()).to(SecretProviderRegistry.class).ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(gravitinoEnv.functionDispatcher()).to(FunctionDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
@@ -192,9 +193,6 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addServlet(
-        new SecretProvidersConfigServlet(gravitinoEnv.secretProviderRegistry()),
-        "/configs/secrets/providers");
 
     // Root-level aliases for enterprise GTMs that require probes at well-known root paths.
     // Forwards /health, /health/live, /health/ready, and /health.html to the canonical

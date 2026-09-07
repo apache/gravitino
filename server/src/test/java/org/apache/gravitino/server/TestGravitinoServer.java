@@ -40,6 +40,8 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.listener.EventListenerManager;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -170,8 +172,52 @@ public class TestGravitinoServer {
     assertEquals(1, providers.size());
     assertEquals("memory", providers.get(0).get("name"));
     assertEquals("memory", providers.get(0).get("type"));
-    assertEquals("https://secrets.example.com", providers.get(0).get("uri"));
+    assertFalse(providers.get(0).containsKey("uri"));
     assertFalse(providers.get(0).containsKey("className"));
+  }
+
+  @Test
+  public void testSecretProvidersOldPathRemoved() throws Exception {
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(spyServerConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    assertEquals(404, response.statusCode());
+  }
+
+  @Test
+  public void testSecretProvidersRequestIsAudited() throws Exception {
+    CapturedAuditEventListener.clear();
+    ServerConfig serverConfig = spyServerConfig(serverConfigWithAuditListener());
+    gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    List<Map<String, Object>> providers = fetchSecretProviders(serverConfig);
+    assertTrue(providers.isEmpty());
+
+    HttpRequestEvent auditEvent =
+        CapturedAuditEventListener.getEvents().stream()
+            .filter(e -> e instanceof HttpRequestEvent)
+            .map(e -> (HttpRequestEvent) e)
+            .filter(e -> e.requestUri() != null && e.requestUri().contains("/secrets/providers"))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new AssertionError(
+                        "No HttpRequestEvent captured for GET /api/secrets/providers"));
+    assertEquals(200, auditEvent.statusCode());
+    assertEquals("GET", auditEvent.httpMethod());
   }
 
   private static ServerConfig serverConfigWithMemoryProvider() throws IOException {
@@ -196,6 +242,25 @@ public class TestGravitinoServer {
     return serverConfig;
   }
 
+  private static ServerConfig serverConfigWithAuditListener() throws IOException {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
+    configs.put(
+        EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX
+            + EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES,
+        "secretProviderAudit");
+    configs.put(
+        EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX
+            + "secretProviderAudit."
+            + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
+        CapturedAuditEventListener.class.getName());
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(configs, t -> true);
+    return serverConfig;
+  }
+
   private static ServerConfig spyServerConfig(ServerConfig serverConfig) {
     ServerConfig spy = Mockito.spy(serverConfig);
     Mockito.when(spy.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX))
@@ -212,7 +277,8 @@ public class TestGravitinoServer {
         HttpClient.newHttpClient()
             .send(
                 HttpRequest.newBuilder(
-                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
+                        URI.create("http://127.0.0.1:" + port + "/api/secrets/providers"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofString());

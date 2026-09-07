@@ -74,6 +74,7 @@ import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.SecretProviderOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
@@ -122,6 +123,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             JobOperations.class.getName(),
             MetadataObjectCredentialOperations.class.getName(),
             MetadataObjectSecretOperations.class.getName(),
+            SecretProviderOperations.class.getName(),
             LineageOperations.class.getName()));
   }
 

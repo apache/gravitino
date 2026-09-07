@@ -261,6 +261,9 @@ paths:
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 
+  /secrets/providers:
+    $ref: "./secrets.yaml#/paths/~1secrets~1providers"
+
 components:
 
   schemas:

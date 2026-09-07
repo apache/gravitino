@@ -50,6 +50,7 @@ import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.dto.secret.SecretProviderDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -547,6 +548,27 @@ public class TestResponses {
     assertDoesNotThrow(response::validate);
     assertNull(response.getPrincipal());
     assertFalse(response.isServiceAdmin());
+  }
+
+  @Test
+  void testSecretProviderListResponse() throws JsonProcessingException {
+    SecretProviderListResponse response =
+        new SecretProviderListResponse(
+            new SecretProviderDTO[] {new SecretProviderDTO("memory", "memory")});
+    response.validate();
+    assertEquals(0, response.getCode());
+    assertEquals(1, response.getProviders().length);
+    assertEquals("memory", response.getProviders()[0].name());
+    assertEquals("memory", response.getProviders()[0].type());
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    assertFalse(serJson.contains("uri"));
+    SecretProviderListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, SecretProviderListResponse.class);
+    assertEquals(response, deserResponse);
+
+    SecretProviderListResponse empty = new SecretProviderListResponse();
+    assertThrows(IllegalArgumentException.class, empty::validate);
   }
 
   @Test
