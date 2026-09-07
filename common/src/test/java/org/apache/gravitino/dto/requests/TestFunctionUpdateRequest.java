@@ -104,6 +104,84 @@ public class TestFunctionUpdateRequest {
   }
 
   @Test
+  public void testAddDefinitionRequestDataTypeValidation() {
+    FunctionParamDTO externalParam =
+        FunctionParamDTO.builder()
+            .withName("external")
+            .withDataType(Types.ExternalType.of("engine_specific_type"))
+            .build();
+    FunctionDefinitionDTO externalDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {externalParam})
+            .withReturnType(Types.ExternalType.of("engine_specific_result"))
+            .build();
+
+    FunctionUpdateRequest.AddDefinitionRequest validRequest =
+        new FunctionUpdateRequest.AddDefinitionRequest(externalDefinition);
+    Assertions.assertDoesNotThrow(validRequest::validate);
+
+    FunctionParamDTO unparsedParam =
+        FunctionParamDTO.builder()
+            .withName("legacy")
+            .withDataType(Types.UnparsedType.of("legacy_type"))
+            .build();
+    FunctionDefinitionDTO unparsedDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {unparsedParam})
+            .withReturnType(Types.IntegerType.get())
+            .build();
+
+    FunctionUpdateRequest.AddDefinitionRequest invalidRequest =
+        new FunctionUpdateRequest.AddDefinitionRequest(unparsedDefinition);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
+    Assertions.assertTrue(exception.getMessage().contains("definition.parameters[0].dataType"));
+  }
+
+  @Test
+  public void testSelectorRequestsAllowLegacyUnparsedDataType() {
+    FunctionParamDTO legacyParam =
+        FunctionParamDTO.builder()
+            .withName("legacy")
+            .withDataType(Types.UnparsedType.of("legacy_type"))
+            .build();
+    FunctionParamDTO[] legacyParams = new FunctionParamDTO[] {legacyParam};
+    SQLImplDTO impl = new SQLImplDTO(FunctionImpl.RuntimeType.SPARK.name(), null, null, "SELECT 1");
+
+    FunctionUpdateRequest.RemoveDefinitionRequest removeDefinition =
+        new FunctionUpdateRequest.RemoveDefinitionRequest(legacyParams);
+    FunctionUpdateRequest.AddImplRequest addImpl =
+        new FunctionUpdateRequest.AddImplRequest(legacyParams, impl);
+    FunctionUpdateRequest.UpdateImplRequest updateImpl =
+        new FunctionUpdateRequest.UpdateImplRequest(
+            legacyParams, FunctionImpl.RuntimeType.SPARK.name(), impl);
+    FunctionUpdateRequest.RemoveImplRequest removeImpl =
+        new FunctionUpdateRequest.RemoveImplRequest(
+            legacyParams, FunctionImpl.RuntimeType.SPARK.name());
+
+    Assertions.assertDoesNotThrow(removeDefinition::validate);
+    Assertions.assertDoesNotThrow(addImpl::validate);
+    Assertions.assertDoesNotThrow(updateImpl::validate);
+    Assertions.assertDoesNotThrow(removeImpl::validate);
+
+    FunctionChange.RemoveDefinition removeDefinitionChange =
+        (FunctionChange.RemoveDefinition) removeDefinition.functionChange();
+    FunctionChange.AddImpl addImplChange = (FunctionChange.AddImpl) addImpl.functionChange();
+    FunctionChange.UpdateImpl updateImplChange =
+        (FunctionChange.UpdateImpl) updateImpl.functionChange();
+    FunctionChange.RemoveImpl removeImplChange =
+        (FunctionChange.RemoveImpl) removeImpl.functionChange();
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_type"), removeDefinitionChange.parameters()[0].dataType());
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_type"), addImplChange.parameters()[0].dataType());
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_type"), updateImplChange.parameters()[0].dataType());
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_type"), removeImplChange.parameters()[0].dataType());
+  }
+
+  @Test
   public void testRemoveDefinitionRequestSerDe() throws JsonProcessingException {
     FunctionParamDTO param =
         FunctionParamDTO.builder().withName("x").withDataType(Types.IntegerType.get()).build();

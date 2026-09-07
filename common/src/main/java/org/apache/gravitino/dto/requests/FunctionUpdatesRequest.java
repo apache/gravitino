@@ -25,7 +25,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.apache.gravitino.rest.RESTMessage;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Request to represent updates to a function. */
@@ -44,6 +43,18 @@ public class FunctionUpdatesRequest implements RESTRequest {
     if (updates == null) {
       throw new IllegalArgumentException("Updates list cannot be null");
     }
-    updates.forEach(RESTMessage::validate);
+    for (int i = 0; i < updates.size(); i++) {
+      FunctionUpdateRequest update = updates.get(i);
+      if (update == null) {
+        throw new IllegalArgumentException("\"updates[" + i + "]\" field cannot be null");
+      }
+
+      if (update instanceof FunctionUpdateRequest.AddDefinitionRequest) {
+        ((FunctionUpdateRequest.AddDefinitionRequest) update)
+            .validateDefinition("updates[" + i + "].definition");
+      } else {
+        update.validate();
+      }
+    }
   }
 }
