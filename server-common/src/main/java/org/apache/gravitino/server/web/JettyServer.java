@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -70,6 +71,16 @@ public class JettyServer {
 
   private static final String HTTPS = "https";
   private static final String HTTP_PROTOCOL = "http/1.1";
+
+  /**
+   * The pathSpecs {@link #initialize} registers directly on the shared servlet context when a
+   * {@link MetricsSystem} is available, outside of whatever pathspec the caller itself filters.
+   * Callers that need request-context tracking or audit coverage on these paths (see GH-12760) must
+   * apply their own filters to them explicitly, using this constant rather than re-declaring the
+   * literal path strings, so the two can never drift apart.
+   */
+  public static final ImmutableList<String> METRICS_PATH_SPECS =
+      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private Server server;
 
@@ -174,10 +185,10 @@ public class JettyServer {
       MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
       servletContextHandler.setAttribute(
           "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
+      servletContextHandler.addServlet(MetricsServlet.class, METRICS_PATH_SPECS.get(0));
 
       servletContextHandler.addServlet(
-          new ServletHolder(metricsSystem.getPrometheusServlet()), "/prometheus/metrics");
+          new ServletHolder(metricsSystem.getPrometheusServlet()), METRICS_PATH_SPECS.get(1));
     }
 
     HandlerCollection handlers = new HandlerCollection();
@@ -493,7 +504,14 @@ public class JettyServer {
     return server.getThreadPool();
   }
 
-  public void addCustomFilters(String pathSpec) {
+  /**
+   * Registers every configured custom filter, binding each one's single {@link FilterHolder} to all
+   * of {@code pathSpecs} in one pass — so a filter whose {@code init()} isn't safe to run more than
+   * once per JVM only runs it once, regardless of how many paths it's bound to.
+   *
+   * @param pathSpecs the pathSpecs to bind each configured custom filter to
+   */
+  public void addCustomFilters(String... pathSpecs) {
     for (String filterName : serverConfig.getCustomFilters()) {
       if (StringUtils.isBlank(filterName)) {
         continue;
@@ -504,7 +522,10 @@ public class JettyServer {
           serverConfig.getAllWithPrefix(String.format("%s.param.", filterName)).entrySet()) {
         filterHolder.setInitParameter(entry.getKey(), entry.getValue());
       }
-      servletContextHandler.addFilter(filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      for (String pathSpec : pathSpecs) {
+        servletContextHandler.addFilter(
+            filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      }
     }
   }
 

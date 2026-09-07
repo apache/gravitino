@@ -21,6 +21,8 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -99,8 +101,16 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
     server.addFilter(
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+
+    registerMetricsPathFilters(server, eventBus);
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
+    customFilterPaths.add(LANCE_SPEC);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode",
@@ -130,6 +140,26 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public void join() {
     if (server != null) {
       server.join();
+    }
+  }
+
+  /**
+   * Registers request-context tracking and audit-on-failure coverage on {@link
+   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
+   * receive no such coverage at all, with nothing in the build catching it; {@code
+   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
+   * {@link #LANCE_SPEC}. Package-private and static so a unit test can exercise it directly against
+   * a plain {@link JettyServer}, without booting the rest of {@link #serviceInit}. See GH-12760.
+   *
+   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
+   *     coverage
+   * @param eventBus the event bus audit events are dispatched through
+   */
+  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
     }
   }
 
