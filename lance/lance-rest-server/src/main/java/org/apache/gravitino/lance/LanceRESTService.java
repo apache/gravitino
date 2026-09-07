@@ -21,12 +21,8 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
-<<<<<<< HEAD
-=======
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -104,29 +100,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     // request's query parameters and remote address, exactly as on the main server.
     server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
     server.addFilter(
-<<<<<<< HEAD
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
-=======
-        new HttpAuditFilter(
-            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
-        LANCE_SPEC);
-    server.addSystemFilters(LANCE_SPEC);
-    if (auxMode) {
-      server.addFilter(
-          new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
-          LANCE_SPEC);
-    }
-
-    // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
-    // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
-    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
-    // here would double-log every probe.
-    server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
-    server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 
     registerMetricsPathFilters(server, eventBus);
 
@@ -168,9 +143,6 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-<<<<<<< HEAD
-  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
-=======
   /**
    * Registers request-context tracking and audit-on-failure coverage on {@link
    * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
@@ -191,8 +163,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
 

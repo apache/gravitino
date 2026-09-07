@@ -25,44 +25,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
-<<<<<<< HEAD
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-=======
 import java.lang.reflect.Field;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
-<<<<<<< HEAD
-import org.apache.gravitino.server.web.JettyServerConfig;
-=======
-import org.apache.gravitino.secret.SecretProviderRegistry;
-import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.JettyServerTestUtils;
-import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.eclipse.jetty.http.pathmap.ServletPathSpec;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletMapping;
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -198,32 +178,6 @@ public class TestGravitinoServer {
         hookBlock.contains("server.gracefulStop()"),
         "Shutdown hook should invoke server.gracefulStop() so app-level cleanup runs on SIGTERM");
   }
-<<<<<<< HEAD
-=======
-
-  @Test
-  public void testSecretProvidersDiscoveryEmpty() throws Exception {
-    gravitinoServer.initialize();
-    gravitinoServer.start();
-
-    List<Map<String, Object>> providers = fetchSecretProviders(spyServerConfig);
-    assertTrue(providers.isEmpty());
-  }
-
-  @Test
-  public void testSecretProvidersDiscoveryWithMemoryProvider() throws Exception {
-    ServerConfig serverConfig = spyServerConfig(serverConfigWithMemoryProvider());
-    gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
-    gravitinoServer.initialize();
-    gravitinoServer.start();
-
-    List<Map<String, Object>> providers = fetchSecretProviders(serverConfig);
-    assertEquals(1, providers.size());
-    assertEquals("memory", providers.get(0).get("name"));
-    assertEquals("memory", providers.get(0).get("type"));
-    assertEquals("https://secrets.example.com", providers.get(0).get("uri"));
-    assertFalse(providers.get(0).containsKey("className"));
-  }
 
   @Test
   public void testEveryServletPathIsCoveredByAuditFilter() throws Exception {
@@ -305,55 +259,4 @@ public class TestGravitinoServer {
     JettyServer jettyServer = (JettyServer) serverField.get(gravitinoServer);
     return JettyServerTestUtils.getServletContextHandler(jettyServer);
   }
-
-  private static ServerConfig serverConfigWithMemoryProvider() throws IOException {
-    Map<String, String> configs = new HashMap<>();
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
-    configs.put(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
-    configs.put(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "memory."
-            + SecretProviderRegistry.CLASS_NAME,
-        InMemorySecretsProvider.class.getName());
-    configs.put(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "memory."
-            + SecretProviderRegistry.URI,
-        "https://secrets.example.com");
-
-    ServerConfig serverConfig = new ServerConfig();
-    serverConfig.loadFromMap(configs, t -> true);
-    return serverConfig;
-  }
-
-  private static ServerConfig spyServerConfig(ServerConfig serverConfig) {
-    ServerConfig spy = Mockito.spy(serverConfig);
-    Mockito.when(spy.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX))
-        .thenReturn(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
-    return spy;
-  }
-
-  private static List<Map<String, Object>> fetchSecretProviders(ServerConfig serverConfig)
-      throws Exception {
-    int port =
-        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
-            .getHttpPort();
-    HttpResponse<String> response =
-        HttpClient.newHttpClient()
-            .send(
-                HttpRequest.newBuilder(
-                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
-                    .GET()
-                    .build(),
-                HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, response.statusCode());
-    Map<String, Object> body =
-        ObjectMapperProvider.objectMapper()
-            .readValue(response.body(), new TypeReference<Map<String, Object>>() {});
-    return ObjectMapperProvider.objectMapper()
-        .convertValue(body.get("providers"), new TypeReference<List<Map<String, Object>>>() {});
-  }
->>>>>>> b639f5c12 ([#12760] fix(server): Cover root-mounted servlets with the request-context, audit, and custom filter chain (#12922))
 }
