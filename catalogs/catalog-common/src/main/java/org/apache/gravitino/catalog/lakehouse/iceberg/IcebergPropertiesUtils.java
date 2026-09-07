@@ -43,7 +43,15 @@ public class IcebergPropertiesUtils {
       ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID;
   private static final String ICEBERG_AZURE_CLIENT_SECRET =
       ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET;
-  private static final List<MutuallyExclusivePropertyMapping> EXCLUSIVE_PROPERTY_MAPPINGS;
+  private static final List<String> ICEBERG_AZURE_SHARED_KEY_PROPERTIES =
+      Arrays.asList(
+          IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME,
+          IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
+  private static final List<String> ICEBERG_AZURE_SERVICE_PRINCIPAL_PROPERTIES =
+      Arrays.asList(ICEBERG_AZURE_TENANT_ID, ICEBERG_AZURE_CLIENT_ID, ICEBERG_AZURE_CLIENT_SECRET);
+  private static final Map<String, String> ICEBERG_AZURE_SERVICE_PRINCIPAL_DEFAULTS =
+      Collections.singletonMap(
+          ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
@@ -114,23 +122,6 @@ public class IcebergPropertiesUtils {
         });
     ICEBERG_CATALOG_CONFIG_TO_GRAVITINO =
         Collections.unmodifiableMap(icebergCatalogConfigToGravitino);
-
-    PropertyMappingAlternative azureSharedKey =
-        new PropertyMappingAlternative(
-            Arrays.asList(
-                IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME,
-                IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY),
-            Collections.emptyMap());
-    PropertyMappingAlternative azureServicePrincipal =
-        new PropertyMappingAlternative(
-            Arrays.asList(
-                ICEBERG_AZURE_TENANT_ID, ICEBERG_AZURE_CLIENT_ID, ICEBERG_AZURE_CLIENT_SECRET),
-            Collections.singletonMap(
-                ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER));
-    EXCLUSIVE_PROPERTY_MAPPINGS =
-        Collections.singletonList(
-            new MutuallyExclusivePropertyMapping(
-                Arrays.asList(azureSharedKey, azureServicePrincipal), azureSharedKey));
   }
 
   /**
@@ -144,7 +135,11 @@ public class IcebergPropertiesUtils {
       Map<String, String> gravitinoProperties) {
     Map<String, String> icebergProperties = new HashMap<>();
     convertProperties(GRAVITINO_CONFIG_TO_ICEBERG, gravitinoProperties, icebergProperties);
-    EXCLUSIVE_PROPERTY_MAPPINGS.forEach(mapping -> mapping.apply(icebergProperties));
+    applyExclusivePropertyMapping(
+        icebergProperties,
+        ICEBERG_AZURE_SHARED_KEY_PROPERTIES,
+        ICEBERG_AZURE_SERVICE_PRINCIPAL_PROPERTIES,
+        ICEBERG_AZURE_SERVICE_PRINCIPAL_DEFAULTS);
     return icebergProperties;
   }
 
@@ -178,47 +173,32 @@ public class IcebergPropertiesUtils {
         });
   }
 
-  private static final class MutuallyExclusivePropertyMapping {
-    private final List<PropertyMappingAlternative> alternatives;
-    private final PropertyMappingAlternative fallback;
+  /**
+   * Keeps the preferred property set when it is complete. Otherwise, it selects the alternative
+   * when complete and adds the properties required by that alternative. If neither set is complete,
+   * the preferred properties are retained so downstream validation remains unchanged.
+   */
+  private static void applyExclusivePropertyMapping(
+      Map<String, String> properties,
+      List<String> preferredProperties,
+      List<String> alternativeProperties,
+      Map<String, String> alternativeAdditionalProperties) {
+    boolean useAlternative =
+        !containsAllProperties(properties, preferredProperties)
+            && containsAllProperties(properties, alternativeProperties);
 
-    private MutuallyExclusivePropertyMapping(
-        List<PropertyMappingAlternative> alternatives, PropertyMappingAlternative fallback) {
-      this.alternatives = alternatives;
-      this.fallback = fallback;
-    }
-
-    private void apply(Map<String, String> properties) {
-      PropertyMappingAlternative selected =
-          alternatives.stream()
-              .filter(alternative -> alternative.isComplete(properties))
-              .findFirst()
-              .orElse(fallback);
-
-      alternatives.stream()
-          .filter(alternative -> alternative != selected)
-          .flatMap(alternative -> alternative.requiredProperties.stream())
-          .forEach(properties::remove);
-
-      if (selected.isComplete(properties)) {
-        properties.putAll(selected.additionalProperties);
-      }
+    if (useAlternative) {
+      preferredProperties.forEach(properties::remove);
+      properties.putAll(alternativeAdditionalProperties);
+    } else {
+      // Do not pass credentials for an unselected or incomplete alternative.
+      alternativeProperties.forEach(properties::remove);
     }
   }
 
-  private static final class PropertyMappingAlternative {
-    private final List<String> requiredProperties;
-    private final Map<String, String> additionalProperties;
-
-    private PropertyMappingAlternative(
-        List<String> requiredProperties, Map<String, String> additionalProperties) {
-      this.requiredProperties = requiredProperties;
-      this.additionalProperties = additionalProperties;
-    }
-
-    private boolean isComplete(Map<String, String> properties) {
-      return requiredProperties.stream()
-          .allMatch(property -> StringUtils.isNotBlank(properties.get(property)));
-    }
+  private static boolean containsAllProperties(
+      Map<String, String> properties, List<String> requiredProperties) {
+    return requiredProperties.stream()
+        .allMatch(property -> StringUtils.isNotBlank(properties.get(property)));
   }
 }
