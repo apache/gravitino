@@ -36,14 +36,14 @@ Check the relevant data source configuration in [data source properties](https:/
 
 When using Gravitino with Trino, pass the Trino PostgreSQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
 | Configuration item      | Description                                                                                                                                                       | Default value | Required |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `jdbc-url`              | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`. | (none)        | Yes      |
+| `jdbc-url`              | A valid PostgreSQL JDBC URL, for example `jdbc:postgresql://localhost:5432/pg_database?sslmode=require`. If the URL omits the database, set `jdbc-database`. | (none)        | Yes      |
 | `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      |
-| `jdbc-database`         | The database of the JDBC connection. Configure it with the same value as the database in the `jdbc-url`. For example `pg_database`.                               | (none)        | Yes      |
+| `jdbc-database`         | The database of the JDBC connection. Derived from `jdbc-url` when omitted. An explicit value must be nonblank and match the URL database when both are provided. | (none)        | Only if absent from `jdbc-url` |
 | `jdbc-user`             | The JDBC user name.                                                                                                                                               | (none)        | Yes      |
 | `jdbc-password`         | The JDBC password.                                                                                                                                                | (none)        | Yes      |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                    | `2`           | No       |
@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 
 :::caution
 Download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
-Explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
+When `jdbc-database` is omitted, the catalog derives it from `jdbc-url`. Catalog creation rejects invalid PostgreSQL URLs, even when `jdbc-database` is set, and fails if neither provides a nonblank database name. When both `jdbc-database` and the URL specify a database, their names must match; catalog creation rejects conflicting values.
 :::
 :::info
 In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema corresponds to the Gravitino schema.
