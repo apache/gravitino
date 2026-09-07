@@ -26,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("JavaUtilDate") // AccessToken API uses java.util.Date
 public class TestGcsAccessTokenCache {
 
   @AfterEach
