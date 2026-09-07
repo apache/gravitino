@@ -334,8 +334,7 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
                   HttpRequest.BodyPublishers.ofString(
                       ObjectMapperProvider.objectMapper().writeValueAsString(body)))
               .build();
-      // USER cannot create catalogs in auxiliary mode. The remote backend receives the service
-      // user's
+      // USER cannot create catalogs in auxiliary mode. The backend receives the service user's
       // credentials and roles, despite USER selecting NONE on this incoming request.
       assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
       Assertions.assertEquals(
@@ -345,6 +344,26 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
               .loadCatalog(catalog)
               .auditInfo()
               .creator());
+      // The backend service user cannot read this admin-owned schema. Even an incoming admin
+      // must receive the backend's 403, rather than 500 or the incoming caller's privileges.
+      HttpRequest deniedRequest =
+          request(ADMIN, "/v1/namespace/" + id(VISIBLE_CATALOG, VISIBLE_SCHEMA) + "/describe")
+              .uri(
+                  URI.create(
+                      "http://localhost:"
+                          + port
+                          + "/lance/v1/namespace/"
+                          + id(VISIBLE_CATALOG, VISIBLE_SCHEMA)
+                          + "/describe?delimiter=."))
+              .POST(HttpRequest.BodyPublishers.ofString("{}"))
+              .build();
+      HttpResponse<String> deniedResponse =
+          httpClient.send(deniedRequest, HttpResponse.BodyHandlers.ofString());
+      assertStatus(403, deniedResponse);
+      ErrorResponse error =
+          ObjectMapperProvider.objectMapper().readValue(deniedResponse.body(), ErrorResponse.class);
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertTrue(error.getError().contains(serviceUser), error.getError());
       assertStatus(200, drop(serviceUser, catalog, null, "cascade"));
     } finally {
       standalone.serviceStop();

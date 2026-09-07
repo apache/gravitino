@@ -110,9 +110,9 @@ REST-style canonical form.
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
 - **CreateTable**: Creates an empty Lance dataset using the schema from the Arrow IPC stream
 :::note
-The current `CreateTable` implementation reads the Arrow stream schema but does not ingest its
-record batches. Send a schema-only stream and write records through a Lance client or engine
-after creation.
+The current `CreateTable` implementation accepts schema-only Arrow streams, including zero-row
+batches. A stream containing rows returns HTTP `406` before any metadata or dataset changes,
+including for `overwrite`. Write records through a Lance client or engine after creation.
 
 The `version` field of `CreateTable` reports the stored Lance dataset version when available.
 `DescribeTable` currently returns the latest metadata even when a historical `version` is requested;
@@ -278,6 +278,10 @@ Lance REST uses Gravitino's `gravitino.authenticators` configuration for incomin
 both auxiliary and standalone mode. See [Authentication](./security/how-to-authenticate.md) for
 configuring the authenticators and their credentials. Health check endpoints bypass authentication.
 Authentication errors use the Lance JSON error format; unsupported credentials return HTTP `401`.
+In standalone mode, backend authentication and authorization failures retain HTTP `401` and `403`
+respectively. Authentication/authorization failures do not include internal stack traces in `detail`.
+Unexpected failures return HTTP `500` with a generic message; the server logs retain the exception
+for diagnosis.
 
 | Mode                               | Identity used for Gravitino metadata operations                                                                                                               | Metadata authorization                                                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
