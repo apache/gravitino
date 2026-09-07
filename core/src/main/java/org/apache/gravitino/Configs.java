@@ -420,8 +420,13 @@ public class Configs {
   public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
   public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
-          .doc("The seconds of Gravitino metrics time sliding window")
+          .doc(
+              "The seconds of Gravitino metrics time sliding window. No longer used: timers and "
+                  + "histograms use an ExponentiallyDecayingReservoir, which does not have a "
+                  + "fixed time window, so infrequently-invoked operations no longer report a "
+                  + "duration of zero.")
           .version(ConfigConstants.VERSION_0_5_1)
+          .deprecated()
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 

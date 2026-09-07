@@ -250,7 +250,7 @@ line with catalog count, plugin count, and query concurrency: `-Xms4g -Xmx4g
 
 | Configuration Item                        | Description                                          | Default Value |
 |-------------------------------------------|------------------------------------------------------|---------------|
-| `gravitino.metrics.timeSlidingWindowSecs` | Width in seconds of the metrics time sliding window. | `60`          |
+| `gravitino.metrics.timeSlidingWindowSecs` | Deprecated, no longer used. Duration timers and histograms now use an exponentially-decaying reservoir instead of a fixed time window, so infrequently-invoked operations no longer report a duration of zero. | `60`          |
 
 ### Storing Metadata
 
