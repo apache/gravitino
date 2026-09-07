@@ -82,6 +82,8 @@ public class GravitinoServer extends ResourceConfig {
 
   private static final String API_ANY_PATH = "/api/*";
 
+  private static final String ROOT_PATH = "/*";
+
   public static final String CONF_FILE = "gravitino.conf";
 
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
@@ -196,12 +198,12 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(new HealthAliasServlet(), "/health/*");
     server.addServlet(new HealthAliasServlet(), "/health.html");
 
-    server.addFilter(new RequestContextFilter(), "/*");
+    server.addFilter(new RequestContextFilter(), ROOT_PATH);
     server.addFilter(
-        new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), "/*");
-    server.addCustomFilters("/*");
-    server.addFilter(new VersioningFilter(), "/*");
-    server.addSystemFilters("/*");
+        new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), ROOT_PATH);
+    server.addCustomFilters(ROOT_PATH);
+    server.addFilter(new VersioningFilter(), ROOT_PATH);
+    server.addSystemFilters(ROOT_PATH);
     if (server.isWebUiEnabled()) {
       server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
       server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
