@@ -88,13 +88,14 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
     DorisReadSchema35 readSchema =
         DorisSchemaCompatibility35.plan(
             identifier, gravitinoTable, physicalSchema, sparkTypeConverter);
+    Table nativeTable = catalog.createNativeTable(identifier, physicalSchema);
     Table jdbcTable =
         catalog.createJdbcTable(
             identifier, readSchema, jdbcUrl, jdbcDriver, jdbcUser, jdbcPassword, jdbcReadOptions);
     return new DorisHybridTable35(
         identifier,
         gravitinoTable,
-        sparkTable,
+        nativeTable,
         jdbcTable,
         readSchema,
         propertiesConverter,

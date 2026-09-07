@@ -24,14 +24,21 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.sql.SQLException;
 import java.util.List;
 import org.apache.doris.spark.rest.models.Field;
 import org.apache.doris.spark.rest.models.Schema;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
 
 /** Tests error handling at the boundary with the official Doris catalog. */
+@SuppressWarnings("deprecation")
 public class TestDorisTableCatalog35 {
 
   @Test
@@ -92,5 +99,31 @@ public class TestDorisTableCatalog35 {
     assertTrue(metadataFailure.getMessage().contains("index 0"));
     assertTrue(metadataFailure.getMessage().contains("FE=id INT"));
     assertTrue(metadataFailure.getMessage().contains("JDBC=id BIGINT"));
+  }
+
+  @Test
+  void testNativeTableUsesSeededPhysicalSchema() {
+    DorisTableCatalog35 catalog = new DorisTableCatalog35();
+    catalog.initialize(
+        "doris",
+        new CaseInsensitiveStringMap(
+            ImmutableMap.of(
+                "doris.fenodes",
+                "127.0.0.1:8030",
+                "doris.query.port",
+                "9030",
+                "doris.user",
+                "user",
+                "doris.password",
+                "password")));
+    Identifier identifier = Identifier.of(new String[] {"db"}, "table");
+    StructType schema =
+        DataTypes.createStructType(
+            new StructField[] {DataTypes.createStructField("id", DataTypes.IntegerType, false)});
+
+    Table nativeTable =
+        catalog.createNativeTable(identifier, new DorisPhysicalSchema35(schema, List.of("INT")));
+
+    assertEquals(schema, nativeTable.schema());
   }
 }

@@ -24,10 +24,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.doris.spark.catalog.DorisTableCatalog;
+import org.apache.doris.spark.config.DorisConfig;
+import org.apache.doris.spark.config.DorisOptions;
+import org.apache.doris.spark.exception.OptionRequiredException;
 import org.apache.doris.spark.rest.models.Field;
 import org.apache.doris.spark.rest.models.Schema;
 import org.apache.doris.spark.util.SchemaConvertors;
@@ -38,6 +42,7 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
+import scala.Option;
 import scala.Tuple2;
 import scala.collection.immutable.Map$;
 
@@ -149,6 +154,26 @@ final class DorisTableCatalog35 extends DorisTableCatalog {
             jdbcUser,
             jdbcPassword,
             readOptions));
+  }
+
+  Table createNativeTable(Identifier identifier, DorisPhysicalSchema35 physicalSchema) {
+    Map<String, String> tableOptions = new HashMap<>(dorisConfig().toMap());
+    tableOptions.put(
+        DorisOptions.DORIS_TABLE_IDENTIFIER.getName(),
+        String.format(
+            Locale.ROOT,
+            "%s.%s",
+            DorisReadSchema35.quoteIdentifier(identifier.namespace()[0]),
+            DorisReadSchema35.quoteIdentifier(identifier.name())));
+    try {
+      DorisConfig tableConfig = DorisConfig.fromMap(tableOptions, false);
+      return newTableInstance(identifier, tableConfig, Option.apply(physicalSchema.schema()));
+    } catch (OptionRequiredException e) {
+      // Do not retain the third-party configuration exception because the options contain vended
+      // credentials.
+      throw new IllegalArgumentException(
+          String.format(Locale.ROOT, "Failed to create Doris table for %s", identifier));
+    }
   }
 
   private static List<JdbcColumnMetadata> loadJdbcColumnMetadata(
