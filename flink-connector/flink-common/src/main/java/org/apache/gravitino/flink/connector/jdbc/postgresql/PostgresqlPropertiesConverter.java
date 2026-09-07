@@ -19,7 +19,12 @@
 
 package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
+import com.google.common.base.Strings;
+import java.util.Map;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
 public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
@@ -36,5 +41,25 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
   @Override
   public String getFlinkCatalogType() {
     return GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER;
+  }
+
+  @Override
+  protected String getConnectionDatabase(
+      Map<String, String> flinkCatalogProperties, ObjectPath tablePath) {
+    // For PostgreSQL, the Flink "database" is a Gravitino schema, not the PostgreSQL database
+    // that the JDBC connection must target. The connection must use the catalog's configured
+    // jdbc-database instead, which JdbcPropertiesConverter#toFlinkCatalogProperties defaults into
+    // the 'default-database' option.
+    String database =
+        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(database),
+        JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE + " should not be null or empty.");
+    return database;
+  }
+
+  @Override
+  protected String getTableName(ObjectPath tablePath) {
+    return tablePath.getDatabaseName() + "." + tablePath.getObjectName();
   }
 }
