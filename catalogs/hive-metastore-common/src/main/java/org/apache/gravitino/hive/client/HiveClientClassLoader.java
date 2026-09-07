@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.logging.log4j.LogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,6 +148,33 @@ public final class HiveClientClassLoader extends URLClassLoader {
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new IOException("Failed to list jar files in directory: " + jarDir.toString(), e);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    try {
+      shutdownLog4jContext();
+    } finally {
+      super.close();
+    }
+  }
+
+  /**
+   * When a barrier class defined by this loader (e.g. {@link Util}, {@link HiveClientImpl}) first
+   * logs, log4j-slf4j2-impl's {@code Log4jLoggerFactory} resolves the caller class and creates a
+   * {@link org.apache.logging.log4j.spi.LoggerContext} keyed by that class's defining classloader,
+   * i.e. this loader. That factory keeps a strong reference from the {@code LoggerContext} to its
+   * internal per-logger registry, so the context - and transitively this classloader - stays
+   * reachable even after {@link #close()} closes the jar handles, preventing the classloader and
+   * its loaded classes from ever being collected. Explicitly shutting the context down here removes
+   * that registration.
+   */
+  private void shutdownLog4jContext() {
+    try {
+      LogManager.shutdown(LogManager.getContext(this, false));
+    } catch (Throwable t) {
+      LOG.warn("Failed to shut down Log4j context for classloader {}", getName(), t);
     }
   }
 

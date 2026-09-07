@@ -98,6 +98,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,20 +128,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected abstract AbstractCatalog realCatalog();
 
-<<<<<<< HEAD
-=======
-  /**
-   * Converts a Flink logical type to a Gravitino type. Subclasses may override this to special-case
-   * types whose default mapping does not fit a particular catalog (e.g. Oracle has no pure date
-   * type, so its catalog maps Flink's {@code DATE} to a Gravitino timestamp instead).
-   *
-   * @param logicalType the Flink logical type
-   * @return the corresponding Gravitino type
-   */
-  protected Type toGravitinoType(LogicalType logicalType) {
-    return TypeUtils.toGravitinoType(logicalType);
-  }
-
   /**
    * Converts a Gravitino type to a Flink type, allowing catalog-specific native type mappings.
    *
@@ -151,7 +138,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return TypeUtils.toFlinkType(type);
   }
 
->>>>>>> 14f4995f9 ([MINOR] refactor(flink): Allow catalogs to customize Flink type conversion (#12961))
   @Override
   public void open() throws CatalogException {
     realCatalog().open();
