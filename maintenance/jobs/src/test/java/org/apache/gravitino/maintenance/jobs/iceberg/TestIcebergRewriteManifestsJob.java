@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -60,7 +63,7 @@ public class TestIcebergRewriteManifestsJob {
   }
 
   @Test
-  public void testJobTemplateHasMainClass() {
+  public void testJobTemplateHasClassName() {
     IcebergRewriteManifestsJob job = new IcebergRewriteManifestsJob();
     SparkJobTemplate template = job.jobTemplate();
 
@@ -138,7 +141,7 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithAllRequired() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
-    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -152,7 +155,7 @@ public class TestIcebergRewriteManifestsJob {
       "--table", "db.sample",
       "--use-caching", "false"
     };
-    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -163,7 +166,7 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithEmptyValues() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--use-caching", ""};
-    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     // Empty values should be ignored
     assertEquals(2, result.size());
@@ -173,44 +176,95 @@ public class TestIcebergRewriteManifestsJob {
   }
 
   @Test
-  public void testParseArgumentsWithMissingValues() {
-    String[] args = {"--catalog", "iceberg_prod", "--table"};
-    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
-
-    // Only catalog should be parsed, table has no value
-    assertEquals(1, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertFalse(result.containsKey("table"));
-  }
-
-  @Test
   public void testParseArgumentsOrderIndependent() {
     String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--use-caching", "true"};
     String[] args2 = {"--use-caching", "true", "--table", "tbl1", "--catalog", "cat1"};
 
-    Map<String, String> result1 = IcebergRewriteManifestsJob.parseArguments(args1);
-    Map<String, String> result2 = IcebergRewriteManifestsJob.parseArguments(args2);
+    Map<String, String> result1 = IcebergJobUtils.parseArguments(args1);
+    Map<String, String> result2 = IcebergJobUtils.parseArguments(args2);
 
     assertEquals(result1, result2);
+  }
+
+  // Test unresolved placeholder handling
+
+  @Test
+  public void testUnresolvedPlaceholderIsDroppedForOptionalArguments() {
+    // The server leaves placeholders untouched when the caller omits the parameter, so they reach
+    // the job as literal arguments.
+    String[] args = {
+      "--catalog", "iceberg_prod",
+      "--table", "db.sample",
+      "--use-caching", "{{use_caching}}",
+      "--spark-conf", "{{spark_conf}}"
+    };
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+
+    assertEquals("{{use_caching}}", result.get("use-caching"));
+    assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("use-caching")));
+    assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("spark-conf")));
+  }
+
+  @Test
+  public void testRealValuesSurviveUnresolvedPlaceholderFiltering() {
+    assertEquals("false", IcebergJobUtils.nullIfUnresolvedPlaceholder("false"));
+    assertEquals("db.sample", IcebergJobUtils.nullIfUnresolvedPlaceholder("db.sample"));
+    // Only a value that is entirely a placeholder is dropped.
+    assertEquals("{{a}}b", IcebergJobUtils.nullIfUnresolvedPlaceholder("{{a}}b"));
+    assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(null));
+  }
+
+  @Test
+  public void testProcedureCallOmitsUseCachingWhenPlaceholderUnresolved() {
+    String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{use_caching}}");
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", useCaching);
+
+    // Without filtering, Boolean.parseBoolean("{{use_caching}}") would silently emit
+    // use_caching => false instead of leaving Iceberg's default in place.
+    assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
+  }
+
+  // Test validateUseCaching method
+
+  @Test
+  public void testValidateUseCachingAcceptsBooleans() {
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateUseCaching("true"));
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateUseCaching("false"));
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateUseCaching("TRUE"));
+  }
+
+  @Test
+  public void testValidateUseCachingAcceptsAbsentValue() {
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateUseCaching(null));
+    assertDoesNotThrow(() -> IcebergRewriteManifestsJob.validateUseCaching(""));
+  }
+
+  @Test
+  public void testValidateUseCachingRejectsNonBoolean() {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRewriteManifestsJob.validateUseCaching("yes"));
+
+    assertTrue(e.getMessage().contains("yes"));
   }
 
   // Test buildProcedureCall method
 
   @Test
   public void testBuildProcedureCallMinimal() {
-    String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null);
+    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null);
 
-    assertEquals("CALL iceberg_prod.system.rewrite_manifests(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
   }
 
   @Test
   public void testBuildProcedureCallWithCachingTrue() {
-    String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "true");
+    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "true");
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_manifests(table => 'db.sample', use_caching => true)",
+        "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', use_caching => true)",
         sql);
   }
 
@@ -220,16 +274,15 @@ public class TestIcebergRewriteManifestsJob {
         IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "false");
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_manifests(table => 'db.sample', use_caching => false)",
+        "CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample', use_caching => false)",
         sql);
   }
 
   @Test
   public void testBuildProcedureCallWithEmptyCaching() {
-    String sql =
-        IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "");
+    String sql = IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", "");
 
-    assertEquals("CALL iceberg_prod.system.rewrite_manifests(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
   }
 
   @Test
@@ -245,10 +298,9 @@ public class TestIcebergRewriteManifestsJob {
 
     // Test SQL injection attempt in catalog name
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
-    sql =
-        IcebergRewriteManifestsJob.buildProcedureCall(maliciousCatalog, "db.table", null);
+    sql = IcebergRewriteManifestsJob.buildProcedureCall(maliciousCatalog, "db.table", null);
 
-    // Verify backticks are escaped
-    assertTrue(sql.contains("catalog``; DROP TABLE users; --"));
+    // Verify backticks are escaped and the whole identifier stays quoted
+    assertTrue(sql.startsWith("CALL `catalog``; DROP TABLE users; --`.system.rewrite_manifests("));
   }
 }
