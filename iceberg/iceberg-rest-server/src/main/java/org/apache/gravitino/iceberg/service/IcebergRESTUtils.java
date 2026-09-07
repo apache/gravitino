@@ -234,6 +234,41 @@ public class IcebergRESTUtils {
   }
 
   /**
+   * Rewrites credentials in a federated {@link LoadTableResponse} so their {@code
+   * refresh-credentials-endpoint} entries, including any flattened into {@code config}, point at
+   * this IRC instance instead of the upstream catalog.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param upstream the load-table response returned by the upstream REST catalog
+   * @return a load-table response with IRC-local refresh endpoints
+   */
+  public static LoadTableResponse rewriteLoadTableCredentials(
+      String catalogName, TableIdentifier tableIdentifier, LoadTableResponse upstream) {
+    Map<String, String> config = new HashMap<>();
+    if (upstream.config() != null) {
+      config.putAll(upstream.config());
+    }
+    Map<String, String> filteredCredentialProperties =
+        CredentialPropertyUtils.filterCredentialProperties(config);
+    config.putAll(filteredCredentialProperties);
+    config.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredCredentialProperties));
+
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(upstream.tableMetadata())
+            .addAllConfig(config);
+    if (upstream.credentials() != null) {
+      for (org.apache.iceberg.rest.credentials.Credential credential : upstream.credentials()) {
+        builder.addCredential(
+            rewriteCredential(
+                catalogName, tableIdentifier, credential.prefix(), credential.config()));
+      }
+    }
+    return builder.build();
+  }
+
+  /**
    * Rewrites credentials in a {@link PlanTableScanResponse} so their {@code
    * refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
    * catalog. Returns the response unchanged when no credentials are present.

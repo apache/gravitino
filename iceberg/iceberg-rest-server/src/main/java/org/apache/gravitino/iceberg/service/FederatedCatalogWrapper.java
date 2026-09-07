@@ -96,6 +96,8 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   private static final String FORMAT_VERSION = "format-version";
   private static final Schema EMPTY_SCHEMA = new Schema();
+  private static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
+  private static final String VENDED_CREDENTIALS = "vended-credentials";
 
   /**
    * Caches whether the remote catalog advertises the scan-plan endpoint. Only successful lookups
@@ -122,9 +124,28 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     return createTableInternal(namespace, request);
   }
 
+  /**
+   * Loads a table from the remote REST catalog.
+   *
+   * <p>When credential vending is requested, the {@code X-Iceberg-Access-Delegation:
+   * vended-credentials} header is forwarded so the remote catalog returns {@code
+   * storage-credentials} inline. Iceberg's {@link RESTCatalog#loadTable} does not send this header,
+   * so a dedicated REST GET is used. Upstream credential refresh endpoints are rewritten to this
+   * IRC catalog. The {@code privilege} is ignored because the remote catalog decides what to vend.
+   *
+   * @param identifier the table identifier.
+   * @param requestCredential whether the client requested vended credentials.
+   * @param privilege ignored; the remote REST catalog vends its own credentials.
+   * @return the load-table response, including rewritten remote credentials when requested.
+   */
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
+    if (requestCredential) {
+      LoadTableResponse upstream = getRESTLoadTable((RESTCatalog) getCatalog(), identifier, true);
+      return IcebergRESTUtils.rewriteLoadTableCredentials(
+          catalogCredentialManager.catalogName(), identifier, upstream);
+    }
     return loadTableInternal(identifier);
   }
 
@@ -362,10 +383,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
     String planPath = ResourcePaths.forCatalogProperties(properties).planTableScan(identifier);
 
-    Map<String, String> headers =
-        requestCredentialVending
-            ? ImmutableMap.of("X-Iceberg-Access-Delegation", "vended-credentials")
-            : Collections.emptyMap();
+    Map<String, String> headers = accessDelegationHeaders(requestCredentialVending);
 
     ParserContext parserContext =
         ParserContext.builder()
@@ -385,6 +403,42 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
                 ErrorHandlers.planErrorHandler(),
                 ignored -> {},
                 parserContext));
+  }
+
+  /**
+   * Sends a {@code GET {table}} request to the remote REST catalog.
+   *
+   * <p>Follows the same HTTP client lifecycle as {@link #getRESTTableCredentials}. When credential
+   * vending is requested, the {@code X-Iceberg-Access-Delegation: vended-credentials} header is
+   * included so the remote catalog returns credentials inline in the load-table response.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table to load.
+   * @param requestCredentialVending whether to include the access-delegation header.
+   * @return the load-table response from the remote catalog.
+   */
+  private static LoadTableResponse getRESTLoadTable(
+      RESTCatalog restCatalog, TableIdentifier identifier, boolean requestCredentialVending) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String tablePath = ResourcePaths.forCatalogProperties(properties).table(identifier);
+    Map<String, String> queryParams = ImmutableMap.of("snapshots", IcebergRESTUtils.SNAPSHOT_ALL);
+
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("loading table: %s", identifier),
+        client ->
+            client.get(
+                tablePath,
+                queryParams,
+                LoadTableResponse.class,
+                accessDelegationHeaders(requestCredentialVending),
+                ErrorHandlers.tableErrorHandler()));
+  }
+
+  private static Map<String, String> accessDelegationHeaders(boolean requestCredentialVending) {
+    return requestCredentialVending
+        ? ImmutableMap.of(X_ICEBERG_ACCESS_DELEGATION, VENDED_CREDENTIALS)
+        : Collections.emptyMap();
   }
 
   /**
