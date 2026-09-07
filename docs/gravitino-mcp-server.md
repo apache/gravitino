@@ -144,7 +144,7 @@ You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows
 
 | Argument                         | Description                                                                                                                     | Default value               | Required |
 |----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`                     | Default Gravitino metalake, used when a request names none. Required for `stdio`; optional for HTTP, where each request may instead name a metalake via the `X-Gravitino-Metalake` header. | none                        | stdio only |
+| `--metalake`                     | Default Gravitino metalake, used when a request names none. See Per-request metalake below.                                     | none                        | stdio only |
 | `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
 | `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
 | `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
