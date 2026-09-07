@@ -49,21 +49,9 @@ class TestPostgreSqlCatalogConfiguration {
       delimiter = '|')
   void testDatabaseFromUrl(String url, String database) {
     Map<String, String> config = Map.of("jdbc-url", url);
-    CapturingCatalog catalog = new CapturingCatalog();
-    catalog.withCatalogConf(config);
-    catalog.withCatalogEntity(
-        CatalogEntity.builder()
-            .withId(1L)
-            .withName("test")
-            .withNamespace(Namespace.of("metalake"))
-            .withType(Catalog.Type.RELATIONAL)
-            .withProvider(catalog.shortName())
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-            .build());
-    Assertions.assertThrows(UnsupportedOperationException.class, catalog::ops);
-    Assertions.assertEquals(database, catalog.config.get("jdbc-database"));
-    Assertions.assertEquals(url, catalog.config.get("jdbc-url"));
+    Map<String, String> resolved = captureOperationsConfig(config);
+    Assertions.assertEquals(database, resolved.get("jdbc-database"));
+    Assertions.assertEquals(url, resolved.get("jdbc-url"));
     Assertions.assertFalse(config.containsKey("jdbc-database"));
   }
 
@@ -76,20 +64,8 @@ class TestPostgreSqlCatalogConfiguration {
       },
       delimiter = '|')
   void testExplicitDatabase(String url, String database) {
-    CapturingCatalog catalog = new CapturingCatalog();
-    catalog.withCatalogConf(Map.of("jdbc-url", url, "jdbc-database", database));
-    catalog.withCatalogEntity(
-        CatalogEntity.builder()
-            .withId(1L)
-            .withName("test")
-            .withNamespace(Namespace.of("metalake"))
-            .withType(Catalog.Type.RELATIONAL)
-            .withProvider(catalog.shortName())
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-            .build());
-    Assertions.assertThrows(UnsupportedOperationException.class, catalog::ops);
-    Assertions.assertEquals(database, catalog.config.get("jdbc-database"));
+    Map<String, String> config = Map.of("jdbc-url", url, "jdbc-database", database);
+    Assertions.assertEquals(config, captureOperationsConfig(config));
   }
 
   @ParameterizedTest
@@ -131,13 +107,55 @@ class TestPostgreSqlCatalogConfiguration {
                 .withCatalogConf(Map.of("jdbc-url", "jdbc:postgresql://localhost/")));
   }
 
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "invalid|",
+        "invalid|demo",
+        "jdbc:mysql://localhost/demo|",
+        "jdbc:mysql://localhost/demo|demo",
+        "jdbc:postgresql://localhost:invalid/demo|",
+        "jdbc:postgresql://localhost:invalid/demo|demo",
+        "jdbc:postgresql://localhost:5432|",
+        "jdbc:postgresql://localhost:5432|demo"
+      },
+      delimiter = '|')
+  void testInvalidUrlRejected(String url, String database) {
+    Map<String, String> config = new HashMap<>();
+    config.put("jdbc-url", url);
+    if (database != null) {
+      config.put("jdbc-database", database);
+    }
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> new PostgreSqlCatalog().withCatalogConf(config));
+    Assertions.assertEquals("Invalid PostgreSQL jdbc-url", error.getMessage());
+  }
+
   @Test
-  void testInvalidUrlRejected() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> new PostgreSqlCatalog().withCatalogConf(Map.of("jdbc-url", "invalid")));
+  void testMissingUrlRejected() {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new PostgreSqlCatalog().withCatalogConf(Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new PostgreSqlCatalog().withCatalogConf(Map.of("jdbc-database", "demo")));
+  }
+
+  private static Map<String, String> captureOperationsConfig(Map<String, String> config) {
+    CapturingCatalog catalog = new CapturingCatalog();
+    catalog.withCatalogConf(config);
+    catalog.withCatalogEntity(
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider(catalog.shortName())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+            .build());
+    Assertions.assertThrows(UnsupportedOperationException.class, catalog::ops);
+    return catalog.config;
   }
 
   private static class CapturingCatalog extends PostgreSqlCatalog {

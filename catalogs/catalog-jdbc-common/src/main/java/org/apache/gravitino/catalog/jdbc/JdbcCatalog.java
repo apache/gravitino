@@ -125,9 +125,11 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
    * Resolves the database required by a JDBC provider before accepting its configuration.
    *
    * @param config The catalog configuration.
-   * @param databaseFromUrl A driver-backed parser returning the database, or null if absent.
+   * @param databaseFromUrl A driver-backed parser returning the database, or null if absent, and
+   *     rejecting invalid URLs.
    * @return A copy of the configuration containing a nonblank database.
-   * @throws IllegalArgumentException if no database is configured or the database names conflict.
+   * @throws IllegalArgumentException if the URL is invalid, no database is configured, or the
+   *     database names conflict.
    */
   protected static Map<String, String> resolveJdbcDatabase(
       Map<String, String> config, Function<String, String> databaseFromUrl) {

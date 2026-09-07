@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.postgresql;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -34,19 +36,14 @@ import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperatio
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.postgresql.Driver;
+import org.postgresql.PGProperty;
 
 public class PostgreSqlCatalog extends JdbcCatalog {
 
   /** {@inheritDoc} */
   @Override
   public JdbcCatalog withCatalogConf(Map<String, String> conf) {
-    return super.withCatalogConf(
-        resolveJdbcDatabase(
-            conf,
-            url -> {
-              Properties parsed = Driver.parseURL(url, new Properties());
-              return parsed == null ? null : parsed.getProperty("PGDBNAME");
-            }));
+    return super.withCatalogConf(resolveJdbcDatabase(conf, PostgreSqlCatalog::databaseFromUrl));
   }
 
   @Override
@@ -93,5 +90,12 @@ public class PostgreSqlCatalog extends JdbcCatalog {
   @Override
   protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
     return new PostgreSqlColumnDefaultValueConverter();
+  }
+
+  @Nullable
+  private static String databaseFromUrl(String url) {
+    Properties parsed = Driver.parseURL(url, new Properties());
+    Preconditions.checkArgument(parsed != null, "Invalid PostgreSQL jdbc-url");
+    return parsed.getProperty(PGProperty.PG_DBNAME.getName());
   }
 }
