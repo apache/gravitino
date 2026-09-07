@@ -21,20 +21,10 @@ package org.apache.gravitino.iceberg.common.utils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
-import com.google.auth.oauth2.AccessToken;
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -47,12 +37,14 @@ import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.io.GravitinoGCSFileIO;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.gcp.gcs.GCSFileIO;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.hive.HiveCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
@@ -75,9 +67,6 @@ public class IcebergCatalogUtil {
    * migration (see {@code JdbcUtil} in iceberg-core).
    */
   private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
-
-  private static final String GCS_CLOUD_PLATFORM_SCOPE =
-      "https://www.googleapis.com/auth/cloud-platform";
 
   private static final ConcurrentHashMap<String, InMemoryCatalog> MEMORY_CATALOGS =
       new ConcurrentHashMap<>();
@@ -283,24 +272,23 @@ public class IcebergCatalogUtil {
   @VisibleForTesting
   public static void applyDefaultResolvingFileIO(Map<String, String> properties) {
     properties.putIfAbsent(IcebergConstants.IO_IMPL, ResolvingFileIO.class.getName());
-    applyGcsServiceAccountCredentials(properties);
+    applyGcsServiceAccountFileIO(properties);
   }
 
   /**
-   * When {@code gcs-service-account-file} is set, mint an OAuth2 access token and inject Iceberg
-   * {@code gcs.oauth2.token} / {@code gcs.oauth2.token-expires-at} so the built-in {@code
-   * GCSFileIO} can authenticate. Iceberg's FileIO does not understand Gravitino's
-   * service-account-file property; S3/OSS/ADLS instead map static keys directly via {@link
-   * org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils}.
+   * When {@code gcs-service-account-file} is set and no explicit {@code gcs.oauth2.token} is
+   * present, switch the FileIO to {@link GravitinoGCSFileIO}. That FileIO remints tokens through
+   * {@link org.apache.gravitino.iceberg.common.io.GcsAccessTokenCache}, independently of the IRC
+   * catalog-wrapper cache. Iceberg's built-in {@link GCSFileIO} / {@link ResolvingFileIO} path does
+   * not understand Gravitino's service-account-file property.
    *
-   * <p>Skips injection when {@code gcs.oauth2.token} is already present. Disables Iceberg's
-   * credentials-endpoint refresh because that path is for vended table credentials, not catalog
-   * bootstrap from a service account file.
+   * <p>Skips when {@code gcs.oauth2.token} is already present, or when the user set a custom {@code
+   * io-impl} other than {@link ResolvingFileIO} / {@link GCSFileIO}.
    *
    * @param properties Iceberg catalog properties, mutated in place
    */
   @VisibleForTesting
-  static void applyGcsServiceAccountCredentials(Map<String, String> properties) {
+  static void applyGcsServiceAccountFileIO(Map<String, String> properties) {
     String serviceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
     if (StringUtils.isBlank(serviceAccountFile)) {
       return;
@@ -309,57 +297,15 @@ public class IcebergCatalogUtil {
       return;
     }
 
-    AccessToken accessToken = loadAccessTokenFromFile(serviceAccountFile);
-    if (accessToken == null || StringUtils.isBlank(accessToken.getTokenValue())) {
-      throw new IllegalStateException(
-          "Failed to obtain GCS access token from service account file: " + serviceAccountFile);
-    }
-
-    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, accessToken.getTokenValue());
-    Date expirationTime = accessToken.getExpirationTime();
-    if (expirationTime != null) {
-      properties.put(
-          IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
-          String.valueOf(expirationTime.toInstant().toEpochMilli()));
-    }
-    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED, "false");
-    LOG.info(
-        "Injected {} from {} for Iceberg GCSFileIO",
-        IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN,
-        GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-  }
-
-  /**
-   * Returns an {@link IcebergConfig} that includes a minted GCS OAuth2 token when {@code
-   * gcs-service-account-file} is configured. The returned config retains {@code
-   * gcs.oauth2.token-expires-at} so callers (for example the IRC catalog cache) can expire the
-   * catalog before the token becomes invalid.
-   *
-   * @param icebergConfig original catalog config
-   * @return the same instance when no token is injected; otherwise a new config with token fields
-   */
-  public static IcebergConfig withGcsServiceAccountCredentials(IcebergConfig icebergConfig) {
-    Map<String, String> properties = new HashMap<>(icebergConfig.getAllConfig());
-    applyGcsServiceAccountCredentials(properties);
-    if (properties.equals(icebergConfig.getAllConfig())) {
-      return icebergConfig;
-    }
-    return new IcebergConfig(properties);
-  }
-
-  private static AccessToken loadAccessTokenFromFile(String serviceAccountFile) {
-    Path credentialsFilePath = Paths.get(serviceAccountFile);
-    try (InputStream inputStream = Files.newInputStream(credentialsFilePath)) {
-      GoogleCredentials credentials =
-          GoogleCredentials.fromStream(inputStream).createScoped(GCS_CLOUD_PLATFORM_SCOPE);
-      credentials.refreshIfExpired();
-      return credentials.getAccessToken();
-    } catch (NoSuchFileException e) {
-      throw new UncheckedIOException(
-          "GCS service account file does not exist: " + serviceAccountFile, e);
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          "Failed to load GCS service account file: " + serviceAccountFile, e);
+    String ioImpl = properties.get(IcebergConstants.IO_IMPL);
+    if (ioImpl == null
+        || ResolvingFileIO.class.getName().equals(ioImpl)
+        || GCSFileIO.class.getName().equals(ioImpl)) {
+      properties.put(IcebergConstants.IO_IMPL, GravitinoGCSFileIO.class.getName());
+      LOG.info(
+          "Using {} for catalog FileIO because {} is set",
+          GravitinoGCSFileIO.class.getName(),
+          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
     }
   }
 

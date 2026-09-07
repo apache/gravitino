@@ -403,7 +403,7 @@ There is no role to assume. The identity is the service account in `gcs-service-
 |----------------------------|------------------------------------------|-------------------------------------|----------|
 | `gcs-service-account-file` | The location of the GCS credential file. | GCS Application default credential. | No       |
 
-`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg `GCSFileIO` on the server (Gravitino injects `gcs.oauth2.token` at catalog load because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
+`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg FileIO on the server (via `GravitinoGCSFileIO` and a dedicated token cache, because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 
 ## Requesting Vended Credentials
 

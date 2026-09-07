@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.common.utils;
 
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
@@ -340,71 +339,68 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
-  void testApplyGcsServiceAccountCredentialsSkipsWhenTokenAlreadyPresent() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
-    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
-
-    IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties);
-
-    Assertions.assertEquals(
-        "existing-token", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
-    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT));
-  }
-
-  @Test
-  void testApplyGcsServiceAccountCredentialsNoOpWithoutServiceAccountFile() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
-
-    IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties);
-
-    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
-  }
-
-  @Test
-  void testApplyGcsServiceAccountCredentialsFailsWhenFileMissing() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(
-        GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gravitino-missing-gcs-key.json");
-
-    UncheckedIOException thrown =
-        Assertions.assertThrows(
-            UncheckedIOException.class,
-            () -> IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties));
-    Assertions.assertTrue(thrown.getMessage().contains("does not exist"));
-  }
-
-  @Test
-  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenNoServiceAccountFile() {
-    IcebergConfig config = new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
-  }
-
-  @Test
-  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenTokenAlreadyPresent() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
-    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
-    IcebergConfig config = new IcebergConfig(properties);
-
-    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
-  }
-
-  @Test
-  void testApplyDefaultResolvingFileIOInjectsGcsToken() {
+  void testApplyGcsServiceAccountFileIOSwitchesFromResolvingFileIO() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.WAREHOUSE, "gs://bucket/warehouse");
     properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
 
-    // Pre-set token so applyDefaultResolvingFileIO skips loading a real service account file.
-    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "pre-set");
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        org.apache.gravitino.iceberg.common.io.GravitinoGCSFileIO.class.getName(),
+        properties.get(IcebergConstants.IO_IMPL));
+    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountFileIOSwitchesFromGcsFileIO() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        org.apache.gravitino.iceberg.common.io.GravitinoGCSFileIO.class.getName(),
+        properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountFileIOSkipsWhenTokenAlreadyPresent() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
+
     IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
 
     Assertions.assertEquals(
         org.apache.iceberg.io.ResolvingFileIO.class.getName(),
         properties.get(IcebergConstants.IO_IMPL));
-    Assertions.assertEquals("pre-set", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+    Assertions.assertEquals(
+        "existing-token", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountFileIONoOpWithoutServiceAccountFile() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
+
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.gcp.gcs.GCSFileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountFileIODoesNotOverrideCustomIOImpl() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
   }
 
   @Test

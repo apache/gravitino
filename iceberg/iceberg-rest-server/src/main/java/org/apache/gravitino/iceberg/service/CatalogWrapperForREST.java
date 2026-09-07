@@ -42,6 +42,7 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.io.GravitinoGCSFileIO;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
@@ -60,6 +61,7 @@ import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.gcp.gcs.GCSFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -258,6 +260,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         new HashMap<>(
             MapUtils.getFilteredMap(
                 sourceProps, key -> catalogPropertiesToClientKeys.contains(key)));
+    // GravitinoGCSFileIO is server-only; clients should use Iceberg's GCSFileIO (plus vended
+    // credentials when enabled).
+    if (GravitinoGCSFileIO.class.getName().equals(filtered.get(IcebergConstants.IO_IMPL))) {
+      filtered.put(IcebergConstants.IO_IMPL, GCSFileIO.class.getName());
+    }
     validateAndNormalizeDataAccessProperty(filtered);
     return Collections.unmodifiableMap(filtered);
   }
