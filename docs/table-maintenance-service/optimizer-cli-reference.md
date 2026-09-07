@@ -365,9 +365,12 @@ The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 | `catalog_name`     | Iceberg catalog name as registered in Spark                        | Required                    |
 | `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
 | `use_caching`      | Caches table metadata in Spark while rewriting; `true` or `false`  | `true` (Iceberg default)    |
+| `spec_id`          | Partition spec ID to rewrite manifests to; non-negative integer    | The table's current spec    |
 | `spark_conf`       | JSON map of Spark configuration                                    | None                        |
 
 Leave `use_caching` unset unless the driver is memory constrained. Caching keeps the table metadata in Spark for the duration of the rewrite, which is faster but holds more memory.
+
+Leave `spec_id` unset for routine consolidation. Set it after a partition spec evolution, when manifests written under the old spec should be re-clustered onto a specific one; `GET .../tables/{table}` and the table's `partitions` metadata table show which spec IDs exist. An unknown ID fails the job rather than falling back to the current spec.
 
 ### Submitting the Job
 
@@ -392,12 +395,13 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/jobs
 ```
 
-The job builds this statement, including `use_caching` only when you supply it:
+The job builds this statement, including `use_caching` and `spec_id` only when you supply them:
 
 ```sql
 CALL `rest_catalog`.system.rewrite_manifests(
   table => 'db.t1',
-  use_caching => false
+  use_caching => false,
+  spec_id => 2
 )
 ```
 

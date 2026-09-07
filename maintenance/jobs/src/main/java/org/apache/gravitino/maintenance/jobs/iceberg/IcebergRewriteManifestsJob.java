@@ -66,6 +66,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
    *   <li>--use-caching &lt;boolean&gt; Optional. Whether to cache the table metadata in Spark
    *       while rewriting (default: Iceberg's own default)
+   *   <li>--spec-id &lt;int&gt; Optional. Rewrite manifests to this partition spec ID (default: the
+   *       table's current spec)
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
    *
@@ -111,11 +113,13 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
     // Optional arguments. Unresolved template placeholders mean the caller left the parameter out,
     // so they are dropped rather than forwarded to Iceberg as literal values.
     String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("use-caching"));
+    String specId = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spec-id"));
     String sparkConfJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spark-conf"));
 
-    // Validate use-caching if provided
+    // Validate optional arguments if provided
     try {
       validateUseCaching(useCaching);
+      validateSpecId(specId);
     } catch (IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       printUsage();
@@ -145,7 +149,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
     try {
       // Build the procedure call SQL
-      String sql = buildProcedureCall(catalogName, tableIdentifier, useCaching);
+      String sql = buildProcedureCall(catalogName, tableIdentifier, useCaching, specId);
 
       System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
 
@@ -179,9 +183,11 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @param catalogName Iceberg catalog name
    * @param tableIdentifier Fully qualified table name
    * @param useCaching Whether to cache table metadata during the rewrite
+   * @param specId Partition spec ID to rewrite manifests to
    * @return SQL CALL statement
    */
-  static String buildProcedureCall(String catalogName, String tableIdentifier, String useCaching) {
+  static String buildProcedureCall(
+      String catalogName, String tableIdentifier, String useCaching, String specId) {
     StringBuilder sql = new StringBuilder();
     sql.append("CALL ")
         .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
@@ -190,6 +196,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
     if (useCaching != null && !useCaching.isEmpty()) {
       sql.append(", use_caching => ").append(Boolean.parseBoolean(useCaching));
+    }
+
+    if (specId != null && !specId.isEmpty()) {
+      sql.append(", spec_id => ").append(Integer.parseInt(specId));
     }
 
     sql.append(")");
@@ -216,6 +226,31 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
     }
   }
 
+  /**
+   * Validate the spec-id parameter value.
+   *
+   * <p>Iceberg partition spec IDs start at 0 and the procedure rejects an unknown ID, but failing
+   * here keeps a malformed value from reaching Spark as an unparseable SQL literal.
+   *
+   * @param specId the spec-id value to validate
+   * @throws IllegalArgumentException if the value is not a non-negative integer
+   */
+  static void validateSpecId(String specId) {
+    if (specId == null || specId.isEmpty()) {
+      return; // spec-id is optional
+    }
+
+    try {
+      if (Integer.parseInt(specId) < 0) {
+        throw new IllegalArgumentException(
+            "Invalid spec-id value '" + specId + "'. Must be a non-negative integer");
+      }
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid spec-id value '" + specId + "'. Must be a non-negative integer");
+    }
+  }
+
   /** Print usage information. */
   private static void printUsage() {
     System.err.println(
@@ -229,6 +264,9 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
             + "  --use-caching <boolean>   Cache table metadata in Spark while rewriting\n"
             + "                              Must be either 'true' or 'false'\n"
             + "                              Default: true (Iceberg default)\n"
+            + "  --spec-id <int>           Rewrite manifests to this partition spec ID\n"
+            + "                              Must be a non-negative integer\n"
+            + "                              Default: the table's current partition spec\n"
             + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
             + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
@@ -238,7 +276,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
             + "  --catalog iceberg_prod --table db.sample\n"
             + "\n"
             + "  # Rewrite without caching table metadata\n"
-            + "  --catalog iceberg_prod --table db.sample --use-caching false");
+            + "  --catalog iceberg_prod --table db.sample --use-caching false\n"
+            + "\n"
+            + "  # Re-cluster manifests onto partition spec 2 after a spec evolution\n"
+            + "  --catalog iceberg_prod --table db.sample --spec-id 2");
   }
 
   /**
@@ -254,6 +295,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
         "{{table_identifier}}",
         "--use-caching",
         "{{use_caching}}",
+        "--spec-id",
+        "{{spec_id}}",
         "--spark-conf",
         "{{spark_conf}}");
   }
