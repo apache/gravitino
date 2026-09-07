@@ -40,10 +40,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
-import org.apache.gravitino.listener.EventListenerManager;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -238,17 +242,47 @@ public class TestGravitinoServer {
 
   @Test
   public void testSecretProvidersRequestIsAudited() throws Exception {
-    CapturedAuditEventListener.clear();
-    ServerConfig serverConfig = spyServerConfig(serverConfigWithAuditListener());
+    // Register the capture listener on the live EventBus after initialize(). Loading a listener via
+    // Class.forName + static list is brittle under the test classpath and left CI with an empty
+    // capture even though GET /api/secrets/providers returned 200 through HttpAuditFilter.
+    List<Event> capturedEvents = new CopyOnWriteArrayList<>();
+    ServerConfig serverConfig = spyServerConfig(serverConfigWithAvailablePort());
     gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
     gravitinoServer.initialize();
+    GravitinoEnv.getInstance()
+        .eventListenerManager()
+        .addEventListener(
+            "secretProviderAudit",
+            new EventListenerPlugin() {
+              @Override
+              public void init(Map<String, String> properties) {}
+
+              @Override
+              public void start() {}
+
+              @Override
+              public void stop() {}
+
+              @Override
+              public void onPostEvent(Event event) {
+                capturedEvents.add(event);
+              }
+
+              @Override
+              public void onPreEvent(PreEvent preEvent) {}
+
+              @Override
+              public Mode mode() {
+                return Mode.SYNC;
+              }
+            });
     gravitinoServer.start();
 
     List<Map<String, Object>> providers = fetchSecretProviders(serverConfig);
     assertTrue(providers.isEmpty());
 
     HttpRequestEvent auditEvent =
-        CapturedAuditEventListener.getEvents().stream()
+        capturedEvents.stream()
             .filter(e -> e instanceof HttpRequestEvent)
             .map(e -> (HttpRequestEvent) e)
             .filter(e -> e.requestUri() != null && e.requestUri().contains("/secrets/providers"))
@@ -256,7 +290,10 @@ public class TestGravitinoServer {
             .orElseThrow(
                 () ->
                     new AssertionError(
-                        "No HttpRequestEvent captured for GET /api/secrets/providers"));
+                        "No HttpRequestEvent captured for GET /api/secrets/providers; events="
+                            + capturedEvents.stream()
+                                .map(e -> e.getClass().getSimpleName())
+                                .collect(Collectors.toList())));
     assertEquals(200, auditEvent.statusCode());
     assertEquals("GET", auditEvent.httpMethod());
   }
@@ -364,20 +401,11 @@ public class TestGravitinoServer {
     return serverConfig;
   }
 
-  private static ServerConfig serverConfigWithAuditListener() throws IOException {
+  private static ServerConfig serverConfigWithAvailablePort() throws IOException {
     Map<String, String> configs = new HashMap<>();
     configs.put(
         GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
-    configs.put(
-        EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX
-            + EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES,
-        "secretProviderAudit");
-    configs.put(
-        EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX
-            + "secretProviderAudit."
-            + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
-        CapturedAuditEventListener.class.getName());
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(configs, t -> true);
     return serverConfig;
