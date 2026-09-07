@@ -26,11 +26,12 @@ from mcp_server.core.setting import Setting
 
 _LOG = logging.getLogger(__name__)
 
-# Upper bound on the number of per-principal REST clients kept alive at once.
-# Each client owns an httpx connection pool; caching by Authorization header lets
-# repeated calls from the same principal reuse a pool instead of opening a new one
-# per tool call, while the LRU bound keeps memory/sockets in check as principals
-# (e.g. rotating tokens) come and go.
+# Upper bound on the number of cached REST clients kept alive at once, across
+# every (principal, metalake) combination. Each client owns an httpx connection
+# pool; caching lets repeated calls from the same principal against the same
+# metalake reuse a pool instead of opening a new one per tool call, while the
+# LRU bound keeps memory/sockets in check as principals (e.g. rotating tokens)
+# and metalakes come and go.
 _MAX_CACHED_CLIENTS = 128
 
 # An RFC 9110 auth-scheme uses the HTTP token syntax. Here it must be followed by
@@ -190,15 +191,17 @@ class GravitinoContext:
             if setting.metalake
             else None
         )
-        # LRU cache of per-principal clients keyed by (Authorization header,
-        # metalake). Safe without locking: rest_client() runs on the single
-        # asyncio event loop and never awaits between lookup and insert.
-        self._clients_by_auth: "OrderedDict[tuple, object]" = OrderedDict()
-        # LRU cache of service-identity clients (static token / OAuth) keyed by
-        # metalake, for requests that name a non-default metalake but carry no
-        # per-request Authorization header. The startup default metalake is
-        # served by _default_client instead and never enters this cache.
-        self._service_clients: "OrderedDict[str, object]" = OrderedDict()
+        # One LRU cache for every cached client, keyed by (Authorization
+        # header, metalake), so _MAX_CACHED_CLIENTS bounds the total number of
+        # open connection pools rather than being applied per cache. An empty
+        # Authorization means the service identity (static token / OAuth),
+        # which is only ever produced by the no-Authorization branch of
+        # rest_client(), so it can never collide with a real principal's key.
+        # Safe without locking: rest_client() runs on the single asyncio event
+        # loop and never awaits between lookup and insert.
+        self._clients_by_auth: "OrderedDict[tuple[str, str], object]" = (
+            OrderedDict()
+        )
         # Strong references to in-flight background close tasks; the event loop
         # only keeps weak references, so without this they could be GC'd before
         # running. Entries are discarded when each task completes.
@@ -251,7 +254,7 @@ class GravitinoContext:
             self._setting.gravitino_uri,
             authorization,
         )
-        self._cache_put(self._clients_by_auth, key, client)
+        self._cache_put(key, client)
         return client
 
     def _resolve_metalake(self) -> str:
@@ -279,9 +282,10 @@ class GravitinoContext:
         ):
             return self._default_client
 
-        cached = self._service_clients.get(metalake)
+        key = ("", metalake)
+        cached = self._clients_by_auth.get(key)
         if cached is not None:
-            self._service_clients.move_to_end(metalake)
+            self._clients_by_auth.move_to_end(key)
             return cached
 
         client = RESTClientFactory.create_rest_client(
@@ -290,14 +294,14 @@ class GravitinoContext:
             startup_authorization(self._setting),
             auth=_service_auth(self._setting),
         )
-        self._cache_put(self._service_clients, metalake, client)
+        self._cache_put(key, client)
         return client
 
-    def _cache_put(self, cache: "OrderedDict", key, client) -> None:
-        """Insert into an LRU cache, evicting (and closing) the oldest past the cap."""
-        cache[key] = client
-        if len(cache) > _MAX_CACHED_CLIENTS:
-            _, evicted = cache.popitem(last=False)
+    def _cache_put(self, key: "tuple[str, str]", client) -> None:
+        """Cache a client, evicting (and closing) the oldest past the cap."""
+        self._clients_by_auth[key] = client
+        if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
+            _, evicted = self._clients_by_auth.popitem(last=False)
             self._schedule_close(evicted)
 
     def _schedule_close(self, client) -> None:

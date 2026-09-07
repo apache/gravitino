@@ -24,6 +24,7 @@ any per-connection/session state (multi-node safe by construction).
 """
 
 import asyncio
+import contextvars
 import sys
 import unittest
 from unittest import mock
@@ -44,7 +45,7 @@ from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args, do_main
 
 # Tests intentionally exercise context/client internals (e.g. _default_client,
-# _service_clients, _catalog_operation) to assert per-request isolation;
+# _clients_by_auth, _catalog_operation) to assert per-request isolation;
 # protected access is expected.
 # pylint: disable=protected-access
 
@@ -186,27 +187,48 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
         )
 
     def test_two_concurrent_requests_get_different_metalake_clients(self):
-        """Different requested metalakes must produce different client instances,
-        even for the same caller identity. This is the concurrency guarantee the
-        header-based design relies on instead of any per-connection session state.
+        """Two requests naming different metalakes, in flight at the same time
+        under the same caller identity, must each get their own client.
+
+        Both tasks set their request context and then park until the other has
+        done the same, so the two requests genuinely overlap: if resolution
+        leaked across tasks, one of them would see the other's metalake. This
+        is the isolation guarantee the header-based design relies on instead of
+        any per-connection session state.
         """
         ctx = self._make_context()
+        # get_http_request() reads a contextvar; mirror that here so each task
+        # sees only its own request, the way the real server does.
+        current_request = contextvars.ContextVar("current_request")
+
+        async def _call(metalake, ready, go):
+            current_request.set(
+                _mock_request(
+                    {"authorization": "Bearer t", METALAKE_HEADER: metalake}
+                )
+            )
+            ready.set()
+            await go.wait()
+            return ctx.rest_client()
+
+        async def _drive():
+            ready_a, ready_b, go = (
+                asyncio.Event(),
+                asyncio.Event(),
+                asyncio.Event(),
+            )
+            task_a = asyncio.ensure_future(_call("ml_a", ready_a, go))
+            task_b = asyncio.ensure_future(_call("ml_b", ready_b, go))
+            await ready_a.wait()
+            await ready_b.wait()
+            go.set()
+            return await asyncio.gather(task_a, task_b)
 
         with patch(
             "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request(
-                {"authorization": "Bearer t", METALAKE_HEADER: "ml_a"}
-            ),
+            side_effect=current_request.get,
         ):
-            client_a = ctx.rest_client()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request(
-                {"authorization": "Bearer t", METALAKE_HEADER: "ml_b"}
-            ),
-        ):
-            client_b = ctx.rest_client()
+            client_a, client_b = asyncio.run(_drive())
 
         self.assertEqual(client_a._catalog_operation.metalake_name, "ml_a")
         self.assertEqual(client_b._catalog_operation.metalake_name, "ml_b")
@@ -255,13 +277,12 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
             second = ctx.rest_client()
 
         self.assertIs(first, second)
-        self.assertEqual(len(ctx._service_clients), 1)
+        self.assertEqual(len(ctx._clients_by_auth), 1)
 
-    def test_service_client_cache_is_bounded(self):
-        """The metalake-keyed service-identity cache evicts past its cap too,
-        mirroring _clients_by_auth's bound (test_client_cache_is_bounded in
-        test_per_request_token.py) - it must not be exempt from the same LRU
-        limit just because it's the newer of the two caches."""
+    def test_service_client_shares_the_one_client_cache_bound(self):
+        """Service-identity clients live in the same LRU as per-principal ones,
+        so _MAX_CACHED_CLIENTS bounds the total number of open connection pools
+        rather than being applied separately per cache."""
         ctx = self._make_context()
         cap = context_module._MAX_CACHED_CLIENTS
 
@@ -272,7 +293,31 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
             ):
                 ctx.rest_client()
 
-        self.assertLessEqual(len(ctx._service_clients), cap)
+        self.assertLessEqual(len(ctx._clients_by_auth), cap)
+
+    def test_one_bound_covers_principal_and_service_clients_together(self):
+        """Filling the cache with per-principal clients and service-identity
+        clients must not exceed the single cap between them."""
+        ctx = self._make_context()
+        cap = context_module._MAX_CACHED_CLIENTS
+
+        for i in range(cap):
+            with patch(
+                "fastmcp.server.dependencies.get_http_request",
+                return_value=_mock_request(
+                    {"authorization": f"Bearer t{i}", METALAKE_HEADER: "ml_a"}
+                ),
+            ):
+                ctx.rest_client()
+
+        for i in range(10):
+            with patch(
+                "fastmcp.server.dependencies.get_http_request",
+                return_value=_mock_request({METALAKE_HEADER: f"ml_{i}"}),
+            ):
+                ctx.rest_client()
+
+        self.assertLessEqual(len(ctx._clients_by_auth), cap)
 
     def test_evicted_service_client_is_closed(self):
         closed = []
