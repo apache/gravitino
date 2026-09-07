@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +43,7 @@ public class IcebergPropertiesUtils {
       ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID;
   private static final String ICEBERG_AZURE_CLIENT_SECRET =
       ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET;
+  private static final List<MutuallyExclusivePropertyMapping> EXCLUSIVE_PROPERTY_MAPPINGS;
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
@@ -111,6 +114,23 @@ public class IcebergPropertiesUtils {
         });
     ICEBERG_CATALOG_CONFIG_TO_GRAVITINO =
         Collections.unmodifiableMap(icebergCatalogConfigToGravitino);
+
+    PropertyMappingAlternative azureSharedKey =
+        new PropertyMappingAlternative(
+            Arrays.asList(
+                IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME,
+                IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY),
+            Collections.emptyMap());
+    PropertyMappingAlternative azureServicePrincipal =
+        new PropertyMappingAlternative(
+            Arrays.asList(
+                ICEBERG_AZURE_TENANT_ID, ICEBERG_AZURE_CLIENT_ID, ICEBERG_AZURE_CLIENT_SECRET),
+            Collections.singletonMap(
+                ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER));
+    EXCLUSIVE_PROPERTY_MAPPINGS =
+        Collections.singletonList(
+            new MutuallyExclusivePropertyMapping(
+                Arrays.asList(azureSharedKey, azureServicePrincipal), azureSharedKey));
   }
 
   /**
@@ -124,50 +144,8 @@ public class IcebergPropertiesUtils {
       Map<String, String> gravitinoProperties) {
     Map<String, String> icebergProperties = new HashMap<>();
     convertProperties(GRAVITINO_CONFIG_TO_ICEBERG, gravitinoProperties, icebergProperties);
-    configureAzureAuthentication(gravitinoProperties, icebergProperties);
+    EXCLUSIVE_PROPERTY_MAPPINGS.forEach(mapping -> mapping.apply(icebergProperties));
     return icebergProperties;
-  }
-
-  private static void configureAzureAuthentication(
-      Map<String, String> gravitinoProperties, Map<String, String> icebergProperties) {
-    String storageAccountName =
-        gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-    String storageAccountKey =
-        gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    boolean hasSharedKey = StringUtils.isNoneBlank(storageAccountName, storageAccountKey);
-
-    String tenantId = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_TENANT_ID);
-    String clientId = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_CLIENT_ID);
-    String clientSecret = gravitinoProperties.get(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET);
-    boolean hasServicePrincipal = StringUtils.isNoneBlank(tenantId, clientId, clientSecret);
-
-    if (hasSharedKey || !hasServicePrincipal) {
-      removeAzureServicePrincipalProperties(icebergProperties);
-      return;
-    }
-
-    icebergProperties.remove(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME);
-    icebergProperties.remove(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
-    icebergProperties.put(
-        ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
-  }
-
-  private static void removeAzureServicePrincipalProperties(Map<String, String> icebergProperties) {
-    icebergProperties.remove(ICEBERG_AZURE_TENANT_ID);
-    icebergProperties.remove(ICEBERG_AZURE_CLIENT_ID);
-    icebergProperties.remove(ICEBERG_AZURE_CLIENT_SECRET);
-  }
-
-  private static void convertProperties(
-      Map<String, String> propertyMapping,
-      Map<String, String> gravitinoProperties,
-      Map<String, String> icebergProperties) {
-    propertyMapping.forEach(
-        (gravitinoKey, icebergKey) -> {
-          if (gravitinoProperties.containsKey(gravitinoKey)) {
-            icebergProperties.put(icebergKey, gravitinoProperties.get(gravitinoKey));
-          }
-        });
   }
 
   /**
@@ -186,5 +164,61 @@ public class IcebergPropertiesUtils {
     return Optional.ofNullable(catalogBackend)
         .map(s -> s.toLowerCase(Locale.ROOT))
         .orElse("memory");
+  }
+
+  private static void convertProperties(
+      Map<String, String> propertyMapping,
+      Map<String, String> gravitinoProperties,
+      Map<String, String> icebergProperties) {
+    propertyMapping.forEach(
+        (gravitinoKey, icebergKey) -> {
+          if (gravitinoProperties.containsKey(gravitinoKey)) {
+            icebergProperties.put(icebergKey, gravitinoProperties.get(gravitinoKey));
+          }
+        });
+  }
+
+  private static final class MutuallyExclusivePropertyMapping {
+    private final List<PropertyMappingAlternative> alternatives;
+    private final PropertyMappingAlternative fallback;
+
+    private MutuallyExclusivePropertyMapping(
+        List<PropertyMappingAlternative> alternatives, PropertyMappingAlternative fallback) {
+      this.alternatives = alternatives;
+      this.fallback = fallback;
+    }
+
+    private void apply(Map<String, String> properties) {
+      PropertyMappingAlternative selected =
+          alternatives.stream()
+              .filter(alternative -> alternative.isComplete(properties))
+              .findFirst()
+              .orElse(fallback);
+
+      alternatives.stream()
+          .filter(alternative -> alternative != selected)
+          .flatMap(alternative -> alternative.requiredProperties.stream())
+          .forEach(properties::remove);
+
+      if (selected.isComplete(properties)) {
+        properties.putAll(selected.additionalProperties);
+      }
+    }
+  }
+
+  private static final class PropertyMappingAlternative {
+    private final List<String> requiredProperties;
+    private final Map<String, String> additionalProperties;
+
+    private PropertyMappingAlternative(
+        List<String> requiredProperties, Map<String, String> additionalProperties) {
+      this.requiredProperties = requiredProperties;
+      this.additionalProperties = additionalProperties;
+    }
+
+    private boolean isComplete(Map<String, String> properties) {
+      return requiredProperties.stream()
+          .allMatch(property -> StringUtils.isNotBlank(properties.get(property)));
+    }
   }
 }
