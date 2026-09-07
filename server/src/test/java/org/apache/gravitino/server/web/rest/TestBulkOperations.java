@@ -120,7 +120,8 @@ public class TestBulkOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "bulkManager", new BulkManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     bulkOperations = new BulkOperations();
@@ -301,6 +302,28 @@ public class TestBulkOperations extends BaseOperationsTest {
     Assertions.assertEquals(1, bulkResponse.getErrors().length);
     Assertions.assertEquals("ghost", bulkResponse.getErrors()[0].getName());
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, bulkResponse.getErrors()[0].getCode());
+  }
+
+  @Test
+  public void testRemoveUsersWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/users/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testRemoveGroupsWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/groups/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
   }
 
   @Test

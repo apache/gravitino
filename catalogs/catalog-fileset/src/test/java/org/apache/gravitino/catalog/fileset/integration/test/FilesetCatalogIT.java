@@ -46,7 +46,6 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -1368,14 +1367,12 @@ public class FilesetCatalogIT extends BaseIT {
   }
 
   /**
-   * Historical size asserts excluded gravitino.identifier (previously omitted). It is now returned
-   * as a masked placeholder, so expected size is historical + 1.
+   * Asserts response property size. {@code gravitino.identifier} is reserved+hidden and omitted
+   * from API responses, so {@code expectedSize} must not include it.
    */
   private static void assertFilesetPropertiesSize(
-      Map<String, String> properties, int expectedSizeWithoutIdentifier) {
-    Assertions.assertEquals(
-        expectedSizeWithoutIdentifier + 1, properties.size(), () -> "properties=" + properties);
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, properties.get(StringIdentifier.ID_KEY));
+      Map<String, String> properties, int expectedSize) {
+    Assertions.assertEquals(expectedSize, properties.size(), () -> "properties=" + properties);
+    Assertions.assertFalse(properties.containsKey(StringIdentifier.ID_KEY));
   }
 }

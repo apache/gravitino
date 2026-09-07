@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -134,13 +136,8 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(metalakeName, catalog, sourceSchema, sourceTable));
 
-    String sourceExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER";
-
     AuthorizationExpressionEvaluator sourceEvaluator =
-        new AuthorizationExpressionEvaluator(sourceExpression);
+        new AuthorizationExpressionEvaluator(DROP_TABLE_AUTHORIZATION_EXPRESSION);
 
     boolean sourceAuthorized =
         sourceEvaluator.evaluate(

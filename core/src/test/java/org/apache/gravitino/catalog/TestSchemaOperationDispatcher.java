@@ -47,7 +47,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -389,10 +388,13 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(schemaIdent, "comment", props);
 
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+          return null;
+        });
 
     Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
     Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));

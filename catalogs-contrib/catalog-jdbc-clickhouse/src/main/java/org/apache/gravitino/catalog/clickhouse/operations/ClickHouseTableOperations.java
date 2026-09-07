@@ -46,8 +46,11 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -70,6 +73,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.bean.JdbcIndexBean;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
@@ -132,7 +136,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       WHERE system.tables.primary_key <> ''
         AND system.tables.database = '%s'
         AND system.tables.name = '%s'
-      ORDER BY COLUMN_NAME
+      ORDER BY PK_NAME, KEY_SEQ
       """;
 
   private static final String SECONDARY_INDEX_QUERY =
@@ -256,12 +260,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
-      List<Index> indexes = new ArrayList<>();
+      Map<String, List<JdbcIndexBean>> primaryKeysByName = new LinkedHashMap<>();
       while (resultSet.next()) {
+        // ClickHouse exposes one primary-key expression without a constraint name; the query
+        // synthesizes PRIMARY to match Gravitino's default primary-key name.
         String indexName = resultSet.getString("PK_NAME");
         String columnName = resultSet.getString("COLUMN_NAME");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        int keySequence = resultSet.getInt("KEY_SEQ");
+        Preconditions.checkArgument(
+            !resultSet.wasNull() && keySequence > 0,
+            "Primary key %s column %s has invalid KEY_SEQ %s",
+            indexName,
+            columnName,
+            keySequence);
+        primaryKeysByName
+            .computeIfAbsent(indexName, ignored -> new ArrayList<>())
+            .add(
+                new JdbcIndexBean(Index.IndexType.PRIMARY_KEY, columnName, indexName, keySequence));
+      }
+
+      List<Index> indexes = new ArrayList<>();
+      for (Map.Entry<String, List<JdbcIndexBean>> entry : primaryKeysByName.entrySet()) {
+        Set<Integer> keySequences = new HashSet<>();
+        for (JdbcIndexBean primaryKeyColumn : entry.getValue()) {
+          Preconditions.checkArgument(
+              keySequences.add(primaryKeyColumn.getOrder()),
+              "Primary key %s has duplicate KEY_SEQ %s",
+              entry.getKey(),
+              primaryKeyColumn.getOrder());
+        }
+        List<String> columnNames =
+            entry.getValue().stream()
+                .sorted(Comparator.comparingInt(JdbcIndexBean::getOrder))
+                .map(JdbcIndexBean::getColName)
+                .collect(Collectors.toList());
+        indexes.add(Indexes.primary(entry.getKey(), convertIndexFieldNames(columnNames)));
       }
       indexes.addAll(getSecondaryIndexes(connection, databaseName, tableName));
       return indexes;

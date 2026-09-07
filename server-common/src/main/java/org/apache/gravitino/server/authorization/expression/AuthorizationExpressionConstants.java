@@ -100,6 +100,18 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
                   """;
 
+  /**
+   * Authorizes removing a table, whether the stored data is deleted with it or only the Gravitino
+   * metadata is. Removal requires ownership of the table or of one of its ancestors: MODIFY_TABLE
+   * alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER
+                  """;
+
   public static final String LOAD_TOPICS_AUTHORIZATION_EXPRESSION =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
@@ -139,15 +151,11 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW)
                   """;
 
   public static final String ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION =
-      """
-                  ANY(OWNER, METALAKE, CATALOG) ||
-                  SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW)
-                  """;
+      LOAD_VIEW_AUTHORIZATION_EXPRESSION;
 
   /**
    * Existence-check expression for Iceberg REST {@code loadView}: when the primary load-view
@@ -161,20 +169,28 @@ public class AuthorizationExpressionConstants {
                   (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 
-  public static final String ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION =
+  /** Creates a view through the generic or Iceberg REST metadata API. */
+  public static final String CREATE_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_VIEW
                   """;
 
-  /** Iceberg REST replace view, drop view, and rename view (VIEW::OWNER path). */
-  public static final String ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION =
+  public static final String ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION =
+      CREATE_VIEW_AUTHORIZATION_EXPRESSION;
+
+  /** View alter, drop, and rename operations use the {@code VIEW::OWNER} path. */
+  public static final String VIEW_OWNER_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && VIEW::OWNER
                   """;
+
+  /** Iceberg REST replace view, drop view, and rename view (VIEW::OWNER path). */
+  public static final String ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION =
+      VIEW_OWNER_AUTHORIZATION_EXPRESSION;
 
   /** Iceberg REST {@code HEAD .../views/{view}} (view exists). */
   public static final String ICEBERG_VIEW_EXISTS_AUTHORIZATION_EXPRESSION =

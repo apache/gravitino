@@ -55,20 +55,27 @@ public class TestMetalakeHookDispatcher {
     mockDispatcher = mock(MetalakeDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockAccessControlDispatcher = mock(AccessControlDispatcher.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    savedAccessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    savedAccessControlDispatcher = GravitinoEnv.getInstance().internalAccessControlDispatcher();
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", mockAccessControlDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        mockAccessControlDispatcher,
+        true);
     hookDispatcher = new MetalakeHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", savedAccessControlDispatcher, true);
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        savedAccessControlDispatcher,
+        true);
   }
 
   @Test

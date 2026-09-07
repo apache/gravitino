@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -63,6 +64,12 @@ public class GrantUserRolesFailureEvent extends UserFailureEvent {
    */
   public List<String> roles() {
     return roles;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return RoleAssignmentAuditInfos.of(roles);
   }
 
   /**

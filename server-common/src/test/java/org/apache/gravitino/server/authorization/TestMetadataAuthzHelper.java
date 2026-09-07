@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -38,8 +39,10 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -56,11 +59,12 @@ import org.mockito.MockedStatic;
 public class TestMetadataAuthzHelper {
 
   private static MockedStatic<GravitinoEnv> mockedStaticGravitinoEnv;
+  private static GravitinoEnv gravitinoEnv;
 
   @BeforeAll
   public static void setup() {
     mockedStaticGravitinoEnv = mockStatic(GravitinoEnv.class);
-    GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
+    gravitinoEnv = mock(GravitinoEnv.class);
     mockedStaticGravitinoEnv.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     Config configMock = mock(Config.class);
     when(gravitinoEnv.config()).thenReturn(configMock);
@@ -108,6 +112,33 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
+    }
+  }
+
+  @Test
+  public void testPreloadUsesInternalDispatchers() throws Exception {
+    AccessControlDispatcher accessControlDispatcher = mock(AccessControlDispatcher.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    NameIdentifier tableIdentifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier schemaIdentifier = NameIdentifier.of("metalake", "catalog", "schema");
+
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(schemaDispatcher.schemaExists(schemaIdentifier)).thenReturn(false);
+
+    Method preload =
+        MetadataAuthzHelper.class.getDeclaredMethod(
+            "preloadToCache", Entity.EntityType.class, NameIdentifier[].class);
+    preload.setAccessible(true);
+    try {
+      preload.invoke(
+          null, new Object[] {Entity.EntityType.TABLE, new NameIdentifier[] {tableIdentifier}});
+      verify(schemaDispatcher).schemaExists(schemaIdentifier);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
     }
   }
 

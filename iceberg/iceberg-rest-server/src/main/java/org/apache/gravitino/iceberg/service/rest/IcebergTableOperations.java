@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -206,10 +210,7 @@ public class IcebergTableOperations {
   @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -252,10 +253,7 @@ public class IcebergTableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER ",
+      expression = DROP_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -459,10 +457,7 @@ public class IcebergTableOperations {
   @Timed(name = "get-table-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-table-credentials", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response getTableCredentials(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -514,10 +509,7 @@ public class IcebergTableOperations {
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "plan-table-scan", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response planTableScan(
       @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,

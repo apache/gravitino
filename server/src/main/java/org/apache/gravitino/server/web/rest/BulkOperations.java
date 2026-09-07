@@ -81,7 +81,7 @@ public class BulkOperations {
   public BulkOperations() {
     this.bulkManager = GravitinoEnv.getInstance().bulkManager();
     this.accessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   /**
@@ -158,6 +158,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkRemoveRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserException(
+          OperationType.REMOVE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -264,6 +272,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkRemoveRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.REMOVE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

@@ -273,13 +273,17 @@ public class TestTagManager {
     tagManager = new TagManager(idGenerator, entityStore);
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "viewDispatcher", viewDispatcher, true);
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "functionDispatcher", functionDispatcher, true);
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
 
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);

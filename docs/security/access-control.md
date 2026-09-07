@@ -176,7 +176,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table       | Read any table in scope                                            |
 | `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table       | Read and write to, and alter the schema of, any table in scope     |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema              | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read any view in scope                                             |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read view metadata in scope                                        |
 | `CREATE_TOPIC`       | Metalake, Catalog, Schema              | Create topics in any schema in scope                               |
 | `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from any topic in scope                                    |
 | `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from, produce to, and alter any topic in scope             |
@@ -190,8 +190,9 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function    | Read the metadata of, and execute, any function in scope           |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function    | Alter or drop any function in scope                                |
 
-Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata, and the same pairing
-holds for views, topics, and filesets.
+Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
+have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
+view metadata, while altering or dropping a view is owner-only.
 
 `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated aliases for `REGISTER_MODEL` and
 `LINK_MODEL_VERSION`. They resolve to identical authorization, so existing grants keep working, but
@@ -235,8 +236,8 @@ Three rules apply throughout, so they are not repeated below:
 - Reaching an object inside a catalog and a schema also requires `USE_CATALOG` and `USE_SCHEMA`.
 - A privilege counts whether it is held on the object itself or on any ancestor.
 
-List operations never fail. They return the entries the caller is entitled to see, which for a
-metalake owner is all of them.
+List operations first require access to their parent scope. After that gateway check succeeds, they
+return only the entries the caller is entitled to see, which for a metalake owner is all of them.
 
 #### Data Objects
 
@@ -255,8 +256,19 @@ Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching a credential takes whatever loading the object takes.
 
-Renaming a table or view into a different schema is the one operation needing a privilege on a second
-object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on the target schema.
+The View row applies to metadata operations through both the native Gravitino REST API and the
+Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and
+then filters individual views by ownership or `SELECT_VIEW`. Creating a view makes the caller its
+owner, which is the path used for later alter and drop operations.
+
+These checks authorize View metadata operations only. They do not grant access to referenced tables
+or authorize SQL execution. The current Iceberg engine path uses invoker semantics, so the caller
+still needs access to the underlying data. The View API has no explicit `INVOKER`/`DEFINER` option,
+and Gravitino does not implement `DEFINER` execution or a new engine integration as part of this
+authorization behavior.
+
+The native View rename operation changes only the name within the existing schema and remains
+owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 

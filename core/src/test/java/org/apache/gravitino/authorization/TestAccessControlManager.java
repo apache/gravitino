@@ -68,8 +68,8 @@ import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -195,7 +195,7 @@ public class TestAccessControlManager {
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = mock(BaseCatalog.class);
-    when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     authorizationPlugin = mock(AuthorizationPlugin.class);
     when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
@@ -655,8 +655,6 @@ public class TestAccessControlManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertTrue(
-        !testProps.containsKey(StringIdentifier.ID_KEY)
-            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
+    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
   }
 }

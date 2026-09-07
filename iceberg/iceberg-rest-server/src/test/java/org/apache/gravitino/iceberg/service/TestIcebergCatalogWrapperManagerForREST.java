@@ -21,9 +21,13 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -42,11 +46,12 @@ import org.mockito.Mockito;
 public class TestIcebergCatalogWrapperManagerForREST {
 
   private static final String DEFAULT_CATALOG = "memory";
+  private static CatalogManager mockCatalogManager;
 
   @BeforeAll
   public static void setup() throws IllegalAccessException {
     // Mock CatalogManager for GravitinoEnv to avoid initialization errors
-    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    mockCatalogManager = Mockito.mock(CatalogManager.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
   }
 
@@ -143,6 +148,45 @@ public class TestIcebergCatalogWrapperManagerForREST {
 
     Assertions.assertFalse(wrapper instanceof FederatedCatalogWrapper);
     Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
+  }
+
+  @Test
+  public void testDefaultCatalogAliasInvalidatedWhenCatalogRemoved() throws Exception {
+    Mockito.clearInvocations(mockCatalogManager);
+    AtomicReference<Consumer<NameIdentifier>> removeListener = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              removeListener.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(mockCatalogManager)
+        .addCatalogCacheRemoveListener(Mockito.any());
+
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    Mockito.when(
+            configProvider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG))
+        .thenReturn(Optional.of(icebergConfig));
+
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake")) {
+      IcebergRESTServerContext.create(configProvider, false, false, true, manager);
+      CatalogWrapperForREST original =
+          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+
+      removeListener.get().accept(NameIdentifier.of("metalake", "test"));
+
+      CatalogWrapperForREST replacement =
+          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+      Assertions.assertNotSame(original, replacement);
+    }
   }
 
   private static IcebergCatalogWrapperManager newManager() {
