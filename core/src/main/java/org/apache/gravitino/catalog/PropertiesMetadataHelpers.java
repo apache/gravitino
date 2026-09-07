@@ -93,6 +93,13 @@ public class PropertiesMetadataHelpers {
       PropertiesMetadata propertiesMetadata,
       Map<String, String> upserts,
       Map<String, String> deletes) {
+    if (upserts == null) {
+      upserts = Map.of();
+    }
+    if (deletes == null) {
+      deletes = Map.of();
+    }
+
     HiddenPropertyMaskUtils.validateNoMaskedPlaceholders(upserts);
 
     // Reject undeclared upserts for closed property sets (catalogs). Deletes of undeclared keys
@@ -138,6 +145,9 @@ public class PropertiesMetadataHelpers {
             .sorted()
             .collect(Collectors.toList());
     Preconditions.checkArgument(
-        unknownProperties.isEmpty(), "Unknown properties are not allowed: %s", unknownProperties);
+        unknownProperties.isEmpty(),
+        "Unknown properties are not allowed: %s. Use properties declared by the catalog"
+            + " provider, or a declared prefix such as gravitino.bypass.",
+        unknownProperties);
   }
 }

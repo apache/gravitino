@@ -95,7 +95,6 @@ public class TestFilesetCloudPropertiesMetadata {
         response.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
 
-
   @Test
   void testAcceptsDeclaredS3CredentialsOnCreate() {
     FilesetCatalogPropertiesMetadata metadata = new FilesetCatalogPropertiesMetadata();
@@ -120,5 +119,18 @@ public class TestFilesetCloudPropertiesMetadata {
             IllegalArgumentException.class, () -> validatePropertyForCreate(metadata, properties));
     assertTrue(exception.getMessage().contains("Unknown properties"));
     assertTrue(exception.getMessage().contains("foo-bar"));
+  }
+
+  @Test
+  void testAcceptsFsPathConfigPrefix() {
+    FilesetCatalogPropertiesMetadata metadata = new FilesetCatalogPropertiesMetadata();
+    Map<String, String> properties =
+        ImmutableMap.of(
+            FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX + "cluster1",
+            "hdfs://cluster1/",
+            FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX
+                + "cluster1.config.resource",
+            "/etc/core-site.xml");
+    assertDoesNotThrow(() -> validatePropertyForCreate(metadata, properties));
   }
 }

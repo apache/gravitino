@@ -225,6 +225,16 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                   DEFAULT_DISABLE_FILESYSTEM_OPS,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              FS_GRAVITINO_PATH_CONFIG_PREFIX,
+              PropertyEntry.stringOptionalPropertyPrefixEntry(
+                  FS_GRAVITINO_PATH_CONFIG_PREFIX,
+                  "Location-scoped filesystem configs: fs.path.config.<name> and"
+                      + " fs.path.config.<name>.<key>",
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
