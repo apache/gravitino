@@ -31,6 +31,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -91,7 +92,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
@@ -111,13 +112,13 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testListPartitions() {
     Partition[] partitions = partitionOperationDispatcher.listPartitions(TABLE_IDENT);
-    Assertions.assertTrue(Arrays.asList(partitions).contains(PARTITION));
+    Assertions.assertTrue(Arrays.asList(partitions).contains(DTOConverters.toDTO(PARTITION)));
   }
 
   @Test
   public void testGetPartition() {
     Partition p = partitionOperationDispatcher.getPartition(TABLE_IDENT, PARTITION.name());
-    Assertions.assertEquals(PARTITION, p);
+    Assertions.assertEquals(DTOConverters.toDTO(PARTITION), p);
   }
 
   @Test

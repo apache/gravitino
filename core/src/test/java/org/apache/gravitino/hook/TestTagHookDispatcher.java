@@ -48,15 +48,16 @@ public class TestTagHookDispatcher {
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(TagDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     hookDispatcher = new TagHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
   }
 
   @Test

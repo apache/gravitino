@@ -58,6 +58,7 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -130,7 +131,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("comment", table1.comment());
     testProperties(props, table1.properties());
     Assertions.assertEquals(0, table1.partitioning().length);
-    Assertions.assertArrayEquals(columns, table1.columns());
+    testColumns(columns, table1.columns());
 
     // Test required table properties exception
     Map<String, String> illegalTableProperties =
@@ -582,12 +583,15 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             tableOperationDispatcher.alterTable(
                 tableIdent, TableChange.rename(renamedTableIdent.name())));
 
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadTable(tableIdent));
-    Assertions.assertThrows(
-        NoSuchTableException.class, () -> testCatalogOperations.loadTable(renamedTableIdent));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadTable(tableIdent));
+          Assertions.assertThrows(
+              NoSuchTableException.class, () -> testCatalogOperations.loadTable(renamedTableIdent));
+          return null;
+        });
     reset(entityStore);
   }
 
@@ -685,7 +689,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
@@ -724,7 +729,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // now-empty namespaces, so the catalog no longer knows the table (dropTable returns false),
     // while Gravitino still holds the orphaned schema entities.
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropTable(tableIdent));
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
@@ -768,7 +774,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // now-empty namespaces, so the catalog no longer knows the table (purgeTable returns false),
     // while Gravitino still holds the orphaned schema entities.
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.purgeTable(tableIdent));
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
@@ -790,7 +797,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "topic81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.createSchema(
         NameIdentifier.of(tableNs.levels()), "", Collections.emptyMap());
@@ -859,7 +867,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     // Test if the column from table is not matched with the column from table entity
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
 
     // 1. Update the existing column
@@ -1236,31 +1245,20 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   private static void testColumns(Column[] expectedColumns, Column[] actualColumns) {
-    Map<String, Column> expectedColumnMap =
-        expectedColumns == null
-            ? Collections.emptyMap()
-            : Arrays.stream(expectedColumns)
-                .collect(Collectors.toMap(c -> c.name().toLowerCase(), Function.identity()));
-    Map<String, Column> actualColumnMap =
-        actualColumns == null
-            ? Collections.emptyMap()
-            : Arrays.stream(actualColumns)
-                .collect(Collectors.toMap(Column::name, Function.identity()));
-
-    Assertions.assertEquals(expectedColumnMap.size(), actualColumnMap.size());
-    expectedColumnMap.forEach(
-        (name, expectedColumn) -> {
-          TestColumn actualColumn = (TestColumn) actualColumnMap.get(name);
-          TestColumn e = (TestColumn) expectedColumn;
-          Assertions.assertNotNull(actualColumn);
-          Assertions.assertEquals(e.name().toLowerCase(), actualColumn.name());
-          Assertions.assertEquals(e.position(), actualColumn.position());
-          Assertions.assertEquals(e.dataType(), actualColumn.dataType());
-          Assertions.assertEquals(e.comment(), actualColumn.comment());
-          Assertions.assertEquals(e.nullable(), actualColumn.nullable());
-          Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
-          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
-        });
+    int expectedSize = expectedColumns == null ? 0 : expectedColumns.length;
+    int actualSize = actualColumns == null ? 0 : actualColumns.length;
+    Assertions.assertEquals(expectedSize, actualSize);
+    for (int i = 0; i < expectedSize; i++) {
+      Column expectedColumn = expectedColumns[i];
+      Column actualColumn = actualColumns[i];
+      Assertions.assertEquals(expectedColumn.name().toLowerCase(), actualColumn.name());
+      Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
+      Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
+      Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
+      Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
+      Assertions.assertEquals(
+          DTOConverters.toDTO(expectedColumn).defaultValue(), actualColumn.defaultValue());
+    }
   }
 
   private static void testColumnAndColumnEntities(
@@ -1288,7 +1286,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.comment(), actualColumn.comment());
           Assertions.assertEquals(e.nullable(), actualColumn.nullable());
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
-          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
+          Assertions.assertEquals(
+              DTOConverters.toDTO(e).defaultValue(), actualColumn.defaultValue());
         });
   }
 
