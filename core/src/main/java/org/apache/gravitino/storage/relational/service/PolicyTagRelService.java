@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -338,21 +337,16 @@ public class PolicyTagRelService {
 
   private static TagPO lockTag(NameIdentifier tagIdentifier) {
     String metalake = tagIdentifier.namespace().level(0);
-    return SessionUtils.getWithoutCommit(
-        TagMetaMapper.class,
-        mapper -> {
-          TagPO observed = mapper.selectTagMetaByMetalakeAndName(metalake, tagIdentifier.name());
-          if (observed == null) {
-            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
-          }
-          TagPO locked = mapper.selectTagByTagIdForUpdate(observed.getTagId());
-          if (locked == null
-              || !Objects.equals(locked.getTagName(), tagIdentifier.name())
-              || !Objects.equals(locked.getMetalakeId(), observed.getMetalakeId())) {
-            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
-          }
-          return locked;
-        });
+    TagPO observed =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagMetaByMetalakeAndName(metalake, tagIdentifier.name()));
+    if (observed == null) {
+      throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
+    }
+    // The tag row is locked before any policy row, so every path through this service takes its
+    // locks in the same tag-then-policy order.
+    return TagMetaService.lockTags(Collections.singletonList(observed)).get(observed.getTagId());
   }
 
   private static Map<String, Long> resolvePolicyIds(
