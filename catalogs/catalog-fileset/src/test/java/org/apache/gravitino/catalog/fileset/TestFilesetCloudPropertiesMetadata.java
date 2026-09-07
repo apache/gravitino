@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
@@ -90,5 +93,32 @@ public class TestFilesetCloudPropertiesMetadata {
     assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         response.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+
+  @Test
+  void testAcceptsDeclaredS3CredentialsOnCreate() {
+    FilesetCatalogPropertiesMetadata metadata = new FilesetCatalogPropertiesMetadata();
+    Map<String, String> properties =
+        ImmutableMap.of(
+            FilesetCatalogPropertiesMetadata.LOCATION,
+            "s3a://bucket/path",
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "AKIATEST",
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "secret-value");
+    assertDoesNotThrow(() -> validatePropertyForCreate(metadata, properties));
+  }
+
+  @Test
+  void testRejectsUnknownCatalogProperty() {
+    FilesetCatalogPropertiesMetadata metadata = new FilesetCatalogPropertiesMetadata();
+    Map<String, String> properties = ImmutableMap.of("foo-bar", "value");
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> validatePropertyForCreate(metadata, properties));
+    assertTrue(exception.getMessage().contains("Unknown properties"));
+    assertTrue(exception.getMessage().contains("foo-bar"));
   }
 }

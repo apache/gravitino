@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
@@ -76,6 +77,8 @@ public class PropertiesMetadataHelpers {
         "Properties or property prefixes are required and must be set: %s",
         absentProperties);
 
+    rejectUnknownProperties(propertiesMetadata, properties.keySet());
+
     // use decode function to validate the property values
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
@@ -91,6 +94,10 @@ public class PropertiesMetadataHelpers {
       Map<String, String> upserts,
       Map<String, String> deletes) {
     HiddenPropertyMaskUtils.validateNoMaskedPlaceholders(upserts);
+
+    // Reject undeclared upserts for closed property sets (catalogs). Deletes of undeclared keys
+    // remain allowed so operators can remove previously persisted mistyped secrets.
+    rejectUnknownProperties(propertiesMetadata, upserts.keySet());
 
     for (Map.Entry<String, String> entry : upserts.entrySet()) {
       if (!propertiesMetadata.containsProperty(entry.getKey())) {
@@ -118,5 +125,19 @@ public class PropertiesMetadataHelpers {
             "Property " + entry.getKey() + " is immutable or reserved, cannot be deleted");
       }
     }
+  }
+
+  private static void rejectUnknownProperties(
+      PropertiesMetadata propertiesMetadata, Set<String> propertyKeys) {
+    if (!propertiesMetadata.rejectsUnknownProperties() || propertyKeys == null) {
+      return;
+    }
+    List<String> unknownProperties =
+        propertyKeys.stream()
+            .filter(key -> !propertiesMetadata.containsProperty(key))
+            .sorted()
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        unknownProperties.isEmpty(), "Unknown properties are not allowed: %s", unknownProperties);
   }
 }

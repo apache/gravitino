@@ -108,6 +108,19 @@ public interface PropertiesMetadata {
   }
 
   /**
+   * Whether create and alter upserts must use only declared property names (or declared prefixes).
+   *
+   * <p>Catalog metadata returns {@code true} so mistyped credential keys cannot be persisted and
+   * returned unredacted. Table / schema / other open property models keep the default {@code
+   * false}.
+   *
+   * @return true when undeclared property names are rejected on create and alter upsert
+   */
+  default boolean rejectsUnknownProperties() {
+    return false;
+  }
+
+  /**
    * Get the value of the property from the given properties map.
    *
    * @param properties The properties map.

@@ -23,6 +23,8 @@ import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -41,6 +43,15 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
    * metalake is disabled, this property is set to {@code false} on all its catalogs.
    */
   public static String PROPERTY_METALAKE_IN_USE = "metalake-in-use";
+
+  /** Prefix for Trino connector passthrough catalog properties. */
+  public static final String TRINO_BYPASS_PREFIX = "trino.bypass.";
+
+  /** Prefix for Flink connector passthrough catalog properties. */
+  public static final String FLINK_BYPASS_PREFIX = "flink.bypass.";
+
+  /** Prefix for Spark connector passthrough catalog properties. */
+  public static final String SPARK_BYPASS_PREFIX = "spark.bypass.";
 
   public static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
       new BaseCatalogPropertiesMetadata() {
@@ -99,8 +110,41 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   PROPERTY_METALAKE_IN_USE,
                   "The property indicating the metalake that holds the catalog is in use",
                   true /* default value */,
-                  true /* hidden */)),
+                  true /* hidden */),
+              stringOptionalPropertyPrefixEntry(
+                  CATALOG_BYPASS_PREFIX,
+                  "Pass-through properties forwarded to the underlying catalog implementation",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */),
+              stringOptionalPropertyPrefixEntry(
+                  TRINO_BYPASS_PREFIX,
+                  "Pass-through properties forwarded to the Trino connector",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */),
+              stringOptionalPropertyPrefixEntry(
+                  FLINK_BYPASS_PREFIX,
+                  "Pass-through properties forwarded to the Flink connector",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */),
+              stringOptionalPropertyPrefixEntry(
+                  SPARK_BYPASS_PREFIX,
+                  "Pass-through properties forwarded to the Spark connector",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */)),
           PropertyEntry::getName);
+
+  @Override
+  public boolean rejectsUnknownProperties() {
+    return true;
+  }
 
   @Override
   public Map<String, PropertyEntry<?>> propertyEntries() {
