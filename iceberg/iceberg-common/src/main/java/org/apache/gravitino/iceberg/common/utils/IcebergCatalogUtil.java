@@ -329,6 +329,24 @@ public class IcebergCatalogUtil {
         GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
   }
 
+  /**
+   * Returns an {@link IcebergConfig} that includes a minted GCS OAuth2 token when {@code
+   * gcs-service-account-file} is configured. The returned config retains {@code
+   * gcs.oauth2.token-expires-at} so callers (for example the IRC catalog cache) can expire the
+   * catalog before the token becomes invalid.
+   *
+   * @param icebergConfig original catalog config
+   * @return the same instance when no token is injected; otherwise a new config with token fields
+   */
+  public static IcebergConfig withGcsServiceAccountCredentials(IcebergConfig icebergConfig) {
+    Map<String, String> properties = new HashMap<>(icebergConfig.getAllConfig());
+    applyGcsServiceAccountCredentials(properties);
+    if (properties.equals(icebergConfig.getAllConfig())) {
+      return icebergConfig;
+    }
+    return new IcebergConfig(properties);
+  }
+
   private static AccessToken loadAccessTokenFromFile(String serviceAccountFile) {
     Path credentialsFilePath = Paths.get(serviceAccountFile);
     try (InputStream inputStream = Files.newInputStream(credentialsFilePath)) {

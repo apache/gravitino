@@ -376,6 +376,22 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
+  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenNoServiceAccountFile() {
+    IcebergConfig config = new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
+  }
+
+  @Test
+  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenTokenAlreadyPresent() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
+    IcebergConfig config = new IcebergConfig(properties);
+
+    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
+  }
+
+  @Test
   void testApplyDefaultResolvingFileIOInjectsGcsToken() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.WAREHOUSE, "gs://bucket/warehouse");
