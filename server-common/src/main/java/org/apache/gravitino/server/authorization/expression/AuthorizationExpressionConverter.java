@@ -27,6 +27,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TOPICS_AUTHORIZATION_EXPRESSION;
@@ -185,7 +186,8 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
-              ( entityType == 'FUNCTION' && (%s))
+              ( entityType == 'FUNCTION' && (%s)) ||
+              ( entityType == 'SEMANTIC_MODEL' && (%s))
               """
             .formatted(
                 LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
@@ -202,7 +204,8 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
-                LOAD_FUNCTION_AUTHORIZATION_EXPRESSION));
+                LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
+                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -317,6 +320,21 @@ public class AuthorizationExpressionConverter {
             "ANY_MODIFY_FUNCTION",
             "((ANY(MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)) "
                 + "&& !(ANY(DENY_MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_SEMANTIC_MODEL",
+            "((ANY(CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_SELECT_SEMANTIC_MODEL",
+            "((ANY(SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_SEMANTIC_MODEL",
+            "((ANY(MODIFY_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_MODIFY_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",

@@ -171,6 +171,22 @@ public class SecurableObjects {
   }
 
   /**
+   * Create the semantic model {@link SecurableObject} with the given securable schema object,
+   * semantic model name and privileges.
+   *
+   * @param schema The schema securable object
+   * @param semanticModel The semantic model name
+   * @param privileges The privileges of the semantic model
+   * @return The created semantic model {@link SecurableObject}
+   */
+  public static SecurableObject ofSemanticModel(
+      SecurableObject schema, String semanticModel, List<Privilege> privileges) {
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
+    names.add(semanticModel);
+    return of(MetadataObject.Type.SEMANTIC_MODEL, names, privileges);
+  }
+
+  /**
    * Create the tag {@link SecurableObject} with the given tag name and privileges.
    *
    * @param tag The tag name

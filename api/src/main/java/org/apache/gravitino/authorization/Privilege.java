@@ -157,7 +157,13 @@ public interface Privilege {
     /** The privilege to view a tag. */
     VIEW_TAG(0L, 1L << 34),
     /** The privilege to view a policy. */
-    VIEW_POLICY(0L, 1L << 35);
+    VIEW_POLICY(0L, 1L << 35),
+    /** The privilege to create a semantic model. */
+    CREATE_SEMANTIC_MODEL(0L, 1L << 36),
+    /** The privilege to discover a semantic model and load its definition. */
+    SELECT_SEMANTIC_MODEL(0L, 1L << 37),
+    /** The privilege to rename a semantic model or alter its definition and metadata. */
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 38);
 
     private final long highBits;
     private final long lowBits;
