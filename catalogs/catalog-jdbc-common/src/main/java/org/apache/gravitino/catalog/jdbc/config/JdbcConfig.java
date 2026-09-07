@@ -39,7 +39,9 @@ public class JdbcConfig extends Config {
 
   public static final ConfigEntry<String> JDBC_DATABASE =
       new ConfigBuilder("jdbc-database")
-          .doc("The database of the jdbc connection")
+          .doc(
+              "The database of the JDBC connection. PostgreSQL requires a nonblank "
+                  + "value here or a database in jdbc-url; other JDBC providers do not require it.")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)

@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.postgresql;
 
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -32,8 +33,21 @@ import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperati
 import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
+import org.postgresql.Driver;
 
 public class PostgreSqlCatalog extends JdbcCatalog {
+
+  /** {@inheritDoc} */
+  @Override
+  public JdbcCatalog withCatalogConf(Map<String, String> conf) {
+    return super.withCatalogConf(
+        resolveJdbcDatabase(
+            conf,
+            url -> {
+              Properties parsed = Driver.parseURL(url, new Properties());
+              return parsed == null ? null : parsed.getProperty("PGDBNAME");
+            }));
+  }
 
   @Override
   public String shortName() {
