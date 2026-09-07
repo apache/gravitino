@@ -749,6 +749,79 @@ public class TestViewMetaService extends TestJDBCBackend {
         () -> ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()));
   }
 
+  /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */
+  @TestTemplate
+  public void testConcurrentOverwriteOfMissingView() throws Exception {
+    String name = GravitinoITUtils.genRandomName("view_first_overwrite");
+    Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity first = createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, name, AUDIT_INFO);
+    ViewEntity second =
+        copyView(
+            createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, name, AUDIT_INFO),
+            name,
+            ns,
+            "second overwrite");
+    CountDownLatch firstWritten = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> firstResult =
+        executor.submit(
+            () -> {
+              SessionUtils.beginTransaction();
+              try {
+                ViewMetaService.getInstance().insertView(first, true);
+                firstWritten.countDown();
+                await(allowCommit);
+                SessionUtils.commitTransaction();
+                return null;
+              } catch (Throwable failure) {
+                SessionUtils.rollbackTransaction();
+                return failure;
+              }
+            });
+    try {
+      assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                try {
+                  ViewMetaService.getInstance().insertView(second, true);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      assertTrue(secondStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> secondResult.get(500, TimeUnit.MILLISECONDS));
+      allowCommit.countDown();
+      assertNull(firstResult.get(30, TimeUnit.SECONDS));
+      Throwable failure = secondResult.get(30, TimeUnit.SECONDS);
+      // H2 may serialize at the parent lock; MySQL/PostgreSQL can reach the missing-row INSERT.
+      if (failure != null) {
+        assertTrue(
+            failure instanceof OptimisticLockException, () -> "Unexpected failure: " + failure);
+        assertEquals(1, listViewVersions(first.id()).size());
+        assertTrue(listViewVersions(second.id()).isEmpty());
+        ViewMetaService.getInstance().insertView(second, true);
+      }
+      ViewEntity stored = ViewMetaService.getInstance().getViewByIdentifier(first.nameIdentifier());
+      assertEquals(first.id(), stored.id());
+      assertEquals("second overwrite", stored.comment());
+      assertEquals(
+          2,
+          ViewMetaService.getInstance()
+              .getViewPOByIdentifier(first.nameIdentifier())
+              .getCurrentVersion());
+      assertEquals(2, listViewVersions(first.id()).size());
+      assertTrue(listViewVersions(second.id()).isEmpty());
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   @TestTemplate
   public void testNaturalKeyOverwriteWaitsForConcurrentRename() throws Exception {
     String viewName = GravitinoITUtils.genRandomName("view_overwrite_rename_race");

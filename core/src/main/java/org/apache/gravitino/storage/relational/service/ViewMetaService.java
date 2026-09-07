@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -119,8 +120,18 @@ public class ViewMetaService {
                       po.getMetalakeId()),
           () -> insertViewWithoutCommit(viewEntity, po, overwrite));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.VIEW, viewEntity.nameIdentifier().toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            re, Entity.EntityType.VIEW, viewEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwrite) {
+          // A missing-row locking read cannot fence a concurrent insert at READ_COMMITTED.
+          // The transaction has rolled back; let the caller retry against the winning row.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.VIEW, viewEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw re;
     }
   }
@@ -319,28 +330,18 @@ public class ViewMetaService {
   }
 
   private ViewPO findAndLockViewForOverwrite(ViewPO initializedViewPO) {
-    ViewPO sameNameViewPO =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper ->
-                mapper.selectViewMetaBySchemaIdAndNameForUpdate(
-                    initializedViewPO.getSchemaId(), initializedViewPO.getViewName()));
-    if (sameNameViewPO != null) {
-      return sameNameViewPO;
-    }
-
-    ViewPO sameIdViewPO =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper -> mapper.selectViewMetaByIdForUpdate(initializedViewPO.getViewId()));
-    // Only a view that already lives under the target schema can be replaced by ID. A stored view
-    // with the same ID under another schema belongs to a different parent: adopting it here would
-    // move it without ever fencing its own schema.
-    if (sameIdViewPO == null
-        || !Objects.equals(sameIdViewPO.getSchemaId(), initializedViewPO.getSchemaId())) {
-      return null;
-    }
-    return sameIdViewPO;
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                ViewMetaMapper.class,
+                mapper ->
+                    mapper.selectViewMetaBySchemaIdAndNameForUpdate(
+                        initializedViewPO.getSchemaId(), initializedViewPO.getViewName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                ViewMetaMapper.class,
+                mapper -> mapper.selectViewMetaByIdForUpdate(initializedViewPO.getViewId())),
+        current -> Objects.equals(current.getSchemaId(), initializedViewPO.getSchemaId()));
   }
 
   private ViewPO viewPOForOverwrite(ViewPO incomingPO, ViewPO persistedPO) {
