@@ -162,6 +162,18 @@ public interface FunctionMetaMapper {
       method = "selectFunctionMetaByIdForUpdate")
   FunctionPO selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId);
 
+  /**
+   * Checks whether a soft-deleted function still owns the requested primary key.
+   *
+   * @param functionId the function ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select(
+      "SELECT COUNT(*) FROM "
+          + TABLE_NAME
+          + " WHERE function_id = #{functionId} AND deleted_at > 0")
+  int countDeletedFunctionMetasById(@Param("functionId") Long functionId);
+
   @SelectProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "selectFunctionIdBySchemaIdAndFunctionName")

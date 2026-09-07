@@ -134,7 +134,7 @@ public class FunctionMetaService {
       } catch (EntityAlreadyExistsException duplicate) {
         if (overwrite) {
           // A missing-row locking read cannot fence a concurrent insert at READ_COMMITTED.
-          // The transaction has rolled back; let the caller retry against the winning row.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
           throw ExceptionUtils.concurrentModification(
               Entity.EntityType.FUNCTION, functionEntity.nameIdentifier());
         }
@@ -358,6 +358,14 @@ public class FunctionMetaService {
 
     FunctionPO existingFunctionPO = findAndLockFunctionForOverwrite(initializedFunctionPO);
     if (existingFunctionPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              FunctionMetaMapper.class,
+              mapper -> mapper.countDeletedFunctionMetasById(initializedFunctionPO.functionId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The function ID %s is reserved by a deleted function; use a new ID",
+            initializedFunctionPO.functionId());
+      }
       insertNewFunctionWithoutCommit(initializedFunctionPO);
       return;
     }

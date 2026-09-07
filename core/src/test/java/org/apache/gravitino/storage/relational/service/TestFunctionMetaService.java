@@ -1110,6 +1110,32 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
   }
 
+  /** A deleted ID is a permanent conflict until GC, rather than a retryable concurrent write. */
+  @TestTemplate
+  public void testOverwriteRejectsDeletedFunctionId() throws IOException {
+    Namespace ns = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), ns, "deleted_function_id", AUDIT_INFO);
+    FunctionMetaService service = FunctionMetaService.getInstance();
+    service.insertFunction(function, false);
+    assertTrue(service.deleteFunction(function.nameIdentifier()));
+
+    EntityAlreadyExistsException failure =
+        assertThrows(
+            EntityAlreadyExistsException.class, () -> service.insertFunction(function, true));
+    assertTrue(failure.getMessage().contains("use a new ID"));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> service.getFunctionByIdentifier(function.nameIdentifier()));
+    listFunctionVersions(function.id()).values().forEach(deletedAt -> assertTrue(deletedAt > 0));
+
+    FunctionEntity replacement =
+        createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, function.name(), AUDIT_INFO);
+    service.insertFunction(replacement, true);
+    assertEquals(replacement.id(), service.getFunctionByIdentifier(function.nameIdentifier()).id());
+  }
+
   /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */
   @TestTemplate
   public void testConcurrentOverwriteOfMissingFunction() throws Exception {

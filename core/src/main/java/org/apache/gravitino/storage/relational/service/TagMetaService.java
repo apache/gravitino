@@ -124,7 +124,18 @@ public class TagMetaService {
           () -> lockMetalakeForTagCreate(metalakePO),
           () -> insertTagWithoutCommit(tagEntity, tagPO, overwritten));
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagEntity.toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            e, Entity.EntityType.TAG, tagEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwritten) {
+          // A missing-row locking read does not fence a concurrent insert at READ_COMMITTED.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.TAG, tagEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw e;
     }
   }
@@ -744,6 +755,14 @@ public class TagMetaService {
 
     TagPO existingTagPO = findAndLockTagForOverwrite(initializedTagPO);
     if (existingTagPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              TagMetaMapper.class,
+              mapper -> mapper.countDeletedTagMetasById(initializedTagPO.getTagId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The tag ID %s is reserved by a deleted tag; use a new ID",
+            initializedTagPO.getTagId());
+      }
       insertNewTagWithoutCommit(initializedTagPO);
       return;
     }
