@@ -27,6 +27,7 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorization;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -104,7 +105,7 @@ public class TestAuthorization {
   }
 
   @Test
-  public void testAuthorizationProviderConfiguredSurvivesClose() throws Exception {
+  public void testConfiguredAuthorizationPluginUnavailableAfterClose() throws Exception {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     CatalogEntity entity =
@@ -126,24 +127,23 @@ public class TestAuthorization {
                     "authorization.ranger.service.type",
                     "HadoopSQL"))
             .withCatalogEntity(entity);
-    Assertions.assertFalse(catalog.isAuthorizationProviderConfigured());
-
-    IsolatedClassLoader isolatedClassLoader =
+    try (IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
-            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
-    Assertions.assertTrue(catalog.isAuthorizationProviderConfigured());
-    Assertions.assertNotNull(catalog.getAuthorizationPlugin());
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList())) {
+      catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
+      Assertions.assertNotNull(catalog.getAuthorizationPlugin());
 
-    // Closing the catalog drops the plugin, but the catalog still reports that an authorization
-    // provider was configured, so a null plugin can be told apart from "no authorization".
-    catalog.close();
-    Assertions.assertNull(catalog.getAuthorizationPlugin());
-    Assertions.assertTrue(catalog.isAuthorizationProviderConfigured());
+      catalog.close();
+      AuthorizationPluginException exception =
+          Assertions.assertThrows(
+              AuthorizationPluginException.class, catalog::getAuthorizationPlugin);
+      Assertions.assertTrue(
+          exception.getMessage().contains("catalog-test3"), exception.getMessage());
+    }
   }
 
   @Test
-  public void testAuthorizationProviderNotConfigured() {
+  public void testAuthorizationProviderNotConfigured() throws Exception {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     CatalogEntity entity =
@@ -158,13 +158,14 @@ public class TestAuthorization {
 
     TestCatalog catalog =
         new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(entity);
-    IsolatedClassLoader isolatedClassLoader =
-        new IsolatedClassLoader(
-            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
+    try (IsolatedClassLoader isolatedClassLoader =
+            new IsolatedClassLoader(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        catalog) {
+      catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
 
-    Assertions.assertFalse(catalog.isAuthorizationProviderConfigured());
-    Assertions.assertNull(catalog.getAuthorizationPlugin());
+      Assertions.assertNull(catalog.getAuthorizationPlugin());
+    }
   }
 
   @Test

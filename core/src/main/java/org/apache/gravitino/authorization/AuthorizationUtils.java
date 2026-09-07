@@ -42,7 +42,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -228,7 +227,8 @@ public class AuthorizationUtils {
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    List<NameIdentifier> catalogIdents = getMetadataObjectCatalogs(metalake, metadataObject);
+    List<NameIdentifier> catalogIdents =
+        getMetadataObjectCatalogs(catalogManager, metalake, metadataObject);
     for (NameIdentifier catalogIdent : catalogIdents) {
       callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
     }
@@ -345,16 +345,19 @@ public class AuthorizationUtils {
     }
   }
 
+  /**
+   * Removes catalog privileges using the live catalog's name while its operation lease is held.
+   *
+   * @param catalogIdent the identifier used to load the catalog
+   * @param locations the catalog storage locations
+   */
   public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
-    // If we enable authorization, we should remove the privileges about the entity in the
-    // authorization plugin.
-    MetadataObject metadataObject =
-        MetadataObjects.of(null, catalogIdent.name(), MetadataObject.Type.CATALOG);
-    MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject, locations);
-
     callAuthorizationPluginImpl(
-        authorizationPlugin -> {
-          authorizationPlugin.onMetadataUpdated(removeObject);
+        (authorizationPlugin, catalogName) -> {
+          MetadataObject metadataObject =
+              MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+          authorizationPlugin.onMetadataUpdated(
+              MetadataObjectChange.remove(metadataObject, locations));
         },
         GravitinoEnv.getInstance().catalogManager(),
         catalogIdent);
@@ -449,28 +452,6 @@ public class AuthorizationUtils {
     return !SKIP_APPLY_TYPES.contains(type);
   }
 
-  /**
-   * Returns the authorization plugin of the given catalog, or null if the catalog is not configured
-   * with an authorization provider.
-   *
-   * <p>A catalog that was configured with an authorization provider but no longer has a plugin may
-   * have been closed. Calling the plugin is then impossible, and silently skipping the call could
-   * leave stale grants in the external authorization system, so this method fails loudly instead.
-   *
-   * @param catalog the leased catalog to read the authorization plugin from.
-   * @return the authorization plugin, or null if none is configured.
-   */
-  static AuthorizationPlugin getAuthorizationPlugin(BaseCatalog<?> catalog) {
-    AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
-    if (authorizationPlugin == null && catalog.isAuthorizationProviderConfigured()) {
-      throw new AuthorizationPluginException(
-          "The authorization plugin of catalog %s is unavailable even though an authorization "
-              + "provider is configured; the catalog may have been closed while it was in use",
-          catalog.name());
-    }
-    return authorizationPlugin;
-  }
-
   private static void callAuthorizationPluginImpl(
       BiConsumer<AuthorizationPlugin, String> consumer,
       CatalogManager catalogManager,
@@ -478,7 +459,7 @@ public class AuthorizationUtils {
     catalogManager.doWithCatalog(
         catalogIdent,
         catalog -> {
-          AuthorizationPlugin authorizationPlugin = getAuthorizationPlugin(catalog);
+          AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
           if (authorizationPlugin != null) {
             consumer.accept(authorizationPlugin, catalog.name());
           }
@@ -508,8 +489,7 @@ public class AuthorizationUtils {
   }
 
   private static List<NameIdentifier> getMetadataObjectCatalogs(
-      String metalake, MetadataObject metadataObject) {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+      CatalogManager catalogManager, String metalake, MetadataObject metadataObject) {
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
       return Arrays.asList(catalogManager.listCatalogs(Namespace.of(metalake)));
     }
