@@ -127,6 +127,31 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected abstract AbstractCatalog realCatalog();
 
+<<<<<<< HEAD
+=======
+  /**
+   * Converts a Flink logical type to a Gravitino type. Subclasses may override this to special-case
+   * types whose default mapping does not fit a particular catalog (e.g. Oracle has no pure date
+   * type, so its catalog maps Flink's {@code DATE} to a Gravitino timestamp instead).
+   *
+   * @param logicalType the Flink logical type
+   * @return the corresponding Gravitino type
+   */
+  protected Type toGravitinoType(LogicalType logicalType) {
+    return TypeUtils.toGravitinoType(logicalType);
+  }
+
+  /**
+   * Converts a Gravitino type to a Flink type, allowing catalog-specific native type mappings.
+   *
+   * @param type the Gravitino type
+   * @return the corresponding Flink data type
+   */
+  protected DataType toFlinkType(Type type) {
+    return TypeUtils.toFlinkType(type);
+  }
+
+>>>>>>> 14f4995f9 ([MINOR] refactor(flink): Allow catalogs to customize Flink type conversion (#12961))
   @Override
   public void open() throws CatalogException {
     realCatalog().open();
@@ -1142,12 +1167,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
    * @param columns the Gravitino column definitions
    * @return a Flink schema builder populated with the given columns
    */
-  protected static org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(
-      Column[] columns) {
+  protected org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(Column[] columns) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : columns) {
-      DataType flinkType = TypeUtils.toFlinkType(column.dataType());
+      DataType flinkType = toFlinkType(column.dataType());
       builder
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());
