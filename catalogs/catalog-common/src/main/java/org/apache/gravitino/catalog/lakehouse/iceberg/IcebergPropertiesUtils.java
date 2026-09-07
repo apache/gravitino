@@ -35,7 +35,12 @@ public class IcebergPropertiesUtils {
       ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
   private static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
       "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
-  private static final Map<String, String> AZURE_SERVICE_PRINCIPAL_CONFIG_TO_ICEBERG;
+  private static final String ICEBERG_AZURE_TENANT_ID =
+      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID;
+  private static final String ICEBERG_AZURE_CLIENT_ID =
+      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID;
+  private static final String ICEBERG_AZURE_CLIENT_SECRET =
+      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET;
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
@@ -78,6 +83,9 @@ public class IcebergPropertiesUtils {
     map.put(
         AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
         IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
+    map.put(AzureProperties.GRAVITINO_AZURE_TENANT_ID, ICEBERG_AZURE_TENANT_ID);
+    map.put(AzureProperties.GRAVITINO_AZURE_CLIENT_ID, ICEBERG_AZURE_CLIENT_ID);
+    map.put(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, ICEBERG_AZURE_CLIENT_SECRET);
     // Table metadata cache
     map.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, IcebergConstants.TABLE_METADATA_CACHE_IMPL);
     map.put(
@@ -103,19 +111,6 @@ public class IcebergPropertiesUtils {
         });
     ICEBERG_CATALOG_CONFIG_TO_GRAVITINO =
         Collections.unmodifiableMap(icebergCatalogConfigToGravitino);
-
-    Map<String, String> azureServicePrincipalConfigToIceberg = new HashMap<>();
-    azureServicePrincipalConfigToIceberg.put(
-        AzureProperties.GRAVITINO_AZURE_TENANT_ID,
-        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID);
-    azureServicePrincipalConfigToIceberg.put(
-        AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
-        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID);
-    azureServicePrincipalConfigToIceberg.put(
-        AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
-        ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET);
-    AZURE_SERVICE_PRINCIPAL_CONFIG_TO_ICEBERG =
-        Collections.unmodifiableMap(azureServicePrincipalConfigToIceberg);
   }
 
   /**
@@ -147,6 +142,7 @@ public class IcebergPropertiesUtils {
     boolean hasServicePrincipal = StringUtils.isNoneBlank(tenantId, clientId, clientSecret);
 
     if (hasSharedKey || !hasServicePrincipal) {
+      removeAzureServicePrincipalProperties(icebergProperties);
       return;
     }
 
@@ -154,8 +150,12 @@ public class IcebergPropertiesUtils {
     icebergProperties.remove(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
     icebergProperties.put(
         ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
-    convertProperties(
-        AZURE_SERVICE_PRINCIPAL_CONFIG_TO_ICEBERG, gravitinoProperties, icebergProperties);
+  }
+
+  private static void removeAzureServicePrincipalProperties(Map<String, String> icebergProperties) {
+    icebergProperties.remove(ICEBERG_AZURE_TENANT_ID);
+    icebergProperties.remove(ICEBERG_AZURE_CLIENT_ID);
+    icebergProperties.remove(ICEBERG_AZURE_CLIENT_SECRET);
   }
 
   private static void convertProperties(

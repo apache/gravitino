@@ -124,6 +124,9 @@ public class TestIcebergPropertiesUtils {
     Assertions.assertEquals(
         "account-key", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY));
     Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+    Assertions.assertFalse(
+        icebergProps.containsKey(
+            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
   }
 
   @Test
@@ -141,6 +144,9 @@ public class TestIcebergPropertiesUtils {
     Assertions.assertEquals(
         "account", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
     Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+    Assertions.assertFalse(
+        icebergProps.containsKey(
+            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
   }
 
   @Test
