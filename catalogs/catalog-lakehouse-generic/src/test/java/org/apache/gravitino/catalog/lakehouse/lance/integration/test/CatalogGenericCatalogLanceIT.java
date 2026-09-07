@@ -19,9 +19,11 @@
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -511,6 +513,62 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
       }
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  void testVersionCheckPersistsLatestDatasetSchema() {
+    String testCatalogName = GravitinoITUtils.genRandomName("lance_version_check_catalog");
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK");
+    metalake.createCatalog(
+        testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+
+    try {
+      Catalog versionCheckCatalog = metalake.loadCatalog(testCatalogName);
+      String testSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+      versionCheckCatalog
+          .asSchemas()
+          .createSchema(testSchemaName, "comment", createSchemaProperties());
+      NameIdentifier ident =
+          NameIdentifier.of(
+              testSchemaName, GravitinoITUtils.genRandomName("lance_version_check_table"));
+      String location = String.format("%s/%s/%s", tempDirectory, testSchemaName, ident.name());
+      Map<String, String> tableProperties = createProperties();
+      tableProperties.put(Table.PROPERTY_LOCATION, location);
+      tableProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+
+      Table created =
+          versionCheckCatalog
+              .asTableCatalog()
+              .createTable(
+                  ident,
+                  createColumns(),
+                  TABLE_COMMENT,
+                  tableProperties,
+                  Transforms.EMPTY_TRANSFORM,
+                  null,
+                  null);
+      long createdVersion = Long.parseLong(created.properties().get(LANCE_TABLE_VERSION));
+
+      long latestVersion;
+      try (Dataset dataset = Dataset.open().uri(location).build()) {
+        dataset.dropColumns(List.of(LANCE_COL_NAME3));
+        latestVersion = dataset.getVersion().getId();
+      }
+      Assertions.assertTrue(latestVersion > createdVersion);
+
+      Table repaired = versionCheckCatalog.asTableCatalog().loadTable(ident);
+      Assertions.assertEquals(2, repaired.columns().length);
+      Assertions.assertEquals(
+          String.valueOf(latestVersion), repaired.properties().get(LANCE_TABLE_VERSION));
+
+      Table reloaded = versionCheckCatalog.asTableCatalog().loadTable(ident);
+      Assertions.assertEquals(2, reloaded.columns().length);
+      Assertions.assertEquals(
+          String.valueOf(latestVersion), reloaded.properties().get(LANCE_TABLE_VERSION));
+    } finally {
+      metalake.dropCatalog(testCatalogName, true);
     }
   }
 

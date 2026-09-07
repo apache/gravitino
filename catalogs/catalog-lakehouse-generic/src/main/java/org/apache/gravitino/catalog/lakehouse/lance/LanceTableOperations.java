@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -88,10 +89,10 @@ public class LanceTableOperations extends ManagedTableOperations {
    */
   private static final int REPAIR_UPDATE_MAX_ATTEMPTS = 5;
 
-  /** Lower bound (inclusive) of the randomized backoff slept between lost-CAS retries. */
+  /** Lower bound (inclusive) of the randomized backoff slept between repair retries. */
   private static final long REPAIR_RETRY_MIN_BACKOFF_MS = 10;
 
-  /** Upper bound (inclusive) of the randomized backoff slept between lost-CAS retries. */
+  /** Upper bound (inclusive) of the randomized backoff slept between repair retries. */
   private static final long REPAIR_RETRY_MAX_BACKOFF_MS = 100;
 
   public enum CreationMode {
@@ -449,7 +450,39 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   private Table loadTableInternal(NameIdentifier ident, boolean forAlter) {
-    Table table = super.loadTable(ident);
+    OptimisticLockException lastConflict = null;
+    for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
+      try {
+        return loadTableInternalOnce(ident, forAlter);
+      } catch (OptimisticLockException e) {
+        lastConflict = e;
+        LOG.debug(
+            "Table {} changed while reading its Lance schema (attempt {}/{}), {}",
+            ident,
+            attempt,
+            REPAIR_UPDATE_MAX_ATTEMPTS,
+            attempt < REPAIR_UPDATE_MAX_ATTEMPTS ? "reloading repair inputs" : "retries exhausted",
+            e);
+
+        if (attempt < REPAIR_UPDATE_MAX_ATTEMPTS) {
+          try {
+            backoffBeforeRetry(ident);
+          } catch (IOException ioe) {
+            throw new RuntimeException("Failed to retry schema repair for table " + ident, ioe);
+          }
+        }
+      }
+    }
+    throw new OptimisticLockException(
+        lastConflict,
+        "Failed to repair table %s after %d optimistic-lock attempts",
+        ident,
+        REPAIR_UPDATE_MAX_ATTEMPTS);
+  }
+
+  private Table loadTableInternalOnce(NameIdentifier ident, boolean forAlter) {
+    TableEntity observedTable = loadTableEntity(ident);
+    Table table = toGenericTable(observedTable);
     // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
     // Gravitino metadata when the stored table is declared-only, empty, or configured to track
     // Lance dataset versions.
@@ -506,12 +539,22 @@ public class LanceTableOperations extends ManagedTableOperations {
       // can skip the dataset open (see the early-return above). Declared tables are excluded
       // because their lance.declared flag is the authoritative "not yet written" signal.
       if (!declaredOnly) {
-        return recordCheckedEmptyVersion(ident, datasetVersion);
+        return recordCheckedEmptyVersion(ident, observedTable, datasetVersion);
       }
       return table;
     }
 
-    return repairTableMetadata(ident, columns, datasetVersion);
+    return repairTableMetadata(ident, observedTable, columns, datasetVersion);
+  }
+
+  private TableEntity loadTableEntity(NameIdentifier ident) {
+    try {
+      return store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load table " + ident, e);
+    }
   }
 
   private SchemaRefreshMode schemaRefreshMode() {
@@ -562,11 +605,13 @@ public class LanceTableOperations extends ManagedTableOperations {
         .toArray(Column[]::new);
   }
 
-  private Table repairTableMetadata(NameIdentifier ident, Column[] columns, long datasetVersion) {
+  private Table repairTableMetadata(
+      NameIdentifier ident, TableEntity observedTable, Column[] columns, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          updateTableWithCasRetry(
+          updateTableIfObservationCurrent(
               ident,
+              observedTable,
               current -> {
                 if (!needsSchemaRefresh(current, datasetVersion)) {
                   return current;
@@ -584,46 +629,39 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   /**
-   * Repairs stored table metadata and retries only when another repair wins the same race.
-   *
-   * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
-   * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
-   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
-   * retry here and are returned immediately.
+   * Updates stored table metadata only if the dataset observation still belongs to the same table
+   * state.
    */
-  private TableEntity updateTableWithCasRetry(
-      NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
-    OptimisticLockException lastConflict = null;
-    for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
-      try {
-        return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
-      } catch (OptimisticLockException e) {
-        lastConflict = e;
-        LOG.debug(
-            "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
-            ident,
-            attempt,
-            REPAIR_UPDATE_MAX_ATTEMPTS,
-            attempt < REPAIR_UPDATE_MAX_ATTEMPTS ? "retrying" : "retries exhausted",
-            e);
-
-        if (attempt < REPAIR_UPDATE_MAX_ATTEMPTS) {
-          backoffBeforeRetry(ident);
-        }
-      }
-    }
-    // Reaching here means every attempt lost to another writer. Keep the exception type so the
-    // caller still knows this is an OCC conflict, and add the attempt count for diagnosis.
-    throw new OptimisticLockException(
-        lastConflict,
-        "Failed to repair table %s after %d optimistic-lock attempts",
+  private TableEntity updateTableIfObservationCurrent(
+      NameIdentifier ident, TableEntity observedTable, Function<TableEntity, TableEntity> updater)
+      throws IOException {
+    return store.update(
         ident,
-        REPAIR_UPDATE_MAX_ATTEMPTS);
+        TableEntity.class,
+        Entity.EntityType.TABLE,
+        current -> {
+          validateRepairObservation(ident, observedTable, current);
+          return updater.apply(current);
+        });
+  }
+
+  private void validateRepairObservation(
+      NameIdentifier ident, TableEntity observedTable, TableEntity currentTable) {
+    String observedLocation = observedTable.properties().get(Table.PROPERTY_LOCATION);
+    String currentLocation = currentTable.properties().get(Table.PROPERTY_LOCATION);
+    String observedVersion = observedTable.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    String currentVersion = currentTable.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    if (!Objects.equals(observedTable.id(), currentTable.id())
+        || !Objects.equals(observedLocation, currentLocation)
+        || !Objects.equals(observedVersion, currentVersion)) {
+      throw new OptimisticLockException(
+          "Table %s changed after its Lance dataset schema was read", ident);
+    }
   }
 
   /**
-   * Sleeps a short randomized backoff between two lost-CAS retries so that racing loads de-sync
-   * instead of immediately colliding again. Package-private so tests can neutralize the sleep.
+   * Sleeps a short randomized backoff between repair retries so racing loads de-sync instead of
+   * immediately colliding again. Package-private so tests can neutralize the sleep.
    *
    * @param ident the table being updated, used only for the interrupt error message
    * @throws IOException if the thread is interrupted while backing off
@@ -640,11 +678,13 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
-  private Table recordCheckedEmptyVersion(NameIdentifier ident, long datasetVersion) {
+  private Table recordCheckedEmptyVersion(
+      NameIdentifier ident, TableEntity observedTable, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          updateTableWithCasRetry(
+          updateTableIfObservationCurrent(
               ident,
+              observedTable,
               current -> {
                 if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
                   return current;
