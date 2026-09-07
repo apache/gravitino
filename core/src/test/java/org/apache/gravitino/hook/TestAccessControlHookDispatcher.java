@@ -55,9 +55,10 @@ public class TestAccessControlHookDispatcher {
     mockDispatcher = mock(AccessControlDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockAuthorizer = mock(GravitinoAuthorizer.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     savedAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", mockAuthorizer, true);
     hookDispatcher = new AccessControlHookDispatcher(mockDispatcher);
   }
@@ -65,7 +66,7 @@ public class TestAccessControlHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", savedAuthorizer, true);
   }
 
