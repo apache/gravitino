@@ -133,12 +133,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
     if (requestCredential) {
-      LoadTableResponse upstream =
-          getRESTCreateTable((RESTCatalog) getCatalog(), namespace, request, true);
-      return IcebergRESTUtils.rewriteLoadTableCredentials(
-          catalogCredentialManager.catalogName(),
-          TableIdentifier.of(namespace, request.name()),
-          upstream);
+      return createTableWithVendedCredentials(namespace, request);
     }
     return createTableInternal(namespace, request);
   }
@@ -160,10 +155,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    LoadTableResponse upstream =
-        getRESTLoadTable((RESTCatalog) getCatalog(), identifier, requestCredential);
-    return IcebergRESTUtils.rewriteLoadTableCredentials(
-        catalogCredentialManager.catalogName(), identifier, upstream);
+    return loadTableViaRest(identifier, requestCredential);
   }
 
   /**
@@ -182,12 +174,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
     if (requestCredential) {
-      LoadTableResponse upstream =
-          getRESTRegisterTable((RESTCatalog) getCatalog(), namespace, request, true);
-      return IcebergRESTUtils.rewriteLoadTableCredentials(
-          catalogCredentialManager.catalogName(),
-          TableIdentifier.of(namespace, request.name()),
-          upstream);
+      return registerTableWithVendedCredentials(namespace, request);
     }
     return registerTableInternal(namespace, request);
   }
@@ -534,6 +521,34 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     return requestCredentialVending
         ? ImmutableMap.of(X_ICEBERG_ACCESS_DELEGATION, VENDED_CREDENTIALS)
         : Collections.emptyMap();
+  }
+
+  private LoadTableResponse createTableWithVendedCredentials(
+      Namespace namespace, CreateTableRequest request) {
+    LoadTableResponse upstream =
+        getRESTCreateTable((RESTCatalog) getCatalog(), namespace, request, true);
+    return IcebergRESTUtils.rewriteLoadTableCredentials(
+        catalogCredentialManager.catalogName(),
+        TableIdentifier.of(namespace, request.name()),
+        upstream);
+  }
+
+  private LoadTableResponse loadTableViaRest(
+      TableIdentifier identifier, boolean requestCredential) {
+    LoadTableResponse upstream =
+        getRESTLoadTable((RESTCatalog) getCatalog(), identifier, requestCredential);
+    return IcebergRESTUtils.rewriteLoadTableCredentials(
+        catalogCredentialManager.catalogName(), identifier, upstream);
+  }
+
+  private LoadTableResponse registerTableWithVendedCredentials(
+      Namespace namespace, RegisterTableRequest request) {
+    LoadTableResponse upstream =
+        getRESTRegisterTable((RESTCatalog) getCatalog(), namespace, request, true);
+    return IcebergRESTUtils.rewriteLoadTableCredentials(
+        catalogCredentialManager.catalogName(),
+        TableIdentifier.of(namespace, request.name()),
+        upstream);
   }
 
   /**
