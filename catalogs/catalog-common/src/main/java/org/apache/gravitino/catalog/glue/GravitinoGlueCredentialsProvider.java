@@ -33,9 +33,6 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * supplied via {@code client.credentials-provider}. This class is configured in {@code
  * org.apache.gravitino.catalog.glue.GlueIcebergTableHelper#createGlueCatalog} when explicit
  * credentials are provided.
- *
- * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
- * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
  */
 public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
 
