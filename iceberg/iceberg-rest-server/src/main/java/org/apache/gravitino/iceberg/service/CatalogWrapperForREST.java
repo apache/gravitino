@@ -61,7 +61,6 @@ import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
-import org.apache.iceberg.gcp.gcs.GCSFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -86,6 +85,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
+
+  /** Iceberg built-in GCS FileIO; used when rewriting server-only {@link GravitinoGCSFileIO}. */
+  private static final String ICEBERG_GCS_FILE_IO = "org.apache.iceberg.gcp.gcs.GCSFileIO";
 
   /**
    * Client-facing catalog property keys retained when building the IRC {@code /v1/config} defaults
@@ -263,7 +265,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // GravitinoGCSFileIO is server-only; clients should use Iceberg's GCSFileIO (plus vended
     // credentials when enabled).
     if (GravitinoGCSFileIO.class.getName().equals(filtered.get(IcebergConstants.IO_IMPL))) {
-      filtered.put(IcebergConstants.IO_IMPL, GCSFileIO.class.getName());
+      filtered.put(IcebergConstants.IO_IMPL, ICEBERG_GCS_FILE_IO);
     }
     validateAndNormalizeDataAccessProperty(filtered);
     return Collections.unmodifiableMap(filtered);
