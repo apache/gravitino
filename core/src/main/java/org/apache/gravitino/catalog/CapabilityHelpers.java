@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -52,16 +53,12 @@ public class CapabilityHelpers {
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    // Acquire the lease outside the try so a missing catalog keeps propagating its
-    // NoSuchCatalogException (a 404) instead of being wrapped into a plain RuntimeException (a
-    // 500); only the capability lookup itself is wrapped.
-    CatalogLease lease = catalogManager.acquireCatalogLease(catalogIdent);
     try {
-      return lease.wrapper().capabilities();
-    } catch (Exception e) {
+      return catalogManager.doWithCatalog(catalogIdent, catalog -> catalog.capability());
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
-    } finally {
-      lease.close();
     }
   }
 

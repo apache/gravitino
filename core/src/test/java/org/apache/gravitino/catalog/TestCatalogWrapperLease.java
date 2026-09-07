@@ -31,8 +31,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -72,11 +74,6 @@ public class TestCatalogWrapperLease {
   private static final Map<String, String> PROPS =
       ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
 
-  private static Config config;
-  private static InMemoryEntityStore entityStore;
-
-  private CatalogManager catalogManager;
-
   private static final BaseMetalake METALAKE_ENTITY =
       BaseMetalake.builder()
           .withId(1L)
@@ -85,6 +82,11 @@ public class TestCatalogWrapperLease {
               AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .withVersion(SchemaVersion.V_0_1)
           .build();
+
+  private static Config config;
+  private static InMemoryEntityStore entityStore;
+
+  private CatalogManager catalogManager;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -250,6 +252,59 @@ public class TestCatalogWrapperLease {
   }
 
   @Test
+  public void testConcurrentLeaseAcquisitionsLoadOneWrapperPerKey() throws Exception {
+    NameIdentifier ident = createCatalog("concurrent_reload");
+    CatalogWrapper oldWrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+    Assertions.assertNotNull(oldWrapper);
+    catalogManager.getCatalogCache().invalidate(ident);
+    await().atMost(Duration.ofSeconds(10)).until(oldWrapper::isRetired);
+
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch continueLoad = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              loadStarted.countDown();
+              Assertions.assertTrue(continueLoad.await(10, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<CatalogLease> first = executor.submit(() -> catalogManager.acquireCatalogLease(ident));
+      Assertions.assertTrue(loadStarted.await(10, TimeUnit.SECONDS));
+      CountDownLatch secondStarted = new CountDownLatch(1);
+      Future<CatalogLease> second =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                return catalogManager.acquireCatalogLease(ident);
+              });
+      Assertions.assertTrue(secondStarted.await(10, TimeUnit.SECONDS));
+      await()
+          .during(Duration.ofMillis(200))
+          .atMost(Duration.ofSeconds(1))
+          .untilAsserted(
+              () ->
+                  Mockito.verify(catalogManager, Mockito.times(1))
+                      .createCatalogWrapper(Mockito.any(), Mockito.isNull()));
+
+      continueLoad.countDown();
+      try (CatalogLease firstLease = first.get(10, TimeUnit.SECONDS);
+          CatalogLease secondLease = second.get(10, TimeUnit.SECONDS)) {
+        Assertions.assertSame(firstLease.wrapper(), secondLease.wrapper());
+        Mockito.verify(catalogManager, Mockito.times(1))
+            .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+      }
+    } finally {
+      continueLoad.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testCleanupRunsExactlyOnceForRepeatedRetireAndRelease() throws Exception {
     // Two catalogs of the same provider share one pooled ClassLoader, so the pool entry survives
     // as long as exactly one reference is released per wrapper. A double cleanup would drop the
@@ -312,6 +367,32 @@ public class TestCatalogWrapperLease {
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  @Test
+  public void testLeaseCallbackKeepsTheApplicationClassLoader() throws Exception {
+    NameIdentifier ident = createCatalog("callback_classloader");
+    ClassLoader applicationClassLoader = Thread.currentThread().getContextClassLoader();
+
+    ClassLoader[] observed = new ClassLoader[2];
+    catalogManager.doWithCatalogWrapper(
+        ident,
+        wrapper -> {
+          // Gravitino's own work inside the callback, entity-store reads above all, must not run
+          // with a connector ClassLoader installed: MyBatis and DriverManager resolve through the
+          // thread context ClassLoader and a catalog that bundles its own JDBC driver would win.
+          observed[0] = Thread.currentThread().getContextClassLoader();
+          // Connector calls still get the catalog ClassLoader, from the wrapper itself.
+          observed[1] = wrapper.doWithCatalog(c -> Thread.currentThread().getContextClassLoader());
+          return null;
+        });
+
+    Assertions.assertSame(applicationClassLoader, observed[0]);
+    Assertions.assertNotSame(applicationClassLoader, observed[1]);
+    Assertions.assertSame(
+        applicationClassLoader,
+        Thread.currentThread().getContextClassLoader(),
+        "the connector ClassLoader must be restored when the callback returns");
   }
 
   @Test
@@ -429,6 +510,173 @@ public class TestCatalogWrapperLease {
         wrapper.catalog(), "a failing close must still drop the catalog reference");
     Assertions.assertEquals(
         0, pool.size(), "a failing close must still release the pooled ClassLoader");
+  }
+
+  @Test
+  public void testManagerCloseWaitsForConcurrentCatalogLoad() throws Exception {
+    NameIdentifier ident = createCatalog("load_while_closing");
+    CatalogWrapper oldWrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+    catalogManager.getCatalogCache().invalidate(ident);
+    await().atMost(Duration.ofSeconds(10)).until(oldWrapper::isRetired);
+
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch continueLoad = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              loadStarted.countDown();
+              Assertions.assertTrue(continueLoad.await(10, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<CatalogLease> acquiredLease =
+          executor.submit(() -> catalogManager.acquireCatalogLease(ident));
+      Assertions.assertTrue(loadStarted.await(10, TimeUnit.SECONDS));
+
+      Future<?> closeFuture = submitCloseAndAssertBlocked(executor);
+
+      continueLoad.countDown();
+      CatalogLease lease = acquiredLease.get(10, TimeUnit.SECONDS);
+      closeFuture.get(10, TimeUnit.SECONDS);
+
+      CatalogWrapper loadedWrapper = lease.wrapper();
+      Assertions.assertTrue(loadedWrapper.isRetired());
+      Assertions.assertNotNull(
+          loadedWrapper.catalog(), "close must preserve a concurrently acquired lease");
+      Assertions.assertThrows(
+          IllegalStateException.class, () -> catalogManager.acquireCatalogLease(ident));
+
+      lease.close();
+      Assertions.assertNull(loadedWrapper.catalog());
+    } finally {
+      continueLoad.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testManagerCloseWaitsForConcurrentCatalogPublication() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(METALAKE, "publish_while_closing");
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch creationStarted = new CountDownLatch(1);
+    CountDownLatch continueCreation = new CountDownLatch(1);
+    AtomicReference<CatalogWrapper> createdWrapper = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              creationStarted.countDown();
+              Assertions.assertTrue(continueCreation.await(10, TimeUnit.SECONDS));
+              CatalogWrapper wrapper = (CatalogWrapper) invocation.callRealMethod();
+              createdWrapper.set(wrapper);
+              return wrapper;
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.any());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Catalog> createdCatalog =
+          executor.submit(
+              () ->
+                  catalogManager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, PROVIDER, "comment", PROPS));
+      Assertions.assertTrue(creationStarted.await(10, TimeUnit.SECONDS));
+
+      Future<?> closeFuture = submitCloseAndAssertBlocked(executor);
+
+      continueCreation.countDown();
+      Assertions.assertNotNull(createdCatalog.get(10, TimeUnit.SECONDS));
+      closeFuture.get(10, TimeUnit.SECONDS);
+
+      Assertions.assertTrue(createdWrapper.get().isRetired());
+      Assertions.assertNull(createdWrapper.get().catalog());
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+      Assertions.assertThrows(
+          IllegalStateException.class, () -> catalogManager.acquireCatalogLease(ident));
+    } finally {
+      continueCreation.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testManagerCloseReleasesThePoolEvenIfRetiringAWrapperFails() throws Exception {
+    createCatalog("failing_retire");
+    ClassLoaderPool pool =
+        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+
+    CatalogWrapper failingWrapper = Mockito.mock(CatalogWrapper.class);
+    Mockito.doThrow(new RuntimeException("retire failed")).when(failingWrapper).retire();
+    catalogManager.getCatalogCache().put(NameIdentifier.of(METALAKE, "failing"), failingWrapper);
+
+    Assertions.assertDoesNotThrow(() -> catalogManager.close());
+
+    // The cache's removal listener retires the wrapper as well, asynchronously.
+    Mockito.verify(failingWrapper, Mockito.atLeastOnce()).retire();
+    Assertions.assertEquals(
+        0, pool.size(), "a failing retirement must not keep the ClassLoader pool open");
+  }
+
+  private Future<?> submitCloseAndAssertBlocked(ExecutorService executor)
+      throws InterruptedException {
+    CountDownLatch closeStarted = new CountDownLatch(1);
+    Future<?> closeFuture =
+        executor.submit(
+            () -> {
+              closeStarted.countDown();
+              catalogManager.close();
+            });
+    Assertions.assertTrue(closeStarted.await(10, TimeUnit.SECONDS));
+    await()
+        .during(Duration.ofMillis(200))
+        .atMost(Duration.ofSeconds(1))
+        .until(() -> !closeFuture.isDone());
+    return closeFuture;
+  }
+
+  @Test
+  public void testManagerCloseWaitsForConcurrentCatalogAlter() throws Exception {
+    NameIdentifier ident = createCatalog("alter_while_closing");
+
+    catalogManager = Mockito.spy(catalogManager);
+    CountDownLatch publicationStarted = new CountDownLatch(1);
+    CountDownLatch continuePublication = new CountDownLatch(1);
+    // The only createCatalogWrapper(entity, null) call of alterCatalog happens after the entity
+    // has been persisted and before the refreshed wrapper is published, i.e. exactly in the window
+    // where a concurrent close() used to fail the alter that had already taken effect.
+    Mockito.doAnswer(
+            invocation -> {
+              publicationStarted.countDown();
+              Assertions.assertTrue(continuePublication.await(10, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(Mockito.any(), Mockito.isNull());
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Catalog> alteredCatalog =
+          executor.submit(
+              () -> catalogManager.alterCatalog(ident, CatalogChange.updateComment("altered")));
+      Assertions.assertTrue(publicationStarted.await(10, TimeUnit.SECONDS));
+
+      Future<?> closeFuture = submitCloseAndAssertBlocked(executor);
+
+      continuePublication.countDown();
+      Catalog altered = alteredCatalog.get(10, TimeUnit.SECONDS);
+      Assertions.assertEquals(
+          "altered", altered.comment(), "the alter must succeed instead of racing with close()");
+      closeFuture.get(10, TimeUnit.SECONDS);
+
+      Assertions.assertThrows(
+          IllegalStateException.class, () -> catalogManager.acquireCatalogLease(ident));
+    } finally {
+      continuePublication.countDown();
+      executor.shutdownNow();
+    }
   }
 
   private NameIdentifier createCatalog(String name) {

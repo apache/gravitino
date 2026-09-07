@@ -830,7 +830,7 @@ public class TestCatalogManager {
     Mockito.doReturn("cache_race_test_renamed").when(freshCatalogInfo).name();
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
     Mockito.doReturn(true).when(freshWrapper).tryAcquire();
-    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCredentialOps(any());
+    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCatalog(any());
 
     AtomicBoolean staleInserted = new AtomicBoolean(false);
     Answer<CatalogManager.CatalogWrapper> insertStaleWrapper =
@@ -969,6 +969,19 @@ public class TestCatalogManager {
     manager.close();
 
     Assertions.assertSame(registeredListener, store.unregisteredListener.get());
+  }
+
+  @Test
+  void testCloseCompletesWhenChangeLogUnregistrationFails() {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.throwOnUnregister = true;
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+
+    Assertions.assertDoesNotThrow(manager::close);
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> manager.loadCatalogAndWrap(NameIdentifier.of("metalake", "catalog")));
   }
 
   @Test
@@ -1146,7 +1159,6 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
     Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
@@ -1156,6 +1168,7 @@ public class TestCatalogManager {
         .doReturn(importedSchema)
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Imported schema (no StringIdentifier in external catalog properties) should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
@@ -1168,6 +1181,7 @@ public class TestCatalogManager {
         new AtomicReference<>();
     private boolean returnFalseForCatalogDelete;
     private boolean throwMissingCatalogForSchemaList;
+    private boolean throwOnUnregister;
 
     @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
@@ -1200,6 +1214,9 @@ public class TestCatalogManager {
     @Override
     public void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {
       this.unregisteredListener.set(listener);
+      if (throwOnUnregister) {
+        throw new RuntimeException("Failed to unregister listener");
+      }
     }
   }
 
@@ -1239,7 +1256,6 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
     Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
@@ -1248,6 +1264,7 @@ public class TestCatalogManager {
         .doThrow(new NoSuchSchemaException("Schema not found"))
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Schema disappearing between listSchemas and loadSchema should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
@@ -1289,7 +1306,6 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
     Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
@@ -1298,6 +1314,7 @@ public class TestCatalogManager {
         .doThrow(new RuntimeException("Failed connect"))
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Unexpected errors during schema classification should propagate (fail-closed).
     RuntimeException ex =
@@ -1337,7 +1354,6 @@ public class TestCatalogManager {
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
     Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1345,6 +1361,7 @@ public class TestCatalogManager {
     Mockito.doThrow(new RuntimeException("Failed connect"))
         .when(catalogWrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, catalogWrapper);
     Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
   }
 
@@ -1370,12 +1387,11 @@ public class TestCatalogManager {
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     CatalogOperations operations =
         Mockito.mock(
             CatalogOperations.class,
             Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
-    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
-    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1521,7 +1537,9 @@ public class TestCatalogManager {
     CountDownLatch writeLockAcquired = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doAnswer(invocation -> new CatalogLease(wrapper))
+        .when(catalogManager)
+        .acquireCatalogLease(ident);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doAnswer(
             invocation -> {
@@ -1804,6 +1822,7 @@ public class TestCatalogManager {
       CatalogEntity storedAfter = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
       Assertions.assertEquals(stored.getProperties(), storedAfter.getProperties());
       Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      Mockito.verify(manager, Mockito.times(4)).acquireCatalogLease(ident);
       Mockito.verify(temporaryWrapper, Mockito.times(3)).close();
     }
   }

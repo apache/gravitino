@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.Dataset;
@@ -56,10 +57,9 @@ public class TestSemanticModelNormalizeDispatcher {
   public void setUp() throws Exception {
     delegate = mock(SemanticModelDispatcher.class);
     CatalogManager catalogManager = mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(wrapper.capabilities()).thenReturn(new ParentNormalizingCapability());
-    when(catalogManager.acquireCatalogLease(NameIdentifier.of("metalake", "catalog")))
-        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     dispatcher = new SemanticModelNormalizeDispatcher(delegate, catalogManager);
   }
 

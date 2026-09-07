@@ -22,7 +22,6 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.Optional;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.CatalogLease;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.iceberg.catalog.Namespace;
@@ -43,12 +42,9 @@ final class IcebergCleanupHelper {
    */
   static long catalogId(String catalogName) {
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
-    try (CatalogLease lease =
-        GravitinoEnv.getInstance()
-            .catalogManager()
-            .acquireCatalogLease(NameIdentifier.of(metalake, catalogName))) {
-      return lease.catalog().entity().id();
-    }
+    return GravitinoEnv.getInstance()
+        .catalogManager()
+        .doWithCatalog(NameIdentifier.of(metalake, catalogName), catalog -> catalog.entity().id());
   }
 
   /**
