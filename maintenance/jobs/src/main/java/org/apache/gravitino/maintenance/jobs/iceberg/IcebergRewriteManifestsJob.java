@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
@@ -33,8 +32,8 @@ import org.apache.spark.sql.SparkSession;
 /**
  * Built-in job for rewriting Iceberg table manifest files.
  *
- * <p>This job leverages Iceberg's RewriteManifestsProcedure to consolidate small manifest files
- * and rewrite manifests with improved partition specs, which improves scan planning performance.
+ * <p>This job leverages Iceberg's RewriteManifestsProcedure to consolidate small manifest files and
+ * rewrite manifests with improved partition specs, which improves scan planning performance.
  */
 public class IcebergRewriteManifestsJob implements BuiltInJob {
 
@@ -65,9 +64,20 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * <ul>
    *   <li>--catalog &lt;catalog_name&gt; Required. Iceberg catalog name.
    *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
-   *   <li>--use-caching &lt;boolean&gt; Optional. Whether to use caching (default: true)
+   *   <li>--use-caching &lt;boolean&gt; Optional. Whether to cache the table metadata in Spark
+   *       while rewriting (default: Iceberg's own default)
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
+   *
+   * <p><b>Important Notes on Special Characters:</b>
+   *
+   * <ul>
+   *   <li><b>Via Gravitino API:</b> Pass values as-is without shell escaping. Gravitino handles
+   *       escaping internally via ProcessBuilder.
+   *   <li><b>Via Command Line:</b> Use shell quoting for values containing whitespace.
+   * </ul>
+   *
+   * <p>Example via command line: --catalog iceberg_catalog --table db.sample --use-caching false
    *
    * <p>Example via Gravitino API:
    *
@@ -75,7 +85,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * Map<String, String> jobConf = new HashMap<>();
    * jobConf.put("catalog_name", "iceberg_catalog");
    * jobConf.put("table_identifier", "db.sample");
-   * jobConf.put("use_caching", "true");
+   * jobConf.put("use_caching", "false");
    * metalake.runJob("builtin-iceberg-rewrite-manifests", jobConf);
    * }</pre>
    */
@@ -85,8 +95,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    Map<String, String> argMap = parseArguments(args);
+    // Parse named arguments
+    Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
+    // Validate required arguments
     String catalogName = argMap.get("catalog");
     String tableIdentifier = argMap.get("table");
 
@@ -96,16 +108,28 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    String useCaching = argMap.get("use-caching");
-    String sparkConfJson = argMap.get("spark-conf");
+    // Optional arguments. Unresolved template placeholders mean the caller left the parameter out,
+    // so they are dropped rather than forwarded to Iceberg as literal values.
+    String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("use-caching"));
+    String sparkConfJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spark-conf"));
 
+    // Validate use-caching if provided
+    try {
+      validateUseCaching(useCaching);
+    } catch (IllegalArgumentException e) {
+      System.err.println("Error: " + e.getMessage());
+      printUsage();
+      System.exit(1);
+    }
+
+    // Build Spark session with custom configs if provided
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
 
+    // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       try {
-        Map<String, String> customConfigs =
-            IcebergRewriteDataFilesJob.parseCustomSparkConfigs(sparkConfJson);
+        Map<String, String> customConfigs = IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
@@ -120,18 +144,23 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
     SparkSession spark = sparkBuilder.getOrCreate();
 
     try {
+      // Build the procedure call SQL
       String sql = buildProcedureCall(catalogName, tableIdentifier, useCaching);
+
       System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
 
-      Row[] results = (Row[]) spark.sql(sql).collect();
+      // Execute the procedure
+      List<Row> results = spark.sql(sql).collectAsList();
 
-      if (results.length > 0) {
-        Row result = results[0];
+      // Print results. The procedure output columns are numeric, but their exact width is an
+      // Iceberg implementation detail, so read them as Number rather than a fixed primitive.
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
         System.out.printf(
             "Rewrite Manifests Results:%n"
                 + "  Rewritten manifests: %d%n"
                 + "  Added manifests: %d%n",
-            result.getInt(0), result.getInt(1));
+            ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
       }
 
       System.out.println("Rewrite manifests job completed successfully");
@@ -149,18 +178,15 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    *
    * @param catalogName Iceberg catalog name
    * @param tableIdentifier Fully qualified table name
-   * @param useCaching Whether to use caching during rewrite
+   * @param useCaching Whether to cache table metadata during the rewrite
    * @return SQL CALL statement
    */
-  static String buildProcedureCall(
-      String catalogName, String tableIdentifier, String useCaching) {
+  static String buildProcedureCall(String catalogName, String tableIdentifier, String useCaching) {
     StringBuilder sql = new StringBuilder();
     sql.append("CALL ")
-        .append(IcebergRewriteDataFilesJob.escapeSqlIdentifier(catalogName))
+        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
         .append(".system.rewrite_manifests(");
-    sql.append("table => '")
-        .append(IcebergRewriteDataFilesJob.escapeSqlString(tableIdentifier))
-        .append("'");
+    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
 
     if (useCaching != null && !useCaching.isEmpty()) {
       sql.append(", use_caching => ").append(Boolean.parseBoolean(useCaching));
@@ -171,30 +197,26 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   }
 
   /**
-   * Parse command line arguments in --key value format.
+   * Validate the use-caching parameter value.
    *
-   * @param args command line arguments
-   * @return map of argument names to values
+   * <p>{@link Boolean#parseBoolean(String)} maps anything that is not {@code "true"} to {@code
+   * false}, so a typo would silently disable caching. Reject such values instead.
+   *
+   * @param useCaching the use-caching value to validate
+   * @throws IllegalArgumentException if the value is neither "true" nor "false"
    */
-  static Map<String, String> parseArguments(String[] args) {
-    Map<String, String> argMap = new HashMap<>();
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].startsWith("--")) {
-        String key = args[i].substring(2);
-        if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-          String value = args[i + 1];
-          if (value != null && !value.trim().isEmpty()) {
-            argMap.put(key, value);
-          }
-          i++;
-        } else {
-          System.err.println("Warning: Flag " + args[i] + " has no value, ignoring");
-        }
-      }
+  static void validateUseCaching(String useCaching) {
+    if (useCaching == null || useCaching.isEmpty()) {
+      return; // use-caching is optional
     }
-    return argMap;
+
+    if (!"true".equalsIgnoreCase(useCaching) && !"false".equalsIgnoreCase(useCaching)) {
+      throw new IllegalArgumentException(
+          "Invalid use-caching value '" + useCaching + "'. Must be either 'true' or 'false'");
+    }
   }
 
+  /** Print usage information. */
   private static void printUsage() {
     System.err.println(
         "Usage: IcebergRewriteManifestsJob [OPTIONS]\n"
@@ -204,18 +226,26 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
             + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
             + "\n"
             + "Optional Options:\n"
-            + "  --use-caching <boolean>   Whether to use caching during rewrite (default: true)\n"
+            + "  --use-caching <boolean>   Cache table metadata in Spark while rewriting\n"
+            + "                              Must be either 'true' or 'false'\n"
+            + "                              Default: true (Iceberg default)\n"
             + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
+            + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
             + "\n"
             + "Examples:\n"
-            + "  # Basic rewrite\n"
+            + "  # Basic rewrite with Iceberg defaults\n"
             + "  --catalog iceberg_prod --table db.sample\n"
             + "\n"
-            + "  # Without caching\n"
-            + "  --catalog iceberg_prod --table db.sample --use-caching false\n");
+            + "  # Rewrite without caching table metadata\n"
+            + "  --catalog iceberg_prod --table db.sample --use-caching false");
   }
 
+  /**
+   * Build template arguments list with named argument format.
+   *
+   * @return list of template arguments
+   */
   private static List<String> buildArguments() {
     return Arrays.asList(
         "--catalog",
@@ -228,6 +258,11 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
         "{{spark_conf}}");
   }
 
+  /**
+   * Build Spark configuration template.
+   *
+   * @return map of Spark configuration keys to template values
+   */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }

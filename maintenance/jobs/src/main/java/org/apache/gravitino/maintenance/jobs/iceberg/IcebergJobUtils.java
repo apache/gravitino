@@ -22,16 +22,42 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
  *
- * <p>Provides SQL escaping, argument parsing, and Spark configuration utilities used by both {@link
- * IcebergRewriteDataFilesJob} and {@link IcebergExpireSnapshotsJob}.
+ * <p>Provides SQL escaping, argument parsing, and Spark configuration utilities used by {@link
+ * IcebergRewriteDataFilesJob}, {@link IcebergExpireSnapshotsJob} and {@link
+ * IcebergRewriteManifestsJob}.
  */
 public final class IcebergJobUtils {
 
+  /**
+   * Matches a job template placeholder that no job configuration value replaced, e.g. {@code
+   * {{use_caching}}}.
+   */
+  private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
   private IcebergJobUtils() {}
+
+  /**
+   * Return the given argument value unless it is an unresolved job template placeholder.
+   *
+   * <p>Job templates declare optional parameters as {@code {{name}}} placeholders. When the caller
+   * omits a parameter, the server leaves the placeholder untouched and it reaches the job as a
+   * literal {@code "{{name}}"} argument. Treating that as a real value would forward nonsense to
+   * Iceberg, so callers use this method to map it back to "not supplied".
+   *
+   * @param value the argument value to inspect
+   * @return the value, or null if it is null or an unresolved placeholder
+   */
+  public static String nullIfUnresolvedPlaceholder(String value) {
+    if (value == null || UNRESOLVED_PLACEHOLDER_PATTERN.matcher(value.trim()).matches()) {
+      return null;
+    }
+    return value;
+  }
 
   /**
    * Escape single quotes in SQL string literals by replacing ' with ''.
