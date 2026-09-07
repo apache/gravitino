@@ -41,6 +41,34 @@ import org.junit.jupiter.api.Test;
 public class TestStarRocksUtils {
 
   @Test
+  void testExtractTableCommentWithoutIdentifier() {
+    String prefix = "CREATE TABLE `t` (\n`c` INT COMMENT \"column comment\"\n) ENGINE=OLAP\n";
+    assertEquals("", StarRocksUtils.extractTableCommentFromSql(prefix));
+    assertEquals(
+        "  user comment  ",
+        StarRocksUtils.extractTableCommentFromSql(
+            prefix + "COMMENT \"  user comment  \"\nDISTRIBUTED BY RANDOM"));
+    assertEquals("", StarRocksUtils.extractTableCommentFromSql(prefix + "COMMENT \"\""));
+    assertEquals(
+        "line one\nline two",
+        StarRocksUtils.extractTableCommentFromSql(prefix + "COMMENT \"line one\nline two\""));
+  }
+
+  @Test
+  void testExtractLegacyCommentPreservesRealIdentifier() {
+    String marker = "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42)";
+    String dummy = "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)";
+    String prefix = "CREATE TABLE `t` (`c` INT)\nCOMMENT \"";
+    assertEquals(
+        "legacy " + marker,
+        StarRocksUtils.extractTableCommentFromSql(
+            prefix + "legacy " + marker + " " + dummy + "\""));
+    assertEquals(
+        "legacy " + marker,
+        StarRocksUtils.extractTableCommentFromSql(prefix + "legacy " + marker + "\""));
+  }
+
+  @Test
   public void testGeneratePropertiesSql() {
     // Test when properties is null
     Map<String, String> properties = null;

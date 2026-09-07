@@ -65,7 +65,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
@@ -1121,18 +1120,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Last modified comment
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
-      // Load the existing table once. We need it for two purposes:
-      //   1. Preserve the Gravitino StringIdentifier embedded in the old comment, so Gravitino can
-      //      still identify the table after the comment is changed.
-      //   2. Re-embed the cluster name so it is not lost. ClickHouse does not persist ON CLUSTER
-      //      in SHOW CREATE TABLE, so the cluster name lives only in the stored comment.
+      // Preserve the cluster routing metadata, which is not retained by SHOW CREATE TABLE.
       lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-      if (null == StringIdentifier.fromComment(newComment)) {
-        StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
-        if (null != identifier) {
-          newComment = StringIdentifier.addToComment(identifier, newComment);
-        }
-      }
       String clusterName = lazyLoadTable.properties().get(ClusterConstants.CLUSTER_NAME);
       if (StringUtils.isNotBlank(clusterName)) {
         newComment = ClickHouseClusterUtils.embedClusterInComment(newComment, clusterName);

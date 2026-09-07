@@ -16,8 +16,16 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
-1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
-2. OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
+Gravitino keeps table identifiers in its own metadata store and does not append them to table
+comments. Existing identifier markers remain readable for compatibility. Renames performed through
+Gravitino preserve the stored identity; renames performed directly in the source cannot be tracked
+by identity for tables without a marker. Replacing a table directly in the source with another table
+of the same name also cannot be distinguished by name alone.
+
+Schema comments may still contain internal identifier markers such as
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
+
+OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
 :::
 
 ## Catalog

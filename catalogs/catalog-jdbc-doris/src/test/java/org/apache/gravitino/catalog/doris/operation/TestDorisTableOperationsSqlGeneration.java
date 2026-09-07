@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -104,7 +105,10 @@ public class TestDorisTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withComment(StringIdentifier.addToComment(StringIdentifier.fromId(42), "legacy comment"))
+          .build();
     }
 
     public String createTableSqlWithIndexes(
@@ -117,6 +121,16 @@ public class TestDorisTableOperationsSqlGeneration {
           Transforms.EMPTY_TRANSFORM,
           distribution,
           indexes);
+    }
+  }
+
+  @Test
+  void testUpdateCommentDoesNotPreserveIdentifier() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    for (String comment : new String[] {"new comment", ""}) {
+      String sql = ops.alterTableSql("test_table", TableChange.updateComment(comment));
+      Assertions.assertTrue(sql.contains("MODIFY COMMENT \"" + comment + "\""), sql);
+      Assertions.assertFalse(sql.contains("gravitino.v1.uid"), sql);
     }
   }
 

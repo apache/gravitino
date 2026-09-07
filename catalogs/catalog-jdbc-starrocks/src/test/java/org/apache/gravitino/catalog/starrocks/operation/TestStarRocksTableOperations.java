@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -201,7 +200,6 @@ public class TestStarRocksTableOperations extends TestStarRocks {
     String tableName = GravitinoITUtils.genRandomName("starrocks_comment_test_table");
     String createComment = "owner's \"comment\" (created) C:\\tmp; --";
     String updatedComment = "reviewer's \"comment\" (updated) D:\\data; --";
-    StringIdentifier identifier = StringIdentifier.fromId(42);
     JdbcColumn column =
         JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
 
@@ -210,15 +208,14 @@ public class TestStarRocksTableOperations extends TestStarRocks {
           databaseName,
           tableName,
           new JdbcColumn[] {column},
-          StringIdentifier.addToComment(identifier, createComment),
+          createComment,
           createProperties(),
           null,
           Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
           Indexes.EMPTY_INDEXES);
 
       Assertions.assertEquals(
-          StringIdentifier.addToComment(identifier, createComment),
-          TABLE_OPERATIONS.load(databaseName, tableName).comment());
+          createComment, TABLE_OPERATIONS.load(databaseName, tableName).comment());
 
       TABLE_OPERATIONS.alterTable(
           databaseName, tableName, TableChange.updateComment(updatedComment));
@@ -228,8 +225,7 @@ public class TestStarRocksTableOperations extends TestStarRocks {
           .untilAsserted(
               () ->
                   Assertions.assertEquals(
-                      StringIdentifier.addToComment(identifier, updatedComment),
-                      TABLE_OPERATIONS.load(databaseName, tableName).comment()));
+                      updatedComment, TABLE_OPERATIONS.load(databaseName, tableName).comment()));
 
       TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.updateComment(""));
       Awaitility.await()
@@ -238,8 +234,7 @@ public class TestStarRocksTableOperations extends TestStarRocks {
           .untilAsserted(
               () ->
                   Assertions.assertEquals(
-                      StringIdentifier.addToComment(identifier, ""),
-                      TABLE_OPERATIONS.load(databaseName, tableName).comment()));
+                      "", TABLE_OPERATIONS.load(databaseName, tableName).comment()));
     } finally {
       TABLE_OPERATIONS.drop(databaseName, tableName);
     }

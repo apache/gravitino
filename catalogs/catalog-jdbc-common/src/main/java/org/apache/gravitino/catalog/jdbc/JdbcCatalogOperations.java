@@ -375,10 +375,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
             : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
-    if (id == null) {
-      LOG.warn(
-          "The table {} comment {} does not contain Gravitino id attribute", tableName, comment);
-    } else {
+    if (id != null) {
       properties = StringIdentifier.newPropertiesWithId(id, properties);
       // Remove id from comment
       comment = StringIdentifier.removeIdFromComment(comment);
@@ -502,7 +499,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         databaseName,
         tableName,
         jdbcColumns,
-        StringIdentifier.addToComment(identifier, comment),
+        comment,
         resultProperties,
         partitioning,
         distribution,

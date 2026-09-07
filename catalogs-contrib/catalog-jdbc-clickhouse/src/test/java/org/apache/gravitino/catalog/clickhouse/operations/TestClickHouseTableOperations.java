@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseUtils;
@@ -68,6 +69,30 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   private static final Type STRING = Types.StringType.get();
   private static final Type INT = Types.IntegerType.get();
   private static final Type LONG = Types.LongType.get();
+
+  @Test
+  void testUpdateCommentDoesNotPreserveIdentifier() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("tbl")
+            .withProperties(new HashMap<>())
+            .withComment(
+                StringIdentifier.addToComment(StringIdentifier.fromId(42), "legacy comment"))
+            .build());
+    for (String comment : new String[] {"new comment", ""}) {
+      String sql =
+          ops.buildAlterSql("db", "tbl", new TableChange[] {TableChange.updateComment(comment)});
+      Assertions.assertTrue(sql.contains("MODIFY COMMENT '" + comment + "'"), sql);
+      Assertions.assertFalse(sql.contains("gravitino.v1.uid"), sql);
+    }
+  }
 
   @Test
   public void testCreateAndAlterTable() {

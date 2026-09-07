@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -68,9 +69,7 @@ public class StarRocksUtils {
           "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()", Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
-      Pattern.compile(
-          "COMMENT\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\\s+"
-              + "\\(From Gravitino, DO NOT EDIT: gravitino\\.v\\d+\\.uid-?\\d+\\)\"");
+      Pattern.compile("(?m)^[ \t]*COMMENT\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\"");
 
   private static final String PARTITION_TYPE_VALUE_PATTERN_STRING =
       "types: \\[([^\\]]+)\\]; keys: \\[([^\\]]+)\\];";
@@ -199,7 +198,14 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
+      String comment = JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
+      // Older versions appended a dummy marker after the actual table identifier.
+      // Remove only that outer marker so the common JDBC layer can still read the real ID.
+      String dummyMarker = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, "");
+      if (comment.endsWith(dummyMarker)) {
+        return comment.substring(0, comment.length() - dummyMarker.length()).trim();
+      }
+      return comment;
     }
     return "";
   }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.mysql.operation;
 
 import java.util.Collections;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -64,7 +65,20 @@ public class TestMysqlTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withComment(StringIdentifier.addToComment(StringIdentifier.fromId(42), "legacy comment"))
+          .build();
+    }
+  }
+
+  @Test
+  void testUpdateCommentDoesNotPreserveIdentifier() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    for (String comment : new String[] {"new comment", ""}) {
+      String sql = ops.alterTableSql("test_table", TableChange.updateComment(comment));
+      Assertions.assertTrue(sql.contains("COMMENT '" + comment + "'"), sql);
+      Assertions.assertFalse(sql.contains("gravitino.v1.uid"), sql);
     }
   }
 

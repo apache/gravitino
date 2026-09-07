@@ -19,10 +19,13 @@
 package org.apache.gravitino.catalog.oceanbase.operation;
 
 import java.util.Collections;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -40,6 +43,18 @@ public class TestOceanBaseTableOperationsSqlGeneration {
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
     }
 
+    String alterTableSql(String tableName, TableChange... changes) {
+      return generateAlterTableSql("database", tableName, changes);
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(String databaseName, String tableName, JdbcTable table) {
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withComment(StringIdentifier.addToComment(StringIdentifier.fromId(42), "legacy comment"))
+          .build();
+    }
+
     public String createTableSql(String tableName, JdbcColumn[] columns) {
       return generateCreateTableSql(
           tableName,
@@ -49,6 +64,16 @@ public class TestOceanBaseTableOperationsSqlGeneration {
           Transforms.EMPTY_TRANSFORM,
           Distributions.NONE,
           Indexes.EMPTY_INDEXES);
+    }
+  }
+
+  @Test
+  void testUpdateCommentDoesNotPreserveIdentifier() {
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
+    for (String comment : new String[] {"new comment", ""}) {
+      String sql = ops.alterTableSql("test_table", TableChange.updateComment(comment));
+      Assertions.assertTrue(sql.contains("COMMENT '" + comment + "'"), sql);
+      Assertions.assertFalse(sql.contains("gravitino.v1.uid"), sql);
     }
   }
 

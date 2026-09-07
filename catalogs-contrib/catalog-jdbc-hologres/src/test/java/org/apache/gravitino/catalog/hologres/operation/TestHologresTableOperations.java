@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.hologres.converter.HologresColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.hologres.converter.HologresExceptionConverter;
 import org.apache.gravitino.catalog.hologres.converter.HologresTypeConverter;
@@ -869,9 +870,17 @@ public class TestHologresTableOperations {
 
   @Test
   void testAlterTableUpdateComment() {
-    // Note: updateComment needs a JdbcTable with StringIdentifier, which requires
-    // getOrCreateTable. Since we can't mock the DB connection, we test the SQL format
-    // via the other alter operations that don't require table loading.
+    ops.setMockTable(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withComment(
+                StringIdentifier.addToComment(StringIdentifier.fromId(42), "legacy comment"))
+            .build());
+    for (String comment : new String[] {"new comment", ""}) {
+      String sql = ops.alterTableSql("public", "test_table", TableChange.updateComment(comment));
+      assertTrue(sql.contains("IS '" + comment + "'"));
+      assertFalse(sql.contains("gravitino.v1.uid"));
+    }
   }
 
   @Test

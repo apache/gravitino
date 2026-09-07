@@ -104,6 +104,35 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testStoredIdentitySurvivesMissingSourceIdentifierAndRename() throws IOException {
+    Namespace namespace = Namespace.of(metalake, catalog, "schema_without_table_ids");
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(namespace.levels()), "", properties);
+    NameIdentifier ident = NameIdentifier.of(namespace, "table_without_id");
+    Column[] columns = {
+      TestColumn.builder().withName("col1").withPosition(0).withType(Types.StringType.get()).build()
+    };
+    tableOperationDispatcher.createTable(ident, columns, "comment", properties, new Transform[0]);
+    TableEntity original = entityStore.get(ident, TABLE, TableEntity.class);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations sourceOperations = (TestCatalogOperations) testCatalog.ops();
+    sourceOperations.loadTable(ident).properties().remove(ID_KEY);
+
+    Table loaded = tableOperationDispatcher.loadTable(ident);
+    Assertions.assertFalse(loaded.properties().containsKey(ID_KEY));
+    Assertions.assertEquals(original.id(), entityStore.get(ident, TABLE, TableEntity.class).id());
+    Table altered = tableOperationDispatcher.alterTable(ident, TableChange.rename("renamed_table"));
+    Assertions.assertEquals("renamed_table", altered.name());
+    TableEntity renamed =
+        entityStore.get(NameIdentifier.of(namespace, "renamed_table"), TABLE, TableEntity.class);
+    Assertions.assertEquals(original.id(), renamed.id());
+    Assertions.assertEquals(original.columns().get(0).id(), renamed.columns().get(0).id());
+    Assertions.assertFalse(entityStore.exists(ident, TABLE));
+  }
+
+  @Test
   public void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

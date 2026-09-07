@@ -40,7 +40,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -118,7 +117,6 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .collect(Collectors.joining(",\n")));
     sqlBuilder.append(")\n");
     if (StringUtils.isNotEmpty(comment)) {
-      comment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, comment);
       sqlBuilder.append(" COMMENT \"").append(escapeSqlLiteral(comment, '"')).append("\"");
     }
 
@@ -171,16 +169,6 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
         String newComment = updateComment.getNewComment();
-        if (StringIdentifier.fromComment(newComment) == null) {
-          lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-          StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
-          if (identifier != null) {
-            newComment = StringIdentifier.addToComment(identifier, newComment);
-          }
-        }
-        if (StringUtils.isNotEmpty(newComment)) {
-          newComment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, newComment);
-        }
         alterSql.add("COMMENT = \"" + escapeSqlLiteral(newComment, '"') + "\"");
       } else if (change instanceof TableChange.SetProperty) {
         if (hasSetPropertyChange) {

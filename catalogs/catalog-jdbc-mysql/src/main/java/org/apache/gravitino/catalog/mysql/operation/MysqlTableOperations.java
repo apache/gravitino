@@ -42,7 +42,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -288,14 +287,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
     // Last modified comment
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
-      if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add Gravitino id.
-        JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
-        if (null != identifier) {
-          newComment = StringIdentifier.addToComment(identifier, newComment);
-        }
-      }
       alterSql.add("COMMENT '" + escapeSqlLiteral(newComment, '\'') + "'");
     }
 
