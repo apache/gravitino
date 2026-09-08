@@ -48,6 +48,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
    *
    * @param catalogManager The catalog manager.
    * @param schemaDispatcher The schema operation dispatcher used for parent validation.
+   * @param tableDispatcher The internal table dispatcher used for source validation.
+   * @param viewDispatcher The internal view dispatcher used for source validation.
    * @param store The EntityStore used for Semantic Model persistence.
    * @param idGenerator The stable entity ID generator.
    * @param secretManager The secret manager required by the operation dispatcher base class.
@@ -55,13 +57,18 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   public SemanticModelOperationDispatcher(
       CatalogManager catalogManager,
       SchemaDispatcher schemaDispatcher,
+      TableDispatcher tableDispatcher,
+      ViewDispatcher viewDispatcher,
       EntityStore store,
       IdGenerator idGenerator,
       SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
     this.catalogManager = catalogManager;
     this.schemaDispatcher = schemaDispatcher;
-    this.managedOperations = new ManagedSemanticModelOperations(store, idGenerator);
+    SemanticModelValidator validator =
+        new SemanticModelValidator(catalogManager, tableDispatcher, viewDispatcher);
+    this.managedOperations =
+        new ManagedSemanticModelOperations(store, idGenerator, validator::validateForWrite);
   }
 
   @Override
@@ -89,7 +96,6 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       Map<String, String> properties)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    Preconditions.checkArgument(definition != null, "Definition must not be null");
     Preconditions.checkArgument(properties != null, "Properties must not be null");
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
@@ -101,6 +107,9 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
+    if (changes == null || changes.length == 0) {
+      throw new IllegalSemanticModelException("At least one Semantic Model change is required");
+    }
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     if (!schemaDispatcher.schemaExists(schemaIdent)) {

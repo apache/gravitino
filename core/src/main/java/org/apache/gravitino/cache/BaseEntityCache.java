@@ -49,8 +49,8 @@ public abstract class BaseEntityCache implements EntityCache {
    * (an old comment, property, or job status), never a wrong pointer, and each can be invalidated
    * with a single one-to-one key drop. Every other type is read straight from the store.
    * User/group/role embed relation-derived data that a per-node cache cannot invalidate;
-   * model/model version and function carry a load-bearing pointer that would be silently wrong if
-   * served stale.
+   * model/model version, Semantic Model, and function carry load-bearing content that would be
+   * silently wrong if served stale.
    */
   private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(

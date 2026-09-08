@@ -252,6 +252,10 @@ public abstract class TestJDBCBackend {
         tableName = "function_meta";
         idColumnName = "function_id";
         break;
+      case SEMANTIC_MODEL:
+        tableName = "semantic_model_meta";
+        idColumnName = "semantic_model_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
