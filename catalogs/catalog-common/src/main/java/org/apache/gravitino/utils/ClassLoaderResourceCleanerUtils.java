@@ -33,6 +33,13 @@ import org.slf4j.LoggerFactory;
  * Utility class to clean up resources related to a specific class loader to prevent memory leaks.
  * Gravitino uses isolated class loaders for catalog implementations, and these class loaders must
  * be properly cleaned up when no longer needed to prevent Metaspace leaks.
+ *
+ * <p>Several steps here are per-vendor special cases (AWS, GCP, Azure, commons-logging, MySQL).
+ * Three things hold for all of them, and for any added later: guard with {@link
+ * #isOwnedByClassLoader} so a library resolved from a parent or shared ClassLoader is left alone;
+ * prefer the library's own shutdown API over interrupting its thread; and run the step before
+ * {@link #stopThreadsAndClearThreadLocalVariables}, which interrupts any thread whose context
+ * ClassLoader is the target and would otherwise get there first.
  */
 public class ClassLoaderResourceCleanerUtils {
 
@@ -58,9 +65,30 @@ public class ClassLoaderResourceCleanerUtils {
       return;
     }
 
+    runCleanupSteps(classLoader);
+  }
+
+  /**
+   * The cleanup sequence itself, without the test-environment guard above. Split out so a test can
+   * drive the whole sequence: unit tests run with {@code GRAVITINO_TEST} set, which would otherwise
+   * make {@link #closeClassLoaderResource} return before doing anything. The order of the steps
+   * matters, see the class javadoc.
+   *
+   * @param classLoader the classloader to be closed
+   */
+  @VisibleForTesting
+  static void runCleanupSteps(ClassLoader classLoader) {
     // Clear statics threads in FileSystem and close all FileSystem instances.
     executeAndCatch(
         ClassLoaderResourceCleanerUtils::closeStatsDataClearerInFileSystem, classLoader);
+
+    // Ahead of the generic thread sweep below: the MySQL driver sets its cleanup thread's context
+    // ClassLoader to the loader that defined the driver, so the sweep would match that thread and
+    // interrupt it. Interrupting it lands in referenceQueue.remove() rather than the driver's own
+    // shutdown path, so let the driver stop the thread itself first.
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::shutdownMySQLAbandonedConnectionCleanupThread,
+        classLoader);
 
     // Stop threads that run under the target class loader and clear ThreadLocals that reference it.
     // Such ThreadLocals can sit on any thread (Jetty webserver, Caffeine ForkJoinPool,
@@ -79,10 +107,6 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAzure, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::clearShutdownHooks, classLoader);
-
-    executeAndCatch(
-        ClassLoaderResourceCleanerUtils::shutdownMySQLAbandonedConnectionCleanupThread,
-        classLoader);
   }
 
   /**
@@ -192,15 +216,21 @@ public class ClassLoaderResourceCleanerUtils {
 
     // Sweep every application thread, not only the Gravitino-webserver-* ones: a ThreadLocal
     // pointing at the target ClassLoader can live on any thread, such as a Caffeine ForkJoinPool
-    // worker, a catalog-cleaner thread, or a Hadoop daemon. The check below clears only entries
-    // whose value was loaded by the target ClassLoader, so ThreadLocals owned by other
-    // ClassLoaders are left alone.
+    // worker, a catalog-cleaner thread, or a Hadoop daemon.
+    //
+    // What bounds this is the value check below, not the set of threads: an entry is cleared only
+    // when its value's class was loaded by the target ClassLoader, so ThreadLocals belonging to
+    // other ClassLoaders are left alone even on a thread shared JVM-wide. What remains is that a
+    // value belonging to the catalog being dropped may be nulled while that thread is still using
+    // it. Work in flight against a catalog that is going away fails either way; an allowlist of
+    // thread names would not change that, and would reintroduce the silent miss this sweep was
+    // widened to fix.
     //
     // Skip threads whose immediate group is the JVM "system" group (Reference Handler, Finalizer,
     // Signal Dispatcher, and the like): they hold no catalog ClassLoader references, and reflecting
     // into their ThreadLocals is best avoided. This checks the immediate group only, so threads in
-    // a sub-group of system (such as InnocuousThreadGroup for common-pool workers) are still swept.
-    // That is intended: ForkJoinPool threads can hold catalog ThreadLocals.
+    // a sub-group of system (such as InnocuousThreadGroup for common-pool workers) are still swept,
+    // because those can hold catalog ThreadLocals.
     ThreadGroup group = thread.getThreadGroup();
     if (group != null && "system".equals(group.getName())) {
       return;

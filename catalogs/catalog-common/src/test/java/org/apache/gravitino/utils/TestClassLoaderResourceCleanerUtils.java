@@ -298,6 +298,83 @@ class TestClassLoaderResourceCleanerUtils {
     }
   }
 
+  /**
+   * The property the issue is actually about: stopping the cleanup thread has to make the dropped
+   * ClassLoader collectable, not merely make the thread go away. The control case matters, because
+   * a bare WeakReference plus System.gc() assertion is unreliable enough that a green result
+   * without one proves little.
+   */
+  @Test
+  void testShutdownMySQLAbandonedConnectionCleanupThreadLetsDroppedClassLoaderBeCollected()
+      throws Exception {
+    URL mysqlJar = mysqlConnectorJarUrl();
+    Assumptions.assumeTrue(mysqlJar != null, "mysql-connector jar is not on the test classpath");
+    ClassLoader platform = ClassLoader.getSystemClassLoader().getParent();
+
+    // Control: the same shape of child loader, never asked for the driver. If this one were not
+    // collectable either, the assertions below would be measuring the probe, not the leak.
+    URLClassLoader control = new URLClassLoader(new URL[] {mysqlJar}, platform);
+    WeakReference<ClassLoader> controlRef = new WeakReference<>(control);
+    control.close();
+    control = null;
+    assertTrue(
+        awaitCollected(controlRef),
+        "a child loader that never loaded the driver must be collectable");
+
+    URLClassLoader child = new URLClassLoader(new URL[] {mysqlJar}, platform);
+    Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread", true, child);
+    assertNotNull(findCleanupThreadBoundTo(child), "the cleanup thread should be running");
+    WeakReference<ClassLoader> ref = new WeakReference<>(child);
+    child.close();
+    child = null;
+
+    // The leak: the running cleanup thread pins the loader through its context ClassLoader.
+    assertFalse(
+        awaitCollected(ref), "a live cleanup thread must keep the dropped loader reachable");
+
+    // Still reachable, so the test can get the loader back to run the fix on it.
+    ClassLoader leaked = ref.get();
+    assertNotNull(leaked, "loader should still be reachable while its cleanup thread runs");
+    ClassLoaderResourceCleanerUtils.shutdownMySQLAbandonedConnectionCleanupThread(leaked);
+    assertTrue(
+        waitForCleanupThreadGone(leaked), "cleanup thread should be gone after the shutdown");
+    leaked = null;
+
+    assertTrue(
+        awaitCollected(ref), "loader must be collectable once its cleanup thread is stopped");
+  }
+
+  /**
+   * Drives the whole cleanup sequence rather than one step. Every other case here calls a single
+   * step directly, so nothing covers the sequence, which is where step ordering lives. This asserts
+   * the sequence's outcome; it cannot by itself distinguish one order from another, since a later
+   * step can cover for an earlier one.
+   *
+   * <p>Goes through {@code runCleanupSteps} rather than {@code closeClassLoaderResource}: the
+   * latter returns immediately when {@code GRAVITINO_TEST} is set, which the build sets for every
+   * test task.
+   */
+  @Test
+  void testRunCleanupStepsStopsTheDriverThreadAndFreesTheClassLoader() throws Exception {
+    URL mysqlJar = mysqlConnectorJarUrl();
+    Assumptions.assumeTrue(mysqlJar != null, "mysql-connector jar is not on the test classpath");
+    ClassLoader platform = ClassLoader.getSystemClassLoader().getParent();
+
+    URLClassLoader child = new URLClassLoader(new URL[] {mysqlJar}, platform);
+    Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread", true, child);
+    assertNotNull(findCleanupThreadBoundTo(child), "the cleanup thread should be running");
+    WeakReference<ClassLoader> ref = new WeakReference<>(child);
+
+    ClassLoaderResourceCleanerUtils.runCleanupSteps(child);
+
+    assertTrue(
+        waitForCleanupThreadGone(child),
+        "the sequence should leave no cleanup thread on the loader");
+    child.close();
+    child = null;
+    assertTrue(awaitCollected(ref), "loader must be collectable after the full cleanup sequence");
+  }
+
   private static boolean awaitCollected(WeakReference<?> ref) throws InterruptedException {
     for (int i = 0; i < 20; i++) {
       if (ref.get() == null) {
