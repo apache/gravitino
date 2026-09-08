@@ -587,7 +587,7 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
-When `gcs-service-account-file` is set, Gravitino uses `GravitinoGCSFileIO`, which remints OAuth2 tokens from that file through a dedicated token cache. Token refresh is independent of the IRC catalog cache. If unset, use Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
+When `gcs-service-account-file` is set, Gravitino loads it at catalog initialization and injects Iceberg `gcs.oauth2.token` for FileIO. The IRC catalog cache evicts that catalog before the token expires so the next request recreates the catalog and mints a fresh token. If unset, use Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 :::
 
 :::info

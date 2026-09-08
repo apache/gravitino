@@ -908,17 +908,6 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testCatalogConfigRewritesGravitinoGcsFileIOForClients() {
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.filterCatalogConfigForClients(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                org.apache.gravitino.iceberg.common.io.GravitinoGCSFileIO.class.getName()));
-    Assertions.assertEquals(
-        "org.apache.iceberg.gcp.gcs.GCSFileIO", configToClients.get(IcebergConstants.IO_IMPL));
-  }
-
-  @Test
   void testNonRestCatalogClientConfig() {
     Map<String, String> configToClients =
         CatalogWrapperForREST.filterCatalogConfigForClients(

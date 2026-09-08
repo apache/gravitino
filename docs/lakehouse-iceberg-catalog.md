@@ -182,7 +182,7 @@ Supports using google credential file to access GCS data.
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
 
-When `gcs-service-account-file` is set, Gravitino uses `GravitinoGCSFileIO`, which remints OAuth2 tokens from that file through a dedicated token cache (Iceberg's `GCSFileIO` has no service-account-file property). If that property is unset, fall back to Application Default Credentials, for example `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`.
+When `gcs-service-account-file` is set, Gravitino loads it at catalog initialization and injects Iceberg `gcs.oauth2.token` for FileIO (Iceberg's `GCSFileIO` has no service-account-file property). If that property is unset, fall back to Application Default Credentials, for example `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`.
 
 :::info
 Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
