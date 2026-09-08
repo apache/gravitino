@@ -159,25 +159,6 @@ public class JobMetaBaseSQLProvider {
         + " last_version = #{newJobMeta.lastVersion}"
         + " WHERE job_run_id = #{oldJobMeta.jobRunId}"
         + " AND current_version = #{oldJobMeta.currentVersion}"
-        + " AND last_version = #{oldJobMeta.lastVersion}"
-        + " AND deleted_at = 0";
-  }
-
-  public String softDeleteJobMetaByMetalakeAndTemplate(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return "UPDATE "
-        + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE metalake_id = ("
-        + " SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND job_template_id IN ("
-        + " SELECT job_template_id FROM "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobTemplateName} AND deleted_at = 0)"
         + " AND deleted_at = 0";
   }
 
@@ -187,14 +168,6 @@ public class JobMetaBaseSQLProvider {
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
-    return "UPDATE "
-        + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
   }
 
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
@@ -240,5 +213,48 @@ public class JobMetaBaseSQLProvider {
         + " )"
         + " AND jrm.deleted_at = 0 AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobRunId the stable job run ID
+   * @param metalakeId the owning metalake ID
+   * @return the SQL statement
+   */
+  public String selectJobRunIdForUpdate(
+      @Param("jobRunId") Long jobRunId, @Param("metalakeId") Long metalakeId) {
+    return "SELECT job_run_id FROM "
+        + JobMetaMapper.TABLE_NAME
+        + " WHERE job_run_id = #{jobRunId} AND metalake_id = #{metalakeId} AND deleted_at = 0 FOR UPDATE";
+  }
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobRunId the stable job run ID
+   * @param currentVersion the expected OCC version
+   * @return the SQL statement
+   */
+  public String softDeleteJobByRunIdWithVersion(
+      @Param("jobRunId") Long jobRunId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE job_run_id = #{jobRunId} AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /**
+   * Deletes active metadata using a stable identity.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String softDeleteJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0";
   }
 }

@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -37,6 +36,7 @@ import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -91,15 +91,18 @@ public class JobTemplateMetaService {
       JobTemplatePO jobTemplatePO =
           JobTemplatePO.initializeJobTemplatePO(jobTemplateEntity, builder);
 
-      SessionUtils.doWithCommit(
-          JobTemplateMetaMapper.class,
-          mapper -> {
-            if (overwrite) {
-              mapper.insertJobTemplateMetaOnDuplicateKeyUpdate(jobTemplatePO);
-            } else {
-              mapper.insertJobTemplateMeta(jobTemplatePO);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () -> lockMetalake(metalakeName, metalakeId),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  JobTemplateMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertJobTemplateMetaOnDuplicateKeyUpdate(jobTemplatePO);
+                    } else {
+                      mapper.insertJobTemplateMeta(jobTemplatePO);
+                    }
+                  }));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB_TEMPLATE, jobTemplateEntity.name());
       throw e;
@@ -110,24 +113,12 @@ public class JobTemplateMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteJobTemplate")
   public boolean deleteJobTemplate(NameIdentifier jobTemplateIdent) {
-    String metalakeName = jobTemplateIdent.namespace().level(0);
-    String jobTemplateName = jobTemplateIdent.name();
-
-    AtomicInteger result = new AtomicInteger(0);
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                JobMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteJobMetaByMetalakeAndTemplate(metalakeName, jobTemplateName)),
-        () ->
-            result.set(
-                SessionUtils.getWithoutCommit(
-                    JobTemplateMetaMapper.class,
-                    mapper ->
-                        mapper.softDeleteJobTemplateMetaByMetalakeAndName(
-                            metalakeName, jobTemplateName))));
-    return result.get() > 0;
+    try {
+      deleteJobTemplateWithVersion(jobTemplateIdent, getJobTemplatePO(jobTemplateIdent));
+      return true;
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
   }
 
   @Monitored(
@@ -160,31 +151,21 @@ public class JobTemplateMetaService {
     JobTemplatePO newJobTemplatePO =
         JobTemplatePO.updateJobTemplatePO(oldJobTemplatePO, newJobTemplateEntity, newBuilder);
 
-    Integer result;
     try {
-      result =
-          SessionUtils.doWithCommitAndFetchResult(
-              JobTemplateMetaMapper.class,
-              mapper -> mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              OccWriteSupport.updateWithVersion(
+                  () ->
+                      SessionUtils.getWithoutCommit(
+                          JobTemplateMetaMapper.class,
+                          mapper ->
+                              mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO)),
+                  () -> writeFailure(jobTemplateIdent, oldJobTemplatePO)));
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(
-          e, Entity.EntityType.JOB_TEMPLATE, oldJobTemplateEntity.name());
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB_TEMPLATE, jobTemplateIdent.name());
       throw e;
     }
-
-    if (result == null || result == 0) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
-          oldJobTemplateEntity.name());
-    } else if (result > 1) {
-      throw new IOException(
-          String.format(
-              "Failed to update job template: %s, because more than one rows are updated: %d",
-              oldJobTemplateEntity.name(), result));
-    } else {
-      return newJobTemplateEntity;
-    }
+    return newJobTemplateEntity;
   }
 
   private JobTemplatePO getJobTemplatePO(NameIdentifier jobTemplateIdent) {
@@ -238,5 +219,64 @@ public class JobTemplateMetaService {
               .map(po -> JobTemplatePO.fromJobTemplatePO(po, firstIdent.namespace()))
               .collect(Collectors.toList());
         });
+  }
+
+  /** Deletes the observed template before its jobs, rolling back all changes on any failure. */
+  void deleteJobTemplateWithVersion(NameIdentifier ident, JobTemplatePO observed) {
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        JobTemplateMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteJobTemplateById(
+                                observed.jobTemplateId(), observed.currentVersion())),
+                () -> writeFailure(ident, observed)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                JobMetaMapper.class,
+                mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())));
+  }
+
+  /** Locks the observed template while a job is inserted in the same transaction. */
+  void lockTemplateForJobWrite(String name, Long templateId, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.JOB_TEMPLATE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                JobTemplateMetaMapper.class,
+                mapper -> mapper.selectJobTemplateByIdForShare(templateId)),
+        null,
+        current ->
+            Objects.equals(current.jobTemplateName(), name)
+                && Objects.equals(current.metalakeId(), metalakeId));
+  }
+
+  private RuntimeException writeFailure(NameIdentifier ident, JobTemplatePO observed) {
+    return OccWriteSupport.writeFailure(
+        ident,
+        Entity.EntityType.JOB_TEMPLATE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                JobTemplateMetaMapper.class,
+                mapper -> mapper.selectJobTemplateByIdForUpdate(observed.jobTemplateId())),
+        null,
+        current ->
+            Objects.equals(current.jobTemplateName(), observed.jobTemplateName())
+                && Objects.equals(current.metalakeId(), observed.metalakeId()));
+  }
+
+  private void lockMetalake(String name, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), name));
   }
 }

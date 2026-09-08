@@ -81,12 +81,6 @@ public class JobMetaSQLProviderFactory {
     return getProvider().updateJobMeta(newJobPO, oldJobPO);
   }
 
-  public static String softDeleteJobMetaByMetalakeAndTemplate(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return getProvider().softDeleteJobMetaByMetalakeAndTemplate(metalakeName, jobTemplateName);
-  }
-
   public static String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteJobMetasByMetalakeId(metalakeId);
   }
@@ -101,12 +95,41 @@ public class JobMetaSQLProviderFactory {
     return getProvider().softDeleteJobMetasByLegacyTimeline(legacyTimeline);
   }
 
-  public static String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
-    return getProvider().softDeleteJobMetaByRunId(jobRunId);
-  }
-
   public static String batchSelectJobByRunIds(
       @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<Long> jobRunIds) {
     return getProvider().batchSelectJobByRunIds(metalakeName, jobRunIds);
+  }
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobRunId the stable job run ID
+   * @param metalakeId the owning metalake ID
+   * @return the SQL statement
+   */
+  public static String selectJobRunIdForUpdate(
+      @Param("jobRunId") Long jobRunId, @Param("metalakeId") Long metalakeId) {
+    return getProvider().selectJobRunIdForUpdate(jobRunId, metalakeId);
+  }
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobRunId the stable job run ID
+   * @param currentVersion the expected OCC version
+   * @return the SQL statement
+   */
+  public static String softDeleteJobByRunIdWithVersion(
+      @Param("jobRunId") Long jobRunId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteJobByRunIdWithVersion(jobRunId, currentVersion);
+  }
+
+  /**
+   * Deletes active metadata using a stable identity.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public static String softDeleteJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().softDeleteJobsByTemplateId(jobTemplateId);
   }
 }

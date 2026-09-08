@@ -94,20 +94,6 @@ public class JobTemplateMetaBaseSQLProvider {
         + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
-  public String softDeleteJobTemplateMetaByMetalakeAndName(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return "UPDATE "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE job_template_name = #{jobTemplateName} AND metalake_id ="
-        + " (SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
@@ -137,10 +123,7 @@ public class JobTemplateMetaBaseSQLProvider {
         + " last_version = #{newJobTemplateMeta.lastVersion},"
         + " deleted_at = #{newJobTemplateMeta.deletedAt}"
         + " WHERE job_template_id = #{oldJobTemplateMeta.jobTemplateId}"
-        + " AND job_template_name = #{oldJobTemplateMeta.jobTemplateName}"
-        + " AND metalake_id = #{oldJobTemplateMeta.metalakeId}"
         + " AND current_version = #{oldJobTemplateMeta.currentVersion}"
-        + " AND last_version = #{oldJobTemplateMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -207,5 +190,40 @@ public class JobTemplateMetaBaseSQLProvider {
         + " )"
         + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String selectJobTemplateByIdForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
+    return selectJobTemplateById(jobTemplateId) + " FOR UPDATE";
+  }
+
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String selectJobTemplateByIdForShare(@Param("jobTemplateId") Long jobTemplateId) {
+    return selectJobTemplateById(jobTemplateId) + " LOCK IN SHARE MODE";
+  }
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobTemplateId the stable template ID
+   * @param currentVersion the expected OCC version
+   * @return the SQL statement
+   */
+  public String softDeleteJobTemplateById(
+      @Param("jobTemplateId") Long jobTemplateId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE job_template_id = #{jobTemplateId} AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 }
