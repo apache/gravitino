@@ -356,6 +356,8 @@ components:
             type: string
             maxLength: 128
           description: The local user store groups the user belongs to
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
 
     IdpGroup:
       type: object
@@ -376,6 +378,8 @@ components:
             type: string
             maxLength: 128
           description: The usernames of members in the local user store group
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
 
     AddUserRequest:
       type: object

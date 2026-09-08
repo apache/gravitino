@@ -36,6 +36,7 @@ public class IdpGroupPO {
   private Long groupId;
   private String groupName;
   private String groupComment;
+  private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;

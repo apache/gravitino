@@ -35,6 +35,15 @@ ALTER TABLE `idp_user_meta`
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
 
+ALTER TABLE `idp_user_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT NOT NULL DEFAULT '{}' COMMENT 'idp user audit info' AFTER `enabled`;
+
+ALTER TABLE `idp_group_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT NOT NULL DEFAULT '{}' COMMENT 'idp group audit info' AFTER `group_comment`;
+
+ALTER TABLE `idp_user_group_rel`
+    ADD COLUMN `audit_info` MEDIUMTEXT NOT NULL DEFAULT '{}' COMMENT 'idp user group relation audit info' AFTER `group_id`;
+
 CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
 
