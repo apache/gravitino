@@ -90,6 +90,21 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
+  public void testErrorMessageAloneIsSurfaced() {
+    GlueException e =
+        (GlueException)
+            GlueException.builder()
+                .awsErrorDetails(
+                    AwsErrorDetails.builder().errorMessage("throttled by Glue").build())
+                .build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(converted.getMessage().contains("schema db6a"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("throttled by Glue"), converted.getMessage());
+  }
+
+  @Test
   public void testErrorCodeAloneIsSurfaced() {
     GlueException e =
         (GlueException)
