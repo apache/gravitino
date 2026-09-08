@@ -808,6 +808,13 @@ public class JobManager implements JobOperationDispatcher {
                 FileUtils.deleteDirectory(jobStagingDir);
                 LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
               }
+            } catch (OptimisticLockException e) {
+              // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
+              // job and checks retention eligibility again; this batch can process other jobs.
+              LOG.info(
+                  "Job {} under metalake {} changed concurrently; deferring cleanup",
+                  job.name(),
+                  metalake);
             } catch (IOException e) {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }

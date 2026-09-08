@@ -1044,103 +1044,13 @@ public class TestJobManager {
 
   @Test
   public void testPullJobStatusSkipsJobDeletedConcurrently() throws IOException {
-    JobEntity deletedJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    JobEntity survivingJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-
-    BaseMetalake mockMetalake =
-        BaseMetalake.builder()
-            .withName(metalake)
-            .withId(idGenerator.nextId())
-            .withVersion(SchemaVersion.V_0_1)
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
-    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
-        .thenReturn(ImmutableList.of(mockMetalake));
-    mockedMetalake
-        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
-        .thenReturn(ImmutableList.of(metalake));
-
-    when(jobManager.listJobs(metalake, Optional.empty()))
-        .thenReturn(ImmutableList.of(deletedJob, survivingJob));
-    when(jobExecutor.getJobStatus(deletedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
-    when(jobExecutor.getJobStatus(survivingJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
-
-    // Simulate deletedJob having been removed from storage concurrently (e.g. by legacy-timeline
-    // cleanup) in the gap between the listJobs() snapshot above and the update call, while
-    // survivingJob's update succeeds normally.
-    NameIdentifier deletedJobIdent = NameIdentifierUtil.ofJob(metalake, deletedJob.name());
-    NameIdentifier survivingJobIdent = NameIdentifierUtil.ofJob(metalake, survivingJob.name());
-    when(entityStore.update(
-            eq(deletedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
-        .thenThrow(new NoSuchEntityException("Job does not exist"));
-    when(entityStore.update(
-            eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
-        .thenAnswer(
-            invocation -> {
-              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
-              return updater.apply(survivingJob);
-            });
-
-    // The disappearance of one job must not stop the rest of the batch from being processed, nor
-    // escape this method - scheduleAtFixedRate() would silently cancel all future runs otherwise.
-    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
-
-    verify(entityStore, times(1))
-        .update(eq(deletedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
-    verify(entityStore, times(1))
-        .update(eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    assertStatusPollingContinues(new NoSuchEntityException("Job does not exist"));
   }
 
   /** Verifies OCC conflicts do not cancel future status polls. */
   @Test
   public void testPullJobStatusContinuesAfterOccConflict() throws IOException {
-    JobEntity deletedJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    JobEntity survivingJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-
-    BaseMetalake mockMetalake =
-        BaseMetalake.builder()
-            .withName(metalake)
-            .withId(idGenerator.nextId())
-            .withVersion(SchemaVersion.V_0_1)
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
-    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
-        .thenReturn(ImmutableList.of(mockMetalake));
-    mockedMetalake
-        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
-        .thenReturn(ImmutableList.of(metalake));
-
-    when(jobManager.listJobs(metalake, Optional.empty()))
-        .thenReturn(ImmutableList.of(deletedJob, survivingJob));
-    when(jobExecutor.getJobStatus(deletedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
-    when(jobExecutor.getJobStatus(survivingJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
-
-    // A losing CAS must not stop this batch or future scheduled polls.
-    NameIdentifier deletedJobIdent = NameIdentifierUtil.ofJob(metalake, deletedJob.name());
-    NameIdentifier survivingJobIdent = NameIdentifierUtil.ofJob(metalake, survivingJob.name());
-    when(entityStore.update(
-            eq(deletedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
-        .thenThrow(new OptimisticLockException("Job changed concurrently"));
-    when(entityStore.update(
-            eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
-        .thenAnswer(
-            invocation -> {
-              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
-              return updater.apply(survivingJob);
-            });
-
-    // Both polls process the other job even when this job keeps conflicting.
-    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
-    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
-
-    verify(entityStore, times(2))
-        .update(eq(deletedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
-    verify(entityStore, times(2))
-        .update(eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    assertStatusPollingContinues(new OptimisticLockException("Job changed concurrently"));
   }
 
   @Test
@@ -1233,6 +1143,38 @@ public class TestJobManager {
     Assertions.assertEquals(JobHandle.Status.CANCELLING, result.status());
     Assertions.assertEquals(12345L, result.startedAt());
     Assertions.assertEquals(0L, result.finishedAt());
+  }
+
+  /** Conflicts preserve files without stopping this cleanup batch or its next scheduled run. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterOccConflict() throws IOException {
+    JobEntity conflicted = expiredJob();
+    JobEntity other = expiredJob();
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    when(jobManager.listJobs(metalake, Optional.empty()))
+        .thenReturn(ImmutableList.of(conflicted, other), ImmutableList.of(conflicted));
+    NameIdentifier conflictedIdent = NameIdentifierUtil.ofJob(metalake, conflicted.name());
+    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
+    when(entityStore.delete(conflictedIdent, Entity.EntityType.JOB))
+        .thenThrow(new OptimisticLockException("job changed"))
+        .thenReturn(true);
+    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File conflictedDir = new File(testStagingDir, metalake + "/shell_job/" + conflicted.name());
+    File otherDir = new File(testStagingDir, metalake + "/shell_job/" + other.name());
+    Assertions.assertTrue(conflictedDir.mkdirs());
+    Assertions.assertTrue(otherDir.mkdirs());
+    File artifact = new File(conflictedDir, "artifact");
+    Assertions.assertTrue(artifact.createNewFile());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertTrue(artifact.isFile());
+    Assertions.assertFalse(otherDir.exists());
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertFalse(conflictedDir.exists());
+    verify(entityStore, times(2)).delete(conflictedIdent, Entity.EntityType.JOB);
+    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
   }
 
   @Test
@@ -1489,6 +1431,54 @@ public class TestJobManager {
                 oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
   }
 
+  private void assertStatusPollingContinues(RuntimeException failure) throws IOException {
+    JobEntity conflictedJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity survivingJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty()))
+        .thenReturn(ImmutableList.of(conflictedJob, survivingJob));
+    when(jobExecutor.getJobStatus(conflictedJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobStatus(survivingJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.SUCCEEDED);
+
+    // A losing CAS must not stop this batch or future scheduled polls.
+    NameIdentifier conflictedJobIdent = NameIdentifierUtil.ofJob(metalake, conflictedJob.name());
+    NameIdentifier survivingJobIdent = NameIdentifierUtil.ofJob(metalake, survivingJob.name());
+    when(entityStore.update(
+            eq(conflictedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenThrow(failure);
+    when(entityStore.update(
+            eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenAnswer(
+            invocation -> {
+              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
+              return updater.apply(survivingJob);
+            });
+
+    // Both polls process the other job even when this job keeps conflicting.
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(entityStore, times(2))
+        .update(eq(conflictedJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(entityStore, times(2))
+        .update(eq(survivingJobIdent), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+  }
+
   private JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
         ShellJobTemplate.builder()
@@ -1525,6 +1515,20 @@ public class TestJobManager {
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private JobEntity expiredJob() {
+    long id = idGenerator.nextId();
+    return JobEntity.builder()
+        .withId(id)
+        .withJobExecutionId(Long.toString(id))
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName("shell_job")
+        .withStartedAt(1L)
+        .withFinishedAt(2L)
+        .withStatus(JobHandle.Status.SUCCEEDED)
+        .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
 
