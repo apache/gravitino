@@ -21,7 +21,6 @@ package org.apache.gravitino.idp.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.List;
-import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -53,24 +52,12 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class IdpUserOperations {
 
   private final IdpUserGroupManager userGroupManager;
-  private final Supplier<List<String>> serviceAdminsSupplier;
 
   @Context private HttpServletRequest httpRequest;
 
-  /**
-   * Creates an IdP user REST resource.
-   *
-   * @param userGroupManager the IdP user/group manager
-   */
   @Inject
   public IdpUserOperations(IdpUserGroupManager userGroupManager) {
-    this(userGroupManager, () -> GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS));
-  }
-
-  IdpUserOperations(
-      IdpUserGroupManager userGroupManager, Supplier<List<String>> serviceAdminsSupplier) {
     this.userGroupManager = userGroupManager;
-    this.serviceAdminsSupplier = serviceAdminsSupplier;
   }
 
   @GET
@@ -137,9 +124,10 @@ public class IdpUserOperations {
    * @param user the path username being updated
    * @param request the update request
    */
-  private void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
+  private static void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
     String currentUser = PrincipalUtils.getCurrentUserName();
-    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdminsSupplier.get(), currentUser)) {
+    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
       return;
     }
     if (!user.equals(currentUser)) {
