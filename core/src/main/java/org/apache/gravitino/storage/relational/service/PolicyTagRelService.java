@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -359,7 +360,9 @@ public class PolicyTagRelService {
         .map(target -> target.nameIdentifier().name())
         .forEach(policyNames::add);
     if (policyNames.isEmpty()) {
-      return Collections.emptyMap();
+      // A mutable map, like the one built below: returning Collections.emptyMap() here would mix
+      // mutable and immutable return values, which Error Prone rejects.
+      return new LinkedHashMap<>();
     }
 
     List<PolicyPO> policies =
@@ -368,8 +371,13 @@ public class PolicyTagRelService {
             mapper ->
                 mapper.listPolicyPOsByMetalakeAndPolicyNames(
                     metalake, new ArrayList<>(policyNames)));
-    Map<String, Long> policyIds =
-        policies.stream().collect(Collectors.toMap(PolicyPO::getPolicyName, PolicyPO::getPolicyId));
+    // Lock the policy rows in policy-ID order so that two relation changes touching the same
+    // policies queue up instead of deadlocking. The tag row is locked before this, so every path
+    // through this service takes its locks in the same tag-then-policy order.
+    Map<String, Long> policyIds = new LinkedHashMap<>();
+    PolicyMetaService.lockPolicies(policies)
+        .values()
+        .forEach(policy -> policyIds.put(policy.getPolicyName(), policy.getPolicyId()));
 
     for (String policyName : policyNames) {
       if (!policyIds.containsKey(policyName)) {

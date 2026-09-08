@@ -134,19 +134,13 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+  /** Returns SQL that soft-deletes every active metadata-object relation for a policy ID. */
+  public String softDeletePolicyMetadataObjectRelsByPolicyId(@Param("policyId") Long policyId) {
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " pe JOIN "
-        + PolicyMetaMapper.POLICY_META_TABLE_NAME
-        + " pm ON pe.policy_id = pm.policy_id JOIN "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm ON pm.metalake_id = mm.metalake_id"
-        + " SET pe.deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE mm.metalake_name = #{metalakeName} AND pm.policy_name = #{policyName}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
   public String softDeletePolicyMetadataObjectRelsByMetalakeId(

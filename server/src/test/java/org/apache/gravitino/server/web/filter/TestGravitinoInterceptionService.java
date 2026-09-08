@@ -359,6 +359,51 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testDottedMetadataNameReturnsBadRequest() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authorizationUtilsMocked =
+            mockStatic(AuthorizationUtils.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      authorizationUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      Method method =
+          TestTableLoadOperations.class.getMethod(
+              "loadTable", String.class, String.class, String.class, String.class, String.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              new Object[] {"testMetalake", "testCatalog", "testSchema", "sales.2024", null});
+
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      assertEquals(
+          "The TABLE name 'sales.2024' is unsupported because '.' is reserved as the "
+              + "qualified-name separator.",
+          ((ErrorResponse) response.getEntity()).getMessage());
+      verify(invocation, never()).proceed();
+    }
+  }
+
+  @Test
   public void testMetalakeNotExist() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
