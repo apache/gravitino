@@ -66,8 +66,9 @@ public final class GlueConstants {
 
   /**
    * Base storage path used as a warehouse when no explicit {@code location} is given at table
-   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
-   * {@code s3://my-bucket/gravitino-warehouse}.
+   * creation time and the Glue database declares no {@code LocationUri}. The table location is then
+   * derived as {@code warehouse/database/table}. Example: {@code
+   * s3://my-bucket/gravitino-warehouse}.
    */
   public static final String WAREHOUSE = "warehouse";
 

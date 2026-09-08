@@ -47,6 +47,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
@@ -193,6 +196,10 @@ class TestGlueCatalogOperationsForIceberg {
     GlueColumn[] cols = {
       GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(false).build()
     };
+    // The database declares no location either, so there is nothing to derive the location from.
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(
+            GetDatabaseResponse.builder().database(Database.builder().name(DB).build()).build());
 
     assertThrows(
         IllegalArgumentException.class,
