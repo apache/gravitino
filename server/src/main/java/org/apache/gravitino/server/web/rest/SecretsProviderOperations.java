@@ -25,29 +25,36 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.dto.responses.SecretProviderListResponse;
 import org.apache.gravitino.dto.secret.SecretProviderDTO;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.secret.SecretProviderInfo;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Lists process-global secrets-provider discovery metadata.
+ * Lists process-global secrets-provider discovery metadata under a metalake.
  *
- * <p>The provider registry is server configuration, not a metalake resource, so the path has no
- * metalake segment. Access is restricted to service administrators.
+ * <p>The provider registry is server configuration (not per-metalake state). The metalake path
+ * segment scopes authorization: callers need metalake ownership or {@code VIEW_SECRET_PROVIDERS}.
  */
-@Path("/")
+@Path("/metalakes/{metalake}/secrets/providers")
 public class SecretsProviderOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SecretsProviderOperations.class);
+
+  private static final String LIST_SECRET_PROVIDERS_PRIVILEGE =
+      "METALAKE::OWNER || METALAKE::VIEW_SECRET_PROVIDERS";
 
   private final SecretProviderRegistry secretProviderRegistry;
 
@@ -66,22 +73,25 @@ public class SecretsProviderOperations {
   /**
    * Lists configured secrets providers.
    *
+   * @param metalake the metalake used for authorization scoping
    * @return a list of provider names and types
    */
   @GET
-  @Path("/secrets/providers")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-secret-providers." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-secret-providers", absolute = true)
   @AuthorizationExpression(
-      expression = "SERVICE_ADMIN",
-      errorMessage = "Only service admins can list secrets providers")
-  public Response listSecretProviders() {
-    LOG.info("Received list secrets providers request.");
+      expression = LIST_SECRET_PROVIDERS_PRIVILEGE,
+      errorMessage = "Current user cannot list secrets providers")
+  public Response listSecretProviders(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake) {
+    LOG.info("Received list secrets providers request for metalake: {}", metalake);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            MetalakeManager.checkMetalakeInUse(metalake);
             List<SecretProviderInfo> infos = secretProviderRegistry.listProviders();
             SecretProviderDTO[] providers =
                 infos.stream()
@@ -93,12 +103,11 @@ public class SecretsProviderOperations {
                                 .build())
                     .toArray(SecretProviderDTO[]::new);
             Response response = Utils.ok(new SecretProviderListResponse(providers));
-            LOG.info("Listed {} secrets providers", providers.length);
+            LOG.info("Listed {} secrets providers for metalake: {}", providers.length, metalake);
             return response;
           });
     } catch (Exception e) {
-      LOG.error("Failed to list secrets providers", e);
-      return Utils.internalError(e.getMessage(), e);
+      return ExceptionHandlers.handleMetalakeException(OperationType.LIST, metalake, e);
     }
   }
 }

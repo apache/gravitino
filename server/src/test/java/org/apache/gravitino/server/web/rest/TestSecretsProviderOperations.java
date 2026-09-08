@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,21 +33,36 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SecretProviderListResponse;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderInfo;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.web.mapper.WebApplicationExceptionMapper;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-public class TestSecretsProviderOperations extends JerseyTest {
+public class TestSecretsProviderOperations extends BaseOperationsTest {
+
+  private static final String METALAKE = "test_metalake";
+
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -52,6 +72,16 @@ public class TestSecretsProviderOperations extends JerseyTest {
   }
 
   private final SecretProviderRegistry secretProviderRegistry = mock(SecretProviderRegistry.class);
+
+  @BeforeAll
+  public static void setup() throws IllegalAccessException {
+    Config config = mock(Config.class);
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+  }
 
   @Override
   protected Application configure() {
@@ -77,11 +107,17 @@ public class TestSecretsProviderOperations extends JerseyTest {
   }
 
   @Test
-  public void testListSecretProvidersEmpty() {
+  public void testListSecretProvidersEmpty() throws IOException {
     when(secretProviderRegistry.listProviders()).thenReturn(List.of());
+    stubMetalakeInUse();
 
     Response response =
-        target("/secrets/providers").request().accept("application/vnd.gravitino.v1+json").get();
+        target("/metalakes")
+            .path(METALAKE)
+            .path("secrets/providers")
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     SecretProviderListResponse body = response.readEntity(SecretProviderListResponse.class);
@@ -90,12 +126,18 @@ public class TestSecretsProviderOperations extends JerseyTest {
   }
 
   @Test
-  public void testListSecretProvidersOmitsUri() {
+  public void testListSecretProvidersOmitsUri() throws IOException {
     when(secretProviderRegistry.listProviders())
         .thenReturn(List.of(new SecretProviderInfo("vault", "vault", "https://vault.example.com")));
+    stubMetalakeInUse();
 
     Response response =
-        target("/secrets/providers").request().accept("application/vnd.gravitino.v1+json").get();
+        target("/metalakes")
+            .path(METALAKE)
+            .path("secrets/providers")
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     String json = response.readEntity(String.class);
@@ -103,7 +145,9 @@ public class TestSecretsProviderOperations extends JerseyTest {
     Assertions.assertFalse(json.contains("vault.example.com"));
 
     SecretProviderListResponse body =
-        target("/secrets/providers")
+        target("/metalakes")
+            .path(METALAKE)
+            .path("secrets/providers")
             .request()
             .accept("application/vnd.gravitino.v1+json")
             .get()
@@ -114,9 +158,29 @@ public class TestSecretsProviderOperations extends JerseyTest {
   }
 
   @Test
+  public void testListSecretProvidersNoSuchMetalake() throws IOException {
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
+
+    Response response =
+        target("/metalakes")
+            .path(METALAKE)
+            .path("secrets/providers")
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, error.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testUnsupportedMethodReturnsErrorResponse() {
     Response response =
-        target("/secrets/providers")
+        target("/metalakes")
+            .path(METALAKE)
+            .path("secrets/providers")
             .request()
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity("{}", MediaType.APPLICATION_JSON_TYPE));
@@ -125,5 +189,14 @@ public class TestSecretsProviderOperations extends JerseyTest {
         Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
     ErrorResponse error = response.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, error.getCode());
+  }
+
+  private static void stubMetalakeInUse() throws IOException {
+    Mockito.reset(entityStore);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
   }
 }

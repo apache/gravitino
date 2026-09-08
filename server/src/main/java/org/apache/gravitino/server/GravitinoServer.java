@@ -248,7 +248,7 @@ public class GravitinoServer extends ResourceConfig {
 
     // Only API_ANY_PATH requires authentication today. /configs must stay open for the Web UI's
     // pre-login OAuth bootstrap (see docs/gravitino-server-config.md). Secret provider discovery
-    // lives under /api/secrets/providers and is gated by serviceAdmin (see GH-12921).
+    // lives under /api/metalakes/{metalake}/secrets/providers (see GH-12921).
     server.addSystemFilters(API_ANY_PATH);
     if (server.isWebUiEnabled()) {
       server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.

@@ -210,6 +210,7 @@ they will be removed in a future release. Use the current names in new roles.
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
 | `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
 | `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
@@ -282,6 +283,10 @@ owner-only; it does not accept a target schema.
 | Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
+
+Listing secrets providers under a metalake requires ownership of that metalake or
+`VIEW_SECRET_PROVIDERS`. The provider registry itself is process-global server configuration; the
+metalake path only scopes authorization.
 
 Bulk access-control APIs use the same privileges as the matching single-entity operations. These
 bulk operations are authorized once before processing the request. Bulk requests report item-level

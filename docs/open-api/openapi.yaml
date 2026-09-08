@@ -261,8 +261,8 @@ paths:
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 
-  /secrets/providers:
-    $ref: "./secrets.yaml#/paths/~1secrets~1providers"
+  /metalakes/{metalake}/secrets/providers:
+    $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1secrets~1providers"
 
 components:
 

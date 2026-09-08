@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -244,7 +245,8 @@ public class TestGravitinoServer {
   public void testSecretProvidersRequestIsAudited() throws Exception {
     // Register the capture listener on the live EventBus after initialize(). Loading a listener via
     // Class.forName + static list is brittle under the test classpath and left CI with an empty
-    // capture even though GET /api/secrets/providers returned 200 through HttpAuditFilter.
+    // capture even though GET /api/metalakes/{metalake}/secrets/providers returned 200 through
+    // HttpAuditFilter.
     List<Event> capturedEvents = new CopyOnWriteArrayList<>();
     ServerConfig serverConfig = spyServerConfig(serverConfigWithAvailablePort());
     gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
@@ -290,7 +292,7 @@ public class TestGravitinoServer {
             .orElseThrow(
                 () ->
                     new AssertionError(
-                        "No HttpRequestEvent captured for GET /api/secrets/providers; events="
+                        "No HttpRequestEvent captured for GET /api/metalakes/.../secrets/providers; events="
                             + capturedEvents.stream()
                                 .map(e -> e.getClass().getSimpleName())
                                 .collect(Collectors.toList())));
@@ -423,16 +425,35 @@ public class TestGravitinoServer {
     int port =
         JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
             .getHttpPort();
+    String metalake = "secret_providers_" + UUID.randomUUID().toString().replace("-", "");
+    HttpResponse<String> createResponse =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/metalakes"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
+                    .header("Content-Type", "application/json")
+                    .POST(
+                        HttpRequest.BodyPublishers.ofString(
+                            "{\"name\":\"" + metalake + "\",\"comment\":\"\",\"properties\":{}}"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, createResponse.statusCode(), createResponse.body());
+
     HttpResponse<String> response =
         HttpClient.newHttpClient()
             .send(
                 HttpRequest.newBuilder(
-                        URI.create("http://127.0.0.1:" + port + "/api/secrets/providers"))
+                        URI.create(
+                            "http://127.0.0.1:"
+                                + port
+                                + "/api/metalakes/"
+                                + metalake
+                                + "/secrets/providers"))
                     .header("Accept", "application/vnd.gravitino.v1+json")
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, response.statusCode());
+    assertEquals(200, response.statusCode(), response.body());
     Map<String, Object> body =
         ObjectMapperProvider.objectMapper()
             .readValue(response.body(), new TypeReference<Map<String, Object>>() {});

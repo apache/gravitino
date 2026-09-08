@@ -31,15 +31,20 @@ import org.junit.jupiter.api.Test;
 public class TestSecretsProviderAuthorizationExpression {
 
   @Test
-  public void testListSecretProvidersRequiresServiceAdmin()
+  public void testListSecretProvidersRequiresOwnerOrViewPrivilege()
       throws NoSuchMethodException, OgnlException {
-    Method method = SecretsProviderOperations.class.getMethod("listSecretProviders");
+    Method method = SecretsProviderOperations.class.getMethod("listSecretProviders", String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(authorizationExpressionAnnotation.expression());
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
-    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
-    assertTrue(mockEvaluator.getResult(ImmutableSet.of("SERVICE_ADMIN")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("SERVICE_ADMIN")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::MANAGE_USERS")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::VIEW_SECRET_PROVIDERS")));
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::OWNER", "METALAKE::VIEW_SECRET_PROVIDERS")));
   }
 }
