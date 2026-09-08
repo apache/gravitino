@@ -57,11 +57,6 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames);
   }
 
-  public static String insertPolicyMetaOnDuplicateKeyUpdate(
-      @Param("policyMeta") PolicyPO policyPO) {
-    return getProvider().insertPolicyMetaOnDuplicateKeyUpdate(policyPO);
-  }
-
   public static String insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO) {
     return getProvider().insertPolicyMeta(policyPO);
   }
@@ -77,9 +72,10 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().updatePolicyMeta(newPolicyMeta, oldPolicyMeta);
   }
 
-  public static String softDeletePolicyByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return getProvider().softDeletePolicyByMetalakeAndPolicyName(metalakeName, policyName);
+  /** Delegates a version-checked policy soft delete. */
+  public static String softDeletePolicyByIdAndVersion(
+      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeletePolicyByIdAndVersion(policyId, currentVersion);
   }
 
   public static String deletePolicyMetasByLegacyTimeline(
@@ -96,8 +92,24 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName);
   }
 
+  /** Delegates an exclusive-lock policy query by natural key. */
+  public static String selectPolicyMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
+    return getProvider().selectPolicyMetaByMetalakeIdAndNameForUpdate(metalakeId, policyName);
+  }
+
   public static String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return getProvider().selectPolicyByPolicyId(policyId);
+  }
+
+  /** Delegates an exclusive-lock policy query. */
+  public static String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyByPolicyIdForUpdate(policyId);
+  }
+
+  /** Delegates a locking read of several policies. */
+  public static String listPolicyPOsByPolicyIdsForUpdate(@Param("policyIds") List<Long> policyIds) {
+    return getProvider().listPolicyPOsByPolicyIdsForUpdate(policyIds);
   }
 
   public static String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {

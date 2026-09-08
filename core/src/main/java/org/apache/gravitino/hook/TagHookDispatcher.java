@@ -21,10 +21,12 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -104,6 +106,22 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name, String value) {
     return dispatcher.listMetadataObjectsForTag(metalake, name, value);
+  }
+
+  @Override
+  public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    return dispatcher.listPolicyAssociationsForTag(metalake, name);
+  }
+
+  @Override
+  public void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    dispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
+  }
+
+  @Override
+  public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    dispatcher.removePolicyFromTag(metalake, tagName, policyName);
   }
 
   @Override

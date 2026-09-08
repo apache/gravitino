@@ -20,6 +20,7 @@ package org.apache.gravitino.listener;
 
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyFailureEvent;
@@ -286,6 +287,11 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
               e));
       throw e;
     }
+  }
+
+  @Override
+  public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
+    return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
 
   @Override
