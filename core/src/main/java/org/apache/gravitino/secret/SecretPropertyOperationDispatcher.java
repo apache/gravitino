@@ -38,8 +38,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /**
  * Dispatches secrets requests for catalog, schema, and fileset metadata objects.
  *
- * <p>Loads raw entity properties (including secret URNs) from the entity store / catalog entity,
- * then resolves only secret-manager URNs via {@link SecretPropertyUtils#buildSecrets}.
+ * <p>Loads raw entity properties from the entity store / catalog entity, then builds plaintext
+ * secrets via {@link SecretPropertyUtils#buildSecrets} (secret-manager URNs plus sensitive-named
+ * inline values).
  */
 public class SecretPropertyOperationDispatcher extends OperationDispatcher {
 
@@ -60,7 +61,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   }
 
   /**
-   * Returns resolved secret-manager plaintext properties for the given metadata object.
+   * Returns plaintext secret properties for the given metadata object.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type (CATALOG, SCHEMA, or FILESET).

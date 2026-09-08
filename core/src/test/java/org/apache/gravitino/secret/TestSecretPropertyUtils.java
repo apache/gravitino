@@ -108,14 +108,51 @@ public class TestSecretPropertyUtils {
 
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
-      // All secret-URN entries, including keys also used by credential vending
+      // Secret-URN entries, including keys also used by credential vending
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
       Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
       Assertions.assertEquals("s3-secret-value", secrets.get("s3-secret-access-key"));
+      // Inline sensitive-named plaintext is also returned for getSecrets clients
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
       Assertions.assertFalse(secrets.containsKey("jdbc-user"));
       Assertions.assertFalse(secrets.containsKey("jdbc-url"));
       Assertions.assertFalse(secrets.containsKey("visible"));
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+    }
+  }
+
+  @Test
+  void testIsSensitivePropertyKey() {
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("s3-secret-access-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("S3_SECRET_ACCESS_KEY"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("oauth2.token"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("aws-access-key-id"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("credential-provider"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-user"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("warehouse"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(null));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(""));
+  }
+
+  @Test
+  void testBuildSecretsIncludesInlineSensitivePlaintext() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps =
+          Map.of(
+              "warehouse",
+              "s3://bucket/prefix",
+              "aws-region",
+              "us-east-2",
+              "s3-access-key-id",
+              "AKIA...",
+              "s3-secret-access-key",
+              "super-secret");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
+      Assertions.assertFalse(secrets.containsKey("warehouse"));
+      Assertions.assertFalse(secrets.containsKey("aws-region"));
     }
   }
 
