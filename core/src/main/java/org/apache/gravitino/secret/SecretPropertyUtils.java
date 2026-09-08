@@ -43,7 +43,7 @@ public final class SecretPropertyUtils {
    * getSecrets} for undeclared / mistyped credential properties.
    */
   private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
-      Pattern.compile(".*(secret|password|token|credential|access).*");
+      Pattern.compile(".*(secret|password|token|credential|access|account).*");
 
   private SecretPropertyUtils() {}
 
@@ -51,7 +51,8 @@ public final class SecretPropertyUtils {
    * Returns whether a property key name looks sensitive (credential-like).
    *
    * <p>A key matches when, after lower-casing and normalizing {@code _} to {@code -}, it contains
-   * {@code secret}, {@code password}, {@code token}, {@code credential}, or {@code access}.
+   * {@code secret}, {@code password}, {@code token}, {@code credential}, {@code access}, or {@code
+   * account} (covers Azure storage account key/name and GCS service-account file paths).
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern

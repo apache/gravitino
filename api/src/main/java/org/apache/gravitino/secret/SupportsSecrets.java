@@ -29,9 +29,9 @@ import java.util.Map;
  *   <li>Every secret-URN property value, resolved via the secret manager (including keys that may
  *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
  *   <li>Stored plaintext for property keys whose names look sensitive (contain {@code secret},
- *       {@code password}, {@code token}, {@code credential}, or {@code access}, case-insensitive),
- *       so mistyped / undeclared credential properties remain usable after API responses mask them
- *       as {@code ******}.
+ *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
+ *       case-insensitive), so mistyped / undeclared credential properties remain usable after API
+ *       responses mask them as {@code ******}.
  * </ul>
  *
  * <p>Normal non-sensitive properties are not included; combine with {@code load*().properties()} on

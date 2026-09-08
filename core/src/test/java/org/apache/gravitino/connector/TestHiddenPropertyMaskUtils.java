@@ -144,7 +144,11 @@ public class TestHiddenPropertyMaskUtils {
             "s3-secret-access-key",
             "super-secret",
             "custom-token",
-            "tok");
+            "tok",
+            "azure-storage-account-key",
+            "abs-key",
+            "azure-storage-account-name",
+            "abs-account");
     Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
 
     Assertions.assertEquals("us-east-2", masked.get("aws-region"));
@@ -153,5 +157,9 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-secret-access-key"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("custom-token"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-key"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-name"));
   }
 }
