@@ -381,13 +381,13 @@ public class MetadataAuthzHelper {
     // per-object loop over every catalog in the metalake.
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
-    if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
-      Arrays.stream(nameIdentifiers)
-          .forEach(
-              identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
-    }
-
     if (enableAuthorization() && nameIdentifiers.length > 0) {
+      if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
+        Arrays.stream(nameIdentifiers)
+            .forEach(
+                identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
+      }
+
       String principalName = PrincipalUtils.getCurrentPrincipal().getName();
       if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
         // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in

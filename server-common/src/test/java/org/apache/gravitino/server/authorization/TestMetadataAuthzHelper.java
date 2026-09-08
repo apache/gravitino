@@ -141,6 +141,25 @@ public class TestMetadataAuthzHelper {
   }
 
   @Test
+  public void testFilterPreservesDottedExternalObjectNameWithoutAuthorization() {
+    Config config = gravitinoEnv.config();
+    when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(false);
+    NameIdentifier[] identifiers = {
+      NameIdentifier.of("testMetalake", "testCatalog", "testSchema", "object.with.dot")
+    };
+
+    try {
+      NameIdentifier[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake", "", Entity.EntityType.TABLE, identifiers);
+
+      Assertions.assertSame(identifiers, filtered);
+    } finally {
+      when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+    }
+  }
+
+  @Test
   public void testPreloadUsesInternalDispatchers() throws Exception {
     AccessControlDispatcher accessControlDispatcher = mock(AccessControlDispatcher.class);
     SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
