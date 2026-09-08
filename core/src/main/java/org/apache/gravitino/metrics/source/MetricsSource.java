@@ -25,6 +25,7 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.Timer;
 
 /**
@@ -94,8 +95,7 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Histogram
    */
   public Histogram getHistogram(String name) {
-    return this.metricRegistry.histogram(
-        name, () -> new Histogram(new ExponentiallyDecayingReservoir()));
+    return this.metricRegistry.histogram(name, () -> new Histogram(newReservoir()));
   }
 
   /**
@@ -105,7 +105,7 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Timer
    */
   public Timer getTimer(String name) {
-    return this.metricRegistry.timer(name, () -> new Timer(new ExponentiallyDecayingReservoir()));
+    return this.metricRegistry.timer(name, () -> new Timer(newReservoir()));
   }
 
   /**
@@ -116,5 +116,16 @@ public abstract class MetricsSource {
    */
   public Meter getMeter(String name) {
     return this.metricRegistry.meter(name);
+  }
+
+  /**
+   * Creates the {@link Reservoir} backing new timers and histograms. Package-visible so tests can
+   * override it to inject a reservoir with a controllable {@link com.codahale.metrics.Clock}
+   * instead of exercising real wall-clock time.
+   *
+   * @return a new {@link ExponentiallyDecayingReservoir}
+   */
+  protected Reservoir newReservoir() {
+    return new ExponentiallyDecayingReservoir();
   }
 }

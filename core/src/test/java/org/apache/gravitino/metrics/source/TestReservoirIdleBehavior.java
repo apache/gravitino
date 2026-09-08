@@ -22,7 +22,9 @@ package org.apache.gravitino.metrics.source;
 import com.codahale.metrics.Clock;
 import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
+import com.codahale.metrics.Timer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Assertions;
@@ -32,10 +34,20 @@ import org.junit.jupiter.api.Test;
  * Regression test for {@code MetricsSource} recording a nonzero count but a zero duration once an
  * endpoint or method hasn't been invoked within the reservoir's window: {@link
  * SlidingTimeWindowArrayReservoir} discards every sample once it falls outside its fixed window, so
- * {@link com.codahale.metrics.Timer} and {@link Histogram} then report count-only. {@link
+ * {@link Timer} and {@link Histogram} then report count-only. {@link
  * MetricsSource#getTimer(String)} and {@link MetricsSource#getHistogram(String)} now use {@link
  * ExponentiallyDecayingReservoir} instead, which decays sample weight over time rather than
- * discarding samples outright, so it keeps reporting the last known duration distribution.
+ * expiring it on a fixed window, so infrequently-invoked operations keep reporting a real duration
+ * for far longer (on the order of half a day with the default decay rate) than the old 60-second
+ * window.
+ *
+ * <p>This is a mitigation, not a complete fix: {@link ExponentiallyDecayingReservoir} rescales its
+ * samples' decayed weights periodically, and once that scaling factor underflows to zero in
+ * double-precision arithmetic (in practice, after roughly 13.8 hours of inactivity with the default
+ * decay rate), it clears every sample outright, reproducing the same "count survives, duration
+ * reads zero" symptom the old reservoir showed at 60 seconds. {@link
+ * #metricsSourceTimerEventuallyZeroesOutAfterVeryLongIdlePeriod()} documents that known, unresolved
+ * boundary through the actual {@link MetricsSource} timer-creation path.
  */
 public class TestReservoirIdleBehavior {
 
@@ -55,6 +67,26 @@ public class TestReservoirIdleBehavior {
 
     void advance(long duration, TimeUnit unit) {
       nanos.addAndGet(unit.toNanos(duration));
+    }
+  }
+
+  /**
+   * A {@code MetricsSource} whose reservoirs are driven by a {@link ManualClock} instead of real
+   * wall-clock time, so idle periods can be simulated deterministically while still going through
+   * the production {@link MetricsSource#getTimer(String)}/{@link
+   * MetricsSource#getHistogram(String)} methods rather than constructing reservoirs directly.
+   */
+  private static class ManualClockMetricsSource extends MetricsSource {
+    private final ManualClock clock;
+
+    ManualClockMetricsSource(ManualClock clock) {
+      super("test-manual-clock");
+      this.clock = clock;
+    }
+
+    @Override
+    protected Reservoir newReservoir() {
+      return new ExponentiallyDecayingReservoir(1028, 0.015, clock);
     }
   }
 
@@ -80,7 +112,7 @@ public class TestReservoirIdleBehavior {
   }
 
   @Test
-  void exponentiallyDecayingReservoirSurvivesIdlePeriod() {
+  void exponentiallyDecayingReservoirSurvivesShortIdlePeriod() {
     ManualClock clock = new ManualClock();
     Histogram histogram = new Histogram(new ExponentiallyDecayingReservoir(1028, 0.015, clock));
 
@@ -89,13 +121,51 @@ public class TestReservoirIdleBehavior {
     }
     Assertions.assertTrue(histogram.getSnapshot().getMax() > 0);
 
-    // Same idle period as above, but the reservoir MetricsSource now uses must not go to zero.
+    // Same idle period the old reservoir already failed at; the new one must not go to zero here.
     clock.advance(61, TimeUnit.SECONDS);
 
     Assertions.assertEquals(10, histogram.getCount());
     Assertions.assertTrue(
         histogram.getSnapshot().getMax() > 0,
-        "ExponentiallyDecayingReservoir must keep reporting real duration data after idle "
-            + "periods instead of collapsing to zero");
+        "ExponentiallyDecayingReservoir must keep reporting real duration data after a short "
+            + "idle period instead of collapsing to zero");
+  }
+
+  @Test
+  void metricsSourceTimerUsesExponentiallyDecayingReservoirByDefault() {
+    MetricsSource metricsSource = new ManualClockMetricsSource(new ManualClock());
+    Timer timer = metricsSource.getTimer("op.total");
+    timer.update(100, TimeUnit.MILLISECONDS);
+
+    // Exercised through the real production method, not a directly-constructed reservoir, so this
+    // would fail if MetricsSource ever reverted to SlidingTimeWindowArrayReservoir.
+    Assertions.assertTrue(timer.getSnapshot().getMax() > 0);
+  }
+
+  @Test
+  void metricsSourceTimerEventuallyZeroesOutAfterVeryLongIdlePeriod() {
+    ManualClock clock = new ManualClock();
+    MetricsSource metricsSource = new ManualClockMetricsSource(clock);
+    Timer timer = metricsSource.getTimer("op.total");
+
+    for (int i = 1; i <= 10; i++) {
+      timer.update(i * 100L, TimeUnit.MILLISECONDS);
+    }
+    Assertions.assertTrue(timer.getSnapshot().getMax() > 0);
+
+    // Advance in increments, calling getSnapshot() along the way, to mirror periodic Prometheus
+    // scraping every 30s during the idle period rather than a single large jump.
+    for (int i = 0; i < 1680; i++) { // 1680 * 30s = 14h
+      clock.advance(30, TimeUnit.SECONDS);
+      timer.getSnapshot();
+    }
+
+    Assertions.assertEquals(10, timer.getCount(), "count must still survive the idle period");
+    Assertions.assertEquals(
+        0,
+        timer.getSnapshot().getMax(),
+        "known limitation: ExponentiallyDecayingReservoir's rescale() clears every sample once "
+            + "its decayed weight underflows to zero, so a sufficiently long idle period (roughly "
+            + "half a day with the default decay rate) still reproduces the original bug");
   }
 }
