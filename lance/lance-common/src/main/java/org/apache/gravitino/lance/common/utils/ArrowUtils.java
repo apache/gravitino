@@ -23,11 +23,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
+import org.apache.arrow.flatbuf.Message;
+import org.apache.arrow.flatbuf.MessageHeader;
+import org.apache.arrow.flatbuf.RecordBatch;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.ipc.ReadChannel;
+import org.apache.arrow.vector.ipc.message.MessageMetadataResult;
+import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 public class ArrowUtils {
@@ -80,12 +86,7 @@ public class ArrowUtils {
         ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
       schema = reader.getVectorSchemaRoot().getSchema();
       if (requireEmpty) {
-        while (reader.loadNextBatch()) {
-          if (reader.getVectorSchemaRoot().getRowCount() > 0) {
-            containsRows = true;
-            break;
-          }
-        }
+        containsRows = containsRecordBatchRows(bais);
       }
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to parse Arrow IPC stream", e);
@@ -98,5 +99,28 @@ public class ArrowUtils {
               + "write records through a Lance client or engine after creation");
     }
     return schema;
+  }
+
+  private static boolean containsRecordBatchRows(ByteArrayInputStream input) throws IOException {
+    // The schema reader has consumed the schema message. Inspect only subsequent message headers;
+    // skipping bodies avoids allocating or decoding vectors, including dictionary values.
+    try (ReadChannel channel = new ReadChannel(Channels.newChannel(input))) {
+      MessageMetadataResult metadata;
+      while ((metadata = MessageSerializer.readMessage(channel)) != null) {
+        Message message = metadata.getMessage();
+        if (message.headerType() == MessageHeader.RecordBatch) {
+          RecordBatch batch = (RecordBatch) message.header(new RecordBatch());
+          Preconditions.checkArgument(batch.length() >= 0, "Invalid Arrow record batch row count");
+          if (batch.length() > 0) {
+            return true;
+          }
+        } else if (message.headerType() != MessageHeader.DictionaryBatch) {
+          throw new IOException("Unexpected Arrow message type: " + message.headerType());
+        }
+        Preconditions.checkArgument(message.bodyLength() >= 0, "Invalid Arrow message body length");
+        input.skipNBytes(message.bodyLength());
+      }
+      return false;
+    }
   }
 }

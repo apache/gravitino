@@ -460,7 +460,7 @@ public class LanceRESTServiceIT extends BaseIT {
   void testCreateRejectsNonEmptyArrowWithoutSideEffects() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
-    byte[] data = arrowStreamWithRecord();
+    byte[] data = arrowStreamWithEmptyThenNonEmptyBatch();
     for (String mode : List.of("create", "exist_ok")) {
       String name = "nonempty_" + mode;
       Path location = tempDir.resolve(name);
@@ -1031,7 +1031,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(406, error.getCode());
   }
 
-  private byte[] arrowStreamWithRecord() throws IOException {
+  private byte[] arrowStreamWithEmptyThenNonEmptyBatch() throws IOException {
     try (VectorSchemaRoot root = VectorSchemaRoot.of(new IntVector("id", allocator));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ArrowStreamWriter writer = new ArrowStreamWriter(root, null, output)) {
