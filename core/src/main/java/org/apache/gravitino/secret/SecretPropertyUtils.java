@@ -84,7 +84,7 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
    *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
-   *       not a secret URN and not the API masked placeholder, returning the stored plaintext.
+   *       not a secret URN, returning the stored plaintext.
    * </ol>
    *
    * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
@@ -109,7 +109,7 @@ public final class SecretPropertyUtils {
       }
       if (isSecretProperty(key, value)) {
         secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
-      } else if (isSensitivePropertyKey(key) && !"******".equals(value)) {
+      } else if (isSensitivePropertyKey(key)) {
         secrets.put(key, value);
       }
     }
