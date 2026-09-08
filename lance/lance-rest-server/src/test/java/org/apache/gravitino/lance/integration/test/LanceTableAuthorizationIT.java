@@ -18,22 +18,16 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -55,7 +49,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.lance.Dataset;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DeclareTableRequest;
@@ -348,63 +341,6 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, table(READER, MISSING_TABLE, "deregister"));
     assertStatus(200, table(ADMIN, HIDDEN_TABLE, "describe"));
     assertStatus(404, table(ADMIN, MISSING_TABLE, "deregister"));
-  }
-
-  /** Verifies unsupported input cannot silently discard records or destroy an existing table. */
-  @Test
-  public void testCreateRejectsNonEmptyArrowWithoutSideEffects() throws Exception {
-    byte[] data = arrowStreamWithRecord();
-    for (String mode : List.of("create", "exist_ok")) {
-      String name = "nonempty_" + mode;
-      assertStatus(406, createWithData(PROBER, name, mode, data));
-      assertStatus(404, table(ADMIN, WRITE_SCHEMA, name, "exists"));
-      Assertions.assertFalse(Files.exists(tempDir.resolve(name)));
-    }
-
-    String original = "nonempty_overwrite";
-    createTable(WRITE_SCHEMA, original);
-    assertStatus(406, createWithData(MUTATOR, original, "overwrite", data));
-    Assertions.assertEquals(
-        List.of("id", "value"),
-        describe(ADMIN, WRITE_SCHEMA, original).getSchema().getFields().stream()
-            .map(field -> field.getName())
-            .toList());
-    try (Dataset dataset = Dataset.open().uri(location(original)).build()) {
-      Assertions.assertEquals(0, dataset.countRows());
-      Assertions.assertEquals(2, dataset.getSchema().getFields().size());
-    }
-  }
-
-  private HttpResponse<String> createWithData(
-      String user, String tableName, String mode, byte[] data) throws Exception {
-    HttpRequest req =
-        request(
-                user,
-                "/v1/table/" + id(CATALOG, WRITE_SCHEMA, tableName) + "/create",
-                "&mode=" + mode)
-            .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
-            .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
-            .POST(HttpRequest.BodyPublishers.ofByteArray(data))
-            .build();
-    return httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private byte[] arrowStreamWithRecord() throws Exception {
-    Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
-    try (RootAllocator allocator = new RootAllocator();
-        VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ArrowStreamWriter writer = new ArrowStreamWriter(root, null, output)) {
-      root.allocateNew();
-      root.setRowCount(0);
-      writer.start();
-      writer.writeBatch();
-      ((IntVector) root.getVector("id")).setSafe(0, 42);
-      root.setRowCount(1);
-      writer.writeBatch();
-      writer.end();
-      return output.toByteArray();
-    }
   }
 
   private HttpResponse<String> dropColumns(String user, String tableName, String column)

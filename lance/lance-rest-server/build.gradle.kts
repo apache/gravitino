@@ -193,7 +193,6 @@ tasks {
 
     val primaryBundleDir = lanceSparkBundleDirFor(primaryLanceSparkBundleVersion)
     doFirst {
-      systemProperty("lance.test.runtimeClasspath", sourceSets["main"].runtimeClasspath.asPath)
       val bundleJar =
         primaryBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
           ?: throw GradleException(
