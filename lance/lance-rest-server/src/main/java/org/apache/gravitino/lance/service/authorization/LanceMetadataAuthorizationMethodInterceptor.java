@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.service.authorization;
 
+import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
@@ -186,7 +188,9 @@ public class LanceMetadataAuthorizationMethodInterceptor
     String namespaceId = pathArgument(method.getParameters(), args, "id").orElse("");
     Exception exception;
     if (throwable instanceof ForbiddenException) {
-      exception = new PermissionDeniedException(throwable.getMessage(), "", namespaceId);
+      exception =
+          new PermissionDeniedException(
+              throwable.getMessage(), getStackTrace(throwable), namespaceId);
     } else if (throwable instanceof Exception) {
       exception = (Exception) throwable;
     } else {

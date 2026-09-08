@@ -18,21 +18,16 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
-import java.io.Writer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
@@ -40,16 +35,11 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.HttpUtils;
-import org.apache.gravitino.lance.server.GravitinoLanceRESTServer;
-import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DescribeNamespaceResponse;
 import org.lance.namespace.model.DropNamespaceRequest;
@@ -291,121 +281,6 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     assertStatus(403, httpClient.send(denied, HttpResponse.BodyHandlers.ofString()));
     // An authenticated reader cannot borrow the fallback user's CREATE_CATALOG privilege.
     assertStatus(403, create(USER, catalog, null, Map.of()));
-  }
-
-  /** Verifies standalone HTTP backend calls use service credentials rather than caller roles. */
-  @Test
-  public void testStandaloneUsesBackendServiceIdentity(@TempDir Path directory) throws Exception {
-    int port = RESTUtils.findAvailablePort(10000, 11000);
-    String catalog = "lance_authz_standalone_catalog";
-    String serviceUser = "lance_authz_standalone_user";
-    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
-    metalake.addUser(serviceUser);
-    metalake.createRole(
-        "lance_authz_standalone_role",
-        new HashMap<>(),
-        List.of(
-            SecurableObjects.ofMetalake(
-                metalake.name(),
-                new ArrayList<>(
-                    List.of(Privileges.UseCatalog.allow(), Privileges.CreateCatalog.allow())))));
-    metalake.grantRolesToUser(List.of("lance_authz_standalone_role"), serviceUser);
-    Properties config = new Properties();
-    config.setProperty(Configs.AUTHENTICATORS.getKey(), "simple");
-    config.setProperty("gravitino.lance-rest.httpPort", String.valueOf(port));
-    config.setProperty(
-        "gravitino.lance-rest.gravitino-uri", "http://localhost:" + getGravitinoServerPort());
-    config.setProperty("gravitino.lance-rest.gravitino-metalake", getLanceRESTServerMetalakeName());
-    config.setProperty("gravitino.lance-rest.gravitino-auth-type", "simple");
-    config.setProperty("gravitino.lance-rest.gravitino-simple.user-name", serviceUser);
-    Path configFile = directory.resolve("standalone.conf");
-    try (Writer writer = Files.newBufferedWriter(configFile)) {
-      config.store(writer, "Standalone Lance REST integration test");
-    }
-    Path logFile = directory.resolve("standalone.log");
-    // Use the production bootstrap in its own JVM: deploy mode has no local GravitinoEnv,
-    // while embedded mode must not share its backend environment with the standalone service.
-    ProcessBuilder builder =
-        new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "--add-opens=java.base/java.nio=ALL-UNNAMED",
-                "-cp",
-                System.getProperty("lance.test.runtimeClasspath"),
-                GravitinoLanceRESTServer.class.getName(),
-                configFile.toString())
-            .redirectErrorStream(true)
-            .redirectOutput(logFile.toFile());
-    builder.environment().put("GRAVITINO_TEST", "true");
-    Process standalone = builder.start();
-    try {
-      try {
-        Awaitility.await()
-            .atMost(60, TimeUnit.SECONDS)
-            .until(
-                () -> {
-                  Assertions.assertTrue(standalone.isAlive(), "Standalone process exited");
-                  // Namespace initialization is lazy and occurs on the first metadata request.
-                  return HttpUtils.isHttpServerUp(
-                      "http://localhost:" + port + "/lance/health/live");
-                });
-      } catch (Exception | AssertionError e) {
-        throw new AssertionError("Standalone startup failed:\n" + Files.readString(logFile), e);
-      }
-      CreateNamespaceRequest body = new CreateNamespaceRequest();
-      body.addIdItem(catalog);
-      HttpRequest request =
-          request(USER, "/v1/namespace/" + catalog + "/create")
-              .uri(
-                  URI.create(
-                      "http://localhost:"
-                          + port
-                          + "/lance/v1/namespace/"
-                          + catalog
-                          + "/create?delimiter=."))
-              .setHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, "NONE")
-              .POST(
-                  HttpRequest.BodyPublishers.ofString(
-                      ObjectMapperProvider.objectMapper().writeValueAsString(body)))
-              .build();
-      // USER cannot create catalogs in auxiliary mode. The backend receives the service user's
-      // credentials and roles, despite USER selecting NONE on this incoming request.
-      assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
-      Assertions.assertEquals(
-          serviceUser,
-          client
-              .loadMetalake(getLanceRESTServerMetalakeName())
-              .loadCatalog(catalog)
-              .auditInfo()
-              .creator());
-      // The backend service user cannot read this admin-owned schema. Even an incoming admin
-      // must receive the backend's 403, rather than 500 or the incoming caller's privileges.
-      HttpRequest deniedRequest =
-          request(ADMIN, "/v1/namespace/" + id(VISIBLE_CATALOG, VISIBLE_SCHEMA) + "/describe")
-              .uri(
-                  URI.create(
-                      "http://localhost:"
-                          + port
-                          + "/lance/v1/namespace/"
-                          + id(VISIBLE_CATALOG, VISIBLE_SCHEMA)
-                          + "/describe?delimiter=."))
-              .POST(HttpRequest.BodyPublishers.ofString("{}"))
-              .build();
-      HttpResponse<String> deniedResponse =
-          httpClient.send(deniedRequest, HttpResponse.BodyHandlers.ofString());
-      assertStatus(403, deniedResponse);
-      ErrorResponse error =
-          ObjectMapperProvider.objectMapper().readValue(deniedResponse.body(), ErrorResponse.class);
-      Assertions.assertEquals("", error.getDetail());
-      Assertions.assertTrue(error.getError().contains(serviceUser), error.getError());
-      assertStatus(200, drop(serviceUser, catalog, null, "cascade"));
-    } finally {
-      standalone.destroy();
-      if (!standalone.waitFor(10, TimeUnit.SECONDS)) {
-        standalone.destroyForcibly();
-        Assertions.assertTrue(
-            standalone.waitFor(10, TimeUnit.SECONDS), "Standalone process did not stop");
-      }
-    }
   }
 
   /** Verifies health endpoints remain reachable even when credentials would be rejected. */

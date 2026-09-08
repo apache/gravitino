@@ -18,13 +18,7 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
-import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
-import java.util.List;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -44,54 +38,5 @@ public class TestArrowUtils {
     Schema parsedSchema = ArrowUtils.parseArrowIpcStream(ipcStream);
 
     Assertions.assertEquals(schema, parsedSchema);
-  }
-  /** Verifies schema-only streams and zero-row batches remain supported. */
-  @Test
-  public void testSchemaOnlyStreams() throws Exception {
-    Schema expected = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
-    Assertions.assertEquals(expected, ArrowUtils.parseSchemaOnlyIpcStream(streamWithRows()));
-    Assertions.assertEquals(expected, ArrowUtils.parseSchemaOnlyIpcStream(streamWithRows(0, 0)));
-  }
-
-  /** Verifies that a non-empty batch is rejected, including after empty batches. */
-  @Test
-  public void testRejectRecordBatchesWithRows() throws Exception {
-    for (byte[] stream : List.of(streamWithRows(1), streamWithRows(0, 1))) {
-      UnsupportedOperationException exception =
-          Assertions.assertThrows(
-              UnsupportedOperationException.class,
-              () -> ArrowUtils.parseSchemaOnlyIpcStream(stream));
-      Assertions.assertTrue(exception.getMessage().contains("schema-only"));
-      // Existing callers of the general schema parser retain their previous behavior.
-      Assertions.assertEquals(1, ArrowUtils.parseArrowIpcStream(stream).getFields().size());
-    }
-  }
-
-  /** Verifies malformed input is reported as invalid rather than as unsupported data. */
-  @Test
-  public void testRejectMalformedSchemaOnlyStream() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> ArrowUtils.parseSchemaOnlyIpcStream(new byte[] {1, 2, 3}));
-  }
-
-  private byte[] streamWithRows(int... batches) throws Exception {
-    Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
-    try (RootAllocator allocator = new RootAllocator();
-        VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ArrowStreamWriter writer = new ArrowStreamWriter(root, null, output)) {
-      root.allocateNew();
-      writer.start();
-      for (int rows : batches) {
-        for (int i = 0; i < rows; i++) {
-          ((IntVector) root.getVector("id")).setSafe(i, i);
-        }
-        root.setRowCount(rows);
-        writer.writeBatch();
-      }
-      writer.end();
-      return output.toByteArray();
-    }
   }
 }

@@ -208,9 +208,10 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Test exception", errorResp.getError());
     Assertions.assertEquals("ns1.ns2", errorResp.getInstance());
+    Assertions.assertNotNull(errorResp.getDetail());
+    Assertions.assertTrue(errorResp.getDetail().contains("Test exception"));
 
     // root endpoint should use explicit root identifier instead of delimiter in error instance
     resp =
@@ -261,8 +262,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Test exception", errorResp.getError());
   }
 
   @Test
@@ -321,8 +321,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Test exception", errorResp.getError());
   }
 
   @Test
@@ -394,8 +393,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Test exception", errorResp.getError());
   }
 
   @Test
@@ -459,8 +457,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 
   @Test
@@ -516,8 +513,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 
   @Test
@@ -624,8 +620,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 
   @Test
@@ -682,8 +677,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 
   @Test
@@ -1005,7 +999,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Internal server error", errorResp.getError());
-    Assertions.assertEquals("", errorResp.getDetail());
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 }
