@@ -62,7 +62,7 @@ public class TestGlueExceptionConverter {
     assertSame(e, converted.getCause());
     String message = converted.getMessage();
     assertTrue(message.contains("schema drop_me"), message);
-    assertTrue(message.contains("AccessDeniedException"), message);
+    assertTrue(message.contains("[AccessDeniedException] "), message);
     assertTrue(message.contains("glue:CreateDatabase"), message);
     assertTrue(message.contains("database/drop_me3"), message);
   }
@@ -115,7 +115,8 @@ public class TestGlueExceptionConverter {
 
     RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
 
-    assertTrue(converted.getMessage().contains("InternalServiceException"), converted.getMessage());
+    assertTrue(
+        converted.getMessage().contains("[InternalServiceException]"), converted.getMessage());
   }
 
   @Test

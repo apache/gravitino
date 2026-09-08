@@ -88,13 +88,13 @@ final class GlueExceptionConverter {
       String code = details.errorCode();
       String message = details.errorMessage();
       if (StringUtils.isNotBlank(code) && StringUtils.isNotBlank(message)) {
-        return code + ": " + message;
+        return "[" + code + "] " + message;
       }
       if (StringUtils.isNotBlank(message)) {
         return message;
       }
       if (StringUtils.isNotBlank(code)) {
-        return code;
+        return "[" + code + "]";
       }
     }
     return StringUtils.isNotBlank(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName();
