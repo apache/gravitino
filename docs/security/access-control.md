@@ -242,16 +242,16 @@ return only the entries the caller is entitled to see, which for a metalake owne
 
 #### Data Objects
 
-| Object   | Create              | Load                                       | Alter             | Drop  |
-|----------|---------------------|--------------------------------------------|-------------------|-------|
-| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                              | Owner             | Owner |
-| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                               | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`           | `MODIFY_TABLE`    | Owner |
-| View     | `CREATE_VIEW`       | `SELECT_VIEW`                              | Owner             | Owner |
-| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`         | `PRODUCE_TOPIC`   | Owner |
-| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`          | `WRITE_FILESET`   | Owner |
-| Model    | `REGISTER_MODEL`    | `USE_MODEL`                                | Owner             | Owner |
-| Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION`    | `MODIFY_FUNCTION` | Owner |
+| Object   | Create              | Load                                    | Alter             | Drop  |
+|----------|---------------------|-----------------------------------------|-------------------|-------|
+| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                           | Owner             | Owner |
+| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                            | Owner             | Owner |
+| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`        | `MODIFY_TABLE`    | Owner |
+| View     | `CREATE_VIEW`       | `SELECT_VIEW`                           | Owner             | Owner |
+| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`      | `PRODUCE_TOPIC`   | Owner |
+| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
+| Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
+| Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
@@ -293,15 +293,15 @@ bulk operations are authorized once before processing the request. Role removal 
 item because each role can be removed by the metalake owner or by the owner of that role. Bulk
 requests report item-level failures in `errors`.
 
-| API                                                 | Required privilege                                   |
-|-----------------------------------------------------|------------------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`            |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`            |
-| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`           |
-| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`           |
-| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`             |
-| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role      |
-| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS`   |
+| API                                                 | Required privilege                                 |
+|-----------------------------------------------------|----------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`           |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role    |
+| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS` |
 
 For example, add users in bulk:
 
@@ -428,9 +428,9 @@ as before.
 
 | Condition                                                          | Response          |
 |--------------------------------------------------------------------|-------------------|
-| An empty entry, such as the trailing comma in `analyst,`             | `400 Bad Request` |
-| `ALL` or `NONE` combined with anything else, such as `ALL,analyst`   | `400 Bad Request` |
-| A well-formed value naming a role the caller does not hold           | `403 Forbidden`   |
+| An empty entry, such as the trailing comma in `analyst,`           | `400 Bad Request` |
+| `ALL` or `NONE` combined with anything else, such as `ALL,analyst` | `400 Bad Request` |
+| A well-formed value naming a role the caller does not hold         | `403 Forbidden`   |
 
 A role that does not exist and a role the caller was never granted both return `403`, so the response
 cannot be used to discover which role names exist. An unheld role is rejected rather than ignored,
@@ -707,10 +707,10 @@ schemas, see the [Gravitino REST API](https://gravitino.apache.org/docs/latest/a
 Users, groups, and roles share one shape. Substitute `users`, `groups`, or `roles` for
 `{collection}`, and the user, group, or role name for `{name}`:
 
-| Operation | Method   | Path                  |
-|-----------|----------|-----------------------|
-| Create    | `POST`   | `/{collection}`       |
-| List      | `GET`    | `/{collection}`       |
+| Operation | Method   | Path                   |
+|-----------|----------|------------------------|
+| Create    | `POST`   | `/{collection}`        |
+| List      | `GET`    | `/{collection}`        |
 | Get       | `GET`    | `/{collection}/{name}` |
 | Delete    | `DELETE` | `/{collection}/{name}` |
 
@@ -718,15 +718,15 @@ Add `?details=true` to a list path to get full objects instead of names.
 
 The rest are one of a kind:
 
-| Operation                          | Method       | Path                                                            |
-|------------------------------------|--------------|-----------------------------------------------------------------|
-| Grant privileges to a role         | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`   |
-| Revoke privileges from a role      | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke`  |
-| Replace a role's privileges        | `PUT`        | `/permissions/roles/{role}/`                                    |
-| Grant roles to a user or group     | `PUT`        | `/permissions/{collection}/{name}/grant`                        |
-| Revoke roles from a user or group  | `PUT`        | `/permissions/{collection}/{name}/revoke`                       |
-| List the roles bound to an object  | `GET`        | `/objects/{object_type}/{object_name}/roles`                    |
-| Get or set an object's owner       | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                           |
+| Operation                         | Method       | Path                                                           |
+|-----------------------------------|--------------|----------------------------------------------------------------|
+| Grant privileges to a role        | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`  |
+| Revoke privileges from a role     | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke` |
+| Replace a role's privileges       | `PUT`        | `/permissions/roles/{role}/`                                   |
+| Grant roles to a user or group    | `PUT`        | `/permissions/{collection}/{name}/grant`                       |
+| Revoke roles from a user or group | `PUT`        | `/permissions/{collection}/{name}/revoke`                      |
+| List the roles bound to an object | `GET`        | `/objects/{object_type}/{object_name}/roles`                   |
+| Get or set an object's owner      | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                          |
 
 Replacing a role's privileges is destructive: afterwards the role holds exactly what the request body
 contains, and any object absent from it is dropped.

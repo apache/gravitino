@@ -251,36 +251,43 @@ public class TestGravitinoServer {
     ServerConfig serverConfig = spyServerConfig(serverConfigWithAvailablePort());
     gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
     gravitinoServer.initialize();
+    EventListenerPlugin captureListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            capturedEvents.add(event);
+          }
+
+          @Override
+          public void onPreEvent(PreEvent preEvent) {}
+
+          @Override
+          public Mode mode() {
+            return Mode.SYNC;
+          }
+        };
     GravitinoEnv.getInstance()
         .eventListenerManager()
-        .addEventListener(
-            "secretProviderAudit",
-            new EventListenerPlugin() {
-              @Override
-              public void init(Map<String, String> properties) {}
-
-              @Override
-              public void start() {}
-
-              @Override
-              public void stop() {}
-
-              @Override
-              public void onPostEvent(Event event) {
-                capturedEvents.add(event);
-              }
-
-              @Override
-              public void onPreEvent(PreEvent preEvent) {}
-
-              @Override
-              public Mode mode() {
-                return Mode.SYNC;
-              }
-            });
+        .addEventListener("secretProviderAudit", captureListener);
+    captureListener.start();
     gravitinoServer.start();
 
-    List<Map<String, Object>> providers = fetchSecretProviders(serverConfig);
+    // Create the metalake first, then clear events so create-metalake noise cannot mask the
+    // HttpRequestEvent for the secrets-providers GET (CreateMetalakeEvent + optional HTTP
+    // fallback).
+    String metalake = createMetalakeForSecretProviders(serverConfig);
+    capturedEvents.clear();
+
+    List<Map<String, Object>> providers = fetchSecretProviders(serverConfig, metalake);
     assertTrue(providers.isEmpty());
 
     HttpRequestEvent auditEvent =
@@ -294,7 +301,17 @@ public class TestGravitinoServer {
                     new AssertionError(
                         "No HttpRequestEvent captured for GET /api/metalakes/.../secrets/providers; events="
                             + capturedEvents.stream()
-                                .map(e -> e.getClass().getSimpleName())
+                                .map(
+                                    e ->
+                                        e instanceof HttpRequestEvent
+                                            ? "HttpRequestEvent(method="
+                                                + ((HttpRequestEvent) e).httpMethod()
+                                                + ", uri="
+                                                + ((HttpRequestEvent) e).requestUri()
+                                                + ", status="
+                                                + ((HttpRequestEvent) e).statusCode()
+                                                + ")"
+                                            : e.getClass().getSimpleName())
                                 .collect(Collectors.toList())));
     assertEquals(200, auditEvent.statusCode());
     assertEquals("GET", auditEvent.httpMethod());
@@ -422,6 +439,11 @@ public class TestGravitinoServer {
 
   private static List<Map<String, Object>> fetchSecretProviders(ServerConfig serverConfig)
       throws Exception {
+    return fetchSecretProviders(serverConfig, createMetalakeForSecretProviders(serverConfig));
+  }
+
+  private static String createMetalakeForSecretProviders(ServerConfig serverConfig)
+      throws Exception {
     int port =
         JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
             .getHttpPort();
@@ -438,7 +460,14 @@ public class TestGravitinoServer {
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
     assertEquals(200, createResponse.statusCode(), createResponse.body());
+    return metalake;
+  }
 
+  private static List<Map<String, Object>> fetchSecretProviders(
+      ServerConfig serverConfig, String metalake) throws Exception {
+    int port =
+        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
     HttpResponse<String> response =
         HttpClient.newHttpClient()
             .send(
