@@ -126,6 +126,62 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  public void testUpgradeSQLScriptIdempotency() throws SQLException, IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
+    Path scriptDir = Path.of(gravitinoHome, "scripts", backendType.toLowerCase());
+    File[] scriptFiles = scriptDir.toFile().listFiles();
+    Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
+    Arrays.sort(scriptFiles, Comparator.comparing(File::getName));
+
+    Pattern upgradePattern =
+        Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
+    for (File upgradeScript : scriptFiles) {
+      Matcher upgradeMatcher = upgradePattern.matcher(upgradeScript.getName());
+      if (!upgradeMatcher.matches()) {
+        continue;
+      }
+
+      String fromVersion = upgradeMatcher.group(1);
+      File sourceSchema =
+          scriptDir
+              .resolve("schema-" + fromVersion + "-" + backendType.toLowerCase() + ".sql")
+              .toFile();
+      Assertions.assertTrue(
+          sourceSchema.isFile(), "No source schema found for " + upgradeScript.getName());
+
+      // First run: apply schema + upgrade script
+      dropAllTables();
+      executeScript(sourceSchema);
+      executeScript(upgradeScript);
+
+      // Second run: re-run the upgrade script to verify idempotency.
+      // Index-creation statements (CREATE INDEX IF NOT EXISTS for PostgreSQL,
+      // and prepared-statement-guarded CREATE INDEX for MySQL) must not throw.
+      // Other DDL (ALTER TABLE ADD COLUMN, etc.) may fail on re-run — those
+      // failures are expected and swallowed.
+      List<String> ddls = extractStatements(upgradeScript.toPath());
+      try (SqlSession sqlSession =
+              SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+          Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement()) {
+        for (String ddl : ddls) {
+          try {
+            statement.execute(ddl);
+          } catch (SQLException e) {
+            Assertions.assertFalse(
+                isIndexCreationStatement(ddl),
+                "Index-creation statement should be idempotent but failed on re-run: "
+                    + ddl
+                    + " — "
+                    + e.getMessage());
+          }
+        }
+      }
+    }
+  }
+
   private void executeScript(File scriptFile) throws IOException, SQLException {
     List<String> ddls = extractStatements(scriptFile.toPath());
     try (SqlSession sqlSession =
@@ -138,6 +194,21 @@ public class TestSQLScripts extends TestJDBCBackend {
             "Failed to execute DDL in file " + scriptFile.getName() + " ddl: " + ddl);
       }
     }
+  }
+
+  private boolean isIndexCreationStatement(String ddl) {
+    String upper = ddl.toUpperCase().trim();
+    // PostgreSQL: CREATE INDEX IF NOT EXISTS ...
+    // MySQL prepared-statement block: SET @idx := ... (check information_schema
+    //   before CREATE INDEX). These are split into individual statements by
+    //   extractStatements; the SET and PREPARE statements are safe to re-run.
+    return upper.startsWith("CREATE INDEX")
+        || upper.startsWith("CREATE UNIQUE INDEX")
+        || upper.startsWith("SET @IDX :=")
+        || upper.startsWith("SET @SQL :=")
+        || upper.startsWith("PREPARE STMT")
+        || upper.startsWith("EXECUTE STMT")
+        || upper.startsWith("DEALLOCATE PREPARE");
   }
 
   private List<String> extractStatements(Path sqlFile) throws IOException {

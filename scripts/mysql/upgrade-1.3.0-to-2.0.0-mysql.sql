@@ -35,8 +35,19 @@ ALTER TABLE `idp_user_meta`
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
 
-CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
-CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'uk_ti_mi_mo_tv_del');
+SET @sql := IF(@idx = 0,
+    'CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`)',
+    'SELECT ''uk_ti_mi_mo_tv_del already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_tid_value');
+SET @sql := IF(@idx = 0,
+    'CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`)',
+    'SELECT ''idx_tid_value already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Index names are only scoped per-table in MySQL, so the same name could be
 -- reused across tables. Prefix each reused name with its table name so that
