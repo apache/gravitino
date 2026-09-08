@@ -20,8 +20,14 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.lang.ref.Reference;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.security.Provider;
+import java.security.Security;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Timer;
@@ -74,6 +80,12 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(ClassLoaderResourceCleanerUtils::releaseLogFactoryInCommonLogging, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::removeLoggerContextListeners, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::deregisterJdbcDrivers, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::shutdownMysqlConnectionCleanup, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::removeSecurityProviders, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAWS, classLoader);
 
@@ -165,8 +177,30 @@ public class ClassLoaderResourceCleanerUtils {
     }
   }
 
-  private static boolean runningWithClassLoader(Thread thread, ClassLoader targetClassLoader) {
-    return thread != null && thread.getContextClassLoader() == targetClassLoader;
+  /**
+   * Whether the thread belongs to the class loader being released.
+   *
+   * <p>The context ClassLoader is only one of the ways a thread can carry a catalog. A driver that
+   * starts its own housekeeping thread, such as PostgreSQL's {@code LazyCleaner}, is running code
+   * defined by the catalog's loader: the thread is a GC root, so its class alone keeps the loader
+   * alive no matter what its context ClassLoader says.
+   */
+  @VisibleForTesting
+  static boolean runningWithClassLoader(Thread thread, ClassLoader targetClassLoader) {
+    if (thread == null) {
+      return false;
+    }
+    if (thread.getContextClassLoader() == targetClassLoader
+        || thread.getClass().getClassLoader() == targetClassLoader) {
+      return true;
+    }
+    try {
+      Object runnable = FieldUtils.readField(thread, "target", true);
+      return runnable != null && runnable.getClass().getClassLoader() == targetClassLoader;
+    } catch (Exception e) {
+      LOG.debug("Cannot read the runnable of thread {}", thread.getName(), e);
+      return false;
+    }
   }
 
   private static Thread[] getAllThreads() {
@@ -278,6 +312,105 @@ public class ClassLoaderResourceCleanerUtils {
    * through it the catalog's ClassLoader, stays reachable from a static for the life of the
    * process.
    */
+  /**
+   * Removes the JCA security providers the class loader installed.
+   *
+   * <p>{@link Security} keeps installed providers in a JVM-wide static list. Hadoop's cloud
+   * connectors install one, such as the shaded {@code OpenSSLProvider} that ships in the AWS
+   * bundle, and it is never removed, so the provider's class holds the catalog's loader for the
+   * life of the process.
+   */
+  @VisibleForTesting
+  static void removeSecurityProviders(ClassLoader targetClassLoader) {
+    for (Provider provider : Security.getProviders()) {
+      if (provider.getClass().getClassLoader() == targetClassLoader) {
+        Security.removeProvider(provider.getName());
+        LOG.info("Removed security provider {} of a released catalog ClassLoader", provider);
+      }
+    }
+  }
+
+  /**
+   * Shuts down MySQL Connector/J's abandoned-connection cleanup thread when the driver belongs to
+   * this class loader.
+   *
+   * <p>The driver keeps that thread and its executor in a static field, and the executor's thread
+   * factory is a lambda defined by the catalog's loader, so a running cleanup thread pins the
+   * loader through its own stack frame. Connector/J exposes {@code uncheckedShutdown()} for exactly
+   * this case.
+   */
+  private static void shutdownMysqlConnectionCleanup(ClassLoader targetClassLoader)
+      throws Exception {
+    Class<?> cleanupThreadClass =
+        Class.forName(
+            "com.mysql.cj.jdbc.AbandonedConnectionCleanupThread", true, targetClassLoader);
+    if (!isOwnedByClassLoader(cleanupThreadClass, targetClassLoader)) {
+      LOG.debug(
+          "MySQL Connector/J is owned by {}, not {}; skipping shared-class cleanup",
+          cleanupThreadClass.getClassLoader(),
+          targetClassLoader);
+      return;
+    }
+    // uncheckedShutdown stops the thread even when the driver still believes it is in use, which
+    // is what unloading the ClassLoader requires; checkedShutdown returns without doing anything.
+    MethodUtils.invokeStaticMethod(cleanupThreadClass, "uncheckedShutdown");
+    LOG.info("Shut down the MySQL abandoned-connection cleanup thread of a released ClassLoader");
+  }
+
+  /**
+   * Deregisters the JDBC drivers the class loader registered with {@link java.sql.DriverManager}.
+   *
+   * <p>{@code DriverManager} keeps registered drivers in a static list, and a driver defined by a
+   * catalog's ClassLoader keeps that loader alive for the life of the process. It cannot be removed
+   * from here directly: {@code DriverManager} filters both {@code getDrivers()} and {@code
+   * deregisterDriver()} by the class loader of the calling class, so from the server's ClassLoader
+   * the catalog's drivers are not even visible. Defining {@link JdbcDriverDeregisterer} inside the
+   * target loader and calling it there gives {@code DriverManager} a caller that owns them.
+   */
+  @VisibleForTesting
+  static void deregisterJdbcDrivers(ClassLoader targetClassLoader) throws Exception {
+    String name = JdbcDriverDeregisterer.class.getName();
+    byte[] bytecode;
+    try (InputStream in =
+        ClassLoaderResourceCleanerUtils.class
+            .getClassLoader()
+            .getResourceAsStream(name.replace('.', '/') + ".class")) {
+      if (in == null) {
+        LOG.debug("Cannot locate the bytecode of {}, skipping JDBC driver cleanup", name);
+        return;
+      }
+      ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+      byte[] chunk = new byte[8192];
+      int read;
+      while ((read = in.read(chunk)) != -1) {
+        buffer.write(chunk, 0, read);
+      }
+      bytecode = buffer.toByteArray();
+    }
+
+    Method defineClass =
+        ClassLoader.class.getDeclaredMethod(
+            "defineClass", String.class, byte[].class, int.class, int.class);
+    defineClass.setAccessible(true);
+    Class<?> deregisterer;
+    try {
+      deregisterer =
+          (Class<?>) defineClass.invoke(targetClassLoader, name, bytecode, 0, bytecode.length);
+    } catch (InvocationTargetException e) {
+      if (e.getCause() instanceof LinkageError) {
+        // Already defined by an earlier cleanup of the same loader, whose drivers are gone.
+        LOG.debug("{} is already defined in {}", name, targetClassLoader);
+        return;
+      }
+      throw e;
+    }
+
+    Object deregistered = MethodUtils.invokeStaticMethod(deregisterer, "deregisterAll");
+    if (deregistered instanceof Collection && !((Collection<?>) deregistered).isEmpty()) {
+      LOG.info("Deregistered JDBC driver(s) {} of a released catalog ClassLoader", deregistered);
+    }
+  }
+
   @VisibleForTesting
   static void removeLoggerContextListeners(ClassLoader targetClassLoader) throws Exception {
     Class<?> logManagerClass = Class.forName("org.apache.logging.log4j.LogManager");

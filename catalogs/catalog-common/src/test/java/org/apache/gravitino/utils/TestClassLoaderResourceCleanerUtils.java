@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -28,6 +29,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.security.Security;
 import org.junit.jupiter.api.Test;
 
 class TestClassLoaderResourceCleanerUtils {
@@ -37,6 +39,12 @@ class TestClassLoaderResourceCleanerUtils {
 
   /** A class with no dependencies beyond java.*, so a bare-bones child loader can define it. */
   public static class Leaky {}
+
+  /** A Runnable the child loader can define, standing in for a driver's housekeeping task. */
+  public static class LeakyTask implements Runnable {
+    @Override
+    public void run() {}
+  }
 
   private static URLClassLoader childLoaderOwning(Class<?> clazz) throws Exception {
     URL location = clazz.getProtectionDomain().getCodeSource().getLocation();
@@ -91,6 +99,36 @@ class TestClassLoaderResourceCleanerUtils {
 
       assertNull(SOFT_HOLDER.get());
     }
+  }
+
+  /**
+   * A driver's own housekeeping thread runs code the catalog defined, so the thread pins the loader
+   * whatever its context ClassLoader says.
+   */
+  @Test
+  void testRunningWithClassLoaderMatchesTheRunnableOfAThread() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Runnable owned =
+          (Runnable)
+              child.loadClass(LeakyTask.class.getName()).getDeclaredConstructor().newInstance();
+      Thread thread = new Thread(owned, "leaky-task");
+      thread.setContextClassLoader(null);
+
+      assertTrue(ClassLoaderResourceCleanerUtils.runningWithClassLoader(thread, child));
+      assertFalse(
+          ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+              new Thread(() -> {}, "unrelated"), child));
+    }
+  }
+
+  /** Providers installed by other loaders, and by the JDK itself, must be left alone. */
+  @Test
+  void testRemoveSecurityProvidersLeavesUnrelatedProviders() throws Exception {
+    int before = Security.getProviders().length;
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      ClassLoaderResourceCleanerUtils.removeSecurityProviders(child);
+    }
+    assertEquals(before, Security.getProviders().length);
   }
 
   /** Entries belonging to another loader must survive the sweep. */
