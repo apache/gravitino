@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * <p>The provider registry is server configuration (not per-metalake state). The metalake path
  * segment scopes authorization: callers need metalake ownership or {@code VIEW_SECRET_PROVIDERS}.
  */
-@Path("/metalakes/{metalake}/secrets/providers")
+@Path("metalakes/{metalake}/secrets")
 public class SecretsProviderOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SecretsProviderOperations.class);
@@ -77,6 +77,7 @@ public class SecretsProviderOperations {
    * @return a list of provider names and types
    */
   @GET
+  @Path("providers")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-secret-providers." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-secret-providers", absolute = true)
