@@ -20,8 +20,12 @@ package org.apache.gravitino.listener;
 
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagPreEvent;
 import org.apache.gravitino.listener.api.event.AlterTagEvent;
 import org.apache.gravitino.listener.api.event.AlterTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
@@ -55,7 +59,11 @@ import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFail
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagPreEvent;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -234,6 +242,42 @@ public class TagEventDispatcher implements TagDispatcher {
       eventBus.dispatchEvent(
           new ListMetadataObjectsForTagFailureEvent(
               PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    return dispatcher.listPolicyAssociationsForTag(metalake, name);
+  }
+
+  @Override
+  public void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(
+        new AddPolicyForTagPreEvent(user, metalake, tagName, policyName, selector));
+    try {
+      dispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
+      eventBus.dispatchEvent(
+          new AddPolicyForTagEvent(user, metalake, tagName, policyName, selector));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new AddPolicyForTagFailureEvent(user, metalake, tagName, policyName, selector, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName));
+    try {
+      dispatcher.removePolicyFromTag(metalake, tagName, policyName);
+      eventBus.dispatchEvent(new RemovePolicyFromTagEvent(user, metalake, tagName, policyName));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new RemovePolicyFromTagFailureEvent(user, metalake, tagName, policyName, e));
       throw e;
     }
   }

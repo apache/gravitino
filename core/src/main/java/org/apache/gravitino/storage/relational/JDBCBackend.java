@@ -48,7 +48,6 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -289,76 +288,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E getByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        return (E) UserMetaService.getInstance().getUserByExternalId(ident);
-      case GROUP:
-        return (E) GroupMetaService.getInstance().getGroupByExternalId(ident);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for get by external id operation", entityType);
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for update enabled by external id operation", entityType);
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E getById(
-      NameIdentifier ident, Entity.EntityType entityType)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        AuthorizationUtils.checkUserId(ident);
-        return (E)
-            UserMetaService.getInstance()
-                .getUserById(ident.namespace().level(0), Long.parseLong(ident.name()));
-      case GROUP:
-        AuthorizationUtils.checkGroupId(ident);
-        return (E)
-            GroupMetaService.getInstance()
-                .getGroupById(ident.namespace().level(0), Long.parseLong(ident.name()));
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for get by id operation", entityType);
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E updateById(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        AuthorizationUtils.checkUserId(ident);
-        return (E)
-            UserMetaService.getInstance()
-                .updateUserById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
-      case GROUP:
-        AuthorizationUtils.checkGroupId(ident);
-        return (E)
-            GroupMetaService.getInstance()
-                .updateGroupById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for update by id operation", entityType);
-    }
-  }
-
-  @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
     if (identifiers == null || identifiers.isEmpty()) {
@@ -438,7 +367,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    if (!BaseEntityCache.isCacheable(entityType)) {
+    if (!shouldRecordEntityDrop(entityType)) {
       return deleteEntity(ident, entityType, cascade);
     }
 
@@ -1190,6 +1119,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 entityType.name(),
                 EntityChangeLogNameIdentifierCodec.encode(ident),
                 operateType));
+  }
+
+  private static boolean shouldRecordEntityDrop(Entity.EntityType entityType) {
+    // Functions bypass the Entity Store cache, but their drops must still invalidate JCasbin's
+    // name-to-ID cache on peer nodes.
+    return BaseEntityCache.isCacheable(entityType) || entityType == Entity.EntityType.FUNCTION;
   }
 
   /** Start JDBC database if necessary. For example, start the H2 database if the backend is H2. */

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.Preconditions;
@@ -59,6 +60,19 @@ public abstract class JdbcPropertiesConverter
     // The URL in FlinkJdbcCatalog does not support database and other parameters.
     flinkCatalogProperties.put(
         JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+
+    // Default the Flink catalog's 'default-database' option from the Gravitino jdbc-database
+    // property when it was not already supplied (e.g. via flink.bypass.default-database). This
+    // makes the value available when building per-table scan properties, since only the Flink
+    // catalog properties (not the Gravitino table properties) reach toFlinkTableProperties, and
+    // 'default-database' -- unlike 'jdbc-database' -- is an option Flink's JdbcCatalogFactory
+    // already recognizes, so it survives that factory's strict option validation.
+    String gravitinoJdbcDatabase =
+        gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE);
+    if (StringUtils.isNotBlank(gravitinoJdbcDatabase)) {
+      flinkCatalogProperties.putIfAbsent(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, gravitinoJdbcDatabase);
+    }
     return flinkCatalogProperties;
   }
 
@@ -75,7 +89,7 @@ public abstract class JdbcPropertiesConverter
   @Override
   public Map<String, String> toFlinkTableProperties(
       Map<String, String> flinkCatalogProperties,
-      Map<String, String> gravitinoProperties,
+      Map<String, String> gravitinoTableProperties,
       ObjectPath tablePath) {
     String jdbcUser = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER);
     String jdbcPassword = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
@@ -89,11 +103,30 @@ public abstract class JdbcPropertiesConverter
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
-        jdbcBaseUrl + tablePath.getDatabaseName());
-    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, tablePath.getObjectName());
+        jdbcBaseUrl + getConnectionDatabase(flinkCatalogProperties, tablePath));
+    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, getTableName(tablePath));
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcUser);
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcPassword);
     return tableOptions;
+  }
+
+  /**
+   * Returns the database name used to build the JDBC connection URL for a table scan. Defaults to
+   * the Flink "database", which corresponds to the Gravitino schema name.
+   *
+   * @param flinkCatalogProperties the Flink catalog properties produced by {@link
+   *     #toFlinkCatalogProperties(Map)}.
+   * @param tablePath the Flink table path being scanned.
+   * @return the database name to use when building the JDBC connection URL.
+   */
+  protected String getConnectionDatabase(
+      Map<String, String> flinkCatalogProperties, ObjectPath tablePath) {
+    return tablePath.getDatabaseName();
+  }
+
+  /** Returns the table name used in the JDBC connector's {@code table-name} option. */
+  protected String getTableName(ObjectPath tablePath) {
+    return tablePath.getObjectName();
   }
 
   protected abstract String defaultDriverName();

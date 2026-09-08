@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.PO
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 
@@ -31,7 +32,8 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
       String metalakeName, String policyName) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = (SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
@@ -55,7 +57,8 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
       Long policyId, long versionRetentionLine, int limit) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE id IN (SELECT id FROM "
         + POLICY_VERSION_TABLE_NAME
         + " WHERE policy_id = #{policyId} AND version <= #{versionRetentionLine}"
@@ -66,7 +69,8 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
   public String softDeletePolicyVersionsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

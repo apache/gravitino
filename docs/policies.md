@@ -33,7 +33,7 @@ Common uses:
 policies. A policy needs a name, the object types it supports, and its rules. Built-in policies are
 created over REST.
 
-**2. Attach it to an object.** Open the catalog, schema, table, fileset, topic, or model you want to
+**2. Attach it to an object.** Open the catalog, schema, table, fileset, topic, model, view, or function you want to
 govern and add the policy from its policy control. Only policies that already exist in the metalake
 are offered.
 
@@ -64,7 +64,7 @@ shape.
 ### What Can Carry a Policy
 
 A metadata object is identified by a type and a name, with each level below the catalog separated by
-a dot. Six object types can carry a policy.
+a dot. Eight object types can carry a policy.
 
 | Object type | Name form                                     |
 |-------------|-----------------------------------------------|
@@ -74,8 +74,10 @@ a dot. Six object types can carry a policy.
 | `FILESET`   | `{catalog_name}.{schema_name}.{fileset_name}` |
 | `TOPIC`     | `{catalog_name}.{schema_name}.{topic_name}`   |
 | `MODEL`     | `{catalog_name}.{schema_name}.{model_name}`   |
+| `VIEW`      | `{catalog_name}.{schema_name}.{view_name}`    |
+| `FUNCTION`  | `{catalog_name}.{schema_name}.{function_name}`|
 
-Columns, views, and functions cannot carry a policy, which is narrower than
+Columns cannot carry a policy, which is narrower than
 [tags](./tags.md). A metalake cannot carry one either, so to reach every object
 in a catalog, attach the policy to the catalog.
 
@@ -128,7 +130,7 @@ whoever reads the policy, useful for holding a policy through review without del
 ### Inheritance
 
 An object shows the policies attached to it plus the policies attached to each of its ancestors, so
-a policy on a catalog applies to every schema, table, fileset, topic, and model beneath it. For
+a policy on a catalog applies to every schema, table, fileset, topic, model, view, and function beneath it. For
 catalogs that support multi-level schemas, the intermediate schemas are ancestors too.
 
 Each policy appears once, whether it reaches the object through one ancestor or several. A policy

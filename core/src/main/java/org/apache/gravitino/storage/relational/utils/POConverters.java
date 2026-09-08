@@ -908,9 +908,10 @@ public class POConverters {
   }
 
   public static TopicPO updateTopicPOWithVersion(TopicPO oldTopicPO, TopicEntity newEntity) {
-    Long lastVersion = oldTopicPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every successful alter advances beyond both stored version markers. They normally match, but
+    // taking the larger value also prevents an inconsistent legacy row from moving either marker
+    // backwards and making an old request current again.
+    Long nextVersion = Math.max(oldTopicPO.getCurrentVersion(), oldTopicPO.getLastVersion()) + 1;
     try {
       return TopicPO.builder()
           .withTopicId(oldTopicPO.getTopicId())
@@ -943,8 +944,6 @@ public class POConverters {
       return builder
           .withUserId(userEntity.id())
           .withUserName(userEntity.name())
-          .withExternalId(userEntity.externalId())
-          .withEnabled(userEntity.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -959,21 +958,16 @@ public class POConverters {
    * Update UserPO version
    *
    * @param oldUserPO the old UserPO object
-   * @param newUser the new TableEntity object
+   * @param newUser the new UserEntity object
    * @return UserPO object with updated version
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
-    Long lastVersion = oldUserPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldUserPO.getCurrentVersion() + 1;
     try {
       return UserPO.builder()
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
           .withMetalakeId(oldUserPO.getMetalakeId())
-          .withExternalId(newUser.externalId())
-          .withEnabled(newUser.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1003,8 +997,6 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
-              .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1033,8 +1025,6 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
-              .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {
@@ -1091,7 +1081,6 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
-              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1120,7 +1109,6 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
-              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
 
@@ -1226,7 +1214,6 @@ public class POConverters {
       return builder
           .withGroupId(groupEntity.id())
           .withGroupName(groupEntity.name())
-          .withExternalId(groupEntity.externalId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1245,15 +1232,11 @@ public class POConverters {
    * @return GroupPO object with updated version
    */
   public static GroupPO updateGroupPOWithVersion(GroupPO oldGroupPO, GroupEntity newGroup) {
-    Long lastVersion = oldGroupPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldGroupPO.getCurrentVersion() + 1;
     try {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
-          .withExternalId(newGroup.externalId())
           .withMetalakeId(oldGroupPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)
@@ -1372,11 +1355,15 @@ public class POConverters {
     }
   }
 
+  /**
+   * Updates a role PO and advances its OCC version.
+   *
+   * @param oldRolePO the role PO carrying the current version
+   * @param newRole the updated role entity
+   * @return a role PO whose current and last versions are advanced
+   */
   public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
-    Long lastVersion = oldRolePO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldRolePO.getCurrentVersion() + 1;
     try {
       return RolePO.builder()
           .withRoleId(oldRolePO.getRoleId())
@@ -1436,10 +1423,7 @@ public class POConverters {
   }
 
   public static TagPO updateTagPOWithVersion(TagPO oldTagPO, TagEntity newEntity) {
-    Long lastVersion = oldTagPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldTagPO.getCurrentVersion() + 1;
     try {
       return TagPO.builder()
           .withTagId(oldTagPO.getTagId())
@@ -1644,6 +1628,9 @@ public class POConverters {
           .withModelName(modelEntity.name())
           .withModelComment(modelEntity.comment())
           .withModelLatestVersion(modelEntity.latestVersion())
+          // A new model has no earlier writes, so its concurrency version starts at 1.
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
           .withModelProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.auditInfo()))
@@ -1688,14 +1675,17 @@ public class POConverters {
   }
 
   /**
-   * Updata ModelPO with new ModelEntity object, metalakeID, catalogID, schemaID will be the same as
-   * the old one. the id, name, comment, properties, latestVersion and auditInfo will be updated.
+   * Creates a {@link ModelPO} for a model update.
    *
-   * @param oldModelPO the old ModelPO object
-   * @param newModel the new ModelEntity object
-   * @return the updated ModelPO object
+   * <p>The parent metalake, catalog, and schema IDs stay unchanged. The model fields come from the
+   * new entity, and the shared concurrency version advances by one.
+   *
+   * @param oldModelPO the model record read before the update
+   * @param newModel the updated model entity
+   * @return the model record to store
    */
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
+    long nextModelVersion = oldModelPO.getCurrentVersion() + 1;
     try {
       return ModelPO.builder()
           .withModelId(newModel.id())
@@ -1705,6 +1695,11 @@ public class POConverters {
           .withSchemaId(oldModelPO.getSchemaId())
           .withModelComment(newModel.comment())
           .withModelLatestVersion(newModel.latestVersion())
+          // Reserve the next shared concurrency version for this model change. The guard on the
+          // write matches current_version, so that column is what the next version is derived from;
+          // last_version only mirrors it.
+          .withCurrentVersion(nextModelVersion)
+          .withLastVersion(nextModelVersion)
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)

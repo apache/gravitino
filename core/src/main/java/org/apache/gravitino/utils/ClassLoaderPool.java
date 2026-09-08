@@ -24,7 +24,7 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
  * URIs, JDBC URL, default filesystem). Sharing ClassLoaders across same-configuration catalogs
  * significantly reduces Metaspace memory usage.
  *
- * <p>Thread safety is guaranteed through {@link ConcurrentHashMap#compute} for all acquire/release
- * operations.
+ * <p>Thread safety is guaranteed through {@link ConcurrentHashMap#compute} for per-key reference
+ * counting and a lifecycle read-write lock that serializes acquisitions with shutdown.
  *
  * <p><b>Concurrency note:</b> the classloader factory (JAR scanning in {@code acquire}) and {@link
  * #doFinalCleanup} (thread interruption and reflective ThreadLocal cleanup in {@code release}) run
@@ -52,7 +52,10 @@ public class ClassLoaderPool implements Closeable {
   private final ConcurrentHashMap<ClassLoaderKey, PooledClassLoaderEntry> pool =
       new ConcurrentHashMap<>();
 
-  private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final ReentrantReadWriteLock lifecycleLock = new ReentrantReadWriteLock();
+
+  /** Guarded by {@link #lifecycleLock}. */
+  private boolean closed;
 
   /**
    * Acquires a ClassLoader entry for the given key. If an entry already exists, increments the
@@ -64,24 +67,29 @@ public class ClassLoaderPool implements Closeable {
    * @throws IllegalStateException if the pool has been closed.
    */
   public PooledClassLoaderEntry acquire(ClassLoaderKey key, Supplier<IsolatedClassLoader> factory) {
-    return pool.compute(
-        key,
-        (k, existing) -> {
-          if (closed.get()) {
-            throw new IllegalStateException("ClassLoaderPool is already closed");
-          }
-          if (existing != null) {
-            existing.incrementRefCount();
-            LOG.debug("Reusing ClassLoader for key {}, refCount={}.", key, existing.refCount());
-            return existing;
-          }
-          // If the factory throws (e.g., invalid classpath), the exception propagates to the
-          // caller and ConcurrentHashMap leaves the key unmapped.
-          IsolatedClassLoader classLoader = factory.get();
-          PooledClassLoaderEntry newEntry = new PooledClassLoaderEntry(k, classLoader);
-          LOG.info("Created new ClassLoader for key {}, refCount=1.", key);
-          return newEntry;
-        });
+    lifecycleLock.readLock().lock();
+    try {
+      return pool.compute(
+          key,
+          (k, existing) -> {
+            if (closed) {
+              throw new IllegalStateException("ClassLoaderPool is already closed");
+            }
+            if (existing != null) {
+              existing.incrementRefCount();
+              LOG.debug("Reusing ClassLoader for key {}, refCount={}.", key, existing.refCount());
+              return existing;
+            }
+            // If the factory throws (e.g., invalid classpath), the exception propagates to the
+            // caller and ConcurrentHashMap leaves the key unmapped.
+            IsolatedClassLoader classLoader = factory.get();
+            PooledClassLoaderEntry newEntry = new PooledClassLoaderEntry(k, classLoader);
+            LOG.info("Created new ClassLoader for key {}, refCount=1.", key);
+            return newEntry;
+          });
+    } finally {
+      lifecycleLock.readLock().unlock();
+    }
   }
 
   /**
@@ -124,12 +132,29 @@ public class ClassLoaderPool implements Closeable {
    */
   @Override
   public void close() {
-    closed.set(true);
-    // Drain with a loop to catch entries inserted by concurrent acquire() calls that were
-    // already past the closed check when we set the flag. Since closed=true prevents any new
-    // entries from being created, this loop is guaranteed to terminate.
-    while (!pool.isEmpty()) {
+    lifecycleLock.writeLock().lock();
+    try {
+      closed = true;
       pool.keySet().forEach(this::removeAndCleanup);
+    } finally {
+      lifecycleLock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Prevents new acquisitions while allowing existing owners to release their entries normally. An
+   * entry is removed immediately when its reference count reaches zero, so every entry still in the
+   * map is active and is cleaned up by {@link #release(PooledClassLoaderEntry)}.
+   *
+   * <p>This is intended for graceful owner shutdown: unlike {@link #close()}, it never closes a
+   * ClassLoader that an active owner may still be using.
+   */
+  public void closeWhenIdle() {
+    lifecycleLock.writeLock().lock();
+    try {
+      closed = true;
+    } finally {
+      lifecycleLock.writeLock().unlock();
     }
   }
 

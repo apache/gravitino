@@ -142,6 +142,20 @@ public final class ClickHouseClusterUtils {
   }
 
   /**
+   * Returns whether {@code storedComment} contains the Gravitino cluster metadata marker.
+   *
+   * <p>This deliberately distinguishes an absent marker from a present marker with a blank value.
+   * Callers performing cluster-wide DDL can therefore keep unmarked external objects local while
+   * rejecting corrupted Gravitino metadata before mutation.
+   *
+   * @param storedComment The raw comment as stored in ClickHouse.
+   * @return {@code true} if the Gravitino cluster metadata marker is present.
+   */
+  public static boolean hasClusterMetadata(String storedComment) {
+    return storedComment != null && storedComment.contains(CLUSTER_META_PREFIX);
+  }
+
+  /**
    * Returns the user-visible portion of the stored comment, stripping any embedded cluster metadata
    * suffix. Returns {@code null} if {@code storedComment} is {@code null}.
    *

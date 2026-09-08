@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -40,16 +41,19 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -266,20 +270,26 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return Boolean.parseBoolean(catalogInUseStr);
   }
 
-  private boolean isInvokedBy(String methodName) {
-    return StackWalker.getInstance()
-        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
-  }
-
+  /**
+   * Returns the authorization plugin configured for this catalog.
+   *
+   * <p>A configured provider without a plugin means the catalog's authorization lifecycle is
+   * incomplete. Silently treating that state as authorization being disabled could leave stale
+   * grants in the external authorization system.
+   *
+   * @return the authorization plugin, or null if no authorization provider is configured
+   * @throws AuthorizationPluginException if a configured authorization plugin is unavailable
+   */
+  @Nullable
   public AuthorizationPlugin getAuthorizationPlugin() {
-    if (authorizationPlugin == null) {
-      synchronized (this) {
-        if (authorizationPlugin == null) {
-          return null;
-        }
-      }
+    AuthorizationPlugin plugin = authorizationPlugin;
+    if (plugin == null && isAuthorizationProviderConfigured()) {
+      throw new AuthorizationPluginException(
+          "The authorization plugin of catalog %s is unavailable although an authorization "
+              + "provider is configured",
+          name());
     }
-    return authorizationPlugin;
+    return plugin;
   }
 
   /**
@@ -298,7 +308,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             LOG.info("Authorization provider is not set!");
             return;
           }
-
           // use try-with-resources to auto-close authorization object if exit with exception
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
@@ -384,6 +393,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       }
     }
     return catalogCredentialManager;
+  }
+
+  private boolean isInvokedBy(String methodName) {
+    return StackWalker.getInstance()
+        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
+  }
+
+  private boolean isAuthorizationProviderConfigured() {
+    return conf != null
+        && catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER) != null;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {
@@ -529,8 +548,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   /**
    * Detects credential providers for this catalog type and appends them to {@code
    * credentialProviders}. The default implementation calls {@link
-   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS credentials. Subclasses
-   * override this to add catalog-specific providers (e.g., JDBC).
+   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS/COS credentials.
+   * Subclasses override this to add catalog-specific providers (e.g., JDBC).
    *
    * @param properties the raw catalog properties
    * @param credentialProviders the list to append detected provider names to
@@ -577,6 +596,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
     if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
       credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
+    }
+
+    String cosAccessKeyId = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID);
+    String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
+      credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
     }
   }
 

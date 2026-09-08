@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -80,8 +81,8 @@ public class TableVersionBaseSQLProvider {
       @Param("tableId") Long tableId, @Param("version") Long version) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
   }
 

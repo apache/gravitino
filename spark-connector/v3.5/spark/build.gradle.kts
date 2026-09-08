@@ -151,6 +151,8 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.aws.policy)
+  testImplementation(project(":iceberg:iceberg-common"))
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

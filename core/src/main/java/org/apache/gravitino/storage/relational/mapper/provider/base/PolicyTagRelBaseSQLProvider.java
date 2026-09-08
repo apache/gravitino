@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -89,6 +90,15 @@ public class PolicyTagRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL for soft-deleting policy relations when a tag is deleted. */
+  public String softDeleteByTagId(@Param("tagId") Long tagId) {
+    return "UPDATE "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + deletedAtNowExpression()
+        + " WHERE tag_id = #{tagId} AND deleted_at = 0";
+  }
+
   /** Returns SQL for physically deleting expired relation rows. */
   public String deleteByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
@@ -99,8 +109,7 @@ public class PolicyTagRelBaseSQLProvider {
 
   /** Returns the database expression for the current epoch-millisecond timestamp. */
   protected String deletedAtNowExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 
   private String listRelations(

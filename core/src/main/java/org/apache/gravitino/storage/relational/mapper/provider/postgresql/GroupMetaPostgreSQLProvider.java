@@ -24,24 +24,28 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
-  public String softDeleteGroupMetaByGroupId(Long groupId) {
+  public String softDeleteGroupMetaByGroupId(Long groupId, Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE group_id = #{groupId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteGroupMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -49,14 +53,14 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name, metalake_id, external_id,"
+        + " (group_id, group_name, metalake_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
         + " #{groupMeta.metalakeId},"
-        + " #{groupMeta.externalId},"
+        + ""
         + " #{groupMeta.auditInfo},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
@@ -65,10 +69,15 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " ON CONFLICT(group_id) DO UPDATE SET"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
-        + " external_id = #{groupMeta.externalId},"
+        + ""
         + " audit_info = #{groupMeta.auditInfo},"
-        + " current_version = #{groupMeta.currentVersion},"
-        + " last_version = #{groupMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + GROUP_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + GROUP_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 
@@ -76,7 +85,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -107,7 +116,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -146,7 +155,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
     return "<script>"
         + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -190,7 +199,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String touchGroupUpdatedAt(@Param("groupId") long groupId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 }

@@ -66,6 +66,11 @@ public class IdpUserMetaSQLProviderFactory {
     return currentProvider().updateIdpUserPassword(username, passwordHash);
   }
 
+  public static String updateIdpUserEnabled(
+      @Param("username") String username, @Param("enabled") boolean enabled) {
+    return currentProvider().updateIdpUserEnabled(username, enabled);
+  }
+
   public static String softDeleteIdpUser(@Param("username") String username) {
     return currentProvider().softDeleteIdpUser(username);
   }

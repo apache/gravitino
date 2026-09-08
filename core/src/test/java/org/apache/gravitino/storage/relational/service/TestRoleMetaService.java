@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -58,8 +59,12 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -836,6 +841,196 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeSecurableObjectsOnConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "concurrent-role",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            RoleMetaService.getInstance()
+                .updateRole(
+                    role.nameIdentifier(),
+                    (RoleEntity oldRole) -> {
+                      advanceRoleVersion(role.id());
+                      List<SecurableObject> securableObjects =
+                          Lists.newArrayList(oldRole.securableObjects());
+                      securableObjects.add(
+                          SecurableObjects.ofMetalake(
+                              METALAKE_NAME, Lists.newArrayList(Privileges.CreateTable.allow())));
+                      return RoleEntity.builder()
+                          .withId(oldRole.id())
+                          .withName(oldRole.name())
+                          .withNamespace(oldRole.namespace())
+                          .withProperties(oldRole.properties())
+                          .withSecurableObjects(securableObjects)
+                          .withAuditInfo(oldRole.auditInfo())
+                          .build();
+                    }));
+
+    RoleEntity storedRole =
+        RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier());
+    assertTrue(
+        CollectionUtils.isEqualCollection(
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            storedRole.securableObjects()));
+  }
+
+  @TestTemplate
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "fenced-role",
+            AUDIT_INFO,
+            "catalog");
+
+    service.insertRole(role, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    RoleEntity duplicate =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            role.name(),
+            AUDIT_INFO,
+            "catalog");
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertRole(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "overwrite-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO initialPO = getRolePO(role.name());
+
+    service.insertRole(role, true);
+
+    RolePO overwrittenPO = getRolePO(role.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            RoleMetaMapper.class,
+            mapper -> mapper.softDeleteRoleMetaByRoleId(role.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testMetadataOnlyUpdateUsesOcc() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "metadata-only-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO beforeUpdate = getRolePO(role.name());
+
+    service.updateRole(role.nameIdentifier(), (RoleEntity oldRole) -> copyRole(oldRole, "value-1"));
+
+    RolePO afterUpdate = getRolePO(role.name());
+    assertEquals(beforeUpdate.getCurrentVersion() + 1, afterUpdate.getCurrentVersion());
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateRole(
+                role.nameIdentifier(),
+                (RoleEntity oldRole) -> {
+                  advanceRoleVersion(role.id());
+                  return copyRole(oldRole, "value-2");
+                }));
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "stale-delete-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO staleRolePO = getRolePO(role.name());
+    advanceRoleVersion(role.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteRoleWithVersion(role.nameIdentifier(), staleRolePO));
+    assertEquals(role.id(), service.getRoleByIdentifier(role.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  void testAlterReportsNoSuchWhenRoleIsDeletedConcurrently() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "deleted-during-alter",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            service.updateRole(
+                role.nameIdentifier(),
+                (RoleEntity oldRole) -> {
+                  service.deleteRole(role.nameIdentifier());
+                  return copyRole(oldRole, "ignored-value");
+                }));
+  }
+
+  @TestTemplate
   void testDeleteMetalakeCascade() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     createAndInsertCatalog(METALAKE_NAME, "catalog");
@@ -1059,6 +1254,29 @@ class TestRoleMetaService extends TestJDBCBackend {
     return count;
   }
 
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(METALAKE_NAME));
+  }
+
+  private RolePO getRolePO(String roleName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        RoleMetaMapper.class,
+        mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), roleName));
+  }
+
+  private RoleEntity copyRole(RoleEntity role, String propertyValue) {
+    return RoleEntity.builder()
+        .withId(role.id())
+        .withName(role.name())
+        .withNamespace(role.namespace())
+        .withProperties(ImmutableMap.of("key", propertyValue))
+        .withSecurableObjects(role.securableObjects())
+        .withAuditInfo(role.auditInfo())
+        .build();
+  }
+
   private Integer countUserRoleRels() {
     int count = 0;
     try (SqlSession sqlSession =
@@ -1126,5 +1344,20 @@ class TestRoleMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceRoleVersion(long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE role_meta SET current_version = current_version + 1 WHERE role_id = "
+                  + roleId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance role version failed", e);
+    }
   }
 }

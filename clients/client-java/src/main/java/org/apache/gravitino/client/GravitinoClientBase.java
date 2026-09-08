@@ -29,10 +29,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -183,6 +185,27 @@ public abstract class GravitinoClientBase implements Closeable {
     resp.validate();
 
     return new GravitinoVersion(resp.getVersion());
+  }
+
+  /**
+   * Retrieves the endpoint of the Gravitino Iceberg REST server, if it is running and serves the
+   * given metalake.
+   *
+   * @param metalakeName the metalake the caller intends to route through the Iceberg REST server
+   * @return the Iceberg REST server endpoint, or empty if it is not running or serves a different
+   *     metalake
+   */
+  public Optional<String> icebergRestServiceUri(String metalakeName) {
+    IcebergRESTServiceResponse resp =
+        restClient.get(
+            "api/system/iceberg-rest",
+            ImmutableMap.of("metalake", metalakeName),
+            IcebergRESTServiceResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+    resp.validate();
+
+    return Optional.ofNullable(resp.getUri());
   }
 
   /** Closes the GravitinoClient and releases any underlying resources. */

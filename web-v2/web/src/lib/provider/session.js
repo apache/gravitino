@@ -26,8 +26,7 @@ import { initialVersion, fetchGitHubInfo, setStars, setForks } from '@/lib/store
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 import { to } from '../utils'
-import { getAuthConfigs, setAuthToken, setAuthUser } from '../store/auth'
-import { getAuthMeApi } from '../api/auth'
+import { getAuthConfigs, getAuthMe, setAuthToken, setAuthUser } from '../store/auth'
 
 const authProvider = {
   version: '',
@@ -98,12 +97,18 @@ const AuthProvider = ({ children }) => {
           router.push('/login')
         } else {
           dispatch(setAuthUser(sessionUser))
+          if (sessionUser) {
+            await dispatch(getAuthMe())
+          }
           goToMetalakeListPage()
         }
       } else if (authType === 'basic') {
         const tokenToUse = sessionStorage.getItem('accessToken')
 
         if (tokenToUse) {
+          dispatch(setAuthToken(tokenToUse))
+          await dispatch(getAuthMe())
+          dispatch(initialVersion())
           goToMetalakeListPage()
         } else {
           router.push('/login')
@@ -122,20 +127,8 @@ const AuthProvider = ({ children }) => {
 
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
-
-          // Fetch server-resolved principal to ensure UI identity matches server-side
-          // identity derived from principalFields + principalMapper config
-          let authUser = user
-          try {
-            const [meErr, meRes] = await to(getAuthMeApi())
-            if (!meErr && meRes && meRes.principal) {
-              authUser = { ...user, name: meRes.principal }
-            }
-          } catch (e) {
-            // Fallback to OIDC profile if /api/authn/me is unavailable
-          }
-
-          authUser && dispatch(setAuthUser(authUser))
+          user && dispatch(setAuthUser(user))
+          await dispatch(getAuthMe())
           dispatch(initialVersion())
           goToMetalakeListPage()
         } else {

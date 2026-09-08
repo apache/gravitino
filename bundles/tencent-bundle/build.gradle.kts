@@ -33,6 +33,7 @@ dependencies {
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.cos)
   implementation(libs.httpclient)
+  implementation(libs.tencentcloud.sdk.sts)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -55,13 +56,14 @@ tasks.withType(ShadowJar::class.java) {
     exclude(project(":catalogs:hadoop-common"))
   }
 
-  // Relocate dependencies to avoid conflicts.
-  // hadoop-cos (from com.qcloud.cos:hadoop-cos) bundles the qcloud-cos SDK and a few common
-  // libraries; relocate them under "org.apache.gravitino.tencent.shaded.*" following the
-  // same pattern as the aws/aliyun/azure/gcp bundles.
+  // Relocate transitive utilities to avoid classpath conflicts. Do NOT relocate `com.qcloud.*`
+  // or `com.tencentcloudapi.*`: `COSCredentialsProvider` extends hadoop-cos's
+  // `AbstractCOSCredentialProvider`, whose `getCredentials()` returns `com.qcloud.cos.auth.
+  // COSCredentials`; shading would break the override and cause `AbstractMethodError`.
   relocate("com.fasterxml.jackson", "org.apache.gravitino.tencent.shaded.com.fasterxml.jackson")
   relocate("com.google", "org.apache.gravitino.tencent.shaded.com.google")
-  relocate("com.qcloud", "org.apache.gravitino.tencent.shaded.com.qcloud")
+  relocate("okhttp3", "org.apache.gravitino.tencent.shaded.okhttp3")
+  relocate("okio", "org.apache.gravitino.tencent.shaded.okio")
   relocate("org.apache.commons", "org.apache.gravitino.tencent.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.tencent.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.tencent.shaded.org.checkerframework")

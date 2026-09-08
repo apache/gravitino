@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.flink.connector.hive;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -281,7 +282,8 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     }
   }
 
-  private void applyGenericTableAlter(
+  @VisibleForTesting
+  void applyGenericTableAlter(
       ObjectPath tablePath, Table existingTable, ResolvedCatalogTable newTable)
       throws TableNotExistException, CatalogException {
     NameIdentifier identifier =
@@ -310,6 +312,14 @@ public class GravitinoHiveCatalog extends BaseCatalog {
             changes.add(TableChange.setProperty(key, value));
           }
         });
+
+    // When the resolved table is identical to the existing one (for example, re-applying the same
+    // options), no TableChange is produced. Skip the alter call in that case: Gravitino's
+    // TableUpdatesRequest.validate rejects an empty update list with "updates must not be empty",
+    // and a no-op alter should succeed rather than fail.
+    if (changes.isEmpty()) {
+      return;
+    }
 
     try {
       catalog().asTableCatalog().alterTable(identifier, changes.toArray(new TableChange[0]));

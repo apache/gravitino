@@ -39,5 +39,6 @@ import lombok.ToString;
 public class IdpUserWithGroupsPO {
   private String name;
   private String passwordHash;
+  @Builder.Default private Boolean enabled = true;
   private String groupNames;
 }

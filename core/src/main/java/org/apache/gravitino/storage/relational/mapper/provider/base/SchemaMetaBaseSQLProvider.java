@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -350,8 +351,8 @@ public class SchemaMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -364,8 +365,8 @@ public class SchemaMetaBaseSQLProvider {
       @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id = #{schemaId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -375,8 +376,8 @@ public class SchemaMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE deleted_at = 0 AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"

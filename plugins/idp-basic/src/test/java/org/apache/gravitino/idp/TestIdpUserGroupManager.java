@@ -40,7 +40,9 @@ import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -96,7 +98,12 @@ public class TestIdpUserGroupManager {
   public void testAddUser() throws IOException {
     IdpUser user = manager.addUser("testAdd", VALID_PASSWORD);
     Assertions.assertEquals("testAdd", user.name());
+    Assertions.assertTrue(user.enabled());
     Assertions.assertTrue(user.groupNames().isEmpty());
+
+    IdpUser disabled = manager.addUser("testAddDisabled", VALID_PASSWORD, false);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertFalse(manager.getUser("testAddDisabled").enabled());
 
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
@@ -131,6 +138,52 @@ public class TestIdpUserGroupManager {
 
     Assertions.assertThrows(
         NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
+  }
+
+  @Test
+  public void testUpdateEnabled() throws IOException {
+    manager.addUser("testEnabled", VALID_PASSWORD);
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", false));
+    Assertions.assertFalse(manager.getUser("testEnabled").enabled());
+    Assertions.assertThrows(
+        UnauthorizedException.class, () -> manager.authenticate("testEnabled", VALID_PASSWORD));
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", true));
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        NotFoundException.class, () -> manager.updateEnabled("not-exist", false));
+  }
+
+  @Test
+  public void testCannotDisableServiceAdmin() throws IOException {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
+    manager.addUser("svcAdminDisable", VALID_PASSWORD);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
+    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
+    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+  }
+
+  @Test
+  public void testCannotAddDisabledServiceAdmin() {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminCreateDisabled");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.addUser("svcAdminCreateDisabled", VALID_PASSWORD, false));
+    Assertions.assertEquals(
+        "Cannot disable service admin svcAdminCreateDisabled", exception.getMessage());
   }
 
   @Test
@@ -204,7 +257,7 @@ public class TestIdpUserGroupManager {
     manager.changeGroupMembership("testRemoveGroup", Lists.newArrayList("groupMember"), null);
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> manager.removeGroup("testRemoveGroup", false));
+        NonEmptyEntityException.class, () -> manager.removeGroup("testRemoveGroup", false));
 
     manager.changeGroupMembership("testRemoveGroup", null, Lists.newArrayList("groupMember"));
     Assertions.assertTrue(manager.removeGroup("testRemoveGroup", false));

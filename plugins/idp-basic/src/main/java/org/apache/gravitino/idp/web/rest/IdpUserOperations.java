@@ -34,7 +34,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
@@ -80,7 +80,9 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
-                  userGroupManager.addUser(request.getUser(), request.getPassword()).toDTO()));
+                  userGroupManager
+                      .addUser(request.getUser(), request.getPassword(), request.enabledOrDefault())
+                      .toDTO()));
         },
         "user",
         IdpOperationType.ADD,
@@ -90,14 +92,19 @@ public class IdpUserOperations {
   @PUT
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "change-idp-user-password", absolute = true)
-  public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
+  @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-idp-user", absolute = true)
+  public Response updateUser(@PathParam("user") String user, UpdateUserRequest request) {
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
           request.validate();
-          userGroupManager.changePassword(user, request.getPassword());
+          if (request.getPassword() != null) {
+            userGroupManager.changePassword(user, request.getPassword());
+          }
+          if (request.getEnabled() != null) {
+            userGroupManager.updateEnabled(user, request.getEnabled());
+          }
           return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
         },
         "user",

@@ -372,6 +372,36 @@ class TestSupportsJobs(IntegrationTestEnv):
         with self.assertRaises(NoSuchJobException):
             self._metalake.get_job("non_existent_job_id")
 
+    def test_run_job_populates_runtime_job_template(self):
+        template = self.builder.with_name("test_run_runtime_template").build()
+        self._metalake.register_job_template(template)
+
+        job_handle = self._metalake.run_job(
+            template.name, {"arg1": "value1", "arg2": "success", "env_var": "value2"}
+        )
+
+        # The resolved runtime template is set at submission time, before the job even starts
+        # executing, and must carry the actual substituted values rather than the original
+        # template's raw {{placeholder}} strings.
+        runtime_job_template = job_handle.runtime_job_template()
+        self.assertIsNotNone(runtime_job_template)
+        self.assertEqual(template.name, runtime_job_template.name)
+        self.assertEqual(template.comment, runtime_job_template.comment)
+        self.assertEqual(["value1", "success"], runtime_job_template.arguments)
+        self.assertEqual({"ENV_VAR": "value2"}, runtime_job_template.environments)
+
+        self._wait_until(
+            lambda: self._metalake.get_job(job_handle.job_id()).job_status()
+            == JobHandle.Status.SUCCEEDED,
+            timeout=180,
+        )
+
+        # The runtime job template is fixed at submission time, so it must be unchanged once the
+        # job reaches a terminal status and its entity has gone through the status-poll update
+        # path.
+        retrieved_job = self._metalake.get_job(job_handle.job_id())
+        self.assertEqual(runtime_job_template, retrieved_job.runtime_job_template())
+
     def test_run_and_cancel_job(self):
         template = self.builder.with_name("test_run_cancel").build()
         self._metalake.register_job_template(template)

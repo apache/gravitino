@@ -30,5 +30,15 @@ public class COSProperties {
   // The static secret access key (Tencent Cloud SecretKey) used to access COS data.
   public static final String GRAVITINO_COS_ACCESS_KEY_SECRET = "cos-secret-access-key";
 
+  // The CAM role ARN that the server assumes when issuing temporary STS credentials.
+  // Format: qcs::cam::uin/<owner-uin>:roleName/<role-name>
+  public static final String GRAVITINO_COS_ROLE_ARN = "cos-role-arn";
+  // Optional external ID associated with the CAM role; required only when the role is configured
+  // with a third-party external ID for cross-account assume-role.
+  public static final String GRAVITINO_COS_EXTERNAL_ID = "cos-external-id";
+  // The Tencent Cloud APPID that owns the COS buckets, used to build resource ARNs in the STS
+  // session policy. Required when STS credential vending is enabled.
+  public static final String GRAVITINO_COS_APP_ID = "cos-app-id";
+
   private COSProperties() {}
 }

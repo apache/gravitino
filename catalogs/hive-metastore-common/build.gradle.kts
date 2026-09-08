@@ -43,6 +43,7 @@ dependencies {
   compileOnly(libs.caffeine)
   compileOnly(libs.guava)
   compileOnly(libs.slf4j.api)
+  compileOnly(libs.log4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")

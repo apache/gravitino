@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
@@ -174,5 +175,18 @@ public class TestCatalogNormalizeDispatcher {
       Assertions.assertEquals(
           "The catalog name '" + illegalName + "' is illegal.", exception.getMessage());
     }
+  }
+
+  @Test
+  void testConnectionChangesValidateRenamedCatalogName() {
+    NameIdentifier catalogIdent = NameIdentifier.of(metalake, "catalog");
+    Mockito.clearInvocations(catalogManager);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalogNormalizeDispatcher.testConnection(
+                catalogIdent, CatalogChange.rename("invalid/name")));
+    Mockito.verify(catalogManager, Mockito.never())
+        .testConnection(Mockito.eq(catalogIdent), Mockito.any(CatalogChange[].class));
   }
 }

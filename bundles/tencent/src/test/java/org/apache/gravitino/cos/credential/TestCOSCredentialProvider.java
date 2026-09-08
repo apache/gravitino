@@ -21,6 +21,7 @@ package org.apache.gravitino.cos.credential;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.storage.COSProperties;
 import org.junit.jupiter.api.Assertions;
@@ -59,5 +60,33 @@ public class TestCOSCredentialProvider {
     COSSecretKeyCredential typed = (COSSecretKeyCredential) credential;
     Assertions.assertEquals("ak", typed.accessKeyId());
     Assertions.assertEquals("sk", typed.secretAccessKey());
+  }
+
+  @Test
+  void testTokenProviderMetadata() {
+    COSTokenProvider provider = new COSTokenProvider();
+    Assertions.assertEquals(
+        COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE, provider.credentialType());
+    Assertions.assertTrue(provider.supportsScheme("cosn"));
+    Assertions.assertTrue(provider.supportsScheme("COSN"));
+    Assertions.assertFalse(provider.supportsScheme("oss"));
+    Assertions.assertEquals(
+        "org.apache.gravitino.cos.credential.COSTokenGenerator", provider.getGeneratorClassName());
+  }
+
+  @Test
+  void testTokenProviderRejectsNonPathContext() {
+    COSTokenProvider provider = new COSTokenProvider();
+    provider.initialize(
+        ImmutableMap.of(
+            COSProperties.GRAVITINO_COS_ACCESS_KEY_ID, "ak",
+            COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET, "sk",
+            COSProperties.GRAVITINO_COS_ROLE_ARN, "qcs::cam::uin/100:roleName/role",
+            COSProperties.GRAVITINO_COS_APP_ID, "1259000000",
+            COSProperties.GRAVITINO_COS_REGION, "ap-shanghai"));
+    // Pass a non-path CredentialContext (just a username); the generator should short-circuit and
+    // return null without reaching the STS service.
+    Credential credential = provider.getCredential(() -> "user");
+    Assertions.assertNull(credential);
   }
 }

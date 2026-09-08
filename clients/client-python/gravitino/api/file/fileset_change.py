@@ -347,8 +347,7 @@ class FilesetChange(ABC):
             if not isinstance(other, FilesetChange.SetSecretBinding):
                 return False
             return (
-                self._property == other.property()
-                and self._binding == other.binding()
+                self._property == other.property() and self._binding == other.binding()
             )
 
         def __hash__(self):

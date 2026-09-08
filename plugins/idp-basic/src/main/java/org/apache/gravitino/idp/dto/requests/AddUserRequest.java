@@ -43,9 +43,12 @@ public class AddUserRequest implements RESTRequest {
   @ToString.Exclude
   private final String password;
 
+  @JsonProperty("enabled")
+  private final Boolean enabled;
+
   /** Default constructor for AddUserRequest. (Used for Jackson deserialization.) */
   public AddUserRequest() {
-    this(null, null);
+    this(null, null, null);
   }
 
   /**
@@ -55,9 +58,21 @@ public class AddUserRequest implements RESTRequest {
    * @param password The password of the built-in IdP user.
    */
   public AddUserRequest(String user, String password) {
+    this(user, password, null);
+  }
+
+  /**
+   * Creates a new AddUserRequest.
+   *
+   * @param user The user name of the built-in IdP user.
+   * @param password The password of the built-in IdP user.
+   * @param enabled Whether the built-in IdP user is enabled. Null defaults to {@code true}.
+   */
+  public AddUserRequest(String user, String password, Boolean enabled) {
     super();
     this.user = user;
     this.password = password;
+    this.enabled = enabled;
   }
 
   /**
@@ -69,5 +84,14 @@ public class AddUserRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     IdpCredentialValidator.validateUsername(user);
     IdpCredentialValidator.validatePassword(password);
+  }
+
+  /**
+   * Returns whether the user should be enabled, defaulting to {@code true} when omitted.
+   *
+   * @return Whether the user is enabled.
+   */
+  public boolean enabledOrDefault() {
+    return enabled == null || enabled;
   }
 }

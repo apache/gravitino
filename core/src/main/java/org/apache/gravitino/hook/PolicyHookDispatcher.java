@@ -20,6 +20,7 @@ package org.apache.gravitino.hook;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -67,7 +68,7 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
     PolicyEntity policy = dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
 
     // Set the creator as the owner of the policy.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerDispatcher != null) {
       ownerDispatcher.setOwner(
           metalake,
@@ -102,6 +103,11 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
     return dispatcher.listMetadataObjectsForPolicy(metalake, policyName);
+  }
+
+  @Override
+  public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
+    return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
 
   @Override

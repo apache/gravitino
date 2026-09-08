@@ -39,6 +39,9 @@ class TestGravitinoConnectorFactory {
             Map.entry("hive.s3.aws-secret-key", "secret-key"),
             Map.entry("authentication.token", "token"),
             Map.entry("oauth2.credential", "credential"),
+            Map.entry(
+                "gravitino.dynamic-catalog.environment-variable.oauth2.credential",
+                "OAUTH_CREDENTIAL"),
             Map.entry("tls.private_key", "private-key"),
             Map.entry("gravitino.uri", "uri"));
 
