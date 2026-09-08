@@ -840,10 +840,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     String databaseLocation = databaseLocationUri(dbName);
     if (StringUtils.isNotBlank(databaseLocation)) {
-      return trimTrailingSlash(databaseLocation) + "/" + tableName;
+      return StringUtils.stripEnd(databaseLocation, "/") + "/" + tableName;
     }
     if (StringUtils.isNotBlank(warehouseLocation)) {
-      return trimTrailingSlash(warehouseLocation) + "/" + dbName + "/" + tableName;
+      return StringUtils.stripEnd(warehouseLocation, "/") + "/" + dbName + "/" + tableName;
     }
     throw new IllegalArgumentException(
         "Table location is required: either set the '"
@@ -862,10 +862,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (GlueException e) {
       throw GlueExceptionConverter.toSchemaException(e, "schema " + dbName);
     }
-  }
-
-  private static String trimTrailingSlash(String path) {
-    return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
   }
 
   private static void applyColumnChange(

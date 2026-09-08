@@ -310,8 +310,8 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testCreateTableLocationFromDatabaseLocationUriWithTrailingSlash() {
-    stubDatabaseLocation("s3://test-bucket/gravprobe/");
+  void testCreateTableLocationFromDatabaseLocationUriWithTrailingSlashes() {
+    stubDatabaseLocation("s3://test-bucket/gravprobe///");
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
 
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
@@ -358,6 +358,29 @@ class TestGlueCatalogTableOperations {
 
   @Test
   void testCreateTableLocationFallsBackToWarehouse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/warehouse/mydb/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableLocationFromWarehouseWithTrailingSlashes() {
+    ops.warehouseLocation = "s3://test-bucket/warehouse///";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
 
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
