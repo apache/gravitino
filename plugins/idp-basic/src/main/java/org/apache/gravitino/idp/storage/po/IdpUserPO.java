@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.idp.storage.po;
 
+import com.google.common.base.Preconditions;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -30,7 +30,6 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder(setterPrefix = "with")
 public class IdpUserPO {
   private Long userId;
@@ -41,4 +40,24 @@ public class IdpUserPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  private IdpUserPO(
+      Long userId,
+      String username,
+      String passwordHash,
+      Boolean enabled,
+      String auditInfo,
+      Long currentVersion,
+      Long lastVersion,
+      Long deletedAt) {
+    Preconditions.checkArgument(auditInfo != null, "Audit info is required");
+    this.userId = userId;
+    this.username = username;
+    this.passwordHash = passwordHash;
+    this.enabled = enabled == null ? Boolean.TRUE : enabled;
+    this.auditInfo = auditInfo;
+    this.currentVersion = currentVersion;
+    this.lastVersion = lastVersion;
+    this.deletedAt = deletedAt;
+  }
 }

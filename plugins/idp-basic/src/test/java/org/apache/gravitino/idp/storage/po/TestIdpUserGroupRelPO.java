@@ -39,9 +39,25 @@ public class TestIdpUserGroupRelPO {
     Assertions.assertEquals(1L, relPO.getId());
     Assertions.assertEquals(20L, relPO.getUserId());
     Assertions.assertEquals(10L, relPO.getGroupId());
+    Assertions.assertEquals("{}", relPO.getAuditInfo());
     Assertions.assertEquals(1L, relPO.getCurrentVersion());
     Assertions.assertEquals(0L, relPO.getLastVersion());
     Assertions.assertEquals(0L, relPO.getDeletedAt());
+  }
+
+  @Test
+  public void testIdpUserGroupRelPOBuilderRequiresAuditInfo() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            IdpUserGroupRelPO.builder()
+                .withId(1L)
+                .withUserId(20L)
+                .withGroupId(10L)
+                .withCurrentVersion(1L)
+                .withLastVersion(0L)
+                .withDeletedAt(0L)
+                .build());
   }
 
   @Test

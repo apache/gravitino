@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.idp.storage.po;
 
+import com.google.common.base.Preconditions;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -30,7 +30,6 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder(setterPrefix = "with")
 public class IdpGroupPO {
   private Long groupId;
@@ -40,4 +39,22 @@ public class IdpGroupPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  private IdpGroupPO(
+      Long groupId,
+      String groupName,
+      String groupComment,
+      String auditInfo,
+      Long currentVersion,
+      Long lastVersion,
+      Long deletedAt) {
+    Preconditions.checkArgument(auditInfo != null, "Audit info is required");
+    this.groupId = groupId;
+    this.groupName = groupName;
+    this.groupComment = groupComment;
+    this.auditInfo = auditInfo;
+    this.currentVersion = currentVersion;
+    this.lastVersion = lastVersion;
+    this.deletedAt = deletedAt;
+  }
 }

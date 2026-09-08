@@ -145,7 +145,7 @@ public class IdpUserGroupManager implements Closeable {
     checkCanDisableUser(username, enabled);
     String passwordHash = passwordHasher.hash(password);
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash, enabled));
-    return new IdpUser(username, Collections.emptyList(), enabled);
+    return USER_SERVICE.getIdpUser(username);
   }
 
   /**
@@ -232,7 +232,7 @@ public class IdpUserGroupManager implements Closeable {
     IdpCredentialValidator.validateGroupComment(comment);
     String normalizedComment = comment == null ? "" : comment;
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName, normalizedComment));
-    return new IdpGroup(groupName, Collections.emptyList(), normalizedComment);
+    return GROUP_SERVICE.getIdpGroup(groupName);
   }
 
   /**

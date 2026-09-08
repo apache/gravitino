@@ -537,7 +537,11 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": []
+          "groups": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -547,7 +551,11 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": ["engineers"]
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -557,7 +565,13 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": ["engineers"]
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z",
+            "lastModifier": "gravitino",
+            "lastModifiedTime": "2023-12-08T07:10:11.123Z"
+          }
         }
       }
 
@@ -567,7 +581,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": []
+          "users": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -577,7 +595,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": ["alice", "bob"]
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -587,7 +609,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": ["alice", "bob"]
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
