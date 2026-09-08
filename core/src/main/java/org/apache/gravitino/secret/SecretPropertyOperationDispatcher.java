@@ -31,7 +31,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
-import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -41,7 +40,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.storage.IdGenerator;
@@ -104,8 +102,6 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         return loadViewRawProperties(identifier);
       case MODEL:
         return loadModelRawProperties(identifier);
-      case MODEL_VERSION:
-        return loadModelVersionRawProperties(identifier);
       default:
         throw new NotSupportedException(
             "Doesn't support secret property operations for entity type: " + entityType);
@@ -223,27 +219,5 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         },
         NoSuchCatalogException.class,
         NoSuchModelException.class);
-  }
-
-  private Map<String, String> loadModelVersionRawProperties(NameIdentifier identifier) {
-    NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
-    NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
-    String versionName = identifier.name();
-    return doWithCatalog(
-        catalogIdent,
-        wrapper -> {
-          wrapper.catalog().checkMetalakeInUse();
-          ModelVersion modelVersion;
-          try {
-            int version = Integer.parseInt(versionName);
-            modelVersion = wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, version));
-          } catch (NumberFormatException e) {
-            modelVersion =
-                wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, versionName));
-          }
-          return modelVersion.properties() == null ? Map.of() : modelVersion.properties();
-        },
-        NoSuchCatalogException.class,
-        NoSuchModelVersionException.class);
   }
 }

@@ -185,7 +185,6 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
-              ( entityType == 'MODEL_VERSION' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s))
               """
             .formatted(
@@ -203,7 +202,6 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
-                LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION));
   }
 

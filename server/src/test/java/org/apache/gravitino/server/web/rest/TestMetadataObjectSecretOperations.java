@@ -121,12 +121,6 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
         MetadataObjects.parse("catalog.schema.model", MetadataObject.Type.MODEL));
   }
 
-  @Test
-  public void testGetSecretsForModelVersion() {
-    testGetSecretsForObject(
-        MetadataObjects.parse("catalog.schema.model.0", MetadataObject.Type.MODEL_VERSION));
-  }
-
   private void testGetSecretsForObject(MetadataObject metadataObject) {
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));

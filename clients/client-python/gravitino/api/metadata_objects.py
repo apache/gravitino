@@ -50,7 +50,7 @@ class MetadataObjects:
             MetadataObject.Type.VIEW,
             MetadataObject.Type.FUNCTION,
         },
-        4: {MetadataObject.Type.COLUMN, MetadataObject.Type.MODEL_VERSION},
+        4: {MetadataObject.Type.COLUMN},
     }
 
     @staticmethod
@@ -98,7 +98,7 @@ class MetadataObjects:
         )
         Precondition.check_argument(
             names_len != 4 or type_ in MetadataObjects._NAMES_LEN_CONDS[4],
-            "If the length of names is 4, it must be COLUMN or MODEL_VERSION",
+            "If the length of names is 4, it must be COLUMN",
         )
         names = name_or_names
         for name in names:
@@ -135,8 +135,6 @@ class MetadataObjects:
         parent_type = None
         if object_type is MetadataObject.Type.COLUMN:
             parent_type = MetadataObject.Type.TABLE
-        elif object_type is MetadataObject.Type.MODEL_VERSION:
-            parent_type = MetadataObject.Type.MODEL
         elif object_type in {
             MetadataObject.Type.TABLE,
             MetadataObject.Type.FILESET,

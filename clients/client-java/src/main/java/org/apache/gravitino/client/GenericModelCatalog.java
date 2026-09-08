@@ -179,9 +179,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
     resp.validate();
 
-    return Arrays.stream(resp.getVersions())
-        .map(v -> new GenericModelVersion(v, restClient, modelFullIdent))
-        .toArray(ModelVersion[]::new);
+    return resp.getVersions();
   }
 
   @Override
@@ -198,7 +196,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             Collections.emptyMap(),
             ErrorHandlers.modelErrorHandler());
     resp.validate();
-    return new GenericModelVersion(resp.getModelVersion(), restClient, modelFullIdent);
+    return new GenericModelVersion(resp.getModelVersion());
   }
 
   @Override
@@ -218,7 +216,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
 
     resp.validate();
-    return new GenericModelVersion(resp.getModelVersion(), restClient, modelFullIdent);
+    return new GenericModelVersion(resp.getModelVersion());
   }
 
   @Override
@@ -375,7 +373,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
 
     resp.validate();
-    return new GenericModelVersion(resp.getModelVersion(), restClient, modelFullIdent);
+    return new GenericModelVersion(resp.getModelVersion());
   }
 
   @Override
@@ -405,7 +403,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
 
     resp.validate();
-    return new GenericModelVersion(resp.getModelVersion(), restClient, modelFullIdent);
+    return new GenericModelVersion(resp.getModelVersion());
   }
 
   /**

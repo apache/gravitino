@@ -166,13 +166,11 @@ public class TestNameIdentifierUtil {
     assertEquals(expectedTagObject, tagObject);
 
     // test model version
-    NameIdentifier modelVersion =
-        NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
-    MetadataObject modelVersionObject =
-        MetadataObjects.parse("catalog1.schema1.model1.0", MetadataObject.Type.MODEL_VERSION);
-    assertEquals(
-        modelVersionObject,
-        NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+    Throwable e3 =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> NameIdentifierUtil.toMetadataObject(model, Entity.EntityType.MODEL_VERSION));
+    assertTrue(e3.getMessage().contains("Entity type MODEL_VERSION is not supported"));
   }
 
   @Test

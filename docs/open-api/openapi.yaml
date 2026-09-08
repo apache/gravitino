@@ -618,7 +618,6 @@ components:
           - "FILESET"
           - "TOPIC"
           - "MODEL"
-          - "MODEL_VERSION"
           - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:
