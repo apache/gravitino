@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +70,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
@@ -177,19 +179,20 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     List<NameIdentifier> result = new ArrayList<>();
     String nextToken = null;
+    String context = "listing schemas under " + namespace;
     try {
       do {
         GetDatabasesRequest.Builder req = GetDatabasesRequest.builder();
         applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
-        GetDatabasesResponse resp = glueClient.getDatabases(req.build());
+        GetDatabasesResponse resp = callGlue(() -> glueClient.getDatabases(req.build()), context);
         resp.databaseList().stream()
             .map(db -> NameIdentifier.of(namespace, db.name()))
             .forEach(result::add);
         nextToken = resp.nextToken();
       } while (nextToken != null);
     } catch (GlueException e) {
-      throw GlueExceptionConverter.toSchemaException(e, "listing schemas under " + namespace);
+      throw GlueExceptionConverter.toSchemaException(e, context);
     }
     return result.toArray(new NameIdentifier[0]);
   }
@@ -215,7 +218,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     applyCatalogId(catalogId, req::catalogId);
 
     try {
-      glueClient.createDatabase(req.build());
+      callGlue(() -> glueClient.createDatabase(req.build()), "schema " + ident.name());
     } catch (GlueException e) {
       throw GlueExceptionConverter.toSchemaException(e, "schema " + ident.name());
     }
@@ -240,7 +243,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     applyCatalogId(catalogId, req::catalogId);
     try {
       GlueSchema schema =
-          GlueSchema.fromGlueDatabase(glueClient.getDatabase(req.build()).database());
+          GlueSchema.fromGlueDatabase(
+              callGlue(() -> glueClient.getDatabase(req.build()), "schema " + ident.name())
+                  .database());
       LOG.info("Loaded Glue schema (database) {}", ident.name());
       return schema;
     } catch (GlueException e) {
@@ -286,7 +291,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     applyCatalogId(catalogId, req::catalogId);
 
     try {
-      glueClient.updateDatabase(req.build());
+      callGlue(() -> glueClient.updateDatabase(req.build()), "schema " + ident.name());
     } catch (GlueException e) {
       throw GlueExceptionConverter.toSchemaException(e, "schema " + ident.name());
     }
@@ -308,7 +313,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GetTablesRequest.builder().databaseName(ident.name()).maxResults(1);
       applyCatalogId(catalogId, tabReq::catalogId);
       try {
-        if (!glueClient.getTables(tabReq.build()).tableList().isEmpty()) {
+        boolean hasTables =
+            !callGlue(
+                    () -> glueClient.getTables(tabReq.build()),
+                    "checking tables in schema " + ident.name())
+                .tableList()
+                .isEmpty();
+        if (hasTables) {
           throw new NonEmptySchemaException(
               "Schema %s is not empty. Use cascade=true to drop it with its tables.", ident.name());
         }
@@ -321,7 +332,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     DeleteDatabaseRequest.Builder req = DeleteDatabaseRequest.builder().name(ident.name());
     applyCatalogId(catalogId, req::catalogId);
     try {
-      glueClient.deleteDatabase(req.build());
+      callGlue(() -> glueClient.deleteDatabase(req.build()), "schema " + ident.name());
       LOG.info("Dropped Glue schema (database) {}", ident.name());
       return true;
     } catch (EntityNotFoundException e) {
@@ -336,12 +347,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String dbName = schemaName(namespace);
     List<NameIdentifier> result = new ArrayList<>();
     String nextToken = null;
+    String context = "listing tables in schema " + dbName;
     try {
       do {
         GetTablesRequest.Builder req = GetTablesRequest.builder().databaseName(dbName);
         applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
-        GetTablesResponse resp = glueClient.getTables(req.build());
+        GetTablesResponse resp = callGlue(() -> glueClient.getTables(req.build()), context);
         resp.tableList().stream()
             .filter(this::matchesFormatFilter)
             .map(t -> NameIdentifier.of(namespace, t.name()))
@@ -351,7 +363,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (EntityNotFoundException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", dbName);
     } catch (GlueException e) {
-      throw GlueExceptionConverter.toSchemaException(e, "listing tables in schema " + dbName);
+      throw GlueExceptionConverter.toSchemaException(e, context);
     }
     return result.toArray(new NameIdentifier[0]);
   }
@@ -363,7 +375,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     applyCatalogId(catalogId, req::catalogId);
     try {
       software.amazon.awssdk.services.glue.model.Table rawGlueTable =
-          glueClient.getTable(req.build()).table();
+          callGlue(() -> glueClient.getTable(req.build()), "table " + ident.name()).table();
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
 
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
@@ -501,7 +513,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     applyCatalogId(catalogId, rawReq::catalogId);
     Table rawGlueTable;
     try {
-      rawGlueTable = glueClient.getTable(rawReq.build()).table();
+      rawGlueTable =
+          callGlue(() -> glueClient.getTable(rawReq.build()), "table " + ident.name()).table();
     } catch (GlueException e) {
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
@@ -642,7 +655,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
     applyCatalogId(catalogId, req::catalogId);
     try {
-      glueClient.deleteTable(req.build());
+      callGlue(() -> glueClient.deleteTable(req.build()), "table " + ident.name());
       LOG.info("Dropped Glue table {}.{}", dbName, ident.name());
       return true;
     } catch (EntityNotFoundException e) {
@@ -679,7 +692,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       String dbName, NameIdentifier ident, CreateTableRequest.Builder req) {
     applyCatalogId(catalogId, req::catalogId);
     try {
-      glueClient.createTable(req.build());
+      callGlue(() -> glueClient.createTable(req.build()), "table " + ident.name());
     } catch (EntityNotFoundException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", dbName);
     } catch (GlueException e) {
@@ -690,7 +703,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private void executeUpdateTable(NameIdentifier ident, UpdateTableRequest.Builder req) {
     applyCatalogId(catalogId, req::catalogId);
     try {
-      glueClient.updateTable(req.build());
+      callGlue(() -> glueClient.updateTable(req.build()), "table " + ident.name());
     } catch (GlueException e) {
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
@@ -899,6 +912,32 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   /** Passes {@code catalogId} to {@code setter} when it is non-null. */
   static void applyCatalogId(String catalogId, Consumer<String> setter) {
     if (catalogId != null) setter.accept(catalogId);
+  }
+
+  /**
+   * Translates a raw AWS SDK credential-chain failure into a message naming this connector's own
+   * {@code aws-access-key-id} / {@code aws-secret-access-key} properties, so operators are not left
+   * to guess from the SDK's generic provider-chain error. Non-credential {@link
+   * SdkClientException}s (e.g. network failures) are rethrown unchanged.
+   */
+  private static RuntimeException translateCredentialFailure(SdkClientException e, String context) {
+    return GlueExceptionConverter.isCredentialFailure(e)
+        ? GlueExceptionConverter.toCredentialException(e, context)
+        : e;
+  }
+
+  /**
+   * Invokes a Glue SDK call, translating a credential-chain {@link SdkClientException} into an
+   * actionable error naming this connector's own credential properties. {@link GlueException} is
+   * left untouched so each call site's own catch block still applies its usual (e.g.
+   * not-found/already-exists) semantics.
+   */
+  private static <T> T callGlue(Supplier<T> call, String context) {
+    try {
+      return call.get();
+    } catch (SdkClientException e) {
+      throw translateCredentialFailure(e, context);
+    }
   }
 
   /**
