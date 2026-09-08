@@ -99,6 +99,34 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET));
   }
 
+  @Test
+  public void testGetSecretsForMetalake() {
+    testGetSecretsForObject(MetadataObjects.parse("test_metalake", MetadataObject.Type.METALAKE));
+  }
+
+  @Test
+  public void testGetSecretsForTopic() {
+    testGetSecretsForObject(
+        MetadataObjects.parse("catalog.schema.topic", MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testGetSecretsForView() {
+    testGetSecretsForObject(MetadataObjects.parse("catalog.schema.view", MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testGetSecretsForModel() {
+    testGetSecretsForObject(
+        MetadataObjects.parse("catalog.schema.model", MetadataObject.Type.MODEL));
+  }
+
+  @Test
+  public void testGetSecretsForModelVersion() {
+    testGetSecretsForObject(
+        MetadataObjects.parse("catalog.schema.model.0", MetadataObject.Type.MODEL_VERSION));
+  }
+
   private void testGetSecretsForObject(MetadataObject metadataObject) {
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));

@@ -28,6 +28,7 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
@@ -36,6 +37,9 @@ from gravitino.api.tag.tag import Tag
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
 )
 from gravitino.client.metadata_object_statistics_operations import (
     MetadataObjectStatisticsOperations,
@@ -64,6 +68,7 @@ class RelationalTable(
     SupportsRoles,
     SupportsStatistics,
     SupportsTags,
+    SupportsSecrets,
 ):
     """Represents a relational table."""
 
@@ -84,6 +89,9 @@ class RelationalTable(
             namespace.level(0), table_object, rest_client
         )
         self._object_statistics_operations = MetadataObjectStatisticsOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             namespace.level(0), table_object, rest_client
         )
 
@@ -292,3 +300,9 @@ class RelationalTable(
 
     def supports_statistics(self) -> SupportsStatistics:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> dict[str, str]:
+        return self._object_secret_operations.get_secrets()

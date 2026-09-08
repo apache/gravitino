@@ -1083,11 +1083,19 @@ public abstract class BaseCatalog extends AbstractCatalog {
                             "View '%s' in catalog '%s' has no SQL representation for dialects %s",
                             view.name(), catalogName(), dialects)));
 
-    Map<String, String> properties =
-        view.properties() != null
-            ? Collections.unmodifiableMap(view.properties())
-            : Collections.emptyMap();
+    Map<String, String> properties = viewPropertiesWithSecrets(view);
     return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
+  }
+
+  private static Map<String, String> viewPropertiesWithSecrets(View view) {
+    Map<String, String> props =
+        new HashMap<>(view.properties() == null ? Collections.emptyMap() : view.properties());
+    try {
+      props.putAll(view.supportsSecrets().getSecrets());
+    } catch (UnsupportedOperationException ignored) {
+      // Server-side / stub views may not implement SupportsSecrets.
+    }
+    return Collections.unmodifiableMap(props);
   }
 
   @VisibleForTesting

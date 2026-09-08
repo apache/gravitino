@@ -58,10 +58,15 @@ public class MetadataObjectSecretOperations {
 
   private static final Set<MetadataObject.Type> supportsSecretMetadataTypes =
       ImmutableSet.of(
+          MetadataObject.Type.METALAKE,
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FILESET,
-          MetadataObject.Type.TABLE);
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.MODEL_VERSION);
 
   private final SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
