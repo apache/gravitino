@@ -90,6 +90,15 @@ public class PolicyTagRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL for soft-deleting tag relations when a policy is deleted. */
+  public String softDeleteByPolicyId(@Param("policyId") Long policyId) {
+    return "UPDATE "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + deletedAtNowExpression()
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
+  }
+
   /** Returns SQL for soft-deleting policy relations when a tag is deleted. */
   public String softDeleteByTagId(@Param("tagId") Long tagId) {
     return "UPDATE "

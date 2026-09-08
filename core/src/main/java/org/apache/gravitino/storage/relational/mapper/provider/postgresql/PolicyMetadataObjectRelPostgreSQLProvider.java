@@ -41,18 +41,12 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
   private static final String DELETED_AT_NOW_EXPRESSION = " " + DatabaseTimeSQL.POSTGRESQL;
 
   @Override
-  public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      String metalakeName, String policyName) {
+  public String softDeletePolicyMetadataObjectRelsByPolicyId(Long policyId) {
     return "UPDATE "
         + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at ="
+        + " SET deleted_at ="
         + DELETED_AT_NOW_EXPRESSION
-        + " WHERE te.policy_id IN (SELECT tm.policy_id FROM "
-        + PolicyMetaMapper.POLICY_META_TABLE_NAME
-        + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.policy_name = #{policyName} AND tm.deleted_at = 0) AND te.deleted_at = 0";
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
   @Override

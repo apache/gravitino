@@ -295,6 +295,12 @@ public class AuthorizationExpressionConstants {
           ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
           """;
 
+  public static final String LOAD_USER_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
+
+  public static final String LOAD_GROUP_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
+
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 
