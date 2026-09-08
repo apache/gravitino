@@ -28,6 +28,7 @@ dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
+  compileOnly(libs.postgresql.driver)
 
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")

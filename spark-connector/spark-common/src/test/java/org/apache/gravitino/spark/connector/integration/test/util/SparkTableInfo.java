@@ -186,6 +186,9 @@ public class SparkTableInfo {
     return baseTable instanceof SparkIcebergTable && !(transform instanceof SortedBucketTransform);
   }
 
+  // Table.schema() is deprecated from Spark 3.4 in favor of columns(); the Gravitino table wrappers
+  // still implement the deprecated form, so the tests read it back the same way.
+  @SuppressWarnings("deprecation")
   private static StructType getSchema(Table baseTable) {
     if (baseTable instanceof SparkHiveTable) {
       return ((SparkHiveTable) baseTable).schema();

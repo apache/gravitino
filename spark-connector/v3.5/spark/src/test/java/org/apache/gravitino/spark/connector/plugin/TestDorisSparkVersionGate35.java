@@ -19,6 +19,7 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,10 +28,11 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.spark.SparkConf;
 import org.apache.spark.package$;
 import org.junit.jupiter.api.Test;
+import scala.util.Properties$;
 
 /** Verifies the Doris registration boundary against the Spark version on the test classpath. */
 public class TestDorisSparkVersionGate35 {
@@ -45,21 +47,21 @@ public class TestDorisSparkVersionGate35 {
 
     Catalog catalog = mock(Catalog.class);
     when(catalog.provider()).thenReturn("jdbc-doris");
-    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin();
-    plugin.setDorisSupportEnabled(true);
+    GravitinoDriverPlugin plugin =
+        (GravitinoDriverPlugin) new GravitinoSparkPlugin().driverPlugin();
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, "true");
+    plugin.registerOptInExtensions(sparkConf);
 
-    if (CatalogNameAdaptor.getCatalogName("jdbc-doris") != null
+    if (Properties$.MODULE$.versionNumberString().startsWith("2.12")
         && GravitinoDriverPlugin.isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION())) {
       assertDoesNotThrow(
-          () ->
-              plugin.registerGravitinoCatalogs(
-                  new SparkConf(false), ImmutableMap.of("doris", catalog)));
+          () -> plugin.registerGravitinoCatalogs(sparkConf, ImmutableMap.of("doris", catalog)));
+      assertEquals(GravitinoSparkPlugin.DORIS_CATALOG, sparkConf.get("spark.sql.catalog.doris"));
     } else {
       assertThrows(
           IllegalArgumentException.class,
-          () ->
-              plugin.registerGravitinoCatalogs(
-                  new SparkConf(false), ImmutableMap.of("doris", catalog)));
+          () -> plugin.registerGravitinoCatalogs(sparkConf, ImmutableMap.of("doris", catalog)));
     }
   }
 }
