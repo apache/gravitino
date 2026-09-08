@@ -23,8 +23,10 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.lance.namespace.errors.ConcurrentModificationException;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
@@ -66,7 +68,13 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
   }
 
   private static LanceNamespaceException toLanceNamespaceException(String instance, Exception ex) {
-    if (ex instanceof NoSuchTableException) {
+    if (ex instanceof UnauthorizedException) {
+      return new UnauthenticatedException(ex.getMessage(), getStackTrace(ex), instance);
+
+    } else if (ex instanceof ForbiddenException) {
+      return new PermissionDeniedException(ex.getMessage(), getStackTrace(ex), instance);
+
+    } else if (ex instanceof NoSuchTableException) {
       return new TableNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
 
     } else if (ex instanceof NotFoundException) {

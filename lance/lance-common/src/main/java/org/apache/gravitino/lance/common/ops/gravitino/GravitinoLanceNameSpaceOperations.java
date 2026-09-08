@@ -42,12 +42,15 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.lance.namespace.errors.InvalidInputException;
@@ -251,15 +254,28 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Catalog catalog;
     try {
       catalog = namespaceWrapper.loadCatalog(catalogName);
-    } catch (NoSuchCatalogException e) {
-      // Catalog does not exist, create it
-      Catalog createdCatalog =
-          namespaceWrapper.createCatalog(
-              catalogName,
-              Catalog.Type.RELATIONAL,
-              "lakehouse-generic",
-              "created by Lance REST server",
-              properties);
+    } catch (NoSuchCatalogException | ForbiddenException e) {
+      // Remote load authorization can reject an absent catalog before checking its existence.
+      // The create endpoint independently checks create privileges. Never treat a denied read
+      // as proof that an existing catalog may be overwritten or exposed through EXIST_OK.
+      Catalog createdCatalog;
+      try {
+        createdCatalog =
+            namespaceWrapper.createCatalog(
+                catalogName,
+                Catalog.Type.RELATIONAL,
+                "lakehouse-generic",
+                "created by Lance REST server",
+                properties);
+      } catch (CatalogAlreadyExistsException conflict) {
+        if (e instanceof ForbiddenException) {
+          throw e;
+        }
+        throw new NamespaceAlreadyExistsException(
+            "Catalog already exists: " + catalogName,
+            CommonUtil.formatCurrentStackTrace(),
+            catalogName);
+      }
       response.setProperties(
           createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
       return response;
@@ -323,10 +339,21 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Schema schema;
     try {
       schema = namespaceWrapper.loadSchema(loadedCatalog, schemaName);
-    } catch (NoSuchSchemaException e) {
-      // Schema does not exist, create it
-      Schema createdSchema =
-          namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
+    } catch (NoSuchSchemaException | ForbiddenException e) {
+      // As with catalogs, let the remote create endpoint check create privileges when a missing
+      // schema cannot be loaded. An existing but hidden schema must remain inaccessible.
+      Schema createdSchema;
+      try {
+        createdSchema = namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
+      } catch (SchemaAlreadyExistsException conflict) {
+        if (e instanceof ForbiddenException) {
+          throw e;
+        }
+        throw new NamespaceAlreadyExistsException(
+            "Schema already exists: " + schemaName,
+            CommonUtil.formatCurrentStackTrace(),
+            schemaName);
+      }
       response.setProperties(
           createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
       return response;
