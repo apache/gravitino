@@ -38,8 +38,8 @@ import org.apache.spark.api.plugin.SparkPlugin;
  * compile-time class references, so a renamed or missing class fails the build rather than the
  * session, and a jar can only bind classes it actually contains.
  *
- * <p>No Paimon catalog is bound: Paimon publishes no {@code paimon-spark-4.1} artifact at any
- * version, so the Spark 4.1 build has no Paimon catalog to name.
+ * <p>No Paimon catalog is bound: Paimon publishes no {@code paimon-spark-4.1} artifact at the
+ * versions released so far, so the Spark 4.1 build has no Paimon catalog to name.
  */
 public class GravitinoSparkPlugin implements SparkPlugin {
 

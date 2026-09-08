@@ -112,10 +112,12 @@ jobs:
         run: |
           ./gradlew assemble -PskipWeb=true
 
-  # To check the spark-connector is compatible with scala2.13
+  # Compiles and unit-tests the connector module of every Spark line, and checks 3.5 against Scala
+  # 2.13. The Spark 4 modules are Scala 2.13 only and ignore -PscalaVersion. The runtime shading
+  # modules are not built here; the full build job below covers those.
   spark-connector-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: changes
     if: needs.changes.outputs.spark_connector_changes == 'true'
     steps:
@@ -131,9 +133,9 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Build with Scala2.13
+      - name: Build Spark 3.5, 4.0 and 4.1 connectors
         run: |
-          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew :spark-connector:spark-3.5:build :spark-connector:spark-4.0:build :spark-connector:spark-4.1:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v7

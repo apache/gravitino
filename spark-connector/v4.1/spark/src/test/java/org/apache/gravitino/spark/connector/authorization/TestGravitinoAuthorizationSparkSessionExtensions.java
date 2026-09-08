@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.authorization;
 
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.spark.sql.SparkSessionExtensions;
@@ -57,19 +58,34 @@ public class TestGravitinoAuthorizationSparkSessionExtensions {
   }
 
   @Test
-  void testParsePlanWithParametersClearsTheDeniedTablesFirst() throws ParseException {
-    ParserInterface parser = injectedParser(Mockito.mock(ParserInterface.class));
+  void testParsePlanWithParametersClearsTheDeniedTablesBeforeDelegating() throws ParseException {
+    ParserInterface delegate = Mockito.mock(ParserInterface.class);
+    ParameterContext parameterContext = Mockito.mock(ParameterContext.class);
+    // Read the denied tables from inside the delegate rather than after the call: the wrapper's own
+    // parsePlan clears them too, so a check made afterwards passes whether or not this method
+    // forwards. Both the ThreadLocal and the answer run on this thread.
+    AtomicBoolean denialReachedTheDelegate = new AtomicBoolean(true);
+    Mockito.when(delegate.parsePlanWithParameters(Mockito.anyString(), Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              denialReachedTheDelegate.set(AuthorizationTable.drainFailure().isPresent());
+              return null;
+            });
+    ParserInterface parser = injectedParser(delegate);
     AuthorizationTable.deny(
         "t",
         "metalake.catalog.schema.t",
         Collections.singleton(Privilege.Name.SELECT_TABLE),
         new ForbiddenException("denied"));
 
-    parser.parsePlanWithParameters("SELECT ?", Mockito.mock(ParameterContext.class));
+    parser.parsePlanWithParameters("SELECT ?", parameterContext);
 
+    // Verify the delegation separately: without it, a wrapper that never forwarded would fail below
+    // with a message about clearing rather than about forwarding.
+    Mockito.verify(delegate).parsePlanWithParameters("SELECT ?", parameterContext);
     Assertions.assertFalse(
-        AuthorizationTable.drainFailure().isPresent(),
-        "a denial recorded before the parse must not carry into the plan parsed after it");
+        denialReachedTheDelegate.get(),
+        "a denial recorded before the parse must be cleared before this method delegates");
   }
 
   private static ParserInterface injectedParser(ParserInterface delegate) {

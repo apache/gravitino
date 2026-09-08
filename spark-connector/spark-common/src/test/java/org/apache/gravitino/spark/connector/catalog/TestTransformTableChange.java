@@ -45,13 +45,14 @@ public class TestTransformTableChange {
     Assertions.assertEquals("value", gravitinoSetProperty.getValue());
   }
 
-  // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
-  // replaces it does not exist on Spark 3.5 or 4.0, and the converter still reads the String.
-  @SuppressWarnings("deprecation")
   @Test
   void testTransformUpdateColumnDefaultValue() {
     String[] fieldNames = new String[] {"col"};
     String defaultValue = "col_default_value";
+    // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
+    // replaces it does not exist on Spark 3.5 or 4.0. Scoped to this declaration so the rest of the
+    // method keeps the -Werror deprecation gate.
+    @SuppressWarnings("deprecation")
     TableChange.UpdateColumnDefaultValue sparkChange =
         (TableChange.UpdateColumnDefaultValue)
             TableChange.updateColumnDefaultValue(fieldNames, defaultValue);

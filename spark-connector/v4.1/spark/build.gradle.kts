@@ -80,10 +80,11 @@ sourceSets {
   }
 }
 
-// Paimon publishes no paimon-spark-4.1 artifact at any version, so the Paimon classes stay out of
-// this build. They live in spark-common/src/main/spark35 and are not on this module's source path;
-// the shared tests that exercise them are excluded here. The two shared test utilities that mention
-// Paimon reach it by simple class name and provider string, so they need no exclusion.
+// Paimon publishes no paimon-spark-4.1 artifact at the versions released so far, so the Paimon
+// classes stay out of this build. They live in spark-common/src/main/spark35 and are not on this
+// module's source path; the shared tests that exercise them are excluded here. The two shared test
+// utilities that mention Paimon reach it by simple class name and provider string, so they need no
+// exclusion.
 sourceSets {
   named("test") {
     java {
