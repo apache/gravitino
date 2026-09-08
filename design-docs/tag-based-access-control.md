@@ -230,9 +230,13 @@ effective on the table   certified = bronze    pii = true
 catalog and grant. The two readings agree under `ALL_VALUES`, where only the presence of the name
 matters, and diverge as soon as a rule reads the value.
 
-The cost lands on the request path. Per-request memoisation in `AuthorizationRequestContext`
-collapses repeated checks within one expression; list endpoints need the batch preload described
-below.
+One constraint on where the check hooks in. `hasAuthorizeWithoutDeny` walks the ancestor chain
+calling `authorize` at each level, so a check placed inside that per-level call would resolve
+effective tags once per level, each resolution walking its own chain — quadratic in chain depth,
+and for nothing, since the leaf's effective tags already subsume every ancestor's. The check runs
+once for the object under decision, not once per level of the RBAC walk.
+
+The cost lands on the request path, and is set out in [Cost](#cost).
 
 ### Rejected: expand tag rows when roles load
 
@@ -275,9 +279,96 @@ See [OQ-1](#oq-1--where-tags-are-evaluated).
 ### List filtering
 
 List endpoints filter their results through the same authorizer, so tag-derived permissions must be
-visible to filtering as well as to point decisions. Resolving tags per candidate object would turn
-one listing into N walks of the ancestor chain. Filtering needs a batch preload of tag and policy
-state for the candidate set, alongside the existing `preloadToCache` and `preloadOwner` paths.
+visible to filtering as well as to point decisions.
+
+Filtering has a fast path today: `allVisibleViaParentScope` skips the per-object loop entirely when
+a parent-scope grant makes every candidate visible and no object-level deny exists. Tags only add
+access, so that short-circuit stays correct untouched — if RBAC already shows everything, no tag
+can change the answer.
+
+When it misses, the per-object loop runs, and that loop is deliberately free of per-object queries:
+`preloadToCache` batch-gets the entities and `preloadOwner` batch-gets their owners, leaving the
+loop as in-memory evaluation. Resolving tags per candidate breaks that property and turns one
+listing into N walks of the ancestor chain. Filtering needs a batch preload of tag and policy state
+for the candidate set, alongside those two paths — not as an optimisation, but to keep an invariant
+the loop already has.
+
+### Cost
+
+The feature is off by default, and the gate sits on evaluation, so a deployment that leaves it off
+pays nothing and the rest of this section does not apply to it. See
+[Enabling the feature](#enabling-the-feature).
+
+With it on, tags are consulted only when the RBAC rows do not already allow, so a check RBAC grants
+costs nothing. The cost falls on the not-allowed branch — which is the common branch for list
+filtering, where most candidates are objects the caller cannot see. The feature therefore makes
+"no" more expensive than "yes", inverting the shape RBAC has today.
+
+On that branch, one check resolves the object's effective tags, then loads the policies bound to
+them:
+
+| Step | Cost today |
+|---|---|
+| Resolve the object's effective tags | One relation query per level of the ancestor chain. Nothing caches the result — `RelationalEntityStore` caches entities, not relation queries. |
+| Load the policies bound to each tag | One `POLICY_METADATA_OBJECT_REL` query per distinct effective tag. |
+| Test `applicable_roles` | In memory, against roles the request has already loaded. |
+
+The chain is not bounded by a constant. `getParentMetadataObjects` expands a hierarchical schema
+one level at a time, so a column under `catalog.a:b.table` walks five levels, and a deeper schema
+walks more:
+
+```
+COLUMN:catalog.a:b.table.col -> TABLE:catalog.a:b.table -> SCHEMA:catalog.a:b
+                             -> SCHEMA:catalog.a -> CATALOG:catalog
+```
+
+Two costs the query count hides. `TagManager.listTagsInfoForMetadataObject` and
+`PolicyManager.listPolicyInfosForMetadataObject` each take a tree read lock and call
+`checkMetadataObject`, whose existence check can reach the underlying catalog — so the evaluator
+has to query the relation directly rather than reuse them. And `batchListEntitiesByRelation`
+implements only `OWNER_REL` today, so the batch preload below is a new query, not a reuse.
+
+There is also a write-side cost that predates this design: applying or removing a tag invalidates
+the entity cache for both endpoints, and that invalidation cascades down the identifier hierarchy,
+so tagging a catalog drops every cached schema and table beneath it.
+
+Three things get worse when the feature is on. The second is a trade-off the feature asks for
+rather than a defect, but it should be a deliberate choice rather than a surprise:
+
+- **Listings that miss the parent-scope short-circuit.** The per-object loop issues no per-object
+  queries today, provided the preload runs — `preloadToCache` returns early when the entity cache
+  is disabled or the type is not preloadable. Each not-allowed candidate adds a chain walk plus a
+  policy query per tag, so a listing of N objects goes from a batch preload and in-memory
+  evaluation to O(N × d) queries against the relational store. Latency on a single call is not the
+  concern; connection-pool pressure under concurrency is.
+- **Granting through tags instead of coarse RBAC makes that miss more often.** The short-circuit
+  fires on a parent-scope RBAC grant. A deployment that replaces those grants with tag-derived
+  access removes the condition the short-circuit tests, so listings that are free today take the
+  slow path.
+- **Tag churn degrades RBAC.** The invalidation above is not scoped to the tag path — the entity
+  cache is shared, so retagging a catalog costs every request that reads entities beneath it,
+  including requests that never touch a tag.
+
+Two guards keep the not-allowed branch cheap where no tag could grant anyway: no enabled
+`system_access_control` policy in the metalake, resolved once per request; and no active roles on
+the request, since `applicable_roles` is tested against active roles and an empty set matches
+nothing. The first has no list-by-type query today, so it lists the metalake's policies.
+
+Three mitigations, in increasing order of what they cost to build:
+
+- **Per-request memoisation.** `AuthorizationRequestContext` already memoises the final decision,
+  but keys it on principal, metalake, object and privilege, while the expensive part — effective
+  tags and the policies bound to them — depends on neither the principal nor the privilege.
+  Memoising that per object keeps a request checking several privileges on one object to a single
+  walk.
+- **Batch preload for lists.** Resolve the candidate set's tag and policy state in one round trip
+  rather than N walks, as above.
+- **A cache across requests.** Not designed here, and not yet designable: caching tag state beyond
+  one request needs an invalidation signal, and two of the three signals in
+  [Freshness](#freshness) have no carrier today. Performance and freshness are the same problem.
+
+The first two land in M3 and M5. The third becomes possible once M4 does, and until then the
+uncached cost above is what the feature costs.
 
 ---
 
@@ -354,6 +445,35 @@ Two properties of that delegation are worth recording:
   subtree — "may apply `certified` within `lakehouse.finance`" is not expressible.
 
 See [OQ-4](#oq-4--authority-to-confer-access-through-a-tag).
+
+### Enabling the feature
+
+A server-level configuration gates the feature, and it defaults to off.
+
+The gate sits on evaluation, not on storage. With it off, policies can still be created, validated
+and bound to tags, and tags can still be applied — every write path in this section works, and
+every authority check on it still applies. The evaluator never consults the result, so no tag
+confers access. That is not a dry run: nothing is evaluated, so nothing is reported. The
+configuration is inert rather than observed.
+
+Two consequences are worth stating plainly:
+
+- **Turning it off revokes.** Access held only through a tag disappears at once. The direction is
+  safe — nothing gains access — but callers experience a revocation, not a pause.
+- **Turning it on confers everything authored while it was off.** That access was not granted
+  unchecked: the write-path authority checks run at bind time, so whoever bound a policy to a tag
+  held the authority to confer it. The flag decides when a delegation takes effect, not whether it
+  was authorised.
+
+On means fully on. Enforcing at point checks but not in list filtering would leave a caller holding
+access to objects that never appear in their listings; the reverse lists objects that are then
+denied. Neither leaks data, since tags only add access, but neither is worth building.
+
+A dry run — evaluate, log what the tag path would have granted, return the RBAC answer regardless —
+is a third mode rather than this one. Because tags only add access, its output can only ever be
+grants that would newly apply, which makes it a useful way to review a configuration before
+enabling it. It pays the full request-path cost for no functional benefit, so it is a diagnostic
+rather than a resting state, and nothing below depends on it.
 
 ---
 
@@ -517,9 +637,9 @@ resolves differently, the milestones marked against it change shape.
 |---|---|---|
 | M1 — model and storage | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet. | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist. |
 | M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked. | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated. |
-| M3 — enforcement, single node | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no work of its own under the proposed placement, and a combining rule under the other. |
+| M3 — enforcement, single node | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no work of its own under the proposed placement, and a combining rule under the other. |
 | M4 — freshness | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment. | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way. |
-| M5 — list filtering | [List filtering](#list-filtering), with the tags for a page of objects preloaded in one batch. | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3. |
+| M5 — affordable list filtering | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive. | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3. |
 | M6 — lifecycle and documentation | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac). | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour. |
 
 M1, M2 and M4 hold whichever way OQ-1 is answered. M3 and M5 are the two that change with it.
