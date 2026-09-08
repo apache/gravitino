@@ -36,6 +36,7 @@ import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +57,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
           .clientPool()
           .run(c -> c.listPartitionNames(tableHandle.table(), (short) -1).toArray(new String[0]));
     } catch (InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to list partition names of table " + tableHandle.name() + "from Hive Metastore",
-          e);
+      throw ExceptionMessages.wrap("Failed to list partition names of table " + tableHandle.name() + "from Hive Metastore", e);
     }
   }
 
@@ -70,8 +69,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
           .run(c -> c.listPartitions(tableHandle.table(), (short) -1))
           .toArray(new Partition[0]);
     } catch (InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to list partitions of table " + tableHandle.name() + "from Hive Metastore", e);
+      throw ExceptionMessages.wrap("Failed to list partitions of table " + tableHandle.name() + "from Hive Metastore", e);
     }
   }
 
@@ -81,13 +79,11 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       return tableHandle.clientPool().run(c -> c.getPartition(tableHandle.table(), partitionName));
 
     } catch (InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to get partition "
+      throw ExceptionMessages.wrap("Failed to get partition "
               + partitionName
               + " of table "
               + tableHandle.name()
-              + "from Hive Metastore",
-          e);
+              + "from Hive Metastore", e);
     }
   }
 
@@ -172,13 +168,11 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       return false;
 
     } catch (InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to get partition "
+      throw ExceptionMessages.wrap("Failed to get partition "
               + partitionName
               + " of table "
               + tableHandle.name()
-              + "from Hive Metastore",
-          e);
+              + "from Hive Metastore", e);
     }
     return true;
   }

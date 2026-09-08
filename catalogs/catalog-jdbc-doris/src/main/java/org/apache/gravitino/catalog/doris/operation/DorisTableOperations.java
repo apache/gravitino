@@ -70,6 +70,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.utils.ExceptionMessages;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
@@ -215,7 +216,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                   .toString());
         }
       } catch (Exception e) {
-        throw new RuntimeException("Failed to get the number of backend servers", e);
+        throw ExceptionMessages.wrap("Failed to get the number of backend servers", e);
       }
     }
 
