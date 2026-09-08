@@ -242,16 +242,16 @@ return only the entries the caller is entitled to see, which for a metalake owne
 
 #### Data Objects
 
-| Object   | Create              | Load                                 | Alter             | Drop  |
-|----------|---------------------|--------------------------------------|-------------------|-------|
-| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                        | Owner             | Owner |
-| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                         | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`     | `MODIFY_TABLE`    | Owner |
-| View     | `CREATE_VIEW`       | `SELECT_VIEW`                        | Owner             | Owner |
-| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`   | `PRODUCE_TOPIC`   | Owner |
-| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`    | `WRITE_FILESET`   | Owner |
-| Model    | `REGISTER_MODEL`    | `USE_MODEL`                          | Owner             | Owner |
-| Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Object   | Create              | Load                                       | Alter             | Drop  |
+|----------|---------------------|--------------------------------------------|-------------------|-------|
+| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                              | Owner             | Owner |
+| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                               | Owner             | Owner |
+| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`           | `MODIFY_TABLE`    | Owner |
+| View     | `CREATE_VIEW`       | `SELECT_VIEW`                              | Owner             | Owner |
+| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`         | `PRODUCE_TOPIC`   | Owner |
+| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`          | `WRITE_FILESET`   | Owner |
+| Model    | `REGISTER_MODEL`    | `USE_MODEL`                                | Owner             | Owner |
+| Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION`    | `MODIFY_FUNCTION` | Owner |
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
@@ -273,31 +273,32 @@ owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object       | Create                  | Read                                   | Alter or delete | Use                                       |
-|--------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------|
-| Metalake     | Service administrator   | Membership                             | Owner           |                                           |
-| User         | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                           |
-| Group        | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                           |
-| Role         | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`          |
-| Tag          | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object |
-| Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
-| Job          |                         | Owner                                  | Owner           |                                           |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
+|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
+| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
+| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
+| Job              |                         | Owner                                  | Owner           |                                                 |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
 
-Listing secrets providers under a metalake requires ownership of that metalake or
-`VIEW_SECRET_PROVIDERS`. The provider registry itself is process-global server configuration; the
-metalake path only scopes authorization.
+The secrets-provider registry is process-global server configuration; the metalake path only scopes
+authorization. Listing providers does not return secret material.
 
 Bulk access-control APIs use the same privileges as the matching single-entity operations. These
 bulk operations are authorized once before processing the request. Bulk requests report item-level
 failures in `errors`.
 
-| API                                                 | Required privilege                         |
-|-----------------------------------------------------|--------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS` |
-| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` |
+| API                                                 | Required privilege                                 |
+|-----------------------------------------------------|----------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS` |
 
 For example, add users in bulk:
 
