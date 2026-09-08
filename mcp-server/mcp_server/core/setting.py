@@ -18,6 +18,11 @@
 from dataclasses import dataclass, field
 from typing import Set
 
+# Tag carried by the metalake discovery tools. Defined here because
+# Setting is what interprets --include-tool-tags; tools/metalake.py
+# imports it so the tag and the check below cannot drift apart.
+METALAKE_TOOL_TAG = "metalake"
+
 
 @dataclass
 class DefaultSetting:
@@ -28,10 +33,9 @@ class DefaultSetting:
 
 @dataclass
 class Setting:  # pylint: disable=too-many-instance-attributes
-    # Default metalake used when a request names none. Optional for HTTP
-    # transport, where each request can instead name a metalake via the
-    # X-Gravitino-Metalake header; required for stdio, which has no
-    # per-request channel to name one.
+    # Default metalake, used by any tool call that does not name one itself
+    # via the `metalake` argument. Optional on every transport: a deployment
+    # serving several metalakes can leave it unset and let each call choose.
     metalake: str = ""
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
@@ -74,22 +78,18 @@ class Setting:  # pylint: disable=too-many-instance-attributes
             and self.oauth_client_secret.strip()
         )
 
+    def exposes_metalake_discovery(self) -> bool:
+        """Whether the `list_metalakes` tool is reachable in this deployment.
+
+        --include-tool-tags is an allowlist, so a tag filter that omits
+        "metalake" hides the discovery tool. Callers use this to avoid telling
+        an agent to call a tool it cannot see.
+        """
+        return not self.tags or METALAKE_TOOL_TAG in self.tags
+
     def has_service_identity(self) -> bool:
         """Return True when a static token or OAuth client-credentials is set."""
         return bool(self.token.strip()) or self.has_oauth_client()
-
-    def validate_metalake(self) -> None:
-        """Reject stdio transport with no default metalake configured.
-
-        stdio has no per-request channel to name a metalake, so --metalake is
-        the only source there. HTTP transport can rely on the per-request
-        X-Gravitino-Metalake header instead, so an empty default is legitimate.
-        """
-        if self.transport == "stdio" and not self.metalake:
-            raise ValueError(
-                "--metalake is required for stdio transport (stdio has no "
-                "per-request way to select a metalake)."
-            )
 
     def validate_oauth(self) -> None:
         """Reject a partial OAuth client-credentials configuration."""

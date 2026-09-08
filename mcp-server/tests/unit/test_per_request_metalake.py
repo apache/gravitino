@@ -15,20 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Tests for per-request metalake resolution.
+"""Tests for per-call metalake selection.
 
-GravitinoContext.rest_client() must resolve the metalake from the current HTTP
-request's X-Gravitino-Metalake header, falling back to the configured startup
-default, so a single server instance can serve more than one metalake without
-any per-connection/session state (multi-node safe by construction).
+Any tool call may name the metalake it operates on with a `metalake` argument,
+falling back to the server's `--metalake` default. The argument is advertised
+and consumed by MetalakeArgumentMiddleware, so no tool declares it, and it is
+carried in a context variable scoped to one call - never across calls, never
+shared between server replicas.
 """
 
 import asyncio
-import contextvars
 import sys
 import unittest
 from unittest import mock
 from unittest.mock import MagicMock, patch
+
+from fastmcp import Client
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.client.plain.plain_rest_client_operation import (
@@ -36,65 +38,338 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 )
 from mcp_server.core import context as context_module
 from mcp_server.core.context import (
-    METALAKE_HEADER,
+    METALAKE_ARGUMENT,
     GravitinoContext,
     ServiceIdentityFallbackDisabled,
-    _get_request_metalake,
+    get_request_metalake,
+    reset_request_metalake,
+    set_request_metalake,
+)
+from mcp_server.core.middleware import (
+    TOOLS_WITHOUT_METALAKE,
+    _schema_with_metalake,
 )
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args, do_main
+from mcp_server.server import GravitinoMCPServer
+from tests.unit.tools import MockOperation
 
-# Tests intentionally exercise context/client internals (e.g. _default_client,
-# _clients_by_auth, _catalog_operation) to assert per-request isolation;
+# Tests intentionally exercise context internals (_default_client,
+# _clients_by_auth, _catalog_operation) to assert per-call isolation;
 # protected access is expected.
 # pylint: disable=protected-access
 
 
-def _mock_request(headers: dict) -> MagicMock:
-    """A fake HTTP request whose headers.get() only knows the given keys."""
-    mock_request = MagicMock()
-    mock_request.headers.get.side_effect = lambda key, default="": headers.get(
-        key, default
-    )
-    return mock_request
+class TestSchemaInjection(unittest.TestCase):
+    """_schema_with_metalake() advertises the argument without breaking tools."""
+
+    def test_adds_optional_metalake_property(self):
+        schema = _schema_with_metalake(
+            {"type": "object", "properties": {"name": {"type": "string"}}}
+        )
+        self.assertIn(METALAKE_ARGUMENT, schema["properties"])
+        self.assertEqual(
+            schema["properties"][METALAKE_ARGUMENT]["type"], "string"
+        )
+
+    def test_does_not_make_metalake_required(self):
+        """Omitting it is what every single-metalake deployment does."""
+        schema = _schema_with_metalake(
+            {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            }
+        )
+        self.assertEqual(schema["required"], ["name"])
+
+    def test_does_not_mutate_the_original_schema(self):
+        original = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }
+        _schema_with_metalake(original)
+        self.assertNotIn(METALAKE_ARGUMENT, original["properties"])
+
+    def test_never_shadows_a_parameter_the_tool_declares(self):
+        original = {
+            "type": "object",
+            "properties": {METALAKE_ARGUMENT: {"type": "integer"}},
+        }
+        schema = _schema_with_metalake(original)
+        self.assertEqual(
+            schema["properties"][METALAKE_ARGUMENT]["type"], "integer"
+        )
 
 
-class TestGetRequestMetalake(unittest.TestCase):
-    """Unit tests for _get_request_metalake() (HTTP context extraction)."""
+class TestMiddlewareOverTheProtocol(unittest.TestCase):
+    """End-to-end through a real FastMCP client, not a stubbed context."""
 
-    def test_returns_header_value(self):
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({METALAKE_HEADER: "ml_a"}),
-        ):
-            self.assertEqual(_get_request_metalake(), "ml_a")
+    def setUp(self):
+        RESTClientFactory.set_rest_client(MockOperation)
+        self.mcp = GravitinoMCPServer(Setting("mock_metalake")).mcp
 
-    def test_returns_empty_when_no_http_context(self):
-        """Simulates stdio mode where get_http_request raises RuntimeError."""
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            side_effect=RuntimeError("no request context"),
-        ):
-            self.assertEqual(_get_request_metalake(), "")
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
 
-    def test_returns_empty_when_header_absent(self):
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({}),
-        ):
-            self.assertEqual(_get_request_metalake(), "")
+    def test_every_metalake_scoped_tool_advertises_the_argument(self):
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.list_tools()
 
-    def test_whitespace_only_header_is_treated_as_absent(self):
-        """A whitespace-only header must not be mistaken for a real metalake name."""
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({METALAKE_HEADER: "   "}),
-        ):
-            self.assertEqual(_get_request_metalake(), "")
+        tools = asyncio.run(_run())
+        self.assertTrue(tools)
+        missing = [
+            t.name
+            for t in tools
+            if t.name not in TOOLS_WITHOUT_METALAKE
+            and METALAKE_ARGUMENT not in (t.inputSchema.get("properties") or {})
+        ]
+        self.assertEqual(missing, [])
+
+    def test_tool_call_accepts_and_consumes_the_argument(self):
+        """The tool function must not receive an argument it cannot accept."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool(
+                    "get_list_of_catalogs", {METALAKE_ARGUMENT: "other_ml"}
+                )
+
+        # Would raise if the argument reached the tool function.
+        result = asyncio.run(_run())
+        self.assertIsNotNone(result)
+
+    def test_metalake_does_not_leak_into_the_next_call(self):
+        """The middleware must reset the context variable after every call.
+
+        Without the reset this per-call plumbing would silently become session
+        state - exactly what this design exists to avoid.
+        """
+        seen = []
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool(
+                    "get_list_of_catalogs", {METALAKE_ARGUMENT: "first_ml"}
+                )
+                seen.append(get_request_metalake())
+                await client.call_tool("get_list_of_catalogs")
+                seen.append(get_request_metalake())
+
+        asyncio.run(_run())
+        self.assertEqual(seen, ["", ""])
 
 
-class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
-    """GravitinoContext.rest_client() isolates per-request metalakes."""
+class _EchoCatalogOperation:
+    """A catalog listing that reports which metalake its client was built for,
+    and parks until every in-flight call has arrived."""
+
+    barrier = None
+
+    def __init__(self, metalake_name):
+        self._metalake_name = metalake_name
+
+    async def get_list_of_catalogs(self) -> str:
+        if _EchoCatalogOperation.barrier is not None:
+            await _EchoCatalogOperation.barrier()
+        return self._metalake_name
+
+
+class _EchoMetalakeClient(MockOperation):
+    """MockOperation that remembers the metalake it was constructed with."""
+
+    def __init__(self, metalake, uri, authorization="", *, auth=None):
+        super().__init__(metalake, uri, authorization, auth=auth)
+        self._metalake = metalake
+
+    def as_catalog_operation(self):
+        return _EchoCatalogOperation(self._metalake)
+
+
+class TestConcurrentToolCallsOverTheProtocol(unittest.TestCase):
+    """The isolation guarantee, proven on the real path.
+
+    The context-level concurrency test drives set_request_metalake() directly.
+    This one goes through the middleware and the MCP protocol, which is what
+    actually sets and resets the context variable per call - line coverage of
+    the middleware does not prove two overlapping calls stay separate.
+    """
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(_EchoMetalakeClient)
+        self.mcp = GravitinoMCPServer(Setting("ml_default")).mcp
+
+    def tearDown(self):
+        _EchoCatalogOperation.barrier = None
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_overlapping_calls_each_use_their_own_metalake(self):
+        arrived = asyncio.Event()
+        counter = {"n": 0}
+
+        async def _barrier():
+            # Neither call may finish until both are inside the tool, so the
+            # two requests are genuinely in flight at the same time.
+            counter["n"] += 1
+            if counter["n"] == 2:
+                arrived.set()
+            await arrived.wait()
+
+        _EchoCatalogOperation.barrier = _barrier
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await asyncio.gather(
+                    client.call_tool(
+                        "get_list_of_catalogs", {METALAKE_ARGUMENT: "ml_a"}
+                    ),
+                    client.call_tool(
+                        "get_list_of_catalogs", {METALAKE_ARGUMENT: "ml_b"}
+                    ),
+                )
+
+        first, second = asyncio.run(asyncio.wait_for(_run(), timeout=10))
+
+        self.assertEqual(
+            [first.content[0].text, second.content[0].text], ["ml_a", "ml_b"]
+        )
+
+    def test_overlapping_calls_do_not_poison_the_default(self):
+        """A call that names no metalake must still get the default even while
+        another call naming one is in flight."""
+        arrived = asyncio.Event()
+        counter = {"n": 0}
+
+        async def _barrier():
+            counter["n"] += 1
+            if counter["n"] == 2:
+                arrived.set()
+            await arrived.wait()
+
+        _EchoCatalogOperation.barrier = _barrier
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await asyncio.gather(
+                    client.call_tool(
+                        "get_list_of_catalogs", {METALAKE_ARGUMENT: "ml_named"}
+                    ),
+                    client.call_tool("get_list_of_catalogs"),
+                )
+
+        named, defaulted = asyncio.run(asyncio.wait_for(_run(), timeout=10))
+
+        self.assertEqual(named.content[0].text, "ml_named")
+        self.assertEqual(defaulted.content[0].text, "ml_default")
+
+
+class TestDiscoveryWithoutADefaultMetalake(unittest.TestCase):
+    """A server with no --metalake must still be usable from a cold start.
+
+    list_metalakes is the tool an agent reaches for when it does not know a
+    metalake yet, so it must not be gated behind having one - otherwise it is
+    unusable on exactly the deployment that needs it.
+    """
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(MockOperation)
+        self.mcp = GravitinoMCPServer(Setting(metalake="")).mcp
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_list_metalakes_works_with_no_metalake_configured(self):
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool("list_metalakes")
+
+        result = asyncio.run(_run())
+        self.assertEqual(result.content[0].text, "mock_metalakes")
+
+    def test_other_tools_report_how_to_recover(self):
+        """The agent should be told to call list_metalakes, not just fail."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool("get_list_of_catalogs")
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(_run())
+        self.assertIn("list_metalakes", str(raised.exception))
+
+    def test_naming_a_metalake_per_call_works_with_no_default(self):
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool(
+                    "get_list_of_catalogs", {METALAKE_ARGUMENT: "ml_a"}
+                )
+
+        self.assertIsNotNone(asyncio.run(_run()))
+
+
+class TestToolsThatNeverResolveAMetalake(unittest.TestCase):
+    """Tools that ignore the metalake must not advertise the argument."""
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(MockOperation)
+        self.mcp = GravitinoMCPServer(Setting("mock_metalake")).mcp
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_discovery_and_pure_computation_tools_skip_the_argument(self):
+        """Offering a knob that does nothing invites the model to misuse it -
+        on list_metalakes it would otherwise be the only parameter, reading
+        like a filter for the listing."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return {
+                    t.name: t.inputSchema for t in await client.list_tools()
+                }
+
+        schemas = asyncio.run(_run())
+        for name in ("list_metalakes", "metadata_type_to_fullname_formats"):
+            self.assertNotIn(
+                METALAKE_ARGUMENT,
+                schemas[name].get("properties") or {},
+                f"{name} should not advertise the metalake argument",
+            )
+
+
+class TestRecoveryHintMatchesTheDeployment(unittest.TestCase):
+    """--include-tool-tags is an allowlist and can hide list_metalakes."""
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(MockOperation)
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def _call_with_tags(self, tags):
+        mcp = GravitinoMCPServer(Setting("", tags=tags)).mcp
+
+        async def _run():
+            async with Client(mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(_run())
+        return str(raised.exception)
+
+    def test_hint_points_at_discovery_when_it_is_exposed(self):
+        self.assertIn("list_metalakes", self._call_with_tags(set()))
+
+    def test_hint_omits_discovery_when_a_tag_filter_hides_it(self):
+        """Naming a tool the agent cannot call leaves it with no way forward."""
+        message = self._call_with_tags({"catalog"})
+        self.assertNotIn("list_metalakes", message)
+        self.assertIn(f"'{METALAKE_ARGUMENT}' argument", message)
+
+
+class TestMetalakeResolution(unittest.TestCase):
+    """GravitinoContext resolves the metalake per call."""
 
     def setUp(self):
         RESTClientFactory.set_rest_client(PlainRESTClientOperation)
@@ -108,63 +383,45 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
             )
         )
 
-    def test_header_overrides_startup_default(self):
+    def test_call_argument_overrides_startup_default(self):
         ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request(
-                {
-                    "authorization": "Bearer t",
-                    METALAKE_HEADER: "ml_other",
-                }
-            ),
-        ):
+        token = set_request_metalake("ml_other")
+        try:
             client = ctx.rest_client()
+        finally:
+            reset_request_metalake(token)
 
         self.assertEqual(client._catalog_operation.metalake_name, "ml_other")
 
-    def test_falls_back_to_startup_default_when_header_absent(self):
+    def test_falls_back_to_startup_default(self):
         ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            side_effect=LookupError,
-        ):
-            client = ctx.rest_client()
+        client = ctx.rest_client()
 
         self.assertIs(client, ctx._default_client)
         self.assertEqual(client._catalog_operation.metalake_name, "ml_default")
 
-    def test_missing_metalake_raises(self):
-        """No startup default and no header -> explicit error, not a silent guess."""
-        ctx = self._make_context(metalake="")
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            side_effect=LookupError,
-        ):
-            with self.assertRaises(ValueError):
-                ctx.rest_client()
-
-    def test_whitespace_only_header_falls_back_to_startup_default(self):
-        """A whitespace-only header must not be used as a literal metalake name."""
+    def test_whitespace_only_argument_is_treated_as_absent(self):
         ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request(
-                {"authorization": "Bearer t", METALAKE_HEADER: "   "}
-            ),
-        ):
+        token = set_request_metalake("   ")
+        try:
             client = ctx.rest_client()
+        finally:
+            reset_request_metalake(token)
 
         self.assertEqual(client._catalog_operation.metalake_name, "ml_default")
 
-    def test_missing_metalake_error_takes_priority_over_fallback_disabled(self):
-        """When both a missing metalake and a disabled service-identity fallback
-        apply, the caller must see the fixable "no metalake" error (ValueError),
-        not ServiceIdentityFallbackDisabled - metalake resolution runs first."""
+    def test_missing_metalake_raises_with_a_recoverable_message(self):
+        """The message is read by an agent, so it must name the way out."""
+        ctx = self._make_context(metalake="")
+
+        with self.assertRaises(ValueError) as raised:
+            ctx.rest_client()
+
+        message = str(raised.exception)
+        self.assertIn("list_metalakes", message)
+        self.assertIn(f"'{METALAKE_ARGUMENT}' argument", message)
+
+    def test_missing_metalake_takes_priority_over_fallback_disabled(self):
         ctx = GravitinoContext(
             Setting(
                 metalake="",
@@ -177,7 +434,7 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
 
         with patch(
             "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({}),
+            side_effect=LookupError,
         ):
             with self.assertRaises(ValueError) as raised:
                 ctx.rest_client()
@@ -186,30 +443,30 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
             raised.exception, ServiceIdentityFallbackDisabled
         )
 
-    def test_two_concurrent_requests_get_different_metalake_clients(self):
-        """Two requests naming different metalakes, in flight at the same time
-        under the same caller identity, must each get their own client.
+    def test_discovery_works_with_no_metalake_anywhere(self):
+        """list_metalakes is what an agent calls before it knows a metalake,
+        so it must not require one - otherwise it is unusable on exactly the
+        server that needs it."""
+        ctx = self._make_context(metalake="")
 
-        Both tasks set their request context and then park until the other has
-        done the same, so the two requests genuinely overlap: if resolution
-        leaked across tasks, one of them would see the other's metalake. This
-        is the isolation guarantee the header-based design relies on instead of
-        any per-connection session state.
-        """
+        client = ctx.rest_client(require_metalake=False)
+
+        self.assertIsNotNone(client.as_metalake_operation())
+
+    def test_two_concurrent_calls_get_different_metalake_clients(self):
+        """Two calls naming different metalakes, in flight at the same time,
+        must each get their own client. Both tasks publish their metalake and
+        then park until the other has too, so the calls genuinely overlap."""
         ctx = self._make_context()
-        # get_http_request() reads a contextvar; mirror that here so each task
-        # sees only its own request, the way the real server does.
-        current_request = contextvars.ContextVar("current_request")
 
         async def _call(metalake, ready, go):
-            current_request.set(
-                _mock_request(
-                    {"authorization": "Bearer t", METALAKE_HEADER: metalake}
-                )
-            )
-            ready.set()
-            await go.wait()
-            return ctx.rest_client()
+            token = set_request_metalake(metalake)
+            try:
+                ready.set()
+                await go.wait()
+                return ctx.rest_client()
+            finally:
+                reset_request_metalake(token)
 
         async def _drive():
             ready_a, ready_b, go = (
@@ -224,11 +481,7 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
             go.set()
             return await asyncio.gather(task_a, task_b)
 
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            side_effect=current_request.get,
-        ):
-            client_a, client_b = asyncio.run(_drive())
+        client_a, client_b = asyncio.run(_drive())
 
         self.assertEqual(client_a._catalog_operation.metalake_name, "ml_a")
         self.assertEqual(client_b._catalog_operation.metalake_name, "ml_b")
@@ -236,179 +489,55 @@ class TestGravitinoContextPerRequestMetalake(unittest.TestCase):
 
     def test_same_identity_and_metalake_reuses_cached_client(self):
         ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request(
-                {"authorization": "Bearer t", METALAKE_HEADER: "ml_a"}
-            ),
-        ):
+        token = set_request_metalake("ml_a")
+        try:
             first = ctx.rest_client()
             second = ctx.rest_client()
+        finally:
+            reset_request_metalake(token)
 
         self.assertIs(first, second)
-
-    def test_non_default_metalake_without_authorization_uses_service_identity(
-        self,
-    ):
-        """No per-request Authorization but a non-default metalake: falls back to
-        the startup service identity (static token / OAuth), scoped to that
-        metalake, not the shared _default_client bound to the startup default.
-        """
-        ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({METALAKE_HEADER: "ml_other"}),
-        ):
-            client = ctx.rest_client()
-
-        self.assertIsNot(client, ctx._default_client)
-        self.assertEqual(client._catalog_operation.metalake_name, "ml_other")
-
-    def test_service_identity_client_is_cached_per_metalake(self):
-        ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            return_value=_mock_request({METALAKE_HEADER: "ml_other"}),
-        ):
-            first = ctx.rest_client()
-            second = ctx.rest_client()
-
-        self.assertIs(first, second)
-        self.assertEqual(len(ctx._clients_by_auth), 1)
-
-    def test_service_client_shares_the_one_client_cache_bound(self):
-        """Service-identity clients live in the same LRU as per-principal ones,
-        so _MAX_CACHED_CLIENTS bounds the total number of open connection pools
-        rather than being applied separately per cache."""
-        ctx = self._make_context()
-        cap = context_module._MAX_CACHED_CLIENTS
-
-        for i in range(cap + 5):
-            with patch(
-                "fastmcp.server.dependencies.get_http_request",
-                return_value=_mock_request({METALAKE_HEADER: f"ml_{i}"}),
-            ):
-                ctx.rest_client()
-
-        self.assertLessEqual(len(ctx._clients_by_auth), cap)
 
     def test_one_bound_covers_principal_and_service_clients_together(self):
-        """Filling the cache with per-principal clients and service-identity
-        clients must not exceed the single cap between them."""
+        """_MAX_CACHED_CLIENTS bounds the total number of open connection
+        pools, not each cache separately."""
         ctx = self._make_context()
         cap = context_module._MAX_CACHED_CLIENTS
+
+        def _mock_request(authorization):
+            request = MagicMock()
+            request.headers.get.side_effect = (
+                lambda key, default="": authorization
+            )
+            return request
 
         for i in range(cap):
             with patch(
                 "fastmcp.server.dependencies.get_http_request",
-                return_value=_mock_request(
-                    {"authorization": f"Bearer t{i}", METALAKE_HEADER: "ml_a"}
-                ),
+                return_value=_mock_request(f"Bearer t{i}"),
             ):
                 ctx.rest_client()
 
         for i in range(10):
-            with patch(
-                "fastmcp.server.dependencies.get_http_request",
-                return_value=_mock_request({METALAKE_HEADER: f"ml_{i}"}),
-            ):
+            token = set_request_metalake(f"ml_{i}")
+            try:
                 ctx.rest_client()
+            finally:
+                reset_request_metalake(token)
 
         self.assertLessEqual(len(ctx._clients_by_auth), cap)
 
-    def test_evicted_service_client_is_closed(self):
-        closed = []
 
-        class _ClosableClient:
-            def __init__(self, *_args, **_kwargs):
-                pass
-
-            async def close(self):
-                closed.append(self)
-
-        RESTClientFactory.set_rest_client(_ClosableClient)
-        try:
-            ctx = self._make_context()
-            cap = context_module._MAX_CACHED_CLIENTS
-
-            async def _drive():
-                for i in range(cap + 1):
-                    with patch(
-                        "fastmcp.server.dependencies.get_http_request",
-                        return_value=_mock_request(
-                            {METALAKE_HEADER: f"ml_{i}"}
-                        ),
-                    ):
-                        ctx.rest_client()
-                await asyncio.sleep(0)
-                await asyncio.gather(*ctx._pending_closes)
-
-            asyncio.run(_drive())
-
-            self.assertEqual(len(closed), 1)
-            self.assertEqual(len(ctx._pending_closes), 0)
-        finally:
-            RESTClientFactory.set_rest_client(PlainRESTClientOperation)
-
-    def test_stdio_mode_always_uses_startup_default(self):
-        """No HTTP request context at all (stdio): the header path never fires."""
-        ctx = self._make_context()
-
-        with patch(
-            "fastmcp.server.dependencies.get_http_request",
-            side_effect=RuntimeError,
-        ):
-            client = ctx.rest_client()
-
-        self.assertIs(client, ctx._default_client)
-
-
-class TestSettingValidateMetalake(unittest.TestCase):
-    def test_stdio_without_metalake_is_rejected(self):
-        setting = Setting(metalake="", transport="stdio")
-        with self.assertRaises(ValueError):
-            setting.validate_metalake()
-
-    def test_stdio_with_metalake_is_accepted(self):
-        Setting(metalake="ml", transport="stdio").validate_metalake()
-
-    def test_http_without_metalake_is_accepted(self):
-        Setting(metalake="", transport="http").validate_metalake()
-
+class TestSettingMetalake(unittest.TestCase):
     def test_whitespace_only_metalake_is_stripped_to_empty(self):
-        """A shell-quoting mistake like --metalake "  " must not be treated as
-        a configured default - it collapses to the same "unconfigured" state
-        as an empty string."""
+        """A shell-quoting mistake like --metalake "  " must not read as a
+        configured default."""
         self.assertEqual(Setting(metalake="  ").metalake, "")
 
-    def test_whitespace_only_metalake_is_rejected_for_stdio(self):
-        setting = Setting(metalake="   ", transport="stdio")
-        with self.assertRaises(ValueError):
-            setting.validate_metalake()
-
-
-class TestGravitinoContextValidatesSettingAtConstruction(unittest.TestCase):
-    """GravitinoContext.__init__ must fail fast, independent of do_main()."""
-
-    def setUp(self):
-        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
-
-    def test_stdio_without_metalake_raises_at_construction(self):
-        with self.assertRaises(ValueError):
-            GravitinoContext(Setting(metalake="", transport="stdio"))
-
-    def test_partial_oauth_raises_at_construction(self):
-        with self.assertRaises(ValueError):
-            GravitinoContext(
-                Setting(
-                    metalake="ml",
-                    oauth_client_id="mcp",
-                    oauth_client_secret="s",
-                )
-            )
+    def test_stdio_without_metalake_is_allowed(self):
+        """stdio can now name a metalake per call like any other transport, so
+        --metalake is no longer required there."""
+        GravitinoContext(Setting(metalake="", transport="stdio"))
 
 
 class TestMetalakeArgParsing(unittest.TestCase):
@@ -417,20 +546,12 @@ class TestMetalakeArgParsing(unittest.TestCase):
             args = _parse_args()
         self.assertEqual(args.metalake, "")
 
-
-class TestMainMetalakeValidation(unittest.TestCase):
-    def test_stdio_without_metalake_inits_logging_before_exit(self):
-        with mock.patch(
-            "mcp_server.main._init_logging"
-        ) as init_log, mock.patch(
+    def test_server_starts_without_a_default_metalake(self):
+        with mock.patch("mcp_server.main._init_logging"), mock.patch(
             "mcp_server.main.GravitinoMCPServer"
-        ), mock.patch.object(
-            sys, "argv", ["mcp_server"]
-        ):
-            with self.assertRaises(SystemExit) as raised:
-                do_main()
-            self.assertEqual(raised.exception.code, 1)
-        init_log.assert_called_once()
+        ) as server, mock.patch.object(sys, "argv", ["mcp_server"]):
+            do_main()
+        server.assert_called_once()
 
 
 if __name__ == "__main__":

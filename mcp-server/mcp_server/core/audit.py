@@ -63,6 +63,7 @@ def emit(
     tool: str,
     outcome: str,
     error_type: str = "",
+    metalake: str = "",
 ) -> None:
     """Write one structured JSON audit record to the audit logger.
 
@@ -74,6 +75,10 @@ def emit(
                    authorization denial being the common case), not only
                    authorization failures; inspect error_type to disambiguate.
         error_type: Exception class name when outcome is "deny", empty otherwise.
+        metalake:  Metalake the call named, empty when it used the server's
+                   configured default. Recorded because one server can now
+                   serve several metalakes, so "which tenant did this touch"
+                   is no longer answerable from the server config alone.
     """
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -81,6 +86,8 @@ def emit(
         "tool": tool,
         "outcome": outcome,
     }
+    if metalake:
+        record["metalake"] = metalake
     if error_type:
         record["error_type"] = error_type
 

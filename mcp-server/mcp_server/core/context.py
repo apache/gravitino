@@ -19,6 +19,7 @@ import asyncio
 import logging
 import re
 from collections import OrderedDict
+from contextvars import ContextVar
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.oauth import RefreshableBearerAuth
@@ -51,9 +52,17 @@ _CANONICAL_AUTH_SCHEMES = {
     "negotiate": "Negotiate",
 }
 
-# HTTP header a request uses to name the metalake it wants to operate on.
-# Headers are matched case-insensitively by the underlying request object.
-METALAKE_HEADER = "X-Gravitino-Metalake"
+# Name of the optional argument that every tool accepts to name the metalake
+# it should operate on. The argument is not declared on any tool function:
+# MetalakeArgumentMiddleware advertises it in each tool's input schema, strips
+# it from the incoming arguments, and publishes it on _REQUEST_METALAKE below.
+METALAKE_ARGUMENT = "metalake"
+
+# The metalake named by the tool call currently being served, or "" when the
+# call named none. Scoped to a single tool invocation (the middleware resets it
+# in a finally block), so this is request plumbing, not session state: nothing
+# is remembered between calls and no state is shared between server replicas.
+_REQUEST_METALAKE: ContextVar[str] = ContextVar("request_metalake", default="")
 
 
 class ServiceIdentityFallbackDisabled(RuntimeError):
@@ -92,22 +101,23 @@ def _get_request_authorization() -> str:
         return ""
 
 
-def _get_request_metalake() -> str:
-    """Return the ``X-Gravitino-Metalake`` header of the current HTTP request.
+def set_request_metalake(metalake: str):
+    """Publish the metalake named by the current tool call.
 
-    Returns an empty string in stdio mode or when the header is absent, in
-    which case the caller falls back to the configured startup default.
+    Returns the token the caller must pass to :func:`reset_request_metalake`
+    once the call finishes, so nothing leaks into the next one.
     """
-    try:
-        # Imported lazily: only available within an HTTP request context.
-        # pylint: disable=import-outside-toplevel
-        from fastmcp.server.dependencies import get_http_request
+    return _REQUEST_METALAKE.set((metalake or "").strip())
 
-        # Stripped so a whitespace-only header (e.g. an empty templated
-        # value) is treated as absent, not as a literal metalake name.
-        return get_http_request().headers.get(METALAKE_HEADER, "").strip()
-    except (LookupError, RuntimeError):
-        return ""
+
+def reset_request_metalake(token) -> None:
+    """Undo :func:`set_request_metalake` at the end of a tool call."""
+    _REQUEST_METALAKE.reset(token)
+
+
+def get_request_metalake() -> str:
+    """The metalake named by the current tool call, or "" when it named none."""
+    return _REQUEST_METALAKE.get()
 
 
 def startup_authorization(setting: Setting) -> str:
@@ -171,10 +181,8 @@ def _service_auth(setting: Setting):
 class GravitinoContext:
     def __init__(self, setting: Setting):
         # Enforced here (not only in do_main()) so any path that constructs a
-        # GravitinoContext directly - not just the CLI entrypoint - fails
-        # fast on an invalid Setting, matching the pre-per-request-metalake
-        # behavior where a bad Setting couldn't be constructed at all.
-        setting.validate_metalake()
+        # GravitinoContext directly - not just the CLI entrypoint - fails fast
+        # on an invalid Setting.
         setting.validate_oauth()
         self._setting = setting
         # Eagerly built only when a startup default is configured, so the
@@ -207,13 +215,19 @@ class GravitinoContext:
         # running. Entries are discarded when each task completes.
         self._pending_closes: "set[asyncio.Task]" = set()
 
-    def rest_client(self):
+    def rest_client(self, *, require_metalake: bool = True):
         """Return a REST client carrying the correct identity and metalake.
 
-        The metalake is resolved per request: an HTTP request's
-        ``X-Gravitino-Metalake`` header takes priority, falling back to the
-        configured startup default (``--metalake``). Raises ``ValueError``
-        when neither is available.
+        The metalake is resolved per call: the ``metalake`` argument of the
+        current tool call takes priority, falling back to the configured
+        startup default (``--metalake``). Raises ``ValueError`` when neither is
+        available.
+
+        ``require_metalake=False`` skips metalake resolution entirely, for the
+        metalake-listing tool: it is what an agent calls when it does not know
+        a metalake yet, so it must work on a server with no default configured.
+        The returned client can only be used for operations that are not
+        metalake-scoped.
 
         Identity resolution is unchanged: in HTTP transport mode the incoming
         request's ``Authorization`` header is forwarded verbatim to Gravitino,
@@ -229,7 +243,7 @@ class GravitinoContext:
         Clients are cached per (identity, metalake) combination (and their
         connection pools reused) so a new pool is not opened on every call.
         """
-        metalake = self._resolve_metalake()
+        metalake = self._resolve_metalake() if require_metalake else ""
         authorization = _get_request_authorization()
         if not authorization:
             if (
@@ -258,20 +272,29 @@ class GravitinoContext:
         return client
 
     def _resolve_metalake(self) -> str:
-        """Resolve the metalake for the current call, header first.
+        """Resolve the metalake for the current call, tool argument first.
 
         Raises ``ValueError`` (an invalid/missing request parameter, mapped
         by FastMCP's error middleware to a client-facing "Invalid params"
-        error rather than an internal-error code) when the request names
-        none and no startup default (``--metalake``) is configured.
+        error rather than an internal-error code) when the call names none and
+        no startup default (``--metalake``) is configured. The message is
+        written for the agent that will read it: it names the recovery path so
+        a model can correct itself instead of just reporting the failure.
         """
-        metalake = _get_request_metalake() or self._setting.metalake
+        metalake = get_request_metalake() or self._setting.metalake
         if not metalake:
-            raise ValueError(
-                f"No metalake specified: the request omitted the "
-                f"{METALAKE_HEADER!r} header and no --metalake default is "
-                "configured."
+            # Only point at the discovery tool when this deployment actually
+            # exposes it; a tag filter can hide it, and naming a tool the
+            # agent cannot call leaves it with no way forward.
+            recovery = (
+                "Call 'list_metalakes' to see the metalakes you can access, "
+                f"then retry this call with the '{METALAKE_ARGUMENT}' "
+                "argument set to one of them."
+                if self._setting.exposes_metalake_discovery()
+                else f"Retry this call with the '{METALAKE_ARGUMENT}' argument "
+                "set to the metalake to use, or ask the user which one to use."
             )
+            raise ValueError(f"No metalake specified. {recovery}")
         return metalake
 
     def _service_client(self, metalake: str):

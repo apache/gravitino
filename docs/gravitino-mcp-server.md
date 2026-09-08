@@ -71,6 +71,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 | Tool name                           | Description                                                                    | Tag          |
 |-------------------------------------|--------------------------------------------------------------------------------|--------------|
+| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`   |
 | `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`    |
 | `create_catalog`                    | Create a new catalog.                                                          | `catalog`    |
 | `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`    |
@@ -142,20 +143,20 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument                         | Description                                                                                                                     | Default value               | Required   |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|------------|
-| `--metalake`                     | Default Gravitino metalake, used when a request names none. See Per-request metalake below.                                     | none                        | stdio only |
-| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No         |
-| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No         |
-| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No         |
-| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.              | none (anonymous)            | No         |
-| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                   | none                        | No         |
-| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                               | none                        | No         |
-| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                       | none                        | No         |
-| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                              | none                        | No         |
-| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`. | `false`                     | No         |
-| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                         | none                        | No         |
-| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                        | none                        | No         |
+| Argument                         | Description                                                                                                                     | Default value               | Required |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
+| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                       | none                        | No       |
+| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
+| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
+| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
+| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.              | none (anonymous)            | No       |
+| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                   | none                        | No       |
+| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                               | none                        | No       |
+| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                       | none                        | No       |
+| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                              | none                        | No       |
+| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`. | `false`                     | No       |
+| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                         | none                        | No       |
+| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                        | none                        | No       |
 
 ## Authentication
 
@@ -225,22 +226,6 @@ For exposed or multi-caller HTTP deployments, set `--no-service-identity-fallbac
 
 Authorization itself is always enforced by Gravitino: the MCP server forwards the identity but does not make access-control decisions of its own.
 
-### Per-request metalake (HTTP)
-
-`--metalake` is **required for stdio transport and optional for HTTP transport**. It is the default metalake: the one used by any request that does not name a metalake itself.
-
-When the server runs with HTTP transport, a request may name the metalake to operate on with the `X-Gravitino-Metalake` header, taking priority over the `--metalake` default. This lets one server instance serve more than one metalake: each request independently resolves its own metalake from its own header, so the server holds no per-connection or per-session metalake state and stays correct regardless of how many replicas it runs as.
-
-The metalake for a call is resolved in this order:
-
-1. The `X-Gravitino-Metalake` header, when the request carries one.
-2. The `--metalake` startup default, when it is configured.
-3. Otherwise the call fails with an error naming the missing argument.
-
-Authorization is unchanged — the caller's identity (see above) determines what it may see in the requested metalake exactly as it would through the REST API.
-
-stdio transport has no per-request header, so `--metalake` is required there and remains the only source; switching metalake means starting another stdio process with a different `--metalake`.
-
 ### Serving over HTTPS (TLS)
 
 To serve the MCP HTTP endpoint (the `--mcp-url`, not the `--gravitino-uri`) over TLS, provide both `--tls-cert` and `--tls-key` and use an `https://` `--mcp-url`. The certificate and key must be provided together, and the URL scheme must match the TLS setting (an `https://` URL without a cert/key, or a cert/key behind an `http://` URL, is rejected at startup).
@@ -249,6 +234,46 @@ To serve the MCP HTTP endpoint (the `--mcp-url`, not the `--gravitino-uri`) over
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --transport streamable-http --mcp-url https://localhost:8000/mcp \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+```
+
+## Selecting a metalake
+
+A metalake is Gravitino's top-level tenant boundary, and every tool operates inside one. `--metalake` sets the **default**: the metalake used by any tool call that does not name one itself. It is optional on every transport.
+
+Any tool call may name a different metalake with a `metalake` argument, which takes priority over the default. The argument is optional on every tool, so a server configured with `--metalake` behaves exactly as it always has for callers that ignore it.
+
+The metalake for a call is resolved in this order:
+
+1. The call's own `metalake` argument, when it passes one.
+2. The `--metalake` startup default, when it is configured.
+3. Otherwise the call fails, telling the agent to call `list_metalakes` and retry.
+
+Because each call carries its own metalake, one server instance can serve several metalakes at once: nothing is remembered between calls, so concurrent callers never see each other's metalake and the server stays correct however many replicas it runs as. This works identically over stdio and HTTP.
+
+Use the `list_metalakes` tool to discover which metalakes a caller may use. It is the one tool that does not need a metalake, so it works on a server started with no `--metalake` at all.
+
+Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
+
+### Examples
+
+Single metalake, agents never think about it — the common case, and unchanged:
+
+```bash
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
+```
+
+Several metalakes behind one server, with `prod` as the default:
+
+```bash
+uv run mcp_server --metalake prod --transport http --mcp-url http://0.0.0.0:8000/mcp
+```
+
+An agent then works in `prod` by default and switches per request when asked — "which catalogs are in the staging metalake?" sends `metalake=staging` on that call alone, without restarting or reconfiguring anything.
+
+No default at all, every call chooses:
+
+```bash
+uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 ```
 
 ## Audit Logging

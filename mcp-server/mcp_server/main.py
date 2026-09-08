@@ -51,7 +51,6 @@ def do_main():
     )
     _init_logging(setting)
     try:
-        setting.validate_metalake()
         setting.validate_oauth()
     except ValueError as exc:
         logging.error("%s", exc)
@@ -94,10 +93,9 @@ def _parse_args():
         "--metalake",
         type=str,
         default="",
-        help="Default Gravitino metalake name, used when a request names "
-        "none. Required for stdio transport. Optional for HTTP transport, "
-        "where each request can instead name a metalake via the "
-        "X-Gravitino-Metalake header.",
+        help="Default Gravitino metalake name, used by any tool call that "
+        "does not name one itself via its 'metalake' argument. Optional: a "
+        "server with no default serves whichever metalake each call names.",
     )
     parser.add_argument(
         "--gravitino-uri",

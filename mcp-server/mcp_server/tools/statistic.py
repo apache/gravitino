@@ -22,7 +22,6 @@ def load_statistic_tools(mcp: FastMCP):
     @mcp.tool(tags={"statistic"})
     async def list_statistics_for_metadata(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
     ) -> str:
@@ -36,7 +35,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata (e.g., table, column). For
                 more, please refer to too 'metadata_type_to_fullname_formats'
             metadata_fullname (str): The full name of the metadata object. For
@@ -70,14 +68,13 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().list_of_statistics(
-            metalake_name, metadata_type, metadata_fullname
+            metadata_type, metadata_fullname
         )
 
     # pylint: disable=R0917
     @mcp.tool(tags={"statistic"})
     async def list_statistics_for_partition(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -92,7 +89,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata, should be "table" for partition statistics.
             metadata_fullname (str): The full name of the metadata item, the format should be
                 "{catalog}.{schema}.{table}".
@@ -136,7 +132,6 @@ def load_statistic_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return (
             await client.as_statistic_operation().list_statistic_for_partition(
-                metalake_name,
                 metadata_type,
                 metadata_fullname,
                 from_partition_name,
