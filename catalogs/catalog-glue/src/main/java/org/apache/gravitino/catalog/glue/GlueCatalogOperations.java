@@ -343,6 +343,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         if (nextToken != null) req.nextToken(nextToken);
         GetTablesResponse resp = glueClient.getTables(req.build());
         resp.tableList().stream()
+            .filter(t -> !isView(t))
             .filter(this::matchesFormatFilter)
             .map(t -> NameIdentifier.of(namespace, t.name()))
             .forEach(result::add);
@@ -364,6 +365,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       software.amazon.awssdk.services.glue.model.Table rawGlueTable =
           glueClient.getTable(req.build()).table();
+      if (isView(rawGlueTable)) {
+        throw new NoSuchTableException(
+            "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
+      }
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
 
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
@@ -506,6 +511,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
 
+    if (isView(rawGlueTable)) {
+      throw new NoSuchTableException(
+          "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
+    }
+
     if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
       return alterIcebergTable(ident, dbName, rawGlueTable, changes);
     }
@@ -585,7 +595,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION);
     boolean isSdkManaged =
         rawGlueTable.hasParameters()
-            && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equals(
+            && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
                 rawGlueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
     if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
@@ -638,6 +648,23 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier ident) {
     String dbName = schemaName(ident.namespace());
+
+    // Glue stores views as objects of type VIRTUAL_VIEW in the same namespace as tables, so the
+    // object has to be fetched first to avoid dropping a view through the table API.
+    GetTableRequest.Builder getReq =
+        GetTableRequest.builder().databaseName(dbName).name(ident.name());
+    applyCatalogId(catalogId, getReq::catalogId);
+    try {
+      if (isView(glueClient.getTable(getReq.build()).table())) {
+        throw new NoSuchTableException(
+            "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
+      }
+    } catch (EntityNotFoundException e) {
+      return false;
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    }
+
     DeleteTableRequest.Builder req =
         DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
     applyCatalogId(catalogId, req::catalogId);
@@ -657,6 +684,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     Preconditions.checkArgument(
         levels.length >= 2, "Namespace must have at least 2 levels, got: %s", levels.length);
     return levels[levels.length - 1];
+  }
+
+  /**
+   * Returns whether the Glue object is a view rather than a table. Glue keeps views and tables in
+   * the same namespace and returns both from the table APIs, so every table entry point has to
+   * screen them out.
+   */
+  private static boolean isView(Table table) {
+    return GlueConstants.VIRTUAL_VIEW_TABLE_TYPE.equalsIgnoreCase(table.tableType());
   }
 
   // NOTE: parameter type is the Glue SDK Table, not GlueTable (our domain class).
