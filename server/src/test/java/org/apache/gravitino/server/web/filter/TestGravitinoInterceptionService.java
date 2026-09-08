@@ -59,6 +59,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
@@ -316,12 +317,13 @@ public class TestGravitinoInterceptionService {
           .thenAnswer(invocation -> null);
 
       GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
-      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
       authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
 
       Method method =
-          TestTableLoadOperations.class.getMethod(
+          TableOperations.class.getMethod(
               "loadTable", String.class, String.class, String.class, String.class, String.class);
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);

@@ -332,15 +332,6 @@ public class MetadataAuthzHelper {
     // per-object loop over every catalog in the metalake.
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
-<<<<<<< HEAD
-    if (enableAuthorization()
-        && nameIdentifiers.length > 0
-        && allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
-      // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in the
-      // list visible, and no object-level deny exists, so the per-object authorization loop is
-      // skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
-      return entities;
-=======
     if (enableAuthorization() && nameIdentifiers.length > 0) {
       if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
         Arrays.stream(nameIdentifiers)
@@ -348,29 +339,12 @@ public class MetadataAuthzHelper {
                 identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
       }
 
-      String principalName = PrincipalUtils.getCurrentPrincipal().getName();
       if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
         // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
         // the list visible, and no object-level deny exists, so the per-object authorization loop
         // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
-        LOG.debug(
-            "List authorization short-circuit HIT for principal {}, entity type {} under metalake "
-                + "{}: all {} listed object(s) are visible via a parent-scope grant; skipping the "
-                + "per-object authorization loop.",
-            principalName,
-            entityType,
-            metalake,
-            nameIdentifiers.length);
         return entities;
       }
-      LOG.debug(
-          "List authorization short-circuit MISS for principal {}, entity type {} under metalake "
-              + "{} ({} object(s)); falling back to the per-object authorization loop.",
-          principalName,
-          entityType,
-          metalake,
-          nameIdentifiers.length);
->>>>>>> 5aea36da5 ([#12977] fix(server): Report dotted metadata names clearly (#12980))
     }
     preloadToCache(entityType, nameIdentifiers);
     preloadOwner(entityType, nameIdentifiers);
