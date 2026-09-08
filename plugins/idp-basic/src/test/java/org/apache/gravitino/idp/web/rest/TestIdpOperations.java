@@ -36,6 +36,8 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -82,9 +84,11 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
+    when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+        .thenReturn(new UserPrincipal("admin"));
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(IdpUserOperations.class);
+    resourceConfig.register(new IdpUserOperations(MANAGER, () -> List.of("admin")));
     resourceConfig.register(IdpGroupOperations.class);
     resourceConfig.register(new IdpAuthorizationFilter(() -> List.of("admin"), () -> "admin"));
     resourceConfig.register(

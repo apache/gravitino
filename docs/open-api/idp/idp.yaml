@@ -114,6 +114,8 @@ paths:
         Updates the password and/or enabled flag of the specified local user store user and returns
         the user object. At least one of `password` or `enabled` is required. Disabled users cannot
         authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
+        Service admins may update any user. Authenticated non-admin users may update only their own
+        password and cannot change `enabled` or another user's account.
       operationId: updateIdpUser
       requestBody:
         required: true
@@ -491,9 +493,10 @@ components:
   responses:
     IdpForbiddenErrorResponse:
       description:
-        Forbidden - Only callers listed in `gravitino.authorization.serviceAdmins` may
-        manage local user store users and groups. Unauthenticated requests and authenticated
-        non-service-admin users receive this response.
+        Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
+        user store users and groups. Authenticated non-admin users may only update their own
+        password via `PUT /idp/users/{user}`. Unauthenticated requests and other non-admin IdP
+        management calls receive this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:

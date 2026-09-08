@@ -27,6 +27,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -115,6 +116,9 @@ public final class IdpRESTUtils {
   private static Response toErrorResponse(String errorMsg, Exception e) {
     if (e instanceof IllegalArgumentException) {
       return illegalArguments(errorMsg, e);
+    }
+    if (e instanceof ForbiddenException) {
+      return forbidden(errorMsg, e);
     }
     if (e instanceof NotFoundException) {
       return notFound(errorMsg, e);

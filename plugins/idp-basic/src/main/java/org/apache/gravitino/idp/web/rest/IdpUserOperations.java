@@ -20,6 +20,8 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
+import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -31,7 +33,10 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
@@ -40,6 +45,7 @@ import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
@@ -47,12 +53,24 @@ import org.apache.gravitino.metrics.MetricNames;
 public class IdpUserOperations {
 
   private final IdpUserGroupManager userGroupManager;
+  private final Supplier<List<String>> serviceAdminsSupplier;
 
   @Context private HttpServletRequest httpRequest;
 
+  /**
+   * Creates an IdP user REST resource.
+   *
+   * @param userGroupManager the IdP user/group manager
+   */
   @Inject
   public IdpUserOperations(IdpUserGroupManager userGroupManager) {
+    this(userGroupManager, () -> GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS));
+  }
+
+  IdpUserOperations(
+      IdpUserGroupManager userGroupManager, Supplier<List<String>> serviceAdminsSupplier) {
     this.userGroupManager = userGroupManager;
+    this.serviceAdminsSupplier = serviceAdminsSupplier;
   }
 
   @GET
@@ -99,6 +117,7 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
+          enforceSelfPasswordUpdateRules(user, request);
           if (request.getPassword() != null) {
             userGroupManager.changePassword(user, request.getPassword());
           }
@@ -110,6 +129,26 @@ public class IdpUserOperations {
         "user",
         IdpOperationType.UPDATE,
         user);
+  }
+
+  /**
+   * Non-service-admins may only change their own password and cannot update {@code enabled}.
+   *
+   * @param user the path username being updated
+   * @param request the update request
+   */
+  private void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdminsSupplier.get(), currentUser)) {
+      return;
+    }
+    if (!user.equals(currentUser)) {
+      throw new ForbiddenException(
+          "Only service admins can update another user's password or enabled flag");
+    }
+    if (request.getEnabled() != null) {
+      throw new ForbiddenException("Only service admins can update the enabled flag");
+    }
   }
 
   @DELETE

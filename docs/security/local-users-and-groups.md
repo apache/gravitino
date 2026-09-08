@@ -73,11 +73,16 @@ These rules apply to user creation, password changes, and `GRAVITINO_INITIAL_ADM
 | Username        | Required, and must not contain a colon    |
 | Password length | 12 to 64 characters inclusive             |
 
-Passwords are reset by an administrator rather than changed by the user, so a password change request carries the new password only and no current password.
+Passwords may be reset by a service admin or changed by the user for their own account.
+The request carries the new password only and no current password; callers authenticate with
+HTTP Basic using their current credentials.
 
 ## Managing Users and Groups
 
-All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication as a service admin. Send `Accept: application/vnd.gravitino.v1+json` on every request, and `Content-Type: application/json` on requests with a body.
+All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication.
+Most operations require a service admin. Authenticated users may also `PUT /api/idp/users/{user}`
+for their own username to change only their password. Send `Accept: application/vnd.gravitino.v1+json`
+on every request, and `Content-Type: application/json` on requests with a body.
 
 ### User Operations
 
@@ -88,7 +93,15 @@ All management endpoints are under `http://{host}:{port}/api/idp` and require Ba
 | Update a user            | PUT    | `/api/idp/users/{user}`             | `{"password":"{new_password}"}` and/or `{"enabled":false}` |
 | Remove a user            | DELETE | `/api/idp/users/{user}`             | None                                       |
 
-The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may update only their own password and cannot change `enabled` or another user's password.
+
+```shell
+curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'alice:{user_password}' | base64)" \
+  -d '{"password":"{new_password}"}' \
+  http://localhost:8090/api/idp/users/alice
+```
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
