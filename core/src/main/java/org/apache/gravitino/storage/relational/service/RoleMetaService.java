@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -41,6 +43,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -288,6 +291,29 @@ public class RoleMetaService {
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.ROLE, identifier.toString());
       throw re;
+    }
+  }
+
+  /**
+   * Fences newly referenced roles until the surrounding membership transaction commits.
+   *
+   * <p>Call after writing the principal row and before modifying any membership rows. This keeps
+   * the principal-before-role order used by metalake cascades. The caller must also fence the
+   * metalake before the principal write. Shared locks permit independent grants of the same role
+   * while excluding its deletion; H2 uses exclusive locks instead. Roles are locked by stable ID in
+   * ascending order, never re-resolved by a reusable name.
+   */
+  void lockRolesForMembership(Long metalakeId, Collection<Long> roleIds) {
+    for (Long roleId : new TreeSet<>(roleIds)) {
+      RolePO role =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class, mapper -> mapper.selectRoleMetaByIdForShare(roleId));
+      if (role == null || !Objects.equals(role.getMetalakeId(), metalakeId)) {
+        // PermissionManager maps a missing role to IllegalRoleException. A generic missing-entity
+        // exception would incorrectly report the principal as missing instead.
+        throw new NoSuchRoleException(
+            "Role with ID %s does not exist in metalake with ID %s", roleId, metalakeId);
+      }
     }
   }
 
