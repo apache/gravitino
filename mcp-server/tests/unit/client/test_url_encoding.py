@@ -463,29 +463,6 @@ class TestPolicyOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
-    def test_associate_policy_encodes_metadata_full_name_and_type(self):
-        client = _make_mock_client({"names": []})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.associate_policy_with_metadata(_QUERY_INJECTION, _SLASH, [], [])
-        )
-        url = _called_url(client.post)
-        self.assertIn(_ENCODED_QUERY_INJECTION, url)
-        self.assertIn(_ENCODED_SLASH, url)
-        self.assertNotIn("?admin=true", url)
-
-    def test_get_policy_for_metadata_encodes_policy_name(self):
-        client = _make_mock_client({"policy": {}})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.get_policy_for_metadata(
-                "meta.full.name", "table", _PATH_TRAVERSAL
-            )
-        )
-        url = _called_url(client.get)
-        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
-        self.assertNotIn("../../", url)
-
     def test_list_metadata_by_policy_encodes_policy_name(self):
         client = _make_mock_client({"metadataObjects": []})
         op = PlainRESTClientPolicyOperation(METALAKE, client)

@@ -37,6 +37,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -115,17 +116,24 @@ public abstract class AbstractGravitinoOptimizerEnvIT extends BaseIT {
                 GravitinoStrategy.JOB_TEMPLATE_NAME_KEY,
                 "template-name"));
     metalakeClient.createPolicy(policyName, "custom", "comment", true, content);
+    String tagName = policyTagName(policyName);
+    metalakeClient.createTag(tagName, "comment", Map.of());
+    metalakeClient.addPolicyForTag(tagName, policyName, AllValuesSelector.get());
   }
 
   protected void associatePoliciesToTable(String policyName, String tableName) {
     Table table =
         catalogClient.asTableCatalog().loadTable(NameIdentifier.of(TEST_SCHEMA, tableName));
-    table.supportsPolicies().associatePolicies(new String[] {policyName}, new String[] {});
+    table.supportsTags().associateTags(new String[] {policyTagName(policyName)}, null);
   }
 
   protected void associatePoliciesToSchema(String policyName, String schemaName) {
     Schema schema = catalogClient.asSchemas().loadSchema(schemaName);
-    schema.supportsPolicies().associatePolicies(new String[] {policyName}, new String[] {});
+    schema.supportsTags().associateTags(new String[] {policyTagName(policyName)}, null);
+  }
+
+  private String policyTagName(String policyName) {
+    return "tag_" + policyName;
   }
 
   protected Map<String, String> getSpecifyConfigs() {

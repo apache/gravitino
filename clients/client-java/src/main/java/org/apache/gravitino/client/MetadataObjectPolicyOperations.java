@@ -25,10 +25,8 @@ import java.util.Collections;
 import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
-import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -92,32 +90,11 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "Policy name must not be null or empty");
 
-    PolicyResponse resp =
-        restClient.get(
-            policyRequestPath + "/" + RESTUtils.encodeString(name),
-            PolicyResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.policyErrorHandler());
-
-    resp.validate();
-    return new GenericPolicy(resp.getPolicy(), restClient, metalakeName);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove) {
-    PoliciesAssociateRequest request =
-        new PoliciesAssociateRequest(policiesToAdd, policiesToRemove);
-    request.validate();
-
-    NameListResponse resp =
-        restClient.post(
-            policyRequestPath,
-            request,
-            NameListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.policyErrorHandler());
-
-    resp.validate();
-    return resp.getNames();
+    return Arrays.stream(listPolicyInfos())
+        .filter(policy -> policy.name().equals(name))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new NoSuchPolicyException("Policy %s does not apply to the metadata object", name));
   }
 }
