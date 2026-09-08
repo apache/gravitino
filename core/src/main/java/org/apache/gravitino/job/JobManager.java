@@ -57,6 +57,7 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -280,6 +281,24 @@ public class JobManager implements JobOperationDispatcher {
           jobTemplateName, metalake);
     }
 
+    // Delete the job template entity as well as all the jobs associated with it.
+    boolean deleted =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
+            LockType.WRITE,
+            () -> {
+              try {
+                return entityStore.delete(
+                    NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
+                    Entity.EntityType.JOB_TEMPLATE);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+    if (!deleted) {
+      return false;
+    }
+
     // Delete all the job staging directories associated with the job template.
     String jobTemplateStagingPath =
         stagingDir.getAbsolutePath() + File.separator + metalake + File.separator + jobTemplateName;
@@ -292,19 +311,7 @@ public class JobManager implements JobOperationDispatcher {
       }
     }
 
-    // Delete the job template entity as well as all the jobs associated with it.
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
-        LockType.WRITE,
-        () -> {
-          try {
-            return entityStore.delete(
-                NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
-                Entity.EntityType.JOB_TEMPLATE);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    return true;
   }
 
   @Override
@@ -669,6 +676,14 @@ public class JobManager implements JobOperationDispatcher {
                                 e);
                           }
                         });
+              } catch (OptimisticLockException e) {
+                // A later poll re-reads both executor state and metadata. Never stop the scheduled
+                // task or replay external submission/cancellation because a metadata CAS lost.
+                LOG.info(
+                    "Job {} under metalake {} changed concurrently; deferring status update",
+                    job.name(),
+                    metalake);
+                return;
               } catch (NoSuchEntityException e) {
                 // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
                 // in the gap between the listJobs() snapshot above and this update. Skip it rather
