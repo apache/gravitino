@@ -20,13 +20,91 @@
 package org.apache.gravitino.utils;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import org.junit.jupiter.api.Test;
 
 class TestClassLoaderResourceCleanerUtils {
+
+  private static final ThreadLocal<Object> SOFT_HOLDER = new ThreadLocal<>();
+  private static final ThreadLocal<Object> UNRELATED_HOLDER = new ThreadLocal<>();
+
+  /** A class with no dependencies beyond java.*, so a bare-bones child loader can define it. */
+  public static class Leaky {}
+
+  private static URLClassLoader childLoaderOwning(Class<?> clazz) throws Exception {
+    URL location = clazz.getProtectionDomain().getCodeSource().getLocation();
+    // A null parent keeps delegation off the app loader, so the child defines the class itself.
+    return new URLClassLoader(new URL[] {location}, null);
+  }
+
+  /** The value's own class identifies the owner in the simple case. */
+  @Test
+  void testDefinedByMatchesTheDeclaringLoader() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Object leaky = child.loadClass(Leaky.class.getName()).getDeclaredConstructor().newInstance();
+      assertTrue(ClassLoaderResourceCleanerUtils.definedBy(leaky, child));
+      assertFalse(ClassLoaderResourceCleanerUtils.definedBy(leaky, Leaky.class.getClassLoader()));
+    }
+  }
+
+  /**
+   * Caches such as Jackson's BufferRecycler park a SoftReference in a ThreadLocal. The reference is
+   * a bootstrap class, so only its referent identifies the owning catalog.
+   */
+  @Test
+  void testDefinedByLooksThroughAReference() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Object leaky = child.loadClass(Leaky.class.getName()).getDeclaredConstructor().newInstance();
+      assertTrue(ClassLoaderResourceCleanerUtils.definedBy(new SoftReference<>(leaky), child));
+      assertTrue(ClassLoaderResourceCleanerUtils.definedBy(new WeakReference<>(leaky), child));
+    }
+  }
+
+  /** An empty reference names no owner and must not be mistaken for one. */
+  @Test
+  void testDefinedByIgnoresNullAndClearedReferences() {
+    assertFalse(ClassLoaderResourceCleanerUtils.definedBy(null, getClass().getClassLoader()));
+    assertFalse(
+        ClassLoaderResourceCleanerUtils.definedBy(
+            new SoftReference<>(null), getClass().getClassLoader()));
+  }
+
+  /**
+   * A thread local holding the catalog's object behind a SoftReference must be cleared. Left in
+   * place it keeps the catalog's ClassLoader alive until heap pressure clears the reference, which
+   * Metaspace pressure alone never triggers.
+   */
+  @Test
+  void testClearThreadLocalMapClearsSoftReferencedValues() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Object leaky = child.loadClass(Leaky.class.getName()).getDeclaredConstructor().newInstance();
+      SOFT_HOLDER.set(new SoftReference<>(leaky));
+
+      ClassLoaderResourceCleanerUtils.clearThreadLocalMap(Thread.currentThread(), child);
+
+      assertNull(SOFT_HOLDER.get());
+    }
+  }
+
+  /** Entries belonging to another loader must survive the sweep. */
+  @Test
+  void testClearThreadLocalMapLeavesUnrelatedValues() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Object unrelated = new Object();
+      UNRELATED_HOLDER.set(unrelated);
+
+      ClassLoaderResourceCleanerUtils.clearThreadLocalMap(Thread.currentThread(), child);
+
+      assertSame(unrelated, UNRELATED_HOLDER.get());
+    }
+  }
 
   /**
    * When a class is loaded by exactly the target classloader, isOwnedByClassLoader must return true

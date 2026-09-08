@@ -20,10 +20,13 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.lang.ref.Reference;
 import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Timer;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.slf4j.Logger;
@@ -69,6 +72,8 @@ public class ClassLoaderResourceCleanerUtils {
     // Release the LogFactory for the classloader, each classloader has its own LogFactory
     // instance.
     executeAndCatch(ClassLoaderResourceCleanerUtils::releaseLogFactoryInCommonLogging, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::removeLoggerContextListeners, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAWS, classLoader);
 
@@ -178,8 +183,9 @@ public class ClassLoaderResourceCleanerUtils {
     return threads;
   }
 
-  private static void clearThreadLocalMap(Thread thread, ClassLoader targetClassLoader) {
-    if (thread == null || !thread.getName().startsWith("Gravitino-webserver-")) {
+  @VisibleForTesting
+  static void clearThreadLocalMap(Thread thread, ClassLoader targetClassLoader) {
+    if (thread == null) {
       return;
     }
 
@@ -197,9 +203,10 @@ public class ClassLoaderResourceCleanerUtils {
         for (Object entry : table) {
           if (entry != null) {
             Object value = FieldUtils.readField(entry, "value", true);
-            if (value != null
-                && value.getClass().getClassLoader() != null
-                && value.getClass().getClassLoader() == targetClassLoader) {
+            // The entry is a WeakReference to the ThreadLocal itself, which can be the leaking
+            // side when the ThreadLocal was declared by a class of the dying catalog.
+            Object key = entry instanceof Reference ? ((Reference<?>) entry).get() : null;
+            if (definedBy(value, targetClassLoader) || definedBy(key, targetClassLoader)) {
               LOG.debug(
                   "Cleaning up thread local {} for thread {} with custom class loader",
                   value,
@@ -212,6 +219,31 @@ public class ClassLoaderResourceCleanerUtils {
     } catch (Exception e) {
       LOG.debug("Failed to clean up thread locals for thread {}", thread.getName(), e);
     }
+  }
+
+  /**
+   * Whether {@code value}, or what it refers to when it is a {@link Reference}, was defined by
+   * {@code classLoader}.
+   *
+   * <p>Looking through a {@link Reference} matters: caches such as Jackson's {@code BufferRecycler}
+   * park a {@code SoftReference} in a {@link ThreadLocal}. The reference itself is a bootstrap
+   * class, so only its referent identifies the owning catalog. Left in place, such an entry keeps
+   * the catalog's ClassLoader alive until heap pressure clears the soft reference, which Metaspace
+   * pressure alone never triggers.
+   */
+  @VisibleForTesting
+  static boolean definedBy(@Nullable Object value, ClassLoader classLoader) {
+    if (value == null) {
+      return false;
+    }
+    if (value.getClass().getClassLoader() == classLoader) {
+      return true;
+    }
+    if (value instanceof Reference) {
+      Object referent = ((Reference<?>) value).get();
+      return referent != null && referent.getClass().getClassLoader() == classLoader;
+    }
+    return false;
   }
 
   /**
@@ -234,6 +266,33 @@ public class ClassLoaderResourceCleanerUtils {
               Thread thread = entry.getKey();
               return thread.getContextClassLoader() == targetClassLoader;
             });
+  }
+
+  /**
+   * Removes shutdown listeners the class loader registered on the shared Log4j {@code
+   * LoggerContext}.
+   *
+   * <p>commons-logging's {@code Log4jApiLogFactory} registers a {@code LogAdapter} with the
+   * LoggerContext of the server, which outlives every catalog. {@code LogFactory.release} drops the
+   * factory from its own cache but leaves that registration in place, so the adapter's class, and
+   * through it the catalog's ClassLoader, stays reachable from a static for the life of the
+   * process.
+   */
+  @VisibleForTesting
+  static void removeLoggerContextListeners(ClassLoader targetClassLoader) throws Exception {
+    Class<?> logManagerClass = Class.forName("org.apache.logging.log4j.LogManager");
+    Object contextFactory = MethodUtils.invokeStaticMethod(logManagerClass, "getFactory");
+    Object selector = MethodUtils.invokeMethod(contextFactory, "getSelector");
+    Collection<?> contexts =
+        (Collection<?>) MethodUtils.invokeMethod(selector, "getLoggerContexts");
+    for (Object context : contexts) {
+      Collection<?> listeners = (Collection<?>) FieldUtils.readField(context, "listeners", true);
+      if (listeners != null) {
+        listeners.removeIf(
+            listener ->
+                listener != null && listener.getClass().getClassLoader() == targetClassLoader);
+      }
+    }
   }
 
   /**
