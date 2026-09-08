@@ -30,6 +30,7 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.Collection;
 import java.util.IdentityHashMap;
+import java.util.ResourceBundle;
 import java.util.Timer;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.annotation.Nullable;
@@ -86,6 +87,8 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(ClassLoaderResourceCleanerUtils::shutdownMysqlConnectionCleanup, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::removeSecurityProviders, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::clearResourceBundleCache, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAWS, classLoader);
 
@@ -183,7 +186,9 @@ public class ClassLoaderResourceCleanerUtils {
    * <p>The context ClassLoader is only one of the ways a thread can carry a catalog. A driver that
    * starts its own housekeeping thread, such as PostgreSQL's {@code LazyCleaner}, is running code
    * defined by the catalog's loader: the thread is a GC root, so its class alone keeps the loader
-   * alive no matter what its context ClassLoader says.
+   * alive no matter what its context ClassLoader says. The same holds for a task scheduled on a
+   * shared executor, such as the AWS SDK's idle-connection reaper, which is only identifiable from
+   * the classes on its stack.
    */
   @VisibleForTesting
   static boolean runningWithClassLoader(Thread thread, ClassLoader targetClassLoader) {
@@ -196,11 +201,30 @@ public class ClassLoaderResourceCleanerUtils {
     }
     try {
       Object runnable = FieldUtils.readField(thread, "target", true);
-      return runnable != null && runnable.getClass().getClassLoader() == targetClassLoader;
+      if (runnable != null && runnable.getClass().getClassLoader() == targetClassLoader) {
+        return true;
+      }
     } catch (Exception e) {
       LOG.debug("Cannot read the runnable of thread {}", thread.getName(), e);
+    }
+
+    // A pooled thread carries none of those references and still runs the catalog's code: an SDK's
+    // idle-connection reaper, for one, is scheduled on a shared executor. Its stack names it.
+    // The calling thread is skipped: cleanup itself runs catalog code and must not stop itself.
+    if (thread == Thread.currentThread()) {
       return false;
     }
+    for (StackTraceElement frame : thread.getStackTrace()) {
+      try {
+        Class<?> frameClass = Class.forName(frame.getClassName(), false, targetClassLoader);
+        if (frameClass.getClassLoader() == targetClassLoader) {
+          return true;
+        }
+      } catch (Throwable ignored) {
+        // The frame names a class this loader cannot see, so it is not the catalog's.
+      }
+    }
+    return false;
   }
 
   private static Thread[] getAllThreads() {
@@ -312,6 +336,19 @@ public class ClassLoaderResourceCleanerUtils {
    * through it the catalog's ClassLoader, stays reachable from a static for the life of the
    * process.
    */
+  /**
+   * Drops the {@link ResourceBundle} cache entries loaded through this class loader.
+   *
+   * <p>{@link ResourceBundle} caches bundles in a JVM-wide static map, behind soft references. A
+   * driver that loads message bundles, such as Oracle's {@code ErrorMessages}, therefore leaves its
+   * class - and the catalog's ClassLoader - reachable until heap pressure clears the soft
+   * reference, which Metaspace pressure alone never causes.
+   */
+  @VisibleForTesting
+  static void clearResourceBundleCache(ClassLoader targetClassLoader) {
+    ResourceBundle.clearCache(targetClassLoader);
+  }
+
   /**
    * Removes the JCA security providers the class loader installed.
    *
