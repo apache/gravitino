@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.namespace.errors.NamespaceAlreadyExistsException;
+import org.lance.namespace.model.CreateNamespaceResponse;
 
 class TestLanceNamespaceCreateAuthorization {
 
@@ -93,19 +95,80 @@ class TestLanceNamespaceCreateAuthorization {
   @ParameterizedTest
   @ValueSource(strings = {"catalog", "catalog.schema"})
   void testConcurrentCreateKeepsConflictStatus(String namespace) {
+    GravitinoLanceNamespaceWrapper wrapper = raceLosingWrapper();
+    Assertions.assertThrows(
+        NamespaceAlreadyExistsException.class,
+        () ->
+            new GravitinoLanceNameSpaceOperations(wrapper)
+                .createNamespace(namespace, "\\.", "create", Map.of()));
+  }
+
+  /**
+   * A create that loses the race still has to honour exist_ok: the namespace the caller asked for
+   * exists by the time the create returns, so reporting a conflict would contradict the mode.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"catalog", "catalog.schema"})
+  void testConcurrentCreateWithExistOkSucceeds(String namespace) {
+    GravitinoLanceNamespaceWrapper wrapper = raceLosingWrapper();
+    Catalog winner = mock(Catalog.class);
+    Schema winnerSchema = mock(Schema.class);
+    when(winner.properties()).thenReturn(Map.of("winner", "catalog"));
+    when(winnerSchema.properties()).thenReturn(Map.of("winner", "schema"));
+    // The second load succeeds: the concurrent writer has committed by then.
+    doThrow(new NoSuchCatalogException("missing"))
+        .doReturn(winner)
+        .when(wrapper)
+        .loadCatalog("catalog");
+    doThrow(new NoSuchSchemaException("missing"))
+        .doReturn(winnerSchema)
+        .when(wrapper)
+        .loadSchema(any(Catalog.class), eq("schema"));
+
+    CreateNamespaceResponse response =
+        new GravitinoLanceNameSpaceOperations(wrapper)
+            .createNamespace(namespace, "\\.", "exist_ok", Map.of());
+
+    Assertions.assertEquals(
+        namespace.contains(".") ? Map.of("winner", "schema") : Map.of("winner", "catalog"),
+        response.getProperties());
+  }
+
+  /** A hidden namespace stays hidden when the create loses the race rather than the load. */
+  @ParameterizedTest
+  @ValueSource(strings = {"catalog", "catalog.schema"})
+  void testConcurrentCreateWithExistOkKeepsReadDenial(String namespace) {
+    GravitinoLanceNamespaceWrapper wrapper = raceLosingWrapper();
+    ForbiddenException denied = new ForbiddenException("Cannot load namespace");
+    doThrow(new NoSuchCatalogException("missing"))
+        .doThrow(denied)
+        .when(wrapper)
+        .loadCatalog("catalog");
+    doThrow(new NoSuchSchemaException("missing"))
+        .doThrow(denied)
+        .when(wrapper)
+        .loadSchema(any(Catalog.class), eq("schema"));
+
+    Assertions.assertSame(
+        denied,
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                new GravitinoLanceNameSpaceOperations(wrapper)
+                    .createNamespace(namespace, "\\.", "exist_ok", Map.of())));
+  }
+
+  private GravitinoLanceNamespaceWrapper raceLosingWrapper() {
     GravitinoLanceNamespaceWrapper wrapper = mock(GravitinoLanceNamespaceWrapper.class);
     Catalog catalog = mock(Catalog.class);
     when(wrapper.loadCatalog("catalog")).thenThrow(new NoSuchCatalogException("missing"));
     when(wrapper.createCatalog(eq("catalog"), any(), anyString(), anyString(), anyMap()))
         .thenThrow(new CatalogAlreadyExistsException("exists"));
     when(wrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
-    when(wrapper.loadSchema(catalog, "schema")).thenThrow(new NoSuchSchemaException("missing"));
-    when(wrapper.createSchema(eq(catalog), eq("schema"), isNull(), anyMap()))
+    when(wrapper.loadSchema(any(Catalog.class), eq("schema")))
+        .thenThrow(new NoSuchSchemaException("missing"));
+    when(wrapper.createSchema(any(Catalog.class), eq("schema"), isNull(), anyMap()))
         .thenThrow(new SchemaAlreadyExistsException("exists"));
-    Assertions.assertThrows(
-        NamespaceAlreadyExistsException.class,
-        () ->
-            new GravitinoLanceNameSpaceOperations(wrapper)
-                .createNamespace(namespace, "\\.", "create", Map.of()));
+    return wrapper;
   }
 }

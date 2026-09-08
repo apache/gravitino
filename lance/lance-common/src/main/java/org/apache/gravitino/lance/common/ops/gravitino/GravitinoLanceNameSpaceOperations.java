@@ -268,13 +268,24 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
                 "created by Lance REST server",
                 properties);
       } catch (CatalogAlreadyExistsException conflict) {
+        // The conflict is deliberately not attached to the exception thrown for a denied read:
+        // reporting that the create failed because the catalog exists would disclose a catalog
+        // the caller may not see.
         if (e instanceof ForbiddenException) {
           throw e;
         }
-        throw new NamespaceAlreadyExistsException(
-            "Catalog already exists: " + catalogName,
-            CommonUtil.formatCurrentStackTrace(),
-            catalogName);
+        if (mode == CreateMode.CREATE) {
+          throw new NamespaceAlreadyExistsException(
+              "Catalog already exists: " + catalogName,
+              CommonUtil.formatCurrentStackTrace(),
+              catalogName);
+        }
+        // Another writer created the catalog between the failed load and this create. EXIST_OK
+        // and OVERWRITE still have to act on the catalog that now exists, so read it again and
+        // continue with the shared handling below. A read denied at this point is reported as
+        // denied, exactly as it would have been without the race.
+        catalog = namespaceWrapper.loadCatalog(catalogName);
+        return applyCatalogMode(catalogName, catalog, mode, properties, response);
       }
       response.setProperties(
           createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
@@ -289,7 +300,16 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
           catalogName);
     }
 
-    // Catalog exists, handle based on mode
+    return applyCatalogMode(catalogName, catalog, mode, properties, response);
+  }
+
+  /** Applies the requested create mode to a catalog that already exists. */
+  private CreateNamespaceResponse applyCatalogMode(
+      String catalogName,
+      Catalog catalog,
+      CreateMode mode,
+      Map<String, String> properties,
+      CreateNamespaceResponse response) {
     switch (mode) {
       case EXIST_OK:
         response.setProperties(
@@ -346,20 +366,37 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
       try {
         createdSchema = namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
       } catch (SchemaAlreadyExistsException conflict) {
+        // As for catalogs, the conflict is not attached when the read was denied, so a hidden
+        // schema is not disclosed through the error.
         if (e instanceof ForbiddenException) {
           throw e;
         }
-        throw new NamespaceAlreadyExistsException(
-            "Schema already exists: " + schemaName,
-            CommonUtil.formatCurrentStackTrace(),
-            schemaName);
+        if (mode == CreateMode.CREATE) {
+          throw new NamespaceAlreadyExistsException(
+              "Schema already exists: " + schemaName,
+              CommonUtil.formatCurrentStackTrace(),
+              schemaName);
+        }
+        // Another writer won the race; EXIST_OK and OVERWRITE act on the schema that now exists.
+        schema = namespaceWrapper.loadSchema(loadedCatalog, schemaName);
+        return applySchemaMode(loadedCatalog, schemaName, schema, mode, properties, response);
       }
       response.setProperties(
           createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
       return response;
     }
 
-    // Schema exists, handle based on mode
+    return applySchemaMode(loadedCatalog, schemaName, schema, mode, properties, response);
+  }
+
+  /** Applies the requested create mode to a schema that already exists. */
+  private CreateNamespaceResponse applySchemaMode(
+      Catalog loadedCatalog,
+      String schemaName,
+      Schema schema,
+      CreateMode mode,
+      Map<String, String> properties,
+      CreateNamespaceResponse response) {
     switch (mode) {
       case EXIST_OK:
         response.setProperties(

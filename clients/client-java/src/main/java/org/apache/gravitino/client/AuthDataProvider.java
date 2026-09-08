@@ -41,6 +41,10 @@ interface AuthDataProvider extends Closeable {
    * <p>Called on the requesting thread for every HTTP request. Implementations must not retain
    * caller-specific state in a shared provider. The token still supplies the Authorization header.
    *
+   * <p>These headers are applied after the ones passed to the request, so a name returned here
+   * replaces a caller-supplied header of the same name. Authorization is set afterwards and cannot
+   * be overridden from here.
+   *
    * @return additional headers, or an empty map
    */
   default Map<String, String> getRequestHeaders() {

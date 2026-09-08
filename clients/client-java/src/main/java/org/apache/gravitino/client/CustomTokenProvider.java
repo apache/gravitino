@@ -21,7 +21,6 @@ package org.apache.gravitino.client;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 /** CustomTokenProvider will provide a custom access token for every request. */
@@ -39,16 +38,6 @@ public abstract class CustomTokenProvider implements AuthDataProvider {
   @Override
   public byte[] getTokenData() {
     return (schemeName + BLANK_SPACE + getCustomTokenInfo()).getBytes(StandardCharsets.UTF_8);
-  }
-
-  /**
-   * Returns additional authentication headers for the current request, such as active roles.
-   *
-   * @return additional headers, or an empty map
-   */
-  @Override
-  public Map<String, String> getRequestHeaders() {
-    return AuthDataProvider.super.getRequestHeaders();
   }
 
   @Override

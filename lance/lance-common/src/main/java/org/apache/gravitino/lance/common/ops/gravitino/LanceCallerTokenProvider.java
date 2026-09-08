@@ -28,10 +28,18 @@ import org.apache.gravitino.auth.ActiveRolesParser;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.client.CustomTokenProvider;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Reads the authenticated caller on each request without retaining credentials in the client. */
 final class LanceCallerTokenProvider extends CustomTokenProvider {
+
+  private static final String RESTORE_SERVICE_ACCOUNT_HINT =
+      "Set "
+          + LanceConfig.LANCE_CONFIG_PREFIX
+          + "gravitino-"
+          + LanceConfig.CONFIG_AUTH_TYPE
+          + "=simple (or oauth2) with its service credentials to use a service account instead.";
 
   @Override
   public byte[] getTokenData() {
@@ -58,7 +66,8 @@ final class LanceCallerTokenProvider extends CustomTokenProvider {
             || token.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER))
         || token.substring(token.indexOf(' ') + 1).trim().isEmpty()) {
       throw new UnauthorizedException(
-          "Standalone Lance REST caller authentication requires Basic or Bearer credentials");
+          "Standalone Lance REST caller authentication requires Basic or Bearer credentials. "
+              + RESTORE_SERVICE_ACCOUNT_HINT);
     }
     return token;
   }
@@ -74,6 +83,7 @@ final class LanceCallerTokenProvider extends CustomTokenProvider {
 
   private static UnauthorizedException missingCredentials() {
     return new UnauthorizedException(
-        "Standalone Lance REST caller authentication requires authenticated caller credentials");
+        "Standalone Lance REST caller authentication requires authenticated caller credentials. "
+            + RESTORE_SERVICE_ACCOUNT_HINT);
   }
 }
