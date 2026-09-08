@@ -83,7 +83,8 @@ final class FlinkGenericTableUtil {
   }
 
   static CatalogTable toFlinkGenericTable(Table table, CatalogCompat catalogCompat) {
-    Map<String, String> flinkProperties = unmaskFlinkProperties(table.properties());
+    Map<String, String> gravitinoProperties = propsWithSecrets(table);
+    Map<String, String> flinkProperties = unmaskFlinkProperties(gravitinoProperties);
     CatalogTable catalogTable = CatalogPropertiesUtil.deserializeCatalogTable(flinkProperties);
     if (catalogTable.getUnresolvedSchema().getColumns().isEmpty()) {
       catalogTable =
@@ -98,6 +99,22 @@ final class FlinkGenericTableUtil {
         catalogTable.getComment(),
         catalogTable.getPartitionKeys(),
         options);
+  }
+
+  /**
+   * Merges masked {@link Table#properties()} with plaintext from {@link
+   * org.apache.gravitino.secret.SupportsSecrets#getSecrets()} so connector options such as {@code
+   * password} remain usable after name-based API masking.
+   */
+  private static Map<String, String> propsWithSecrets(Table table) {
+    Map<String, String> props =
+        new HashMap<>(table.properties() == null ? Collections.emptyMap() : table.properties());
+    try {
+      props.putAll(table.supportsSecrets().getSecrets());
+    } catch (UnsupportedOperationException ignored) {
+      // Server-side / stub tables may not implement SupportsSecrets.
+    }
+    return props;
   }
 
   private static String getConnectorFromProperties(Map<String, String> properties) {

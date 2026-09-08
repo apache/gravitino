@@ -131,6 +131,56 @@ class TestFlinkGenericTableUtil {
     Assertions.assertEquals("value", catalogTable.getOptions().get("custom"));
   }
 
+  @Test
+  void testToFlinkGenericTableMergesSecretsOverMaskedPassword() {
+    String flinkPasswordKey = CatalogPropertiesUtil.FLINK_PROPERTY_PREFIX + "password";
+    String flinkUserKey = CatalogPropertiesUtil.FLINK_PROPERTY_PREFIX + "username";
+    Map<String, String> maskedProperties =
+        ImmutableMap.of(
+            CatalogPropertiesUtil.IS_GENERIC,
+            "true",
+            CatalogPropertiesUtil.FLINK_PROPERTY_PREFIX + "connector",
+            "jdbc",
+            flinkUserKey,
+            "root",
+            flinkPasswordKey,
+            "******");
+
+    CatalogTable catalogTable =
+        FlinkGenericTableUtil.toFlinkGenericTable(
+            new Table() {
+              @Override
+              public String name() {
+                return "tbl";
+              }
+
+              @Override
+              public org.apache.gravitino.rel.Column[] columns() {
+                return new org.apache.gravitino.rel.Column[0];
+              }
+
+              @Override
+              public Map<String, String> properties() {
+                return maskedProperties;
+              }
+
+              @Override
+              public org.apache.gravitino.secret.SupportsSecrets supportsSecrets() {
+                return () -> ImmutableMap.of(flinkPasswordKey, "real-password");
+              }
+
+              @Override
+              public org.apache.gravitino.Audit auditInfo() {
+                return null;
+              }
+            },
+            DefaultCatalogCompat.INSTANCE);
+
+    Assertions.assertEquals("jdbc", catalogTable.getOptions().get("connector"));
+    Assertions.assertEquals("root", catalogTable.getOptions().get("username"));
+    Assertions.assertEquals("real-password", catalogTable.getOptions().get("password"));
+  }
+
   private static ResolvedCatalogTable createResolvedTable(Map<String, String> options) {
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogTable table =

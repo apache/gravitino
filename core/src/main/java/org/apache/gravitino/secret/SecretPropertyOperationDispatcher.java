@@ -30,15 +30,17 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
- * Dispatches secrets requests for catalog, schema, and fileset metadata objects.
+ * Dispatches secrets requests for catalog, schema, fileset, and table metadata objects.
  *
- * <p>Loads raw entity properties from the entity store / catalog entity, then builds plaintext
+ * <p>Loads raw entity properties from the entity store / catalog connector, then builds plaintext
  * secrets via {@link SecretPropertyUtils#buildSecrets} (secret-manager URNs plus sensitive-named
  * inline values).
  */
@@ -64,7 +66,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * Returns plaintext secret properties for the given metadata object.
    *
    * @param identifier The entity name identifier.
-   * @param entityType The entity type (CATALOG, SCHEMA, or FILESET).
+   * @param entityType The entity type (CATALOG, SCHEMA, FILESET, or TABLE).
    * @return secret plaintext properties; never null
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
@@ -81,6 +83,8 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         return loadSchemaRawProperties(identifier);
       case FILESET:
         return loadFilesetRawProperties(identifier);
+      case TABLE:
+        return loadTableRawProperties(identifier);
       default:
         throw new NotSupportedException(
             "Doesn't support secret property operations for entity type: " + entityType);
@@ -133,5 +137,20 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
     } catch (IOException e) {
       throw new RuntimeException("Failed to load fileset entity " + identifier, e);
     }
+  }
+
+  private Map<String, String> loadTableRawProperties(NameIdentifier identifier) {
+    NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+    return doWithCatalog(
+        catalogIdent,
+        wrapper -> {
+          wrapper.catalog().checkMetalakeInUse();
+          // Load from the connector so we get the same raw property map that EntityCombinedTable
+          // masks for API responses (including Flink connector options like flink.password).
+          Table table = wrapper.doWithTableOps(ops -> ops.loadTable(identifier));
+          return table.properties() == null ? Map.of() : table.properties();
+        },
+        NoSuchCatalogException.class,
+        NoSuchTableException.class);
   }
 }

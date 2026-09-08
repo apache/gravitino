@@ -33,6 +33,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
@@ -173,6 +174,14 @@ public interface Table extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Table does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the table supports secret property operations.
+   * @throws UnsupportedOperationException if the table does not support secret property operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Table does not support secret property operations.");
   }
 
   /**
