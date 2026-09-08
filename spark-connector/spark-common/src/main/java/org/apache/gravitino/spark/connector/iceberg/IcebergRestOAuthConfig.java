@@ -80,7 +80,7 @@ class IcebergRestOAuthConfig {
         sparkConf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_REUSE_OAUTH2, true)
             && AuthProperties.isOAuth2(authType);
     boolean hasExplicitLegacyOAuth2 =
-        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
+        AUTH_TYPE_OAUTH2.equalsIgnoreCase(explicitAuthType)
             || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     if (!reuseOAuth2 && !hasExplicitLegacyOAuth2) {
       return result;
@@ -130,6 +130,9 @@ class IcebergRestOAuthConfig {
   }
 
   private static String joinUri(String serverUri, String tokenPath) {
-    return StringUtils.removeEnd(serverUri, "/") + "/" + StringUtils.removeStart(tokenPath, "/");
+    String base =
+        serverUri.endsWith("/") ? serverUri.substring(0, serverUri.length() - 1) : serverUri;
+    String path = tokenPath.startsWith("/") ? tokenPath.substring(1) : tokenPath;
+    return base + "/" + path;
   }
 }

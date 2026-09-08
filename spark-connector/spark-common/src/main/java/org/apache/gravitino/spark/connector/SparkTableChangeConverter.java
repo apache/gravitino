@@ -29,6 +29,9 @@ public class SparkTableChangeConverter {
     this.sparkTypeConverter = sparkTypeConverter;
   }
 
+  // Spark 4.1 deprecates UpdateColumnDefaultValue#newDefaultValue in favour of newCurrentDefault,
+  // which returns a DefaultValue type that Spark 3.5 and 4.0 do not have.
+  @SuppressWarnings("deprecation")
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
     if (change instanceof TableChange.SetProperty) {
       TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
