@@ -361,7 +361,9 @@ components:
       name: queuedAfter
       in: query
       description: >-
-        Only return jobs queued at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z)
+        Only return jobs queued at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
+        When combined with startedAfter or finishedAfter, all supplied time filters must match
+        (AND semantics)
       required: false
       schema:
         type: string
@@ -371,7 +373,8 @@ components:
       in: query
       description: >-
         Only return jobs started at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
-        Jobs that have not started yet are excluded
+        Jobs that have not started yet are excluded. When combined with queuedAfter or
+        finishedAfter, all supplied time filters must match (AND semantics)
       required: false
       schema:
         type: string
@@ -381,7 +384,8 @@ components:
       in: query
       description: >-
         Only return jobs finished at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
-        Jobs that have not finished yet are excluded
+        Jobs that have not finished yet are excluded. When combined with queuedAfter or
+        startedAfter, all supplied time filters must match (AND semantics)
       required: false
       schema:
         type: string
@@ -389,7 +393,10 @@ components:
     sortBy:
       name: sortBy
       in: query
-      description: The field to sort the returned jobs by
+      description: >-
+        The field to sort the returned jobs by. Jobs with no value for the selected field
+        (e.g. jobs that have not started or finished yet) always sort last, for both the asc
+        and desc sort orders
       required: false
       schema:
         type: string
@@ -401,7 +408,9 @@ components:
     sortOrder:
       name: sortOrder
       in: query
-      description: The sort order for the returned jobs
+      description: >-
+        The sort order for the returned jobs. It only orders the jobs that have a value for the
+        selected sortBy field; jobs missing that value always sort last in both orders
       required: false
       schema:
         type: string
