@@ -57,16 +57,46 @@ public class ArrowUtils {
   }
 
   public static Schema parseArrowIpcStream(byte[] stream) {
+    return parseArrowIpcStream(stream, false);
+  }
+
+  /**
+   * Parses a schema-only Arrow IPC stream, rejecting record batches containing rows.
+   *
+   * @param stream the Arrow IPC stream
+   * @return the stream schema
+   * @throws UnsupportedOperationException if any record batch contains rows
+   * @throws IllegalArgumentException if the stream cannot be parsed
+   */
+  public static Schema parseSchemaOnlyIpcStream(byte[] stream) {
+    return parseArrowIpcStream(stream, true);
+  }
+
+  private static Schema parseArrowIpcStream(byte[] stream, boolean requireEmpty) {
     Schema schema;
+    boolean containsRows = false;
     try (BufferAllocator allocator = new RootAllocator();
         ByteArrayInputStream bais = new ByteArrayInputStream(stream);
         ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
       schema = reader.getVectorSchemaRoot().getSchema();
+      if (requireEmpty) {
+        while (reader.loadNextBatch()) {
+          if (reader.getVectorSchemaRoot().getRowCount() > 0) {
+            containsRows = true;
+            break;
+          }
+        }
+      }
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to parse Arrow IPC stream", e);
     }
 
     Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");
+    if (containsRows) {
+      throw new UnsupportedOperationException(
+          "CreateTable only supports schema-only Arrow streams; "
+              + "write records through a Lance client or engine after creation");
+    }
     return schema;
   }
 }
