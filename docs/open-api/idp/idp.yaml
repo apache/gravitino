@@ -80,7 +80,10 @@ paths:
       tags:
         - IDP
       summary: Get local user store user
-      description: Returns the specified local user store user, including group membership (empty if none; the example shows a user who already belongs to groups).
+      description: >
+        Returns the specified local user store user, including group membership (empty if none; the
+        example shows a user who already belongs to groups). Service admins may get any user.
+        Authenticated non-admin users may get only their own user.
       operationId: getIdpUser
       responses:
         "200":
@@ -494,9 +497,9 @@ components:
     IdpForbiddenErrorResponse:
       description:
         Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
-        user store users and groups. Authenticated non-admin users may only update their own
-        password via `PUT /idp/users/{user}`. Unauthenticated requests and other non-admin IdP
-        management calls receive this response.
+        user store users and groups. Authenticated non-admin users may only `GET` or `PUT`
+        `/idp/users/{user}` for their own username (password-only on update). Unauthenticated
+        requests and other non-admin IdP management calls receive this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:

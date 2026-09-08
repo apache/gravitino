@@ -41,17 +41,22 @@ class TestIdpAuthorizationFilter {
   }
 
   @Test
-  void testIsSelfUserUpdate() {
+  void testIsSelfUserAccess() {
     assertFalse(
-        IdpAuthorizationFilter.isSelfUserUpdate(request("PUT", "idp", "users", "alice"), null));
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "alice"), null));
     assertFalse(
-        IdpAuthorizationFilter.isSelfUserUpdate(request("GET", "idp", "users", "alice"), "alice"));
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("DELETE", "idp", "users", "alice"), "alice"));
     assertFalse(
-        IdpAuthorizationFilter.isSelfUserUpdate(request("PUT", "idp", "users", "bob"), "alice"));
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "bob"), "alice"));
     assertFalse(
-        IdpAuthorizationFilter.isSelfUserUpdate(request("PUT", "idp", "groups", "alice"), "alice"));
+        IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "bob"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "groups", "alice"), "alice"));
     assertTrue(
-        IdpAuthorizationFilter.isSelfUserUpdate(request("PUT", "idp", "users", "alice"), "alice"));
+        IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "alice"), "alice"));
+    assertTrue(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "alice"), "alice"));
   }
 
   private static ContainerRequestContext request(String method, String... segments) {

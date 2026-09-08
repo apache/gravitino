@@ -80,9 +80,10 @@ HTTP Basic using their current credentials.
 ## Managing Users and Groups
 
 All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication.
-Most operations require a service admin. Authenticated users may also `PUT /api/idp/users/{user}`
-for their own username to change only their password. Send `Accept: application/vnd.gravitino.v1+json`
-on every request, and `Content-Type: application/json` on requests with a body.
+Most operations require a service admin. Authenticated users may also `GET` or `PUT`
+`/api/idp/users/{user}` for their own username (read profile / change password only).
+Send `Accept: application/vnd.gravitino.v1+json` on every request, and
+`Content-Type: application/json` on requests with a body.
 
 ### User Operations
 
@@ -93,7 +94,7 @@ on every request, and `Content-Type: application/json` on requests with a body.
 | Update a user            | PUT    | `/api/idp/users/{user}`             | `{"password":"{new_password}"}` and/or `{"enabled":false}` |
 | Remove a user            | DELETE | `/api/idp/users/{user}`             | None                                       |
 
-The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may update only their own password and cannot change `enabled` or another user's password.
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may get or update only their own user, and on update may change only their password (not `enabled` or another user).
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \

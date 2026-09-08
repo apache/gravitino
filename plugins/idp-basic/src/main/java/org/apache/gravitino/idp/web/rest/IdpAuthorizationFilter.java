@@ -34,8 +34,9 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * Enforces built-in IdP management API access rules without server interception.
  *
  * <p>Callers listed in {@link Configs#SERVICE_ADMINS} may perform all IdP management operations.
- * Authenticated non-admin users may only {@code PUT /idp/users/{user}} for their own username so
- * they can change their password; other IdP management APIs remain service-admin only.
+ * Authenticated non-admin users may {@code GET} or {@code PUT} {@code /idp/users/{user}} only for
+ * their own username (read profile / change password). Other IdP management APIs remain
+ * service-admin only.
  *
  * <p>This filter runs as a Jersey request filter after the servlet {@code AuthenticationFilter} has
  * authenticated the caller and populated the current user principal.
@@ -70,7 +71,7 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   public void filter(ContainerRequestContext requestContext) throws IOException {
     String currentUser = currentUserSupplier.get();
     if (isServiceAdmin(serviceAdminsSupplier.get(), currentUser)
-        || isSelfUserUpdate(requestContext, currentUser)) {
+        || isSelfUserAccess(requestContext, currentUser)) {
       return;
     }
     requestContext.abortWith(IdpRESTUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
@@ -81,12 +82,16 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   }
 
   /**
-   * Returns whether the request is a PUT to {@code /idp/users/{currentUser}}.
+   * Returns whether the request is a GET or PUT to {@code /idp/users/{currentUser}}.
    *
    * <p>The resource method still rejects non-admin updates that change {@code enabled}.
    */
-  static boolean isSelfUserUpdate(ContainerRequestContext requestContext, String currentUser) {
-    if (currentUser == null || !"PUT".equalsIgnoreCase(requestContext.getMethod())) {
+  static boolean isSelfUserAccess(ContainerRequestContext requestContext, String currentUser) {
+    if (currentUser == null) {
+      return false;
+    }
+    String method = requestContext.getMethod();
+    if (!"GET".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method)) {
       return false;
     }
     List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
