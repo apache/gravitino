@@ -46,35 +46,6 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         )
         return extract_content_from_response(response, "policy", {})
 
-    async def associate_policy_with_metadata(
-        self,
-        metadata_full_name: str,
-        metadata_type: str,
-        policies_to_add: list,
-        policies_to_remove: list,
-    ) -> str:
-        response = await self.rest_client.post(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
-            f"/objects/{encode_path_segment(metadata_type)}"
-            f"/{encode_path_segment(metadata_full_name)}/policies",
-            json={
-                "policiesToAdd": policies_to_add,
-                "policiesToRemove": policies_to_remove,
-            },
-        )
-        return extract_content_from_response(response, "names", [])
-
-    async def get_policy_for_metadata(
-        self, metadata_full_name: str, metadata_type: str, policy_name: str
-    ) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
-            f"/objects/{encode_path_segment(metadata_type)}"
-            f"/{encode_path_segment(metadata_full_name)}"
-            f"/policies/{encode_path_segment(policy_name)}",
-        )
-        return extract_content_from_response(response, "policy", {})
-
     async def list_policies_for_metadata(
         self, metadata_full_name: str, metadata_type: str
     ) -> str:

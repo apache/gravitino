@@ -27,9 +27,7 @@ const Apis = {
   DELETE: ({ metalake, policy }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`,
   UPDATE: ({ metalake, policy }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`,
-  ASSOCIATE: ({ metalake, metadataObjectType, metadataObjectFullName }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/objects/${encodeURIComponent(metadataObjectType)}/${encodeURIComponent(metadataObjectFullName)}/policies`
+    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`
 }
 
 export const getPoliciesApi = ({ metalake, details }) => {
@@ -68,13 +66,6 @@ export const updatePolicyApi = ({ metalake, policy, data }) => {
 export const enableOrDisablePolicyApi = ({ metalake, policy, data }) => {
   return defHttp.patch({
     url: `${Apis.UPDATE({ metalake, policy })}`,
-    data
-  })
-}
-
-export const associatePolicyApi = ({ metalake, metadataObjectType, metadataObjectFullName, data }) => {
-  return defHttp.post({
-    url: Apis.ASSOCIATE({ metalake, metadataObjectType, metadataObjectFullName }),
     data
   })
 }

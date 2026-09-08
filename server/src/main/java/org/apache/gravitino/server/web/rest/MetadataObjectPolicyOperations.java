@@ -29,7 +29,6 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -40,11 +39,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.policy.PolicyDTO;
-import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
-import org.apache.gravitino.dto.responses.PolicyResponse;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -53,7 +49,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -71,75 +66,6 @@ public class MetadataObjectPolicyOperations {
   @Inject
   public MetadataObjectPolicyOperations(PolicyDispatcher policyDispatcher) {
     this.policyDispatcher = policyDispatcher;
-  }
-
-  @GET
-  @Path("{policy}")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-object-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-object-policy", absolute = true)
-  @AuthorizationExpression(
-      expression =
-          "METALAKE::OWNER || ((POLICY::OWNER || ANY_VIEW_POLICY || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
-  public Response getPolicyForObject(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("type") @AuthorizationObjectType String type,
-      @PathParam("fullName") @AuthorizationFullName String fullName,
-      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
-          String policyName) {
-    LOG.info(
-        "Received get policy {} request for object type: {}, full name: {} under metalake: {}",
-        policyName,
-        type,
-        fullName,
-        metalake);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            Optional<PolicyEntity> policyEntity = getPolicyForObject(metalake, object, policyName);
-            Optional<PolicyDTO> policyDTO =
-                policyEntity.map(
-                    policy ->
-                        PolicyOperations.toDTO(
-                            policy, Optional.of(policy.inherited().orElse(false))));
-
-            if (!policyDTO.isPresent()) {
-              LOG.warn(
-                  "Policy {} not found for object type: {}, full name: {} under metalake: {}",
-                  policyName,
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.notFound(
-                  NoSuchPolicyException.class.getSimpleName(),
-                  "Policy not found: "
-                      + policyName
-                      + " for object type: "
-                      + type
-                      + ", full name: "
-                      + fullName
-                      + " under metalake: "
-                      + metalake);
-            } else {
-              LOG.info(
-                  "Get policy: {} for object type: {}, full name: {} under metalake: {}",
-                  policyName,
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.ok(new PolicyResponse(policyDTO.get()));
-            }
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.GET, policyName, fullName, e);
-    }
   }
 
   @GET
@@ -214,78 +140,4 @@ public class MetadataObjectPolicyOperations {
     }
   }
 
-  @Deprecated
-  @POST
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "associate-object-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "associate-object-policies", absolute = true)
-  @AuthorizationExpression(
-      expression =
-          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
-  public Response associatePoliciesForObject(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("type") @AuthorizationObjectType String type,
-      @PathParam("fullName") @AuthorizationFullName String fullName,
-      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_POLICY)
-          PoliciesAssociateRequest request) {
-    if (request == null) {
-      return ExceptionHandlers.handlePolicyException(
-          OperationType.ASSOCIATE,
-          "",
-          fullName,
-          new IllegalArgumentException("Request body cannot be null"));
-    }
-
-    LOG.info(
-        "Received associate policies request for object type: {}, full name: {} under metalake: {}",
-        type,
-        fullName,
-        metalake);
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            request.validate();
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            String[] policyNames =
-                policyDispatcher.associatePoliciesForMetadataObject(
-                    metalake, object, request.getPoliciesToAdd(), request.getPoliciesToRemove());
-            policyNames = policyNames == null ? new String[0] : policyNames;
-
-            LOG.info(
-                "Associated policies: {} for object type: {}, full name: {} under metalake: {}",
-                Arrays.toString(policyNames),
-                type,
-                fullName,
-                metalake);
-            return Utils.ok(new NameListResponse(policyNames));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.ASSOCIATE, "", fullName, e);
-    }
-  }
-
-  /**
-   * Get the policy for the given metadata object and policy name. If the policy is not found,
-   * return an empty Optional.
-   *
-   * @param metalake the name of the metalake
-   * @param object the metadata object for which the policy is associated
-   * @param policyName the name of the policy to retrieve
-   * @return an Optional containing the policy if found, otherwise an empty Optional
-   */
-  private Optional<PolicyEntity> getPolicyForObject(
-      String metalake, MetadataObject object, String policyName) {
-    try {
-      return Optional.ofNullable(
-          policyDispatcher.getPolicyForMetadataObject(metalake, object, policyName));
-    } catch (NoSuchPolicyException e) {
-      LOG.info("Policy {} not found for object: {}", policyName, object);
-      return Optional.empty();
-    }
-  }
 }
