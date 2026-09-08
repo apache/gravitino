@@ -29,12 +29,6 @@ import org.junit.jupiter.api.Test;
 
 public class TestIcebergPropertiesUtils {
 
-  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER = "adls.token-credential-provider";
-  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
-      ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
-  private static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
-      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
-
   @Test
   void testJdbcSchemaVersionPropertyIsMapped() {
     Map<String, String> gravitinoProps =
@@ -85,20 +79,23 @@ public class TestIcebergPropertiesUtils {
     Assertions.assertFalse(
         icebergProps.containsKey(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY));
     Assertions.assertEquals(
-        AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER,
-        icebergProps.get(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+        IcebergConstants.AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER,
+        icebergProps.get(IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER));
     Assertions.assertEquals(
         "tenant",
         icebergProps.get(
-            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
+            IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+                + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
     Assertions.assertEquals(
         "client",
         icebergProps.get(
-            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID));
+            IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+                + AzureProperties.GRAVITINO_AZURE_CLIENT_ID));
     Assertions.assertEquals(
         "secret",
         icebergProps.get(
-            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+            IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+                + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
   }
 
   @Test
@@ -123,10 +120,12 @@ public class TestIcebergPropertiesUtils {
         "account", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
     Assertions.assertEquals(
         "account-key", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY));
-    Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+    Assertions.assertFalse(
+        icebergProps.containsKey(IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER));
     Assertions.assertFalse(
         icebergProps.containsKey(
-            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+            IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+                + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
   }
 
   @Test
@@ -143,10 +142,12 @@ public class TestIcebergPropertiesUtils {
 
     Assertions.assertEquals(
         "account", icebergProps.get(IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME));
-    Assertions.assertFalse(icebergProps.containsKey(ADLS_TOKEN_CREDENTIAL_PROVIDER));
+    Assertions.assertFalse(
+        icebergProps.containsKey(IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER));
     Assertions.assertFalse(
         icebergProps.containsKey(
-            ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
+            IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+                + AzureProperties.GRAVITINO_AZURE_TENANT_ID));
   }
 
   @Test

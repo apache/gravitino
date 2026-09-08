@@ -65,6 +65,18 @@ public class IcebergConstants {
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
+  /** Iceberg property that specifies the ADLS token credential provider implementation. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER =
+      "adls.token-credential-provider";
+
+  /** Prefix for properties passed to the Iceberg ADLS token credential provider. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
+      ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
+
+  /** Gravitino's Azure client-secret token credential provider implementation. */
+  public static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
+      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
+
   // Iceberg Table properties constants
 
   public static final String COMMENT = "comment";

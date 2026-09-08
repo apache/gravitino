@@ -32,17 +32,15 @@ import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergPropertiesUtils {
 
-  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER = "adls.token-credential-provider";
-  private static final String ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
-      ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
-  private static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
-      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
   private static final String ICEBERG_AZURE_TENANT_ID =
-      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID;
+      IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+          + AzureProperties.GRAVITINO_AZURE_TENANT_ID;
   private static final String ICEBERG_AZURE_CLIENT_ID =
-      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_ID;
+      IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+          + AzureProperties.GRAVITINO_AZURE_CLIENT_ID;
   private static final String ICEBERG_AZURE_CLIENT_SECRET =
-      ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET;
+      IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX
+          + AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET;
   private static final List<String> ICEBERG_AZURE_SHARED_KEY_PROPERTIES =
       Arrays.asList(
           IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_NAME,
@@ -51,7 +49,8 @@ public class IcebergPropertiesUtils {
       Arrays.asList(ICEBERG_AZURE_TENANT_ID, ICEBERG_AZURE_CLIENT_ID, ICEBERG_AZURE_CLIENT_SECRET);
   private static final Map<String, String> ICEBERG_AZURE_SERVICE_PRINCIPAL_DEFAULTS =
       Collections.singletonMap(
-          ADLS_TOKEN_CREDENTIAL_PROVIDER, AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
+          IcebergConstants.ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER,
+          IcebergConstants.AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER);
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
