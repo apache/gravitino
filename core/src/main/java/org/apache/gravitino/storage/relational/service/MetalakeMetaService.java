@@ -63,6 +63,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -326,7 +327,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ViewMetaMapper.class,
-                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ViewVersionInfoMapper.class,
+                    mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {

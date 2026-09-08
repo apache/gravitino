@@ -77,6 +77,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.utils.ClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
@@ -90,7 +91,7 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(25, propertyEntryMap.size());
+    Assertions.assertEquals(26, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
@@ -100,6 +101,8 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
     Assertions.assertTrue(propertyEntryMap.containsKey(DEFAULT_CATALOG));
+    Assertions.assertTrue(
+        propertyEntryMap.get(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET).isHidden());
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
