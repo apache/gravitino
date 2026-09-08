@@ -140,14 +140,14 @@ Standalone Lance REST forwards the authenticated caller's `Authorization` header
 applies its own authorization, ownership, and audit rules to these metadata requests. Auxiliary
 mode uses the caller's identity directly through internal APIs.
 
-| Configuration Property                             | Description                                                                        | Default Value       | Required          |
-|----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|
+| Configuration Property                             | Description                                                                                  | Default Value       | Required          |
+|----------------------------------------------------|----------------------------------------------------------------------------------------------|---------------------|-------------------|
 | `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `caller`, `simple`, `oauth2` | `caller`            | No                |
-| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                |
-| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                           | `lance-rest-server` | No                |
+| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                            | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                                  | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                          | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                          | (none)              | Yes, for `oauth2` |
 
 The default `caller` mode reads credentials and active roles separately for every request, including
 requests made through a shared Gravitino client. It forwards Basic or Bearer credentials recorded by
