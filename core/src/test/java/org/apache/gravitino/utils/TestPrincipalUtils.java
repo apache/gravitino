@@ -52,4 +52,22 @@ public class TestPrincipalUtils {
           return null;
         });
   }
+
+  @Test
+  public void testErrorIsPropagated() {
+    UserPrincipal principal = new UserPrincipal("testErrorIsPropagated");
+    AssertionError error = new AssertionError("test error");
+
+    AssertionError thrown =
+        Assertions.assertThrows(
+            AssertionError.class,
+            () ->
+                PrincipalUtils.doAs(
+                    principal,
+                    () -> {
+                      throw error;
+                    }));
+
+    Assertions.assertSame(error, thrown);
+  }
 }
