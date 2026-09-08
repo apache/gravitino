@@ -32,6 +32,18 @@ import org.junit.jupiter.api.Test;
 public class TestAzureClientSecretTokenCredentialProvider {
 
   @Test
+  void testCredentialBeforeInitialize() {
+    AzureClientSecretTokenCredentialProvider provider =
+        new AzureClientSecretTokenCredentialProvider();
+
+    IllegalStateException exception =
+        Assertions.assertThrows(IllegalStateException.class, provider::credential);
+    Assertions.assertEquals(
+        "The Azure credential provider has not been initialized. Call initialize(properties) first.",
+        exception.getMessage());
+  }
+
+  @Test
   void testLoadAndInitializeProviderThroughIceberg() {
     Map<String, String> gravitinoProperties =
         ImmutableMap.of(

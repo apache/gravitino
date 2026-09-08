@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.common.credential;
 import com.azure.core.credential.TokenCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.credential.config.AzureCredentialConfig;
 import org.apache.iceberg.azure.AdlsTokenCredentialProvider;
@@ -34,7 +33,11 @@ public class AzureClientSecretTokenCredentialProvider implements AdlsTokenCreden
   /** {@inheritDoc} */
   @Override
   public TokenCredential credential() {
-    return Objects.requireNonNull(credential, "The Azure credential provider is not initialized");
+    if (credential == null) {
+      throw new IllegalStateException(
+          "The Azure credential provider has not been initialized. Call initialize(properties) first.");
+    }
+    return credential;
   }
 
   /** {@inheritDoc} */
