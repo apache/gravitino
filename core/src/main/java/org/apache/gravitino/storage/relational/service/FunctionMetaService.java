@@ -29,10 +29,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
+import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -125,22 +126,20 @@ public class FunctionMetaService {
                       po.schemaId(),
                       po.catalogId(),
                       po.metalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFunctionVersionMetaOnDuplicateKeyUpdate(po.functionVersionPO());
-                    } else {
-                      mapper.insertFunctionVersionMeta(po.functionVersionPO());
-                    }
-                  }));
+          () -> insertFunctionWithoutCommit(functionEntity, po, overwrite));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.FUNCTION, functionEntity.nameIdentifier().toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            re, Entity.EntityType.FUNCTION, functionEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwrite) {
+          // A missing-row locking read cannot fence a concurrent insert at READ_COMMITTED.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.FUNCTION, functionEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw re;
     }
   }
@@ -150,47 +149,31 @@ public class FunctionMetaService {
       baseMetricName = "deleteFunction")
   public boolean deleteFunction(NameIdentifier ident) {
     FunctionPO functionPO = getFunctionPOByIdentifier(ident);
-    Long functionId = functionPO.functionId();
 
-    AtomicInteger functionDeletedCount = new AtomicInteger();
+    deleteFunctionWithVersion(ident, functionPO);
+    return true;
+  }
+
+  /**
+   * Deletes the observed function and its dependent rows in one transaction.
+   *
+   * <p>Package-private access lets concurrency tests submit a deliberately stale snapshot while
+   * exercising the same root-first ordering as the public delete path.
+   */
+  void deleteFunctionWithVersion(NameIdentifier identifier, FunctionPO observedFunctionPO) {
     SessionUtils.doMultipleWithCommit(
-        // delete function meta
+        // Check the root version before touching relationships. A stale drop stops here.
         () ->
-            functionDeletedCount.set(
-                SessionUtils.getWithoutCommit(
-                    FunctionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionMetaByFunctionId(functionId))),
-
-        // delete function versions, owner rels, and securable object rels after meta deletion
-        () -> {
-          if (functionDeletedCount.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                FunctionVersionMetaMapper.class,
-                mapper -> mapper.softDeleteFunctionVersionsByFunctionId(functionId));
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        functionId, MetadataObject.Type.FUNCTION.name()));
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        functionId, MetadataObject.Type.FUNCTION.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        functionId, MetadataObject.Type.FUNCTION.name()));
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        functionId, MetadataObject.Type.FUNCTION.name()));
-          }
-        });
-
-    return functionDeletedCount.get() > 0;
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        FunctionMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteFunctionMetaByFunctionId(
+                                observedFunctionPO.functionId(),
+                                observedFunctionPO.functionCurrentVersion())),
+                () -> functionWriteFailure(identifier, observedFunctionPO)),
+        () -> deleteFunctionDependents(observedFunctionPO.functionId()));
   }
 
   @Monitored(
@@ -274,36 +257,44 @@ public class FunctionMetaService {
         newEntity.id(),
         oldFunctionEntity.id());
 
+    boolean isSchemaChanged = !newEntity.namespace().equals(oldFunctionEntity.namespace());
+    NamespacedEntityId targetSchemaIds =
+        isSchemaChanged
+            ? EntityIdService.getEntityIds(
+                NameIdentifier.of(newEntity.namespace().levels()), Entity.EntityType.SCHEMA)
+            : null;
+    Long newSchemaId = isSchemaChanged ? targetSchemaIds.entityId() : oldFunctionPO.schemaId();
+    Long newCatalogId =
+        isSchemaChanged ? targetSchemaIds.namespaceIds()[1] : oldFunctionPO.catalogId();
+    Long newMetalakeId =
+        isSchemaChanged ? targetSchemaIds.namespaceIds()[0] : oldFunctionPO.metalakeId();
+
     try {
-      FunctionPO newFunctionPO = updateFunctionPO(oldFunctionPO, newEntity);
-      // Insert a new version and update function meta
+      FunctionPO newFunctionPO =
+          updateFunctionPO(oldFunctionPO, newEntity, newSchemaId, newCatalogId, newMetalakeId);
       SessionUtils.doMultipleWithCommit(
-          // The function was read before this transaction started. Lock its observed parent again
-          // before writing, so a schema drop cannot finish its function cleanup and then let this
-          // update add a new version below the deleted schema.
-          () ->
+          () -> {
+            if (isSchemaChanged) {
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
-                      identifier,
-                      oldFunctionPO.schemaId(),
-                      oldFunctionPO.catalogId(),
-                      oldFunctionPO.metalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())),
+                      newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId);
+            }
+          },
           () -> {
+            // function_current_version is the sole OCC token. The root CAS is the transaction's
+            // decision point and must run before the unguarded version-row insert below.
             int updated =
                 SessionUtils.getWithoutCommit(
                     FunctionMetaMapper.class,
                     mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
             if (updated == 0) {
-              // The version row was inserted earlier in this transaction. Throwing here rolls the
-              // whole transaction back instead of leaving that version without an active function
-              // metadata row.
-              throw ExceptionUtils.concurrentModification(Entity.EntityType.FUNCTION, identifier);
+              throw functionWriteFailure(identifier, oldFunctionPO);
             }
-          });
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FunctionVersionMetaMapper.class,
+                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
 
       return newEntity;
     } catch (RuntimeException re) {
@@ -333,15 +324,170 @@ public class FunctionMetaService {
     builder.withSchemaId(namespacedEntityId.entityId());
   }
 
-  private FunctionPO updateFunctionPO(FunctionPO oldFunctionPO, FunctionEntity newFunction) {
-    Integer newVersion = oldFunctionPO.functionLatestVersion() + 1;
+  private FunctionPO updateFunctionPO(
+      FunctionPO oldFunctionPO,
+      FunctionEntity newFunction,
+      Long newSchemaId,
+      Long newCatalogId,
+      Long newMetalakeId) {
+    // Both version columns always advance together, but deriving the next version from
+    // the higher of the two keeps it above every version row that exists, even if a
+    // future path ever leaves the current version behind the latest one.
+    Integer newVersion = nextVersion(oldFunctionPO);
     FunctionPO.FunctionPOBuilder builder =
         FunctionPO.builder()
-            .withMetalakeId(oldFunctionPO.metalakeId())
-            .withCatalogId(oldFunctionPO.catalogId())
-            .withSchemaId(oldFunctionPO.schemaId())
+            .withMetalakeId(newMetalakeId)
+            .withCatalogId(newCatalogId)
+            .withSchemaId(newSchemaId)
             .withFunctionLatestVersion(newVersion)
             .withFunctionCurrentVersion(newVersion);
     return buildFunctionPO(newFunction, builder, newVersion);
+  }
+
+  /**
+   * Writes a new function or replaces the active function selected by natural key or stable ID.
+   * Locking the root before choosing the next version makes overwrite behavior identical across
+   * databases and keeps standard reads strict about the matching version-row invariant.
+   */
+  private void insertFunctionWithoutCommit(
+      FunctionEntity functionEntity, FunctionPO initializedFunctionPO, boolean overwrite) {
+    if (!overwrite) {
+      insertNewFunctionWithoutCommit(initializedFunctionPO);
+      return;
+    }
+
+    FunctionPO existingFunctionPO = findAndLockFunctionForOverwrite(initializedFunctionPO);
+    if (existingFunctionPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              FunctionMetaMapper.class,
+              mapper -> mapper.countDeletedFunctionMetasById(initializedFunctionPO.functionId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The function ID %s is reserved by a deleted function; use a new ID",
+            initializedFunctionPO.functionId());
+      }
+      insertNewFunctionWithoutCommit(initializedFunctionPO);
+      return;
+    }
+
+    FunctionPO replacementPO = functionPOForOverwrite(initializedFunctionPO, existingFunctionPO);
+    int updated =
+        SessionUtils.getWithoutCommit(
+            FunctionMetaMapper.class,
+            mapper -> ops.updatePO(mapper, replacementPO, existingFunctionPO));
+    if (updated == 0) {
+      throw functionWriteFailure(functionEntity.nameIdentifier(), existingFunctionPO);
+    }
+    SessionUtils.doWithoutCommit(
+        FunctionVersionMetaMapper.class,
+        mapper -> mapper.insertFunctionVersionMeta(replacementPO.functionVersionPO()));
+  }
+
+  private void insertNewFunctionWithoutCommit(FunctionPO functionPO) {
+    SessionUtils.doWithoutCommit(
+        FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, functionPO, false));
+    SessionUtils.doWithoutCommit(
+        FunctionVersionMetaMapper.class,
+        mapper -> mapper.insertFunctionVersionMeta(functionPO.functionVersionPO()));
+  }
+
+  private FunctionPO findAndLockFunctionForOverwrite(FunctionPO initializedFunctionPO) {
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper ->
+                    mapper.selectFunctionMetaBySchemaIdAndNameForUpdate(
+                        initializedFunctionPO.schemaId(), initializedFunctionPO.functionName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper ->
+                    mapper.selectFunctionMetaByIdForUpdate(initializedFunctionPO.functionId())),
+        current -> Objects.equals(current.schemaId(), initializedFunctionPO.schemaId()));
+  }
+
+  /**
+   * Returns the version to write next, one above every version this function has ever had.
+   *
+   * @param functionPO the function row observed by the caller
+   * @return the next monotonic version
+   */
+  private static int nextVersion(FunctionPO functionPO) {
+    return Math.max(functionPO.functionCurrentVersion(), functionPO.functionLatestVersion()) + 1;
+  }
+
+  private FunctionPO functionPOForOverwrite(FunctionPO incomingPO, FunctionPO persistedPO) {
+    int nextVersion = nextVersion(persistedPO);
+    FunctionVersionPO incomingVersionPO = incomingPO.functionVersionPO();
+    FunctionVersionPO persistedVersionPO =
+        FunctionVersionPO.builder()
+            .withFunctionId(persistedPO.functionId())
+            .withMetalakeId(incomingVersionPO.metalakeId())
+            .withCatalogId(incomingVersionPO.catalogId())
+            .withSchemaId(incomingVersionPO.schemaId())
+            .withFunctionVersion(nextVersion)
+            .withFunctionComment(incomingVersionPO.functionComment())
+            .withDefinitions(incomingVersionPO.definitions())
+            .withAuditInfo(incomingVersionPO.auditInfo())
+            .withDeletedAt(incomingVersionPO.deletedAt())
+            .build();
+    return FunctionPO.builder()
+        .withFunctionId(persistedPO.functionId())
+        .withFunctionName(incomingPO.functionName())
+        .withMetalakeId(incomingPO.metalakeId())
+        .withCatalogId(incomingPO.catalogId())
+        .withSchemaId(incomingPO.schemaId())
+        .withFunctionType(incomingPO.functionType())
+        .withDeterministic(incomingPO.deterministic())
+        .withFunctionLatestVersion(nextVersion)
+        .withFunctionCurrentVersion(nextVersion)
+        .withAuditInfo(incomingPO.auditInfo())
+        .withDeletedAt(incomingPO.deletedAt())
+        .withFunctionVersionPO(persistedVersionPO)
+        .build();
+  }
+
+  private void deleteFunctionDependents(Long functionId) {
+    SessionUtils.doWithoutCommit(
+        FunctionVersionMetaMapper.class,
+        mapper -> mapper.softDeleteFunctionVersionsByFunctionId(functionId));
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                functionId, MetadataObject.Type.FUNCTION.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(
+                functionId, MetadataObject.Type.FUNCTION.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                functionId, MetadataObject.Type.FUNCTION.name()));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                functionId, MetadataObject.Type.FUNCTION.name()));
+  }
+
+  private RuntimeException functionWriteFailure(
+      NameIdentifier identifier, FunctionPO observedFunctionPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.FUNCTION,
+        () ->
+            SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper -> mapper.selectFunctionMetaByIdForUpdate(observedFunctionPO.functionId())),
+        null,
+        current ->
+            Objects.equals(current.functionName(), observedFunctionPO.functionName())
+                && Objects.equals(current.schemaId(), observedFunctionPO.schemaId())
+                && Objects.equals(current.catalogId(), observedFunctionPO.catalogId())
+                && Objects.equals(current.metalakeId(), observedFunctionPO.metalakeId()));
   }
 }
