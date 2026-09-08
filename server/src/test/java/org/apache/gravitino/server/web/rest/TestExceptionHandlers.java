@@ -22,12 +22,40 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionHandlers {
+
+  @Test
+  public void testMissingJobParentsReturnNotFound() {
+    Response runResponse =
+        ExceptionHandlers.handleJobException(
+            OperationType.RUN,
+            "template",
+            "metalake",
+            new NoSuchJobTemplateException("Template disappeared"));
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), runResponse.getStatus());
+    Assertions.assertEquals(
+        NoSuchJobTemplateException.class.getSimpleName(),
+        ((ErrorResponse) runResponse.getEntity()).getType());
+
+    Response registerResponse =
+        ExceptionHandlers.handleJobTemplateException(
+            OperationType.REGISTER,
+            "template",
+            "metalake",
+            new NoSuchMetalakeException("Metalake disappeared"));
+    Assertions.assertEquals(
+        Response.Status.NOT_FOUND.getStatusCode(), registerResponse.getStatus());
+    Assertions.assertEquals(
+        NoSuchMetalakeException.class.getSimpleName(),
+        ((ErrorResponse) registerResponse.getEntity()).getType());
+  }
 
   @Test
   public void testGetErrorMsg() {

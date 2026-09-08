@@ -57,6 +57,7 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
@@ -227,6 +228,8 @@ public class JobManager implements JobOperationDispatcher {
             throw new JobTemplateAlreadyExistsException(
                 "Job template with name %s under metalake %s already exists",
                 jobTemplateEntity.name(), metalake);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
           }
@@ -342,9 +345,7 @@ public class JobManager implements JobOperationDispatcher {
                     updateJobTemplateEntity(jobTemplateIdent, jobTemplateEntity, changes));
           } catch (NoSuchEntityException e) {
             throw new NoSuchJobTemplateException(
-                "Job template with name %s under metalake %s does not exist, this could be due to"
-                    + " the job template not existing or updated concurrently. For the latter case"
-                    + " please retry the operation.",
+                "Job template with name %s under metalake %s does not exist",
                 jobTemplateName, metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -497,6 +498,20 @@ public class JobManager implements JobOperationDispatcher {
 
     try {
       entityStore.put(jobEntity, false /* overwrite */);
+    } catch (NoSuchEntityException e) {
+      LOG.error(
+          "Job {} was submitted as execution {} but could not be registered because its template "
+              + "{} or metalake {} no longer exists",
+          jobEntity.name(),
+          jobExecutionId,
+          jobTemplateName,
+          metalake,
+          e);
+      throw new NoSuchJobTemplateException(
+          e,
+          "Job template with name %s under metalake %s does not exist",
+          jobTemplateName,
+          metalake);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }

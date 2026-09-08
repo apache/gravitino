@@ -174,6 +174,63 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRegisterJobTemplateReportsConcurrentMetalakeDeletion() throws IOException {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    NoSuchEntityException missing = new NoSuchEntityException("Metalake was deleted");
+    doThrow(missing).when(entityStore).put(template, false);
+
+    NoSuchMetalakeException failure =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () -> jobManager.registerJobTemplate(metalake, template));
+    Assertions.assertSame(missing, failure.getCause());
+  }
+
+  @Test
+  public void testRunJobReportsParentDisappearingDuringRegistration() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    for (Entity.EntityType parent :
+        List.of(Entity.EntityType.METALAKE, Entity.EntityType.JOB_TEMPLATE)) {
+      Mockito.reset(entityStore, jobExecutor);
+      String executionId = "submitted_" + parent.name();
+      when(jobExecutor.submitJob(any())).thenReturn(executionId);
+      NoSuchEntityException missing = new NoSuchEntityException("Parent was deleted: %s", parent);
+      doThrow(missing).when(entityStore).put(any(JobEntity.class), eq(false));
+
+      NoSuchJobTemplateException failure =
+          Assertions.assertThrows(
+              NoSuchJobTemplateException.class,
+              () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+      Assertions.assertSame(missing, failure.getCause());
+      verify(jobExecutor, times(1)).submitJob(any());
+      verify(jobExecutor, never()).cancelJob(any());
+      verify(entityStore, times(1)).put(any(JobEntity.class), eq(false));
+    }
+  }
+
+  @Test
+  public void testAlterJobTemplateDistinguishesMissingFromConflict() throws IOException {
+    NoSuchEntityException missing = new NoSuchEntityException("Template was deleted");
+    doThrow(missing).when(entityStore).update(any(), any(), any(), any());
+    NoSuchJobTemplateException failure =
+        Assertions.assertThrows(
+            NoSuchJobTemplateException.class,
+            () -> jobManager.alterJobTemplate(metalake, "shell_job"));
+    Assertions.assertEquals(
+        "Job template with name shell_job under metalake " + metalake + " does not exist",
+        failure.getMessage());
+
+    OptimisticLockException conflict = new OptimisticLockException("Template was modified");
+    doThrow(conflict).when(entityStore).update(any(), any(), any(), any());
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () -> jobManager.alterJobTemplate(metalake, "shell_job")));
+  }
+
+  @Test
   public void testListJobTemplates() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
