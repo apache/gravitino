@@ -162,11 +162,17 @@ class Privilege(ABC):
         APPLY_TAG = (0, 1 << 22)
         """The privilege to apply a tag."""
 
+        VIEW_TAG = (0, 1 << 33)
+        """The privilege to view tag metadata and associations."""
+
         CREATE_POLICY = (0, 1 << 23)
         """The privilege to create a policy."""
 
         APPLY_POLICY = (0, 1 << 24)
         """The privilege to apply a policy."""
+
+        VIEW_POLICY = (0, 1 << 34)
+        """The privilege to view policy metadata, content, and associations."""
 
         REGISTER_JOB_TEMPLATE = (0, 1 << 25)
         """The privilege to register a job template."""
@@ -1182,6 +1188,34 @@ class ApplyTag(GenericPrivilege):
         return obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.TAG]
 
 
+class ViewTag(GenericPrivilege):
+    """The privilege to view tag metadata and associations."""
+
+    _ALLOW_INSTANCE: Optional[ViewTag] = None
+    _DENY_INSTANCE: Optional[ViewTag] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        """Return the allow instance of the privilege."""
+        if ViewTag._ALLOW_INSTANCE is None:
+            ViewTag._ALLOW_INSTANCE = ViewTag(
+                Privilege.Condition.ALLOW, Privilege.Name.VIEW_TAG
+            )
+        return ViewTag._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        """Return the deny instance of the privilege."""
+        if ViewTag._DENY_INSTANCE is None:
+            ViewTag._DENY_INSTANCE = ViewTag(
+                Privilege.Condition.DENY, Privilege.Name.VIEW_TAG
+            )
+        return ViewTag._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.TAG]
+
+
 class CreatePolicy(GenericPrivilege):
     """The privilege to create a policy"""
 
@@ -1301,6 +1335,34 @@ class ApplyPolicy(GenericPrivilege):
                 Privilege.Condition.DENY, Privilege.Name.APPLY_POLICY
             )
         return ApplyPolicy._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.POLICY]
+
+
+class ViewPolicy(GenericPrivilege):
+    """The privilege to view policy metadata, content, and associations."""
+
+    _ALLOW_INSTANCE: Optional[ViewPolicy] = None
+    _DENY_INSTANCE: Optional[ViewPolicy] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        """Return the allow instance of the privilege."""
+        if ViewPolicy._ALLOW_INSTANCE is None:
+            ViewPolicy._ALLOW_INSTANCE = ViewPolicy(
+                Privilege.Condition.ALLOW, Privilege.Name.VIEW_POLICY
+            )
+        return ViewPolicy._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        """Return the deny instance of the privilege."""
+        if ViewPolicy._DENY_INSTANCE is None:
+            ViewPolicy._DENY_INSTANCE = ViewPolicy(
+                Privilege.Condition.DENY, Privilege.Name.VIEW_POLICY
+            )
+        return ViewPolicy._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
         return obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.POLICY]
@@ -1610,8 +1672,10 @@ class Privileges:
         Privilege.Name.USE_MODEL: UseModel,
         Privilege.Name.CREATE_TAG: CreateTag,
         Privilege.Name.APPLY_TAG: ApplyTag,
+        Privilege.Name.VIEW_TAG: ViewTag,
         Privilege.Name.CREATE_POLICY: CreatePolicy,
         Privilege.Name.APPLY_POLICY: ApplyPolicy,
+        Privilege.Name.VIEW_POLICY: ViewPolicy,
         Privilege.Name.REGISTER_JOB_TEMPLATE: RegisterJobTemplate,
         Privilege.Name.USE_JOB_TEMPLATE: UseJobTemplate,
         Privilege.Name.RUN_JOB: RunJob,

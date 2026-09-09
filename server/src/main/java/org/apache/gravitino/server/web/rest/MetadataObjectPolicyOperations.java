@@ -78,6 +78,7 @@ public class MetadataObjectPolicyOperations {
     this.policyDispatcher = policyDispatcher;
   }
 
+  @Deprecated
   @GET
   @Path("{policy}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -237,6 +238,7 @@ public class MetadataObjectPolicyOperations {
     }
   }
 
+  @Deprecated
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
