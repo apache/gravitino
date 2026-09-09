@@ -159,7 +159,7 @@ An GCS token is a token credential with scoped privileges, by leveraging GCS [Cr
 | `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                | GCS Application default credential. | No       |
 
 :::note
-For the Gravitino Iceberg REST server, ensure that the credential file is accessible by the server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
+`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg `GCSFileIO` on the server (Gravitino injects `gcs.oauth2.token` at catalog load because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 :::
 
 ## Custom Credentials
