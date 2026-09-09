@@ -187,7 +187,8 @@ public class IcebergCatalogUtil {
       jdbcCatalog.initialize(icebergCatalogName, properties);
     } catch (UncheckedSQLException e) {
       Throwable cause = e.getCause();
-      // SQLState class 28 = invalid authorization (MySQL 1045 -> 28000; PostgreSQL 28P01/28000).
+      // SQLState class 28 = invalid authorization (MySQL 1045 -> 28000; PostgreSQL 28P01/28000;
+      // H2 wrong user/password -> 28000).
       if (cause instanceof SQLException) {
         String sqlState = ((SQLException) cause).getSQLState();
         if (sqlState != null && sqlState.regionMatches(true, 0, "28", 0, 2)) {
