@@ -37,6 +37,7 @@ import net.sf.cglib.proxy.MethodProxy;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -157,7 +158,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                 if (RuntimeException.class.isAssignableFrom(e.getClass())) {
                   throw (RuntimeException) e;
                 }
-                throw new RuntimeException("Failed to invoke method", e);
+                throw ExceptionMessages.wrap("Failed to invoke method", e);
               }
             });
   }
@@ -175,7 +176,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
       this.kerberosRealm = client.getKerberosRealm();
       return ugi;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to login with Kerberos", e);
+      throw ExceptionMessages.wrap("Failed to login with Kerberos", e);
     }
   }
 }

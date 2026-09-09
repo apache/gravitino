@@ -19,12 +19,15 @@
 package org.apache.gravitino.catalog.glue;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.utils.ExceptionMessages;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
@@ -84,7 +87,10 @@ final class GlueExceptionConverter {
       return new SchemaAlreadyExistsException(e, "%s already exists", context);
     }
     if (e instanceof InvalidInputException) {
-      return new IllegalArgumentException(context + ": " + e.getMessage(), e);
+      return ExceptionMessages.illegalArgument(context, e);
+    }
+    if (e instanceof AccessDeniedException) {
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
     return new RuntimeException("Glue error: " + context + ": " + awsErrorDetail(e), e);
   }
@@ -104,7 +110,10 @@ final class GlueExceptionConverter {
       return new TableAlreadyExistsException(e, "%s already exists", context);
     }
     if (e instanceof InvalidInputException) {
-      return new IllegalArgumentException(context + ": " + e.getMessage(), e);
+      return ExceptionMessages.illegalArgument(context, e);
+    }
+    if (e instanceof AccessDeniedException) {
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
     return new RuntimeException("Glue error: " + context + ": " + awsErrorDetail(e), e);
   }
