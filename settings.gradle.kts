@@ -107,7 +107,7 @@ include("spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
 // Spark 4.0 support (#8771). Spark 4 is Scala 2.13 only and needs JDK 17, so these modules pin
-// 2.13 rather than reading -PscalaVersion. The same holds for every later Spark 4 line.
+// 2.13 rather than reading -PscalaVersion.
 include("spark-connector:spark-4.0", "spark-connector:spark-runtime-4.0")
 project(":spark-connector:spark-4.0").projectDir = file("spark-connector/v4.0/spark")
 project(":spark-connector:spark-runtime-4.0").projectDir = file("spark-connector/v4.0/spark-runtime")

@@ -17,7 +17,7 @@ Normal integration test are mainly used to test the correctness of the metadata,
 ./gradlew :spark-connector:spark-3.5:test --tests "org.apache.gravitino.spark.connector.integration.test.hive.SparkHiveCatalogIT35.testCreateHiveFormatPartitionTable"
 ```
 
-Every version module carries its own subclass of each shared IT, named after the Spark minor version, so the Spark 4.1 equivalent is `:spark-connector:spark-4.1:test --tests "...SparkHiveCatalogIT41.testCreateHiveFormatPartitionTable"`.
+Every version module carries its own subclass of each shared IT, named after the Spark minor version, so the Spark 4.0 equivalent is `:spark-connector:spark-4.0:test --tests "...SparkHiveCatalogIT40.testCreateHiveFormatPartitionTable"`.
 
 ## Golden File Integration Test
 
