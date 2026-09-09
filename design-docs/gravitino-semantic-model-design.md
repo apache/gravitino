@@ -269,10 +269,10 @@ DataType = "String" | "Integer" | "Decimal" | "Float" | "Boolean"
 Create and alter validate the complete candidate object before persistence. Validation is atomic:
 if any check fails, no change is persisted.
 
-1. **Contract validation.** Check required fields, collection cardinality, enum values, string
-   constraints, and the pinned Ossie structure.
-2. **Model-local validation.** Check name uniqueness, relationship endpoints, referenced fields,
-   key shapes, and dialect uniqueness without consulting a catalog.
+1. **Contract validation.** Check required fields, collection cardinality, typed alternatives, string
+   constraints, and the Java contract derived from the pinned Ossie structure.
+2. **Model-local validation.** Check name uniqueness, relationship endpoints, key shapes, and dialect
+   uniqueness without consulting a catalog.
 3. **Catalog validation.** Resolve every Dataset source and validate explicitly named source
    columns. Validation uses the caller's authorization context so it does not disclose metadata the
    caller cannot access.
@@ -293,33 +293,23 @@ engine and remain outside the metadata write path.
 
 #### Ossie Compatibility
 
-The public API is a Gravitino contract derived from Ossie, not a stored YAML or JSON document. For
-compatibility validation, the server projects a candidate object into an in-memory Ossie document:
+The public API is a Gravitino contract derived from Ossie, not a stored YAML or JSON document. The
+runtime write path validates the Java object model directly; it does not project a candidate into an
+Ossie document or invoke JSON Schema validation. At implementation time, Apache Ossie commit
+`88e0011148283302c9a04cd0287e00e0b9d87354` did not publish a reusable Java SDK or general-purpose
+Java validator; its Java schema validation was converter-specific. Gravitino therefore implements
+the applicable structural and model-local rules directly in Java, followed by catalog-backed source
+checks. SQL expression validation is not carried into the metadata write path because execution
+semantics and engine compatibility are outside its scope.
 
-```yaml
-version: 0.2.0.dev0
-semantic_model:
-  - name: sales_model
-    description: Governed sales definitions
-    datasets:
-      - name: orders
-        source: sales.mart.orders
-```
-
-The projection maps the entity name to `SemanticModel.name`, `comment` to `description`, and encodes
-each source `NameIdentifier` using the reversible source grammar above. The request path supplies the
-metalake and is not serialized into Ossie.
-
-The request path does not invoke the upstream Python validator or create an intermediate YAML
-string. The implementation validates the in-memory projection against a Gravitino profile derived
-from the bundled copy of the pinned JSON Schema, then runs Gravitino-specific model-local and
-catalog checks. The profile preserves the pinned structural constraints while treating dialect
-identifiers as open non-empty strings. Upstream validation tools are used only in compatibility
-fixtures that contain Ossie-defined dialects.
+Core contract tests validate the Java value model directly, including both `AIContext` variants,
+name uniqueness, relationship references and column cardinality, and absent versus explicitly empty
+arrays. Gravitino's runtime contract deliberately accepts any non-empty custom dialect identifier and
+preserves it exactly, even when the dialect is outside the pinned upstream schema.
 
 The entity carries no per-model Ossie specification version. Each Gravitino release pins one exact
 upstream schema commit and defines the supported read and write contract. Updating that schema
-requires a Gravitino code change, compatibility fixtures, and storage read tests. If a future
+requires a Gravitino code change, native validator tests, and storage read tests. If a future
 incompatible Ossie contract must coexist with the current one, explicit per-entity versioning
 requires a separate design; it should not be inferred from `custom_extensions`.
 
@@ -353,6 +343,11 @@ Supported `SemanticModelChange` operations are:
 - `setProperty` and `removeProperty`: Update Gravitino-specific properties.
 - `replaceDefinition`: Atomically replaces AI context, datasets, relationships, metrics, and custom
   extensions.
+
+Create and `replaceDefinition` run complete Java definition and catalog-backed source validation
+before persistence. A properties-only alter does not revalidate the definition or visit sources.
+Rename and comment changes also do not visit sources; rename continues through the existing
+identifier normalization contract. List, load, and drop do not run write validation.
 
 Each alter request applies all changes atomically to the current Semantic Model. Rename retains the
 stable entity ID. Owner, tag, and policy changes use their existing governance stores and remain
