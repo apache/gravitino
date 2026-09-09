@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -109,6 +111,12 @@ public class MetadataObjectSecretOperations {
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
+            if (!MetadataAuthzHelper.checkAccess(
+                identifier,
+                entityType,
+                AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)) {
+              return Utils.ok(new SecretsResponse(ImmutableMap.of()));
+            }
             Map<String, String> secrets =
                 secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
             return Utils.ok(new SecretsResponse(secrets));

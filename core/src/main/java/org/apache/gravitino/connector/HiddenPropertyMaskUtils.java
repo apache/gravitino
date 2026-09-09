@@ -45,6 +45,11 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *       in-use}, {@code numFiles}).
  * </ul>
  *
+ * <p>Recovery via {@code getSecrets} covers secret-URN values and sensitive-named keys only. A
+ * property that is merely declared {@code hidden} (and whose name does not look sensitive) remains
+ * {@code ******} after merging {@code properties()} with {@code getSecrets()}; that API does not
+ * return it. See {@code org.apache.gravitino.secret.SupportsSecrets}.
+ *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code
  * PropertiesMetadataHelpers}.

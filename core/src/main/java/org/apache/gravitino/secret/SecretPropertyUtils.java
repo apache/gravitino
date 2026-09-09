@@ -38,9 +38,9 @@ import org.apache.commons.lang3.StringUtils;
 public final class SecretPropertyUtils {
 
   /**
-   * Property keys whose names look like credentials. Matching is case-insensitive; {@code _} and
-   * {@code -} are treated the same. Used to mask API responses and to expose plaintext via {@code
-   * getSecrets} for undeclared / mistyped credential properties.
+   * Property keys whose names look like credentials. Matching is case-insensitive. Used to mask API
+   * responses and to expose plaintext via {@code getSecrets} for undeclared / mistyped credential
+   * properties.
    */
   private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
       Pattern.compile(".*(secret|password|token|credential|access|account).*");
@@ -50,9 +50,10 @@ public final class SecretPropertyUtils {
   /**
    * Returns whether a property key name looks sensitive (credential-like).
    *
-   * <p>A key matches when, after lower-casing and normalizing {@code _} to {@code -}, it contains
-   * {@code secret}, {@code password}, {@code token}, {@code credential}, {@code access}, or {@code
-   * account} (covers Azure storage account key/name and GCS service-account file paths).
+   * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
+   * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
+   * storage account key/name and GCS service-account file paths). Underscores and hyphens are not
+   * normalized; they are irrelevant because the matched keywords contain neither.
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern
@@ -61,8 +62,7 @@ public final class SecretPropertyUtils {
     if (key == null || key.isEmpty()) {
       return false;
     }
-    String normalized = key.toLowerCase(Locale.ROOT).replace('_', '-');
-    return SENSITIVE_PROPERTY_KEY_PATTERN.matcher(normalized).matches();
+    return SENSITIVE_PROPERTY_KEY_PATTERN.matcher(key.toLowerCase(Locale.ROOT)).matches();
   }
 
   /**
@@ -87,6 +87,12 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
    *       not a secret URN, returning the stored plaintext.
    * </ol>
+   *
+   * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
+   * hidden. A hidden key is recovered only when it is a secret URN or its name matches {@link
+   * #isSensitivePropertyKey} (for example {@code jdbc-password}). A hidden key whose name does not
+   * look sensitive (for example a path-like {@code auth-file}) stays masked as {@code ******} on
+   * list/get and is absent from this map.
    *
    * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
    * properties()} so undeclared credential keys remain usable without leaking on list/get.

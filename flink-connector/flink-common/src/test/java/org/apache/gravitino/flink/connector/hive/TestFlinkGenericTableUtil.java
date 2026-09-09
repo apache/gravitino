@@ -29,8 +29,11 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.factories.ManagedTableFactory;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -121,7 +124,7 @@ class TestFlinkGenericTableUtil {
               }
 
               @Override
-              public org.apache.gravitino.Audit auditInfo() {
+              public Audit auditInfo() {
                 return null;
               }
             },
@@ -165,12 +168,12 @@ class TestFlinkGenericTableUtil {
               }
 
               @Override
-              public org.apache.gravitino.secret.SupportsSecrets supportsSecrets() {
+              public SupportsSecrets supportsSecrets() {
                 return () -> ImmutableMap.of(flinkPasswordKey, "real-password");
               }
 
               @Override
-              public org.apache.gravitino.Audit auditInfo() {
+              public Audit auditInfo() {
                 return null;
               }
             },
@@ -179,6 +182,53 @@ class TestFlinkGenericTableUtil {
     Assertions.assertEquals("jdbc", catalogTable.getOptions().get("connector"));
     Assertions.assertEquals("root", catalogTable.getOptions().get("username"));
     Assertions.assertEquals("real-password", catalogTable.getOptions().get("password"));
+  }
+
+  @Test
+  void testToFlinkGenericTableContinuesWhenSecretsEndpointMissing() {
+    String flinkPasswordKey = CatalogPropertiesUtil.FLINK_PROPERTY_PREFIX + "password";
+    Map<String, String> maskedProperties =
+        ImmutableMap.of(
+            CatalogPropertiesUtil.IS_GENERIC,
+            "true",
+            CatalogPropertiesUtil.FLINK_PROPERTY_PREFIX + "connector",
+            "jdbc",
+            flinkPasswordKey,
+            "******");
+
+    CatalogTable catalogTable =
+        FlinkGenericTableUtil.toFlinkGenericTable(
+            new Table() {
+              @Override
+              public String name() {
+                return "tbl";
+              }
+
+              @Override
+              public org.apache.gravitino.rel.Column[] columns() {
+                return new org.apache.gravitino.rel.Column[0];
+              }
+
+              @Override
+              public Map<String, String> properties() {
+                return maskedProperties;
+              }
+
+              @Override
+              public SupportsSecrets supportsSecrets() {
+                return () -> {
+                  throw new NotFoundException("secrets endpoint not found");
+                };
+              }
+
+              @Override
+              public Audit auditInfo() {
+                return null;
+              }
+            },
+            DefaultCatalogCompat.INSTANCE);
+
+    Assertions.assertEquals("******", catalogTable.getOptions().get("password"));
   }
 
   private static ResolvedCatalogTable createResolvedTable(Map<String, String> options) {

@@ -53,7 +53,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  *
  * <p>Loads raw entity properties from the entity store / catalog connector, then builds plaintext
  * secrets via {@link SecretPropertyUtils#buildSecrets} (secret-manager URNs plus sensitive-named
- * inline values).
+ * inline values). Declared {@code hidden} properties alone are not recovered; see {@link
+ * SecretPropertyUtils#buildSecrets}.
  */
 public class SecretPropertyOperationDispatcher extends OperationDispatcher {
 

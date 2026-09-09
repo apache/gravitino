@@ -267,6 +267,17 @@ public class AuthorizationExpressionConstants {
                   ANY_WRITE_FILESET
                   """;
 
+  /**
+   * Soft check for retrieving plaintext secrets or vend credentials. Only the metalake owner or a
+   * principal with {@code USE_SECRET} may receive non-empty results; others get an empty response
+   * rather than a forbidden error.
+   */
+  public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_USE_SECRET
+                  """;
+
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||

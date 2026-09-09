@@ -34,6 +34,11 @@ import java.util.Map;
  *       responses mask them as {@code ******}.
  * </ul>
  *
+ * <p>Properties that are only declared {@code hidden} in property metadata, and whose names do
+ * <em>not</em> match the sensitive-name pattern above, are masked as {@code ******} on list/get but
+ * are <strong>not</strong> returned by {@link #getSecrets()}. Clients must not treat a remaining
+ * {@code ******} value as a usable credential for those keys.
+ *
  * <p>Normal non-sensitive properties are not included; combine with {@code load*().properties()} on
  * the client.
  */
@@ -41,6 +46,9 @@ public interface SupportsSecrets {
 
   /**
    * Returns plaintext secret properties for this metadata object.
+   *
+   * <p>Does not recover values for properties that are only metadata-{@code hidden} without a
+   * sensitive-looking name or a secret URN. See the interface javadoc.
    *
    * @return a map of property key to plaintext value; never null, may be empty
    */

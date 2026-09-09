@@ -28,6 +28,7 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.rel.Table;
 
 final class FlinkGenericTableUtil {
@@ -107,14 +108,7 @@ final class FlinkGenericTableUtil {
    * password} remain usable after name-based API masking.
    */
   private static Map<String, String> propsWithSecrets(Table table) {
-    Map<String, String> props =
-        new HashMap<>(table.properties() == null ? Collections.emptyMap() : table.properties());
-    try {
-      props.putAll(table.supportsSecrets().getSecrets());
-    } catch (UnsupportedOperationException ignored) {
-      // Server-side / stub tables may not implement SupportsSecrets.
-    }
-    return props;
+    return PropertyUtils.propertiesWithSecrets(table.properties(), table::supportsSecrets);
   }
 
   private static String getConnectorFromProperties(Map<String, String> properties) {
