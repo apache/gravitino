@@ -87,6 +87,29 @@ public class TestIcebergCatalog {
       };
 
   @Test
+  void testCatalogPropertiesHideAzureClientSecret() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Map<String, String> properties =
+        Map.of(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "azure-client-secret");
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("azure-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .withProperties(properties)
+            .build();
+    IcebergCatalog catalog =
+        new IcebergCatalog().withCatalogConf(properties).withCatalogEntity(entity);
+
+    Assertions.assertFalse(
+        catalog.properties().containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+  }
+
+  @Test
   public void testListDatabases() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
