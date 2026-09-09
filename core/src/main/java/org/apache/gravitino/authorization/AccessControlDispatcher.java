@@ -25,6 +25,7 @@ import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -334,6 +335,18 @@ public interface AccessControlDispatcher {
       throws RoleAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Creates roles in bulk.
+   *
+   * @param metalake The Metalake of the Roles.
+   * @param roles The Roles to create.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If creating the Roles encounters storage issues.
+   */
+  List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
+      throws NoSuchMetalakeException;
+
+  /**
    * Gets a Role.
    *
    * @param metalake The Metalake of the Role.
@@ -356,6 +369,18 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
   boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+
+  /**
+   * Deletes Roles in bulk.
+   *
+   * @param metalake The Metalake of the Roles.
+   * @param roles The names of the Roles.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If deleting the Roles encounters storage issues.
+   */
+  List<BulkItemResult<String>> deleteRoles(String metalake, List<String> roles)
+      throws NoSuchMetalakeException;
 
   Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)

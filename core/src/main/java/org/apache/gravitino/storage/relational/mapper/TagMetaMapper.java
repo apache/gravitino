@@ -23,12 +23,22 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TagMetaMapper {
 
   String TAG_TABLE_NAME = "tag_meta";
+
+  /**
+   * Counts deleted rows that still reserve the requested tag ID.
+   *
+   * @param tagId The tag ID.
+   * @return The number of deleted rows with this ID.
+   */
+  @Select("SELECT COUNT(*) FROM " + TAG_TABLE_NAME + " WHERE tag_id = #{tagId} AND deleted_at > 0")
+  int countDeletedTagMetasById(@Param("tagId") Long tagId);
 
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByMetalake")
   List<TagPO> listTagPOsByMetalake(@Param("metalakeName") String metalakeName);

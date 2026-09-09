@@ -108,8 +108,10 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  compileOnly(libs.azure.identity)
 
   testImplementation(project(":server-common"))
+  testImplementation(libs.azure.identity)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

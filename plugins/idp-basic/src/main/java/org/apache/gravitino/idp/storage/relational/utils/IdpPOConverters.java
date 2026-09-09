@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.idp.storage.relational.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,10 +30,75 @@ import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupWithUsersPO;
 import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Converts built-in IdP persistence objects to domain models. */
 public final class IdpPOConverters {
+
   private IdpPOConverters() {}
+
+  /**
+   * Serializes audit information for persistence.
+   *
+   * @param auditInfo audit information
+   * @return JSON string
+   */
+  public static String toAuditInfoJson(AuditInfo auditInfo) {
+    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize IdP audit info", e);
+    }
+  }
+
+  /**
+   * Deserializes audit information from persistence.
+   *
+   * @param json JSON string, blank means empty audit
+   * @return audit information
+   */
+  public static AuditInfo fromAuditInfoJson(String json) {
+    if (StringUtils.isBlank(json)) {
+      return AuditInfo.EMPTY;
+    }
+    try {
+      return JsonUtils.anyFieldMapper().readValue(json, AuditInfo.class);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize IdP audit info", e);
+    }
+  }
+
+  /**
+   * Builds create-time audit JSON for the current principal.
+   *
+   * @return serialized audit info
+   */
+  public static String newCreateAuditInfoJson() {
+    return toAuditInfoJson(
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentUserName())
+            .withCreateTime(Instant.now())
+            .build());
+  }
+
+  /**
+   * Rebuilds audit JSON with last-modifier fields for the current principal.
+   *
+   * @param existingAuditInfoJson previously stored audit JSON
+   * @return updated audit JSON
+   */
+  public static String withLastModifiedAuditInfoJson(String existingAuditInfoJson) {
+    AuditInfo existing = fromAuditInfoJson(existingAuditInfoJson);
+    return toAuditInfoJson(
+        AuditInfo.builder()
+            .withCreator(existing.creator())
+            .withCreateTime(existing.createTime())
+            .withLastModifier(PrincipalUtils.getCurrentUserName())
+            .withLastModifiedTime(Instant.now())
+            .build());
+  }
 
   /**
    * Converts a joined user row to a built-in IdP user.
@@ -43,10 +110,11 @@ public final class IdpPOConverters {
     Preconditions.checkNotNull(userPO, "userPO must not be null");
     List<String> groupNames = parseJsonStringList(userPO.getGroupNames());
     boolean enabled = userPO.getEnabled() == null || userPO.getEnabled();
+    AuditInfo auditInfo = fromAuditInfoJson(userPO.getAuditInfo());
     if (StringUtils.isBlank(userPO.getPasswordHash())) {
-      return new IdpUser(userPO.getName(), groupNames, enabled);
+      return new IdpUser(userPO.getName(), groupNames, enabled, auditInfo);
     }
-    return new IdpUser(userPO.getName(), userPO.getPasswordHash(), groupNames, enabled);
+    return new IdpUser(userPO.getName(), userPO.getPasswordHash(), groupNames, enabled, auditInfo);
   }
 
   /**
@@ -58,7 +126,10 @@ public final class IdpPOConverters {
   public static IdpGroup fromIdpGroupWithUsersPO(IdpGroupWithUsersPO groupPO) {
     Preconditions.checkNotNull(groupPO, "groupPO must not be null");
     return new IdpGroup(
-        groupPO.getName(), parseJsonStringList(groupPO.getUsernames()), groupPO.getComment());
+        groupPO.getName(),
+        parseJsonStringList(groupPO.getUsernames()),
+        groupPO.getComment(),
+        fromAuditInfoJson(groupPO.getAuditInfo()));
   }
 
   @SuppressWarnings("unchecked")

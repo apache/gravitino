@@ -21,12 +21,15 @@ package org.apache.gravitino.storage.relational.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -50,6 +53,48 @@ public class TestOccWriteSupport {
     Long parentId() {
       return parentId;
     }
+  }
+
+  @Test
+  void testOverwritePrefersNaturalKey() {
+    DummyPO target = new DummyPO("target", 1L);
+    assertSame(
+        target,
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> target,
+            () -> {
+              throw new AssertionError("ID lookup must be skipped");
+            },
+            po -> true));
+  }
+
+  @Test
+  void testOverwriteFallsBackToIdInSameParent() {
+    DummyPO target = new DummyPO("renamed", 1L);
+    assertSame(
+        target,
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> null, () -> target, po -> po.parentId() == 1L));
+  }
+
+  @Test
+  void testOverwriteRejectsIdInDifferentParent() {
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            OccWriteSupport.findAndLockForOverwrite(
+                () -> null, () -> new DummyPO("foreign", 2L), po -> po.parentId() == 1L));
+  }
+
+  @Test
+  void testOverwriteReturnsNullWhenBothLookupsMiss() {
+    assertNull(
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> null,
+            () -> null,
+            po -> {
+              throw new AssertionError("No row to validate");
+            }));
   }
 
   @Test

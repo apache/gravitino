@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -38,6 +39,34 @@ import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 public class OccWriteSupport {
 
   private OccWriteSupport() {}
+
+  /**
+   * Resolves an overwrite target by locking its natural key, then falling back to its stable ID.
+   *
+   * <p>A missing row is not locked. Callers must handle concurrent insert conflicts and roll back
+   * the whole write before retrying. A stable ID under another parent must never be adopted without
+   * fencing that parent.
+   *
+   * @param <T> the persistent object type
+   * @param byNameLookup the locking natural-key lookup
+   * @param byIdLookup the locking stable-ID lookup
+   * @param sameParent checks whether the stable-ID match belongs to the target parent
+   * @return the locked target, or null if both lookups miss
+   * @throws EntityAlreadyExistsException if the stable ID belongs to another parent
+   */
+  @Nullable
+  public static <T> T findAndLockForOverwrite(
+      Supplier<T> byNameLookup, Supplier<T> byIdLookup, Predicate<T> sameParent) {
+    T current = byNameLookup.get();
+    if (current != null) {
+      return current;
+    }
+    current = byIdLookup.get();
+    if (current != null && !sameParent.test(current)) {
+      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
+    }
+    return current;
+  }
 
   /**
    * Classifies a write-failure for an entity during an optimistic concurrency control operation.
