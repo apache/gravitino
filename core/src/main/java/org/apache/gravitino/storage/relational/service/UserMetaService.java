@@ -264,9 +264,11 @@ public class UserMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            if (!insertRoleIds.isEmpty()) {
-              // Metalake deletion cleans memberships before deleting principal rows. Fence it
-              // before writing the principal, otherwise its cleanup can miss this new grant.
+            if (!insertRoleIds.isEmpty() || !deleteRoleIds.isEmpty()) {
+              // The cascade writes memberships before principals; this update does the reverse.
+              // Fence grants and revokes before the principal CAS to avoid both orphan grants and
+              // a revoke/cascade deadlock. Metadata-only updates write no membership rows, so they
+              // need no parent lock (which would serialize unrelated updates on H2).
               lockMetalakeForUserWrite(identifier.namespace().level(0), oldUserPO.getMetalakeId());
             }
           },
@@ -412,7 +414,7 @@ public class UserMetaService {
   }
 
   /**
-   * Keeps the metalake alive while creating a user or adding role memberships.
+   * Keeps the metalake alive while creating a user or changing role memberships.
    *
    * <p>Take this shared lock before the principal write, matching the metalake cascade's root lock.
    * Concurrent writes can share it on MySQL/PostgreSQL; H2 uses an exclusive lock. Validate the

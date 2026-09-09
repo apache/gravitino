@@ -297,6 +297,10 @@ public class RoleMetaService {
   /**
    * Fences newly referenced roles until the surrounding membership transaction commits.
    *
+   * <p>Existing and removed memberships do not need role locks: deletion can clean existing rows,
+   * and a revoke cannot leave a new relation behind. Only lock the added IDs to keep the number of
+   * locking reads proportional to the grant, not the principal's full set of roles.
+   *
    * <p>Call after writing the principal row and before modifying any membership rows. This keeps
    * the principal-before-role order used by metalake cascades. The caller must also fence the
    * metalake before the principal write. Shared locks permit independent grants of the same role
