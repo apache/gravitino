@@ -66,10 +66,13 @@ public class IcebergCatalogUtil {
   private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
 
   /**
-   * SQLSTATE class {@code 28} = invalid authorization specification. Covers MySQL 1045 ({@code
-   * 28000}), PostgreSQL {@code 28P01}/{@code 28000}, and H2 wrong user/password ({@code 28000}).
+   * SQLSTATE {@code 28000}: MySQL error 1045 (Access denied), H2 wrong user/password, and
+   * PostgreSQL {@code invalid_authorization_specification} (for example unknown role).
    */
-  private static final String INVALID_AUTHORIZATION_SQLSTATE_CLASS = "28";
+  private static final String SQLSTATE_INVALID_AUTHORIZATION = "28000";
+
+  /** SQLSTATE {@code 28P01}: PostgreSQL {@code invalid_password}. */
+  private static final String SQLSTATE_INVALID_PASSWORD = "28P01";
 
   private static final ConcurrentHashMap<String, InMemoryCatalog> MEMORY_CATALOGS =
       new ConcurrentHashMap<>();
@@ -195,7 +198,8 @@ public class IcebergCatalogUtil {
       Throwable cause = e.getCause();
       if (cause instanceof SQLException) {
         String sqlState = ((SQLException) cause).getSQLState();
-        if (sqlState != null && sqlState.startsWith(INVALID_AUTHORIZATION_SQLSTATE_CLASS)) {
+        if (SQLSTATE_INVALID_AUTHORIZATION.equals(sqlState)
+            || SQLSTATE_INVALID_PASSWORD.equals(sqlState)) {
           throw new ConnectionFailedException(e, e.getMessage());
         }
       }
