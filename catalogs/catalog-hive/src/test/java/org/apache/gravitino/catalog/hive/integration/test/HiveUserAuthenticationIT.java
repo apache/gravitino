@@ -26,7 +26,6 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PR
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -226,14 +225,15 @@ public class HiveUserAuthenticationIT extends BaseIT {
             CATALOG_NAME, Catalog.Type.RELATIONAL, "hive", "comment", properties);
 
     // Test create schema
-    Exception exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            Exception.class,
+            RuntimeException.class,
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-    // Make sure real user is 'gravitino_client'
-    Assertions.assertTrue(
-        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+    assertPublicClientInternalError(
+        exception,
+        String.format(
+            "Failed to operate object [%s] operation [CREATE] under [%s]",
+            SCHEMA_NAME, CATALOG_NAME));
 
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer(
@@ -285,5 +285,11 @@ public class HiveUserAuthenticationIT extends BaseIT {
     Column col2 = Column.of(HIVE_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
     return new Column[] {col1, col2, col3};
+  }
+
+  private static void assertPublicClientInternalError(
+      RuntimeException exception, String expectedMessageFragment) {
+    Assertions.assertEquals(RuntimeException.class, exception.getClass());
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessageFragment));
   }
 }
