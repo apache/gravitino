@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,9 +29,14 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 
 @Provider
 public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
+
+  // Keep diagnostic stacks inside the server and accept legacy payloads, but never publish them.
+  @JsonIgnoreProperties(value = "stack", allowSetters = true)
+  private abstract static class ErrorResponseMixin {}
 
   private static class ObjectMapperHolder {
     private static final ObjectMapper INSTANCE =
@@ -38,6 +44,7 @@ public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .addMixIn(ErrorResponse.class, ErrorResponseMixin.class)
             .build()
             .setSerializationInclusion(JsonInclude.Include.NON_NULL)
             .registerModule(new JavaTimeModule())

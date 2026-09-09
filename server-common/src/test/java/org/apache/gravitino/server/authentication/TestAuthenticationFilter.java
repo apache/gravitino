@@ -170,6 +170,7 @@ public class TestAuthenticationFilter {
     printWriter.flush();
     String json = stringWriter.toString();
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    Assertions.assertFalse(mapper.readTree(json).has("stack"));
     ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(1011, errorResponse.getCode());
     Assertions.assertEquals("UnauthorizedException", errorResponse.getType());
