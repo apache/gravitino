@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -67,21 +66,21 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ExceptionMessages;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
 public class GenericCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
-  private static final String SLASH = "/";
+  private static final Logger LOG = LoggerFactory.getLogger(GenericCatalogOperations.class);
 
   private final ManagedSchemaOperations schemaOps;
 
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
-  private Optional<String> catalogLocation;
+  private TableLocationProvider tableLocationProvider;
 
   private Map<String, String> catalogProperties = Map.of();
-
-  private HasPropertyMetadata propertiesMetadata;
 
   private final Cache<NameIdentifier, String> tableFormatCache;
 
@@ -130,21 +129,22 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.catalogProperties = conf == null ? Map.of() : Maps.newHashMap(conf);
-    String location =
+
+    String providerName =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(conf, Catalog.PROPERTY_LOCATION);
-    this.catalogLocation =
-        StringUtils.isNotBlank(location)
-            ? Optional.of(location).map(this::ensureTrailingSlash)
-            : Optional.empty();
-    this.propertiesMetadata = propertiesMetadata;
+                .getOrDefault(conf, GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER);
+    this.tableLocationProvider =
+        TableLocationProviderFactory.create(providerName, catalogProperties);
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     tableFormatCache.cleanUp();
+    if (tableLocationProvider != null) {
+      tableLocationProvider.close();
+    }
   }
 
   @Override
@@ -175,6 +175,21 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     return schemaOps.alterSchema(ident, changes);
   }
 
+  /**
+   * Drops a schema, dropping every table it contains first when cascade is set.
+   *
+   * <p>The cascaded tables go through {@link #dropTable(NameIdentifier)} rather than straight to
+   * the table operations, so that the location of each of them is unprovisioned and its cached
+   * format invalidated. A table failing to drop aborts the cascade: the tables handled so far are
+   * gone, the remaining ones and the schema itself are untouched, and the call can safely be
+   * retried. A {@link TableLocationProvider} failing to unprovision a location does not abort it,
+   * because the table it belongs to is already gone.
+   *
+   * @param ident the identifier of the schema to drop
+   * @param cascade whether to drop the tables contained in the schema
+   * @return true if the schema was dropped, false if it did not exist
+   * @throws NonEmptySchemaException if the schema contains tables and cascade is not set
+   */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     Namespace tableNs =
@@ -192,9 +207,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
           "Schema %s is not empty, cannot drop it without cascade", ident);
     }
 
-    // Drop all tables under the schema first if cascade is true.
+    // Drop all tables under the schema first if cascade is true. This goes through the catalog
+    // level dropTable, so that the location of each table is unprovisioned and its cached format
+    // invalidated.
     for (NameIdentifier tableIdent : tableIdents) {
-      tableOps(tableIdent).dropTable(tableIdent);
+      dropTable(tableIdent);
     }
 
     return schemaOps.dropSchema(ident, cascade);
@@ -233,7 +250,16 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
-    String tableLocation = calculateTableLocation(schema, ident, properties);
+    String tableLocation =
+        validateProvisionedLocation(
+            tableLocationProvider.provisionTableLocation(
+                TableLocationContext.builder()
+                    .withTableIdentifier(ident)
+                    .withTableProperties(properties)
+                    .withSchema(schema)
+                    .build()),
+            tableLocationProvider.name(),
+            ident);
 
     String format = properties.getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
     Preconditions.checkArgument(
@@ -273,57 +299,80 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   @Override
   public boolean purgeTable(NameIdentifier ident) {
-    boolean purged = tableOps(ident).purgeTable(ident);
-    tableFormatCache.invalidate(ident);
-    return purged;
+    return dropOrPurgeTable(ident, true /* purge */);
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
-    boolean dropped = tableOps(ident).dropTable(ident);
+    return dropOrPurgeTable(ident, false /* purge */);
+  }
+
+  /**
+   * Drops or purges a table, and hands its location back to the {@link TableLocationProvider}
+   * afterwards.
+   *
+   * <p>The table properties are read before the removal, because they carry the location the
+   * provider has to hand back, and the unprovisioning itself happens after the removal so that a
+   * provider never reclaims the storage of a table that is still there. A provider failing to
+   * unprovision is logged at WARN rather than propagated: the table is already gone at that point,
+   * so failing the request would report a drop that did in fact happen as unsuccessful and invite a
+   * retry that cannot undo anything.
+   *
+   * @param ident the identifier of the table to drop
+   * @param purge whether to purge the table instead of dropping it
+   * @return true if the table was dropped, false if it did not exist
+   */
+  private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge) {
+    Map<String, String> tableProperties;
+    try {
+      tableProperties = store.get(ident, TABLE, TableEntity.class).properties();
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException(
+          String.format("Failed to load table %s before dropping it", ident), e);
+    }
+
+    // Built entirely before the drop, so that a store read failing here fails the request while
+    // the table is still there, rather than after it is gone where it could only be reported as a
+    // provider failure it is not.
+    TableLocationContext context =
+        TableLocationContext.builder()
+            .withTableIdentifier(ident)
+            .withTableProperties(tableProperties)
+            .withSchema(loadSchema(NameIdentifier.of(ident.namespace().levels())))
+            .build();
+
+    boolean dropped = purge ? tableOps(ident).purgeTable(ident) : tableOps(ident).dropTable(ident);
     tableFormatCache.invalidate(ident);
+
+    if (dropped) {
+      try {
+        tableLocationProvider.unprovisionTableLocation(context);
+      } catch (Exception e) {
+        LOG.warn(
+            "Table {} was already {}, but table location provider '{}' failed to unprovision its "
+                + "location '{}'. The storage may be leaked and needs to be reclaimed manually.",
+            ident,
+            purge ? "purged" : "dropped",
+            tableLocationProvider.name(),
+            context.tableProperties().get(Table.PROPERTY_LOCATION),
+            e);
+      }
+    }
+
     return dropped;
   }
 
-  private String calculateTableLocation(
-      Schema schema, NameIdentifier tableIdent, Map<String, String> tableProperties) {
-    String tableLocation =
-        (String)
-            propertiesMetadata
-                .tablePropertiesMetadata()
-                .getOrDefault(tableProperties, Table.PROPERTY_LOCATION);
-    if (StringUtils.isNotBlank(tableLocation)) {
-      return ensureTrailingSlash(tableLocation);
-    }
-
-    String schemaLocation =
-        schema.properties() == null ? null : schema.properties().get(Schema.PROPERTY_LOCATION);
-
-    // If we do not set location in table properties, and schema location is set, use schema
-    // location as the base path.
-    if (StringUtils.isNotBlank(schemaLocation)) {
-      return ensureTrailingSlash(schemaLocation) + tableIdent.name() + SLASH;
-    }
-
-    // If the schema location is not set, use catalog lakehouse dir as the base path. Or else, throw
-    // an exception.
-    if (catalogLocation.isEmpty()) {
-      throw new IllegalArgumentException(
-          "'location' property is neither set in table properties "
-              + "nor in schema properties, and no location is set in catalog properties either. "
-              + "Please set the 'location' in either of them to create the table "
-              + tableIdent);
-    }
-
-    return ensureTrailingSlash(catalogLocation.get())
-        + tableIdent.namespace().level(2)
-        + SLASH
-        + tableIdent.name()
-        + SLASH;
-  }
-
-  private String ensureTrailingSlash(String path) {
-    return path.endsWith(SLASH) ? path : path + SLASH;
+  /**
+   * Returns the cache mapping a table to its format, so that tests can assert it is kept in step
+   * with the tables that exist.
+   *
+   * @return the table format cache
+   */
+  @VisibleForTesting
+  Cache<NameIdentifier, String> tableFormatCache() {
+    return tableFormatCache;
   }
 
   private ManagedTableOperations tableOps(NameIdentifier tableIdent) {
@@ -366,5 +415,32 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     }
 
     return ops;
+  }
+
+  /**
+   * Validates the location returned by a {@link TableLocationProvider} before it is stored in the
+   * table properties, so that a misbehaving provider fails the table creation instead of silently
+   * producing a broken location.
+   *
+   * <p>Only blankness is checked. The shape of the path belongs to the provider: nothing downstream
+   * appends to the location, and the value is stored verbatim so that a provider unprovisioning it
+   * later sees exactly the string it returned.
+   *
+   * @param location the location returned by the provider
+   * @param providerName the name of the provider that returned it
+   * @param tableIdent the identifier of the table being created
+   * @return the validated location
+   * @throws IllegalArgumentException if the location is blank
+   */
+  @VisibleForTesting
+  static String validateProvisionedLocation(
+      String location, String providerName, NameIdentifier tableIdent) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(location),
+        "Table location provider '%s' returned a null or blank location for table %s",
+        providerName,
+        tableIdent);
+
+    return location;
   }
 }

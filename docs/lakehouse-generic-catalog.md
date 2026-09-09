@@ -48,13 +48,87 @@ For detailed information on available operations, see [Manage Relational Metadat
 |-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
 | `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      |
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       |
+| `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created.                               | `default`               | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       |
+
+#### Pluggable table location provider
+
+By default the catalog derives a new table's location from the `location` properties, following the
+hierarchy described in [Key Property: `location`](#key-property-location). Deployments that allocate
+storage through an external service can replace that logic with their own strategy.
+
+Implement `org.apache.gravitino.catalog.lakehouse.generic.TableLocationProvider`, register it in
+`META-INF/services/org.apache.gravitino.catalog.lakehouse.generic.TableLocationProvider`, drop the jar
+into `catalogs/lakehouse-generic/libs`, and select it with the `table-location-provider` catalog
+property (matched case-insensitively against `TableLocationProvider#name()`).
+
+One provider instance is created per catalog. `initialize` is called once with the catalog properties
+before the first provisioning, `provisionTableLocation` is called for every table creation and must
+be thread-safe, and `close` is called when the catalog is closed. The property is immutable, so a catalog
+keeps the provider it was created with.
+
+Implementing `initialize` is optional: a provider that derives the location purely from the context it
+is given has nothing to prepare. Override it when the provider holds a remote client, a connection or
+any state that must outlive a single table creation, and release those resources in `close`.
+
+Both methods receive a `TableLocationContext`, which carries `tableIdentifier()`, `tableProperties()`
+and `schema()` -- the parent schema including its properties. Selection is per catalog, so a provider
+that needs different behaviour for different schemas has to read a schema property and dispatch on it
+itself. A provider doing that should reject an unrecognized value rather than falling back to another
+strategy, and should treat the property as immutable: a table provisioned under one strategy has to be
+unprovisioned under the same one.
+
+A user-supplied table `location` reaches the provider through the context, but the location the
+provider returns is what gets stored. Whether a user-supplied value is honoured is therefore up to the
+selected provider; the built-in provider honours it.
+
+`provisionTableLocation` runs on the server thread handling the table creation request. The catalog
+applies no timeout, so a provider that calls a remote service must bound every call itself and fail
+fast when the service is unavailable; a call that blocks holds that request thread until it returns.
+
+`provisionTableLocation` must return a non-blank location; the catalog rejects the table creation
+otherwise. That is the only check: the shape of the path belongs to the provider, nothing downstream
+appends to it, and the value is stored verbatim so that a provider unprovisioning it later sees
+exactly the string it returned.
+
+When a table is dropped or purged, the catalog calls `unprovisionTableLocation` so that the provider
+can hand the location back. It reads the location to reclaim from `context.tableProperties()` under
+the `location` key, which the catalog fills in from the stored table properties read just before the
+table was removed. Dropping a schema with cascade unprovisions the location of every table it
+contains, one by one.
+
+The method has no default implementation, so every provider has to answer for it. A provider that
+composes the path from configuration and registers it nowhere -- like the built-in one -- writes an
+empty body.
+
+The unprovisioning happens *after* the table metadata, and the data of a managed table, have been
+removed, so a provider that fails does not roll the drop back: the table is gone either way. The
+failure is logged at WARN naming the table, the provider and the location that was not reclaimed,
+and the drop still reports success, because reporting a drop that did happen as unsuccessful would
+only invite a retry that cannot undo anything. For the same reason a failed unprovisioning does not
+abort a cascading schema drop.
+
+`unprovisionTableLocation` is called at most once per dropped table, but a server crash between the
+removal and the call means it may not be called at all, so a provider reclaiming real storage needs
+its own reconciliation to catch those, and must tolerate being called for a location that is already
+released.
+
+Two constraints follow from `ServiceLoader` discovery:
+
+- The implementation needs a public no-argument constructor that is cheap and does not throw. Every
+  provider on the classpath is instantiated before the one named by the catalog property is selected,
+  so a heavy or failing constructor breaks catalog initialization for everyone, including catalogs
+  using the built-in provider. Put clients, connection pools and other expensive setup in `initialize`.
+- `name()` must be unique across the classpath and must not be `default`, which is reserved by the
+  built-in provider. Two providers sharing a name make every catalog selecting that name fail to
+  initialize.
 
 #### Key Property: `location`
 
 The `location` property specifies the root directory for the lakehouse table. All schemas and tables are stored under this location unless explicitly overridden at the schema or table level.
 
-**Location Resolution Hierarchy:**
+**Location Resolution Hierarchy** (applies to the built-in provider; a custom
+`table-location-provider` defines its own):
 1. Table-level `location` (highest priority)
 2. Schema-level `location`, then the location of the table will be `{schema_location}/{table_name}`
 3. Catalog-level `location` (fallback), then the location of the table will be `{catalog_location}/{schema_name}/{table_name}`
