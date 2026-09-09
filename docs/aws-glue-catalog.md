@@ -42,7 +42,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `aws-access-key-id`     | AWS access key ID for static credential authentication. When omitted, the default credential chain is used.                                                                                         | (none)        | No       | No        |
 | `aws-secret-access-key` | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                          | (none)        | No       | No        |
 | `aws-glue-endpoint`     | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`).                                                                                                    | (none)        | No       | No        |
-| `warehouse`             | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. | (none)        | Yes      | No        |
+| `warehouse`             | Base storage path used as the warehouse when no explicit `location` is specified at table creation time and the Glue database declares no `LocationUri` (e.g. `s3://my-bucket/warehouse`). Table location is then derived as `warehouse/database/table`. | (none)        | Yes      | No        |
 | `default-table-format`  | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                          | `hive`        | No       | No        |
 | `table-format-filter`   | Comma-separated list of table formats exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types.              | `all`         | No       | No        |
 
@@ -148,7 +148,7 @@ The following table lists predefined properties for Glue tables. Additional key-
 
 | Property Name       | Description                                                                                                                                                                                                  | Default Value                                                | Required | Reserved | Immutable |
 |---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|----------|----------|-----------|
-| `location`          | The location for table storage, such as `s3://bucket/prefix/test_table`. Derived from `warehouse/database/table` when not specified.                                                                         | (derived from warehouse)                                     | No       | No       | No        |
+| `location`          | The location for table storage, such as `s3://bucket/prefix/test_table`. When not specified, it is derived from the `LocationUri` of the Glue database as `database-location/table`, falling back to `warehouse/database/table` when the database declares no location.                                                                         | (derived from database location or warehouse)                | No       | No       | No        |
 | `format`            | The table file format (`parquet`, `orc`, `textfile`, etc.). When set, `input-format`, `output-format`, and `serde-lib` are derived automatically. Used primarily when creating Hive-format tables via Trino. | (none)                                                       | No       | No       | Yes       |
 | `input-format`      | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                                                                                             | `org.apache.hadoop.mapred.TextInputFormat`                   | No       | No       | Yes       |
 | `output-format`     | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                                                                                           | `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` | No       | No       | Yes       |
@@ -214,7 +214,7 @@ The Glue catalog supports creating and managing Iceberg-format tables through th
 
 Set `table-format=ICEBERG` in the table properties, or configure `default-table-format=iceberg` on the catalog to make all tables Iceberg by default.
 
-The `warehouse` catalog property must be configured. The table location is derived as `warehouse/database/table` when no explicit `location` is specified.
+The `warehouse` catalog property is required, but it is used only as a fallback when no explicit `location` is specified and the Glue database declares no `LocationUri`. Without an explicit `location`, the table location is derived as `database-location/table` when the database declares a `LocationUri`, or as `warehouse/database/table` otherwise.
 
 ### Register an Existing Iceberg Table
 
