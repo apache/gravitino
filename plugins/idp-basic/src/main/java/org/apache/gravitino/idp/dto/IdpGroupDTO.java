@@ -31,6 +31,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.AuditDTO;
 
 /** Represents a built-in IdP group Data Transfer Object (DTO). */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -49,15 +50,19 @@ public class IdpGroupDTO {
   @JsonSetter(nulls = Nulls.AS_EMPTY)
   private List<String> users = Collections.emptyList();
 
+  @JsonProperty("audit")
+  private AuditDTO audit;
+
   /**
    * Creates a new instance of IdpGroupDTO.
    *
    * @param name The name of the built-in IdP group DTO.
    * @param comment The comment of the built-in IdP group DTO.
    * @param users The users of the built-in IdP group DTO.
+   * @param audit The audit information of the built-in IdP group DTO.
    */
   @Builder(setterPrefix = "with")
-  protected IdpGroupDTO(String name, String comment, List<String> users) {
+  protected IdpGroupDTO(String name, String comment, List<String> users, AuditDTO audit) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     if (users != null) {
       users.forEach(
@@ -68,6 +73,7 @@ public class IdpGroupDTO {
     this.name = name;
     this.comment = comment == null ? "" : comment;
     this.users = users == null ? Collections.emptyList() : users;
+    this.audit = audit;
   }
 
   /**
@@ -91,5 +97,12 @@ public class IdpGroupDTO {
    */
   public List<String> users() {
     return users;
+  }
+
+  /**
+   * @return The audit information of the built-in IdP group DTO.
+   */
+  public AuditDTO audit() {
+    return audit;
   }
 }

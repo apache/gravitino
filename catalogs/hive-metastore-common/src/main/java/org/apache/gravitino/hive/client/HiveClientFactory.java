@@ -33,6 +33,7 @@ import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
 import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
+import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -260,6 +261,12 @@ public final class HiveClientFactory {
 
       synchronized (classLoaderLock) {
         if (backendClassLoader != null) {
+          // The backend ClassLoader is a second, nested isolation layer that holds the catalog's
+          // own ClassLoader as its base. Closing it releases its jars but not the references other
+          // threads still hold to it: Hadoop's Shell runs sub-processes, and the JDK's pooled
+          // "process reaper" threads inherit the spawning thread's context ClassLoader, which is a
+          // GC root. Cleaning the nested loader clears those, so both layers become collectable.
+          ClassLoaderResourceCleanerUtils.closeClassLoaderResource(backendClassLoader);
           backendClassLoader.close();
           backendClassLoader = null;
         }

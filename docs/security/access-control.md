@@ -211,6 +211,7 @@ they will be removed in a future release. Use the current names in new roles.
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
 | `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
 | `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
@@ -275,30 +276,35 @@ owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object       | Create                  | Read                                   | Alter or delete | Use                                             |
-|--------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
-| Metalake     | Service administrator   | Membership                             | Owner           |                                                 |
-| User         | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
-| Group        | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
-| Role         | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag          | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
-| Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
-| Job          |                         | Owner                                  | Owner           |                                                 |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
+|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
+| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
+| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
+| Job              |                         | Owner                                  | Owner           |                                                 |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
+
+The secrets-provider registry is process-global server configuration; the metalake path only scopes
+authorization. Listing providers does not return secret material.
 
 Bulk access-control APIs use the same privileges as the matching single-entity operations. Most
 bulk operations are authorized once before processing the request. Role removal is authorized per
 item because each role can be removed by the metalake owner or by the owner of that role. Bulk
 requests report item-level failures in `errors`.
 
-| API                                                 | Required privilege                              |
-|-----------------------------------------------------|-------------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`       |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`       |
-| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`      |
-| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`      |
-| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`        |
-| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role |
+| API                                                 | Required privilege                                 |
+|-----------------------------------------------------|----------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`           |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role    |
+| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS` |
 
 For example, add users in bulk:
 

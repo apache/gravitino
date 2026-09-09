@@ -41,6 +41,15 @@ COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is di
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
 
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_meta.audit_info IS 'idp user audit info';
+
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_group_meta.audit_info IS 'idp group audit info';
+
+ALTER TABLE idp_user_group_rel ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_group_rel.audit_info IS 'idp user group relation audit info';
+
 ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ti_mi_mo_tv_del ON tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, tag_value, deleted_at);

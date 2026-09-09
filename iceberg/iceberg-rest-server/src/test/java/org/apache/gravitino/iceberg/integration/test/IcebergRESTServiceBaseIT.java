@@ -126,7 +126,8 @@ public abstract class IcebergRESTServiceBaseIT {
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.TABLE_METADATA_CACHE_IMPL.getKey(),
         LocalTableMetadataCache.class.getName());
     icebergRESTServerManager.registerCustomConfigs(icebergConfigs);
-    LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
+    // Configuration values may contain credentials. Log only keys for test diagnostics.
+    LOG.info("Iceberg REST service config keys registered: {}", icebergConfigs.keySet());
   }
 
   protected int getServerPort() {

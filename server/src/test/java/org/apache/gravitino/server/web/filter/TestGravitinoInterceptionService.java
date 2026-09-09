@@ -70,6 +70,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -129,6 +130,15 @@ public class TestGravitinoInterceptionService {
   public void testViewOperationsIsRegisteredForInterception() {
     Descriptor descriptor = mock(Descriptor.class);
     when(descriptor.getImplementation()).thenReturn(ViewOperations.class.getName());
+
+    Assertions.assertTrue(
+        new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));
+  }
+
+  @Test
+  public void testSecretsProviderOperationsIsRegisteredForInterception() {
+    Descriptor descriptor = mock(Descriptor.class);
+    when(descriptor.getImplementation()).thenReturn(SecretsProviderOperations.class.getName());
 
     Assertions.assertTrue(
         new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));

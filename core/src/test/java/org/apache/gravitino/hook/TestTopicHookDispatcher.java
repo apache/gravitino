@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTopicOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
@@ -96,7 +97,9 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
-      TopicHookDispatcher localHook = new TopicHookDispatcher(mockTopicDispatcher);
+      TopicDispatcher localHook =
+          new TopicNormalizeDispatcher(
+              new TopicHookDispatcher(mockTopicDispatcher), mockCatalogManager);
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_TOPIC");
       localHook.createTopic(ident, "comment", null, ImmutableMap.of());
 
