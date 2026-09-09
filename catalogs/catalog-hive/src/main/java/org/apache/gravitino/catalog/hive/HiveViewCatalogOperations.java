@@ -50,6 +50,11 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ExceptionMessages;
+>>>>>>> 4deb09451 ([#12998] fix(catalogs): Preserve upstream error messages when wrapping exceptions (#12999))
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +95,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to list Hive views in " + namespace, e);
+      throw ExceptionMessages.wrap("Failed to list Hive views in " + namespace, e);
     }
   }
 
@@ -157,9 +162,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
     } catch (TableAlreadyExistsException e) {
       throw new ViewAlreadyExistsException(e, "View %s already exists in Hive Metastore", ident);
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to create Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to create Hive view " + ident, e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to create Hive view " + ident, e);
     }
   }
 
@@ -264,9 +269,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
     } catch (UnsupportedOperationException e) {
       throw e;
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to alter Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to alter Hive view " + ident, e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to alter Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to alter Hive view " + ident, e);
     }
   }
 
@@ -311,9 +316,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
     } catch (NoSuchTableException e) {
       return false;
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to drop Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to drop Hive view " + ident, e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to drop Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to drop Hive view " + ident, e);
     }
   }
 
@@ -349,9 +354,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
     } catch (NoSuchTableException e) {
       throw new NoSuchViewException(e, "View %s does not exist in Hive Metastore", ident);
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to load Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to load Hive view " + ident, e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to load Hive view " + ident, e);
+      throw ExceptionMessages.wrap("Failed to load Hive view " + ident, e);
     }
   }
 

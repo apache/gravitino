@@ -18,10 +18,21 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+<<<<<<< HEAD
+=======
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
+>>>>>>> 4deb09451 ([#12998] fix(catalogs): Preserve upstream error messages when wrapping exceptions (#12999))
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.utils.ExceptionMessages;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.services.glue.model.AccessDeniedException;
+>>>>>>> 4deb09451 ([#12998] fix(catalogs): Preserve upstream error messages when wrapping exceptions (#12999))
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
@@ -47,7 +58,10 @@ final class GlueExceptionConverter {
       return new SchemaAlreadyExistsException(e, "%s already exists", context);
     }
     if (e instanceof InvalidInputException) {
-      return new IllegalArgumentException(context + ": " + e.getMessage(), e);
+      return ExceptionMessages.illegalArgument(context, e);
+    }
+    if (e instanceof AccessDeniedException) {
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
     return new RuntimeException("Glue error: " + context, e);
   }
@@ -67,7 +81,10 @@ final class GlueExceptionConverter {
       return new TableAlreadyExistsException(e, "%s already exists", context);
     }
     if (e instanceof InvalidInputException) {
-      return new IllegalArgumentException(context + ": " + e.getMessage(), e);
+      return ExceptionMessages.illegalArgument(context, e);
+    }
+    if (e instanceof AccessDeniedException) {
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
     return new RuntimeException("Glue error: " + context, e);
   }

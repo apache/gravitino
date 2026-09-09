@@ -65,7 +65,11 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+<<<<<<< HEAD
 import org.apache.gravitino.storage.relational.service.TableMetaService;
+=======
+import org.apache.gravitino.utils.ExceptionMessages;
+>>>>>>> 4deb09451 ([#12998] fix(catalogs): Preserve upstream error messages when wrapping exceptions (#12999))
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
@@ -303,7 +307,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to purge Lance dataset for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
   }
 
@@ -337,7 +341,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to drop Lance dataset for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
     }
   }
 
@@ -355,7 +359,7 @@ public class LanceTableOperations extends ManagedTableOperations {
           && e.getMessage().contains("Not found:")) {
         LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
       } else {
-        throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
+        throw ExceptionMessages.wrap("Failed to delete Lance dataset at " + location, e);
       }
     }
   }
@@ -433,7 +437,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create Lance dataset at location " + location, e);
+      throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
   }
 
@@ -491,7 +495,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       if (forAlter) {
         throw new IllegalStateException(
-            "Failed to load Lance schema before altering table " + ident, e);
+            ExceptionMessages.withCause(
+                "Failed to load Lance schema before altering table " + ident, e),
+            e);
       }
       LOG.debug(
           "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
@@ -577,9 +583,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException("Failed to repair table " + ident, e);
+      throw ExceptionMessages.illegalArgument("Failed to repair table " + ident, e);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to repair table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to repair table " + ident, e);
     }
   }
 
@@ -688,9 +694,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException("Failed to record empty version for table " + ident, e);
+      throw ExceptionMessages.illegalArgument(
+          "Failed to record empty version for table " + ident, e);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to record empty version for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to record empty version for table " + ident, e);
     }
   }
 
@@ -815,7 +822,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException(
+      throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
     }
   }
