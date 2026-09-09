@@ -132,9 +132,46 @@ public class IdpRESTApiIT extends BaseIT {
     // No Authorization: OAuth rejects the request before the IdP filter runs.
     Assertions.assertEquals(401, get("/idp/users/" + USER1, null, null).statusCode());
 
+    postUser(USER1, USER_PASSWORD);
     postUser(USER2, USER_PASSWORD);
+    Assertions.assertEquals(200, get("/idp/users/" + USER2, USER2, USER_PASSWORD).statusCode());
     assertError(
-        403, get("/idp/users/" + USER2, USER2, USER_PASSWORD), ErrorConstants.FORBIDDEN_CODE);
+        403, get("/idp/users/" + USER1, USER2, USER_PASSWORD), ErrorConstants.FORBIDDEN_CODE);
+    Assertions.assertTrue(deleteUser(USER1));
+    Assertions.assertTrue(deleteUser(USER2));
+  }
+
+  @Test
+  void testSelfUserAccess() throws Exception {
+    postUser(USER1, USER_PASSWORD);
+    postUser(USER2, USER_PASSWORD);
+
+    HttpResponse<String> selfGet = get("/idp/users/" + USER1, USER1, USER_PASSWORD);
+    Assertions.assertEquals(200, selfGet.statusCode(), selfGet.body());
+    IdpUserResponse self =
+        JsonUtils.objectMapper().readValue(selfGet.body(), IdpUserResponse.class);
+    self.validate();
+    Assertions.assertEquals(USER1, self.getUser().name());
+
+    HttpResponse<String> selfUpdate =
+        put("/idp/users/" + USER1, new UpdateUserRequest(UPDATED_PASSWORD), USER1, USER_PASSWORD);
+    Assertions.assertEquals(200, selfUpdate.statusCode(), selfUpdate.body());
+    Assertions.assertEquals(200, get("/version", USER1, UPDATED_PASSWORD).statusCode());
+
+    assertError(
+        403,
+        put(
+            "/idp/users/" + USER2,
+            new UpdateUserRequest(UPDATED_PASSWORD),
+            USER1,
+            UPDATED_PASSWORD),
+        ErrorConstants.FORBIDDEN_CODE);
+    assertError(
+        403,
+        put("/idp/users/" + USER1, new UpdateUserRequest(null, false), USER1, UPDATED_PASSWORD),
+        ErrorConstants.FORBIDDEN_CODE);
+
+    Assertions.assertTrue(deleteUser(USER1));
     Assertions.assertTrue(deleteUser(USER2));
   }
 
@@ -381,8 +418,13 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static HttpResponse<String> put(String path, Object body) throws Exception {
+    return put(path, body, ADMIN, ADMIN_PASSWORD);
+  }
+
+  private static HttpResponse<String> put(
+      String path, Object body, String username, String password) throws Exception {
     return HTTP.send(
-        authorized(ADMIN, ADMIN_PASSWORD)
+        authorized(username, password)
             .uri(URI.create(apiBase + path))
             .header("Content-Type", ACCEPT)
             .PUT(jsonBody(body))

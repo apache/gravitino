@@ -18,57 +18,164 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.junit.jupiter.api.Assertions;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
+import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
+import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
 
+/** Tests for {@link GlueExceptionConverter}. */
 public class TestGlueExceptionConverter {
 
-  @Test
-  public void testDefaultGlueErrorPreservesUpstreamMessage() {
-    GlueException cause =
-        GlueException.builder()
-            .message("User is not authorized to perform glue:CreateDatabase")
-            .build();
-
-    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "schema drop_me");
-
-    Assertions.assertEquals(
-        "Glue error: schema drop_me: User is not authorized to perform glue:CreateDatabase",
-        converted.getMessage());
-    Assertions.assertSame(cause, converted.getCause());
-  }
+  private static final String IAM_MESSAGE =
+      "User: arn:aws:iam::123456789012:user/gravitino is not authorized to perform: "
+          + "glue:CreateDatabase on resource: "
+          + "arn:aws:glue:us-east-2:123456789012:database/drop_me3 "
+          + "because no identity-based policy allows the glue:CreateDatabase action";
 
   @Test
-  public void testAccessDeniedMapsToForbidden() {
-    AccessDeniedException cause =
+  public void testSchemaAccessDeniedKeepsAwsMessage() {
+    AccessDeniedException e =
         AccessDeniedException.builder()
-            .message(
-                "User: arn:aws:iam::123:user/a is not authorized to perform: glue:CreateDatabase")
+            .message(IAM_MESSAGE)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("AccessDeniedException")
+                    .errorMessage(IAM_MESSAGE)
+                    .build())
             .build();
 
-    RuntimeException converted = GlueExceptionConverter.toTableException(cause, "table ctas_test");
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema drop_me");
 
-    Assertions.assertInstanceOf(ForbiddenException.class, converted);
-    Assertions.assertTrue(
-        converted
-            .getMessage()
-            .contains(
-                "User: arn:aws:iam::123:user/a is not authorized to perform:"
-                    + " glue:CreateDatabase"));
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertSame(e, converted.getCause());
+    String message = converted.getMessage();
+    assertTrue(message.contains("schema drop_me"), message);
+    assertTrue(message.contains("[AccessDeniedException] "), message);
+    assertTrue(message.contains("glue:CreateDatabase"), message);
+    assertTrue(message.contains("database/drop_me3"), message);
   }
 
   @Test
-  public void testInvalidInputMapsToIllegalArgument() {
-    InvalidInputException cause =
-        InvalidInputException.builder().message("Name is too long").build();
+  public void testTableAccessDeniedKeepsAwsMessage() {
+    AccessDeniedException e =
+        AccessDeniedException.builder()
+            .message(IAM_MESSAGE)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("AccessDeniedException")
+                    .errorMessage(IAM_MESSAGE)
+                    .build())
+            .build();
 
-    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "schema bad");
+    RuntimeException converted = GlueExceptionConverter.toTableException(e, "table ctas_test");
 
-    Assertions.assertInstanceOf(IllegalArgumentException.class, converted);
-    Assertions.assertEquals("schema bad: Name is too long", converted.getMessage());
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertSame(e, converted.getCause());
+    String message = converted.getMessage();
+    assertTrue(message.contains("table ctas_test"), message);
+    assertTrue(message.contains("AccessDeniedException"), message);
+    assertTrue(message.contains("glue:CreateDatabase"), message);
+  }
+
+  @Test
+  public void testErrorMessageAloneIsSurfaced() {
+    GlueException e =
+        (GlueException)
+            GlueException.builder()
+                .awsErrorDetails(
+                    AwsErrorDetails.builder().errorMessage("throttled by Glue").build())
+                .build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(converted.getMessage().contains("schema db6a"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("throttled by Glue"), converted.getMessage());
+  }
+
+  @Test
+  public void testErrorCodeAloneIsSurfaced() {
+    GlueException e =
+        (GlueException)
+            GlueException.builder()
+                .awsErrorDetails(
+                    AwsErrorDetails.builder().errorCode("InternalServiceException").build())
+                .build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(
+        converted.getMessage().contains("[InternalServiceException]"), converted.getMessage());
+  }
+
+  @Test
+  public void testFallsBackToExceptionMessageWithoutAwsErrorDetails() {
+    GlueException e = (GlueException) GlueException.builder().message("connection reset").build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(converted.getMessage().contains("schema db6a"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("connection reset"), converted.getMessage());
+  }
+
+  @Test
+  public void testFallsBackWhenAwsErrorDetailsAreBlank() {
+    GlueException e =
+        (GlueException)
+            GlueException.builder()
+                .message("connection reset")
+                .awsErrorDetails(AwsErrorDetails.builder().errorCode("").errorMessage("").build())
+                .build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(converted.getMessage().contains("connection reset"), converted.getMessage());
+  }
+
+  @Test
+  public void testFallsBackToExceptionTypeWithoutAnyMessage() {
+    GlueException e = (GlueException) GlueException.builder().build();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema db6a");
+
+    assertTrue(converted.getMessage().contains("GlueException"), converted.getMessage());
+  }
+
+  @Test
+  public void testRecognisedExceptionsKeepTheirMapping() {
+    EntityNotFoundException notFound = EntityNotFoundException.builder().message("gone").build();
+    AlreadyExistsException exists = AlreadyExistsException.builder().message("dup").build();
+    InvalidInputException invalid = InvalidInputException.builder().message("bad name").build();
+
+    assertInstanceOf(
+        NoSuchSchemaException.class,
+        GlueExceptionConverter.toSchemaException(notFound, "schema db6a"));
+    assertInstanceOf(
+        SchemaAlreadyExistsException.class,
+        GlueExceptionConverter.toSchemaException(exists, "schema db6a"));
+    assertInstanceOf(
+        IllegalArgumentException.class,
+        GlueExceptionConverter.toSchemaException(invalid, "schema db6a"));
+
+    assertInstanceOf(
+        NoSuchTableException.class,
+        GlueExceptionConverter.toTableException(notFound, "table ctas_test"));
+    assertInstanceOf(
+        TableAlreadyExistsException.class,
+        GlueExceptionConverter.toTableException(exists, "table ctas_test"));
+    assertInstanceOf(
+        IllegalArgumentException.class,
+        GlueExceptionConverter.toTableException(invalid, "table ctas_test"));
   }
 }

@@ -616,8 +616,14 @@ public class TestCatalogWrapperLease {
 
     // The cache's removal listener retires the wrapper as well, asynchronously.
     Mockito.verify(failingWrapper, Mockito.atLeastOnce()).retire();
-    Assertions.assertEquals(
-        0, pool.size(), "a failing retirement must not keep the ClassLoader pool open");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () ->
+                Assertions.assertEquals(
+                    0,
+                    pool.size(),
+                    "a failing retirement must not keep the ClassLoader pool open"));
   }
 
   private Future<?> submitCloseAndAssertBlocked(ExecutorService executor)

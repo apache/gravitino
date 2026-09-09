@@ -36,6 +36,12 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -56,7 +62,9 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +73,21 @@ class TestIdpOperations extends JerseyTest {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
+
+  private static Config previousConfig;
+
+  @BeforeAll
+  static void installServiceAdminConfig() throws Exception {
+    previousConfig = GravitinoEnv.getInstance().config();
+    Config config = mock(Config.class);
+    when(config.get(Configs.SERVICE_ADMINS)).thenReturn(List.of("admin"));
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+  }
+
+  @AfterAll
+  static void restoreConfig() throws Exception {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+  }
 
   @BeforeEach
   void resetManager() {
@@ -82,6 +105,8 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
+    when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+        .thenReturn(new UserPrincipal("admin"));
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(IdpUserOperations.class);

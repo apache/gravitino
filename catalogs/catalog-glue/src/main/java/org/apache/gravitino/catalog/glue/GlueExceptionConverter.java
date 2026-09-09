@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.utils.ExceptionMessages;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
@@ -53,10 +55,9 @@ final class GlueExceptionConverter {
       return ExceptionMessages.illegalArgument(context, e);
     }
     if (e instanceof AccessDeniedException) {
-      return new ForbiddenException(
-          e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
-    return ExceptionMessages.wrap("Glue error: " + context, e);
+    return new RuntimeException("Glue error: " + context + ": " + awsErrorDetail(e), e);
   }
 
   /**
@@ -77,9 +78,34 @@ final class GlueExceptionConverter {
       return ExceptionMessages.illegalArgument(context, e);
     }
     if (e instanceof AccessDeniedException) {
-      return new ForbiddenException(
-          e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
+      return new ForbiddenException(e, "Glue error: %s: %s", context, awsErrorDetail(e));
     }
-    return ExceptionMessages.wrap("Glue error: " + context, e);
+    return new RuntimeException("Glue error: " + context + ": " + awsErrorDetail(e), e);
+  }
+
+  /**
+   * Renders the AWS-side detail of a Glue exception. AWS names the failing action and the resource
+   * there, which is what the caller needs to act on; the error code is prefixed so the failure can
+   * be classified at a glance.
+   *
+   * @param e the Glue exception to describe
+   * @return the AWS error code and message, or a best-effort description when they are unavailable
+   */
+  private static String awsErrorDetail(GlueException e) {
+    AwsErrorDetails details = e.awsErrorDetails();
+    if (details != null) {
+      String code = details.errorCode();
+      String message = details.errorMessage();
+      if (StringUtils.isNotBlank(code) && StringUtils.isNotBlank(message)) {
+        return "[" + code + "] " + message;
+      }
+      if (StringUtils.isNotBlank(message)) {
+        return message;
+      }
+      if (StringUtils.isNotBlank(code)) {
+        return "[" + code + "]";
+      }
+    }
+    return StringUtils.isNotBlank(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName();
   }
 }

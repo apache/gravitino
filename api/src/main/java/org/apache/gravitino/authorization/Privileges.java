@@ -195,6 +195,10 @@ public class Privileges {
       case CREATE_POLICY:
         return CreatePolicy.allow();
 
+        // Secrets
+      case VIEW_SECRET_PROVIDERS:
+        return ViewSecretProviders.allow();
+
         // Job template
       case REGISTER_JOB_TEMPLATE:
         return RegisterJobTemplate.allow();
@@ -322,6 +326,10 @@ public class Privileges {
         return ViewPolicy.deny();
       case CREATE_POLICY:
         return CreatePolicy.deny();
+
+        // Secrets
+      case VIEW_SECRET_PROVIDERS:
+        return ViewSecretProviders.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1353,6 +1361,38 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to list configured secrets providers. */
+  public static final class ViewSecretProviders extends GenericPrivilege<ViewSecretProviders> {
+
+    private static final ViewSecretProviders ALLOW_INSTANCE =
+        new ViewSecretProviders(Condition.ALLOW, Name.VIEW_SECRET_PROVIDERS);
+    private static final ViewSecretProviders DENY_INSTANCE =
+        new ViewSecretProviders(Condition.DENY, Name.VIEW_SECRET_PROVIDERS);
+
+    private ViewSecretProviders(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewSecretProviders allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewSecretProviders deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
     }
   }
 
