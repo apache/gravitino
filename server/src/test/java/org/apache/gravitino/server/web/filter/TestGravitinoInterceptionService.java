@@ -59,7 +59,11 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+<<<<<<< HEAD
 import org.apache.gravitino.server.web.rest.TableOperations;
+=======
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+>>>>>>> 96f257ecd ([#12921] fix(server): Authenticate secrets-provider discovery under metalake (#12940))
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
@@ -118,6 +122,15 @@ public class TestGravitinoInterceptionService {
   public void testViewOperationsIsRegisteredForInterception() {
     Descriptor descriptor = mock(Descriptor.class);
     when(descriptor.getImplementation()).thenReturn(ViewOperations.class.getName());
+
+    Assertions.assertTrue(
+        new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));
+  }
+
+  @Test
+  public void testSecretsProviderOperationsIsRegisteredForInterception() {
+    Descriptor descriptor = mock(Descriptor.class);
+    when(descriptor.getImplementation()).thenReturn(SecretsProviderOperations.class.getName());
 
     Assertions.assertTrue(
         new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));

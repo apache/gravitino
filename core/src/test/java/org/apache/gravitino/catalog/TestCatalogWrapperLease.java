@@ -595,8 +595,19 @@ public class TestCatalogWrapperLease {
 
     // The cache's removal listener retires the wrapper as well, asynchronously.
     Mockito.verify(failingWrapper, Mockito.atLeastOnce()).retire();
+<<<<<<< HEAD
     Assertions.assertTrue(wrapper.isRetired());
     Assertions.assertNull(wrapper.catalog());
+=======
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () ->
+                Assertions.assertEquals(
+                    0,
+                    pool.size(),
+                    "a failing retirement must not keep the ClassLoader pool open"));
+>>>>>>> 96f257ecd ([#12921] fix(server): Authenticate secrets-provider discovery under metalake (#12940))
   }
 
   private Future<?> submitCloseAndAssertBlocked(ExecutorService executor)

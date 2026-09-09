@@ -71,6 +71,7 @@ import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
@@ -117,6 +118,11 @@ public class GravitinoInterceptionService implements InterceptionService {
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
             MetadataObjectCredentialOperations.class.getName(),
+<<<<<<< HEAD
+=======
+            MetadataObjectSecretOperations.class.getName(),
+            SecretsProviderOperations.class.getName(),
+>>>>>>> 96f257ecd ([#12921] fix(server): Authenticate secrets-provider discovery under metalake (#12940))
             LineageOperations.class.getName()));
   }
 

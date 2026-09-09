@@ -49,6 +49,11 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+>>>>>>> 96f257ecd ([#12921] fix(server): Authenticate secrets-provider discovery under metalake (#12940))
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
@@ -94,7 +99,7 @@ public class GravitinoServer extends ResourceConfig {
   // JettyServer), outside GravitinoServer's own control entirely. See GH-12760.
   private static final ImmutableList<String> ROOT_MOUNTED_PATHS =
       ImmutableList.<String>builder()
-          .add("/configs", "/configs/secrets/providers")
+          .add("/configs")
           .addAll(JettyServer.METRICS_PATH_SPECS)
           .build();
 
@@ -173,6 +178,13 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.credentialOperationDispatcher())
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
+<<<<<<< HEAD
+=======
+            bind(gravitinoEnv.secretPropertyOperationDispatcher())
+                .to(SecretPropertyOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.secretProviderRegistry()).to(SecretProviderRegistry.class).ranked(1);
+>>>>>>> 96f257ecd ([#12921] fix(server): Authenticate secrets-provider discovery under metalake (#12940))
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(gravitinoEnv.functionDispatcher()).to(FunctionDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
@@ -241,9 +253,8 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     // Only API_ANY_PATH requires authentication today. /configs must stay open for the Web UI's
-    // pre-login OAuth bootstrap (see docs/gravitino-server-config.md); /configs/secrets/providers
-    // is open pending GH-12921, which will add an operator-controlled authorization gate for it
-    // specifically.
+    // pre-login OAuth bootstrap (see docs/gravitino-server-config.md). Secret provider discovery
+    // lives under /api/metalakes/{metalake}/secrets/providers (see GH-12921).
     server.addSystemFilters(API_ANY_PATH);
     if (server.isWebUiEnabled()) {
       server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
