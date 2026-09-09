@@ -37,7 +37,6 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -108,7 +107,8 @@ public class JobMetaService {
           JobTemplateMetaService.getInstance()
               .getJobTemplateIdByMetalakeIdAndName(metalakeId, jobEntity.jobTemplateName());
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalake(metalakeName, metalakeId),
+          () ->
+              MetalakeMetaService.getInstance().lockMetalakeForChildWrite(metalakeName, metalakeId),
           () ->
               JobTemplateMetaService.getInstance()
                   .lockTemplateForJobWrite(jobEntity.jobTemplateName(), templateId, metalakeId),
@@ -271,17 +271,5 @@ public class JobMetaService {
                     mapper.selectJobRunIdForUpdate(observed.jobRunId(), observed.metalakeId())),
         null,
         null);
-  }
-
-  private void lockMetalake(String name, Long metalakeId) {
-    OccWriteSupport.lockParentForChildWrite(
-        name,
-        Entity.EntityType.METALAKE,
-        () ->
-            SessionUtils.getWithoutCommit(
-                MetalakeMetaMapper.class,
-                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
-        null,
-        current -> Objects.equals(current.getMetalakeName(), name));
   }
 }

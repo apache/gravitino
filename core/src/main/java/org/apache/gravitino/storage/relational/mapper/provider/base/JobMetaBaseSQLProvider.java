@@ -214,6 +214,7 @@ public class JobMetaBaseSQLProvider {
         + " AND jrm.deleted_at = 0 AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
   }
+
   /**
    * Locks the active row for OCC identity validation.
    *
@@ -256,5 +257,18 @@ public class JobMetaBaseSQLProvider {
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0";
+  }
+
+  /**
+   * Builds a current read that locks a nonterminal job without joining the deleted template.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String selectNonterminalJobForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
+    return "SELECT job_run_id FROM "
+        + JobMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0"
+        + " AND job_run_status NOT IN ('SUCCEEDED', 'FAILED', 'CANCELLED') LIMIT 1 FOR UPDATE";
   }
 }

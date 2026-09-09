@@ -22,6 +22,7 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -30,6 +31,20 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionHandlers {
+
+  @Test
+  void testConcurrentActiveJobReturnsConflict() {
+    try (Response response =
+        ExceptionHandlers.handleJobTemplateException(
+            OperationType.DELETE,
+            "template",
+            "metalake",
+            new InUseException("Template has an active job"))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      Assertions.assertEquals(
+          InUseException.class.getSimpleName(), ((ErrorResponse) response.getEntity()).getType());
+    }
+  }
 
   @Test
   public void testMissingJobParentsReturnNotFound() {

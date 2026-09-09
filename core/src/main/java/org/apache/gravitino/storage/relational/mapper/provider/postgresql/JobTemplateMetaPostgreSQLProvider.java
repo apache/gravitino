@@ -79,6 +79,6 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
 
   @Override
   public String selectJobTemplateByIdForShare(Long jobTemplateId) {
-    return selectJobTemplateById(jobTemplateId) + " FOR SHARE";
+    return selectJobTemplateIdentityById() + " FOR SHARE";
   }
 }

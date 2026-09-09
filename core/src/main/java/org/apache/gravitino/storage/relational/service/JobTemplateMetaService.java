@@ -32,11 +32,11 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -92,7 +92,8 @@ public class JobTemplateMetaService {
           JobTemplatePO.initializeJobTemplatePO(jobTemplateEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalake(metalakeName, metalakeId),
+          () ->
+              MetalakeMetaService.getInstance().lockMetalakeForChildWrite(metalakeName, metalakeId),
           () ->
               SessionUtils.doWithoutCommit(
                   JobTemplateMetaMapper.class,
@@ -233,6 +234,17 @@ public class JobTemplateMetaService {
                             mapper.softDeleteJobTemplateById(
                                 observed.jobTemplateId(), observed.currentVersion())),
                 () -> writeFailure(ident, observed)),
+        () -> {
+          // The template CAS holds an exclusive lock, excluding new job inserts. A locking read
+          // also sees inserts committed while that CAS waited, even under REPEATABLE READ.
+          Long activeJob =
+              SessionUtils.getWithoutCommit(
+                  JobMetaMapper.class,
+                  mapper -> mapper.selectNonterminalJobForUpdate(observed.jobTemplateId()));
+          if (activeJob != null) {
+            throw new NonEmptyEntityException("Job template %s has active jobs", ident);
+          }
+        },
         () ->
             SessionUtils.doWithoutCommit(
                 JobMetaMapper.class,
@@ -266,17 +278,5 @@ public class JobTemplateMetaService {
         current ->
             Objects.equals(current.jobTemplateName(), observed.jobTemplateName())
                 && Objects.equals(current.metalakeId(), observed.metalakeId()));
-  }
-
-  private void lockMetalake(String name, Long metalakeId) {
-    OccWriteSupport.lockParentForChildWrite(
-        name,
-        Entity.EntityType.METALAKE,
-        () ->
-            SessionUtils.getWithoutCommit(
-                MetalakeMetaMapper.class,
-                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
-        null,
-        current -> Objects.equals(current.getMetalakeName(), name));
   }
 }

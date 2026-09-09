@@ -70,6 +70,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockManager;
@@ -386,13 +387,19 @@ public class TestJobManager {
   /** A failed root CAS must not remove files belonging to the still-active template. */
   @Test
   public void testDeleteJobTemplateConflictPreservesStaging() throws IOException {
-    doReturn(Collections.emptyList()).when(jobManager).listJobs(metalake, Optional.of("shell_job"));
+    JobEntity finishedJob = expiredJob();
+    doReturn(Collections.singletonList(finishedJob))
+        .when(jobManager)
+        .listJobs(metalake, Optional.of("shell_job"));
     doThrow(new OptimisticLockException("template changed"))
         .when(entityStore)
         .delete(
             NameIdentifierUtil.ofJobTemplate(metalake, "shell_job"),
             Entity.EntityType.JOB_TEMPLATE);
-    File directory = new File(testStagingDir, metalake + File.separator + "shell_job");
+    File directory =
+        new File(
+            testStagingDir,
+            metalake + File.separator + "shell_job" + File.separator + finishedJob.name());
     Assertions.assertTrue(directory.mkdirs() || directory.isDirectory());
     File artifact = new File(directory, "artifact");
     Assertions.assertTrue(artifact.createNewFile());
@@ -406,6 +413,55 @@ public class TestJobManager {
             Entity.EntityType.JOB_TEMPLATE);
     Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "shell_job"));
     Assertions.assertFalse(directory.exists());
+  }
+
+  /** A successful delete must preserve files belonging to a same-name replacement. */
+  @Test
+  public void testDeletePreservesReplacementStaging() throws IOException {
+    doReturn(Collections.emptyList()).when(jobManager).listJobs(metalake, Optional.of("shell_job"));
+    File replacementDir =
+        new File(
+            testStagingDir, metalake + File.separator + "shell_job" + File.separator + "job_999");
+    File replacementArtifact = new File(replacementDir, "new-job-artifact");
+    when(entityStore.delete(
+            NameIdentifierUtil.ofJobTemplate(metalake, "shell_job"),
+            Entity.EntityType.JOB_TEMPLATE))
+        .thenAnswer(
+            invocation -> {
+              // The database delete has committed. Another server recreates the template and
+              // stages a new job before this server resumes its filesystem cleanup.
+              Assertions.assertTrue(replacementDir.mkdirs());
+              Assertions.assertTrue(replacementArtifact.createNewFile());
+              return true;
+            });
+
+    Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "shell_job"));
+    Assertions.assertTrue(replacementArtifact.isFile(), "Replacement job files must survive");
+  }
+
+  /** A job inserted after the initial check must prevent deletion without losing staging files. */
+  @Test
+  public void testDeleteJobTemplateReportsConcurrentActiveJob() throws IOException {
+    JobEntity finishedJob = expiredJob();
+    doReturn(Collections.singletonList(finishedJob))
+        .when(jobManager)
+        .listJobs(metalake, Optional.of("shell_job"));
+    File directory =
+        new File(
+            testStagingDir,
+            metalake + File.separator + "shell_job" + File.separator + finishedJob.name());
+    Assertions.assertTrue(directory.mkdirs());
+    File artifact = new File(directory, "artifact");
+    Assertions.assertTrue(artifact.createNewFile());
+    doThrow(new NonEmptyEntityException("A job was inserted concurrently"))
+        .when(entityStore)
+        .delete(
+            NameIdentifierUtil.ofJobTemplate(metalake, "shell_job"),
+            Entity.EntityType.JOB_TEMPLATE);
+
+    Assertions.assertThrows(
+        InUseException.class, () -> jobManager.deleteJobTemplate(metalake, "shell_job"));
+    Assertions.assertTrue(artifact.isFile());
   }
 
   @Test

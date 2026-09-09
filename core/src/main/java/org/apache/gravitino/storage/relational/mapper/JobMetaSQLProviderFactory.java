@@ -99,6 +99,7 @@ public class JobMetaSQLProviderFactory {
       @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<Long> jobRunIds) {
     return getProvider().batchSelectJobByRunIds(metalakeName, jobRunIds);
   }
+
   /**
    * Locks the active row for OCC identity validation.
    *
@@ -131,5 +132,15 @@ public class JobMetaSQLProviderFactory {
    */
   public static String softDeleteJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
     return getProvider().softDeleteJobsByTemplateId(jobTemplateId);
+  }
+
+  /**
+   * Builds a locking lookup for a nonterminal job belonging to a template.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public static String selectNonterminalJobForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectNonterminalJobForUpdate(jobTemplateId);
   }
 }

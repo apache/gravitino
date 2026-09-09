@@ -102,4 +102,13 @@ public interface JobMetaMapper {
    */
   @UpdateProvider(type = JobMetaSQLProviderFactory.class, method = "softDeleteJobsByTemplateId")
   int softDeleteJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId);
+  /**
+   * Locks a nonterminal job belonging to the template using a current database read.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return a nonterminal job ID, or null if there are none
+   */
+  @Nullable
+  @SelectProvider(type = JobMetaSQLProviderFactory.class, method = "selectNonterminalJobForUpdate")
+  Long selectNonterminalJobForUpdate(@Param("jobTemplateId") Long jobTemplateId);
 }

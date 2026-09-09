@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
@@ -196,7 +197,7 @@ public class TestJobWriteOcc extends TestJDBCBackend {
     Assertions.assertThrows(NoSuchEntityException.class, () -> jobs.insertJob(candidate, false));
   }
 
-  /** A parent delete waits for an in-flight insertion and then removes the committed child. */
+  /** A parent delete waits for an in-flight insertion and preserves the committed active job. */
   @TestTemplate
   public void testTemplateDeleteWaitsForJobInsert() throws Exception {
     initialize();
@@ -205,12 +206,13 @@ public class TestJobWriteOcc extends TestJDBCBackend {
     Throwable failure =
         whileWriteUncommitted(
             () -> Assertions.assertDoesNotThrow(() -> jobs.insertJob(candidate, false)),
-            () -> Assertions.assertTrue(templates.deleteJobTemplate(templateIdent())));
-    Assertions.assertNull(failure);
-    Assertions.assertNull(
-        SessionUtils.getWithoutCommit(
-            JobMetaMapper.class,
-            mapper -> mapper.selectJobRunIdForUpdate(candidate.id(), metalakeId)));
+            () -> templates.deleteJobTemplate(templateIdent()));
+    Assertions.assertInstanceOf(NonEmptyEntityException.class, failure);
+    Assertions.assertEquals(template.id(), templatePO().jobTemplateId());
+    Assertions.assertEquals(1L, templatePO().currentVersion());
+    Assertions.assertEquals(
+        candidate.id(),
+        jobs.getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE, candidate.name())).id());
   }
 
   /** An identifier under another metalake cannot delete a job solely by its numeric run ID. */
@@ -249,13 +251,40 @@ public class TestJobWriteOcc extends TestJDBCBackend {
             JobMetaMapper.class, mapper -> mapper.selectJobRunIdForUpdate(job.id(), metalakeId)));
   }
 
+  /** All nonterminal states reject deletion and roll back the root CAS. */
+  @TestTemplate
+  public void testNonterminalJobsPreventTemplateDeletion() throws IOException {
+    initialize();
+    for (JobHandle.Status status :
+        new JobHandle.Status[] {
+          JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING
+        }) {
+      JobEntity active = TestJobTemplateMetaService.newJobEntity("template", status, METALAKE);
+      jobs.insertJob(active, false);
+      Assertions.assertThrows(
+          NonEmptyEntityException.class, () -> templates.deleteJobTemplate(templateIdent()));
+      Assertions.assertEquals(1L, templatePO().currentVersion());
+      Assertions.assertEquals(job.id(), jobs.getJobByIdentifier(jobIdent()).id());
+      Assertions.assertEquals(
+          active.id(),
+          jobs.getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE, active.name())).id());
+      Assertions.assertTrue(jobs.deleteJob(NameIdentifierUtil.ofJob(METALAKE, active.name())));
+    }
+    for (JobHandle.Status status :
+        new JobHandle.Status[] {JobHandle.Status.CANCELLED, JobHandle.Status.FAILED}) {
+      jobs.insertJob(TestJobTemplateMetaService.newJobEntity("template", status, METALAKE), false);
+    }
+    Assertions.assertTrue(templates.deleteJobTemplate(templateIdent()));
+    Assertions.assertTrue(jobs.listJobsByNamespace(NamespaceUtil.ofJob(METALAKE)).isEmpty());
+  }
+
   private void initialize() throws IOException {
     metalakeId = RandomIdGenerator.INSTANCE.nextId();
     backend.insert(createBaseMakeLake(metalakeId, METALAKE, AUDIT_INFO), false);
     template =
         TestJobTemplateMetaService.newShellJobTemplateEntity("template", "original", METALAKE);
     templates.insertJobTemplate(template, false);
-    job = TestJobTemplateMetaService.newJobEntity("template", JobHandle.Status.QUEUED, METALAKE);
+    job = TestJobTemplateMetaService.newJobEntity("template", JobHandle.Status.SUCCEEDED, METALAKE);
     jobs.insertJob(job, false);
   }
 

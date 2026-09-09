@@ -191,6 +191,7 @@ public class JobTemplateMetaBaseSQLProvider {
         + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
   }
+
   /**
    * Locks the active row for OCC identity validation.
    *
@@ -198,7 +199,7 @@ public class JobTemplateMetaBaseSQLProvider {
    * @return the SQL statement
    */
   public String selectJobTemplateByIdForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
-    return selectJobTemplateById(jobTemplateId) + " FOR UPDATE";
+    return selectJobTemplateIdentityById() + " FOR UPDATE";
   }
 
   /**
@@ -208,7 +209,7 @@ public class JobTemplateMetaBaseSQLProvider {
    * @return the SQL statement
    */
   public String selectJobTemplateByIdForShare(@Param("jobTemplateId") Long jobTemplateId) {
-    return selectJobTemplateById(jobTemplateId) + " LOCK IN SHARE MODE";
+    return selectJobTemplateIdentityById() + " LOCK IN SHARE MODE";
   }
 
   /**
@@ -225,5 +226,17 @@ public class JobTemplateMetaBaseSQLProvider {
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE job_template_id = #{jobTemplateId} AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /**
+   * Builds the identity projection used by locking reads.
+   *
+   * @return SQL selecting the active template's identity fields
+   */
+  protected String selectJobTemplateIdentityById() {
+    return "SELECT job_template_id AS jobTemplateId, job_template_name AS jobTemplateName,"
+        + " metalake_id AS metalakeId FROM "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0";
   }
 }
