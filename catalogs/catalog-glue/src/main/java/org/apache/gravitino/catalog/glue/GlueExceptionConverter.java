@@ -31,7 +31,8 @@ import software.amazon.awssdk.services.glue.model.InvalidInputException;
 /** Converts AWS Glue SDK exceptions to Gravitino exceptions. */
 final class GlueExceptionConverter {
 
-  private static final String NO_CREDENTIALS_MARKER = "Unable to load credentials";
+  private static final String NO_CREDENTIALS_MARKER =
+      "Unable to load credentials from any of the providers";
 
   private GlueExceptionConverter() {}
 
@@ -59,7 +60,7 @@ final class GlueExceptionConverter {
   static RuntimeException toCredentialException(SdkClientException e, String context) {
     return new RuntimeException(
         String.format(
-            "Failed to authenticate with AWS Glue while %s. No usable AWS credentials were "
+            "Failed to authenticate with AWS Glue for %s. No usable AWS credentials were "
                 + "found. Set both '%s' and '%s' catalog properties, or ensure the default AWS "
                 + "credential chain can resolve credentials.",
             context, GlueConstants.AWS_ACCESS_KEY_ID, GlueConstants.AWS_SECRET_ACCESS_KEY),

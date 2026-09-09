@@ -110,6 +110,10 @@ public final class GlueClientProvider {
     try {
       credentialsProvider.resolveCredentials();
     } catch (SdkClientException e) {
+      if (!GlueExceptionConverter.isCredentialFailure(e)) {
+        throw new IllegalArgumentException(
+            "Failed to resolve AWS credentials for the Glue catalog: " + e.getMessage(), e);
+      }
       throw new IllegalArgumentException(
           String.format(
               "No usable AWS credentials found for the Glue catalog. Set both '%s' and '%s' "
