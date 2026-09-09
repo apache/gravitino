@@ -186,9 +186,11 @@ public class ClassLoaderResourceCleanerUtils {
    * <p>The context ClassLoader is only one of the ways a thread can carry a catalog. A driver that
    * starts its own housekeeping thread, such as PostgreSQL's {@code LazyCleaner}, is running code
    * defined by the catalog's loader: the thread is a GC root, so its class alone keeps the loader
-   * alive no matter what its context ClassLoader says. The same holds for a task scheduled on a
-   * shared executor, such as the AWS SDK's idle-connection reaper, which is only identifiable from
-   * the classes on its stack.
+   * alive no matter what its context ClassLoader says.
+   *
+   * <p>Ownership has to be read from the thread itself, never from what it happens to be running: a
+   * request thread executing an operation on this very catalog is not the catalog's to stop, and
+   * interrupting it fails the request with "Thread was interrupted while waiting for lock".
    */
   @VisibleForTesting
   static boolean runningWithClassLoader(Thread thread, ClassLoader targetClassLoader) {
@@ -208,22 +210,6 @@ public class ClassLoaderResourceCleanerUtils {
       LOG.debug("Cannot read the runnable of thread {}", thread.getName(), e);
     }
 
-    // A pooled thread carries none of those references and still runs the catalog's code: an SDK's
-    // idle-connection reaper, for one, is scheduled on a shared executor. Its stack names it.
-    // The calling thread is skipped: cleanup itself runs catalog code and must not stop itself.
-    if (thread == Thread.currentThread()) {
-      return false;
-    }
-    for (StackTraceElement frame : thread.getStackTrace()) {
-      try {
-        Class<?> frameClass = Class.forName(frame.getClassName(), false, targetClassLoader);
-        if (frameClass.getClassLoader() == targetClassLoader) {
-          return true;
-        }
-      } catch (Throwable ignored) {
-        // The frame names a class this loader cannot see, so it is not the catalog's.
-      }
-    }
     return false;
   }
 

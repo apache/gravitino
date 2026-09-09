@@ -30,6 +30,7 @@ import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.Security;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class TestClassLoaderResourceCleanerUtils {
@@ -43,7 +44,13 @@ class TestClassLoaderResourceCleanerUtils {
   /** A Runnable the child loader can define, standing in for a driver's housekeeping task. */
   public static class LeakyTask implements Runnable {
     @Override
-    public void run() {}
+    public void run() {
+      try {
+        Thread.sleep(60_000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   private static URLClassLoader childLoaderOwning(Class<?> clazz) throws Exception {
@@ -118,6 +125,37 @@ class TestClassLoaderResourceCleanerUtils {
       assertFalse(
           ClassLoaderResourceCleanerUtils.runningWithClassLoader(
               new Thread(() -> {}, "unrelated"), child));
+    }
+  }
+
+  /**
+   * A thread that merely runs the catalog's code is not the catalog's to stop. A request thread
+   * serving an operation on the very catalog being dropped looks exactly like this, and
+   * interrupting it fails the request with "Thread was interrupted while waiting for lock".
+   */
+  @Test
+  void testRunningWithClassLoaderIgnoresAThreadOnlyExecutingTheLoadersCode() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(Leaky.class)) {
+      Runnable owned =
+          (Runnable)
+              child.loadClass(LeakyTask.class.getName()).getDeclaredConstructor().newInstance();
+      // The worker owns neither side: its class and its runnable are the server's, and it just
+      // happens to be executing the catalog's code, which is how a pooled request thread looks.
+      Thread worker = new Thread(() -> owned.run(), "pooled-worker");
+      worker.setDaemon(true);
+      worker.start();
+      try {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (worker.getState() != Thread.State.TIMED_WAITING && System.nanoTime() < deadline) {
+          Thread.sleep(10);
+        }
+        assertEquals(Thread.State.TIMED_WAITING, worker.getState());
+
+        assertFalse(ClassLoaderResourceCleanerUtils.runningWithClassLoader(worker, child));
+      } finally {
+        worker.interrupt();
+        worker.join(TimeUnit.SECONDS.toMillis(5));
+      }
     }
   }
 
