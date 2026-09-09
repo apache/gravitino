@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.iceberg.common.utils;
 
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.storage.GCSProperties;
+>>>>>>> 5c8f5bf9d ([#9418] fix(iceberg): inject GCS FileIO token from gcs-service-account-file (#12962))
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
@@ -310,6 +316,74 @@ public class TestIcebergCatalogUtil {
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsSkipsWhenTokenAlreadyPresent() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
+
+    IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties);
+
+    Assertions.assertEquals(
+        "existing-token", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsNoOpWithoutServiceAccountFile() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
+
+    IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties);
+
+    Assertions.assertNull(properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
+  }
+
+  @Test
+  void testApplyGcsServiceAccountCredentialsFailsWhenFileMissing() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(
+        GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gravitino-missing-gcs-key.json");
+
+    UncheckedIOException thrown =
+        Assertions.assertThrows(
+            UncheckedIOException.class,
+            () -> IcebergCatalogUtil.applyGcsServiceAccountCredentials(properties));
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"));
+  }
+
+  @Test
+  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenNoServiceAccountFile() {
+    IcebergConfig config = new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
+  }
+
+  @Test
+  void testWithGcsServiceAccountCredentialsReturnsSameConfigWhenTokenAlreadyPresent() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "existing-token");
+    IcebergConfig config = new IcebergConfig(properties);
+
+    Assertions.assertSame(config, IcebergCatalogUtil.withGcsServiceAccountCredentials(config));
+  }
+
+  @Test
+  void testApplyDefaultResolvingFileIOInjectsGcsToken() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.WAREHOUSE, "gs://bucket/warehouse");
+    properties.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs-key.json");
+
+    // Pre-set token so applyDefaultResolvingFileIO skips loading a real service account file.
+    properties.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN, "pre-set");
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        org.apache.iceberg.io.ResolvingFileIO.class.getName(),
+        properties.get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals("pre-set", properties.get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN));
   }
 
   @Test

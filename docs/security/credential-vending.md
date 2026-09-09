@@ -215,7 +215,55 @@ To protect credentials, all sensitive catalog properties (such as `s3-access-key
 
 ### Credential Vending REST API
 
+<<<<<<< HEAD
 Clients retrieve vended credentials from:
+=======
+### `gcs-token`
+
+Gravitino downscopes its own credentials using GCS [credential access boundaries](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials) and returns a token scoped to the table path.
+
+There is no role to assume. The identity is the service account in `gcs-service-account-file`, or the application default credentials when that is unset. Grant that service account **Storage Object User** (`roles/storage.objectUser`) on the warehouse bucket, or **Storage Object Viewer** for read-only access. Downscoping narrows from those permissions, so the vended token can never exceed what the service account itself holds.
+
+| Property                   | Description                              | Default value                       | Required |
+|----------------------------|------------------------------------------|-------------------------------------|----------|
+| `gcs-service-account-file` | The location of the GCS credential file. | GCS Application default credential. | No       |
+
+`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg `GCSFileIO` on the server (Gravitino injects `gcs.oauth2.token` at catalog load because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
+
+## Requesting Vended Credentials
+
+How a client asks depends on which interface it uses.
+
+### Over the IRC
+
+Credentials are vended only when the client asks for them. Spark, Flink, and other IRC clients ask with a header:
+
+```
+X-Iceberg-Access-Delegation: vended-credentials
+```
+
+In Spark, set it as a catalog config key:
+
+```properties
+spark.sql.catalog.{name}.header.X-Iceberg-Access-Delegation=vended-credentials
+```
+
+Trino asks with a catalog property instead, and sends the header for you:
+
+```properties
+iceberg.rest-catalog.vended-credentials-enabled=true
+```
+
+### Over the Gravitino REST Catalog API
+
+Hive, Glue, JDBC, Paimon, and Fileset catalogs are reached through the Gravitino REST catalog API, which has no delegation header. Credential properties are hidden from the catalog GET response, so clients fetch them from the Gravitino credential endpoint instead. It works for any metadata object:
+
+```
+GET /api/metalakes/{metalake}/objects/{type}/{full_name}/credentials
+```
+
+For a catalog, `{type}` is `catalog` and `{full_name}` is the catalog name:
+>>>>>>> 5c8f5bf9d ([#9418] fix(iceberg): inject GCS FileIO token from gcs-service-account-file (#12962))
 
 ```
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials

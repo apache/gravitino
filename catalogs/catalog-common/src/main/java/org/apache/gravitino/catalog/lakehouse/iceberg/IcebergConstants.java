@@ -77,6 +77,20 @@ public class IcebergConstants {
   public static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
       "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
 
+  /** Iceberg GCSFileIO OAuth2 access token property. */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
+
+  /** Iceberg GCSFileIO OAuth2 token expiry property (epoch millis). */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  /**
+   * Whether Iceberg GCSFileIO should refresh OAuth2 tokens via a credentials endpoint. Defaults to
+   * true in Iceberg; Gravitino disables it when minting a token from {@code
+   * gcs-service-account-file} because that path has no table credentials refresh endpoint.
+   */
+  public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED =
+      "gcs.oauth2.refresh-credentials-enabled";
+
   // Iceberg Table properties constants
 
   public static final String COMMENT = "comment";
