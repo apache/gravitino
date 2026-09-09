@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.EntityTag;
@@ -76,6 +78,18 @@ public class IcebergRESTUtils {
   public static final String SNAPSHOT_ALL = "all";
 
   public static final String SNAPSHOT_REFS = "refs";
+
+  /**
+   * Iceberg refresh-endpoint keys that may appear in {@link LoadTableResponse#config()}. Kept in
+   * sync with {@link CredentialPropertyUtils#buildRefreshProps}; they are not retained by {@link
+   * CredentialPropertyUtils#filterCredentialProperties}, so top-level config must drop them
+   * explicitly before IRC-local endpoints are re-applied.
+   */
+  private static final Set<String> REFRESH_CREDENTIALS_ENDPOINT_KEYS =
+      ImmutableSet.of(
+          "client.refresh-credentials-endpoint",
+          "gcs.oauth2.refresh-credentials-endpoint",
+          "adls.refresh-credentials-endpoint");
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -232,6 +246,95 @@ public class IcebergRESTUtils {
     return toRESTCredential(prefix, ImmutableMap.copyOf(filteredConfig));
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Rewrites credentials in a federated {@link LoadTableResponse} so their {@code
+   * refresh-credentials-endpoint} entries, including any flattened into {@code config}, point at
+   * this IRC instance instead of the upstream catalog.
+   *
+   * <p>Upstream refresh endpoints are removed from top-level {@code config} before IRC-local ones
+   * are re-applied, matching {@link #rewriteCredential}. Without that step a refresh URL that lived
+   * only in {@code config} (with tokens only in {@code storage-credentials}) would leak.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param upstream the load-table response returned by the upstream REST catalog
+   * @return a load-table response with IRC-local refresh endpoints
+   */
+  public static LoadTableResponse rewriteLoadTableCredentials(
+      String catalogName, TableIdentifier tableIdentifier, LoadTableResponse upstream) {
+    Map<String, String> config = new HashMap<>();
+    if (upstream.config() != null) {
+      config.putAll(upstream.config());
+    }
+    // filterCredentialProperties drops refresh endpoints from its return value but putAll does not
+    // remove keys already copied from upstream.config(). Drop them first so a refresh URL that
+    // lived only in config (tokens only in storage-credentials) cannot leak to clients.
+    config.keySet().removeAll(REFRESH_CREDENTIALS_ENDPOINT_KEYS);
+    Map<String, String> filteredCredentialProperties =
+        CredentialPropertyUtils.filterCredentialProperties(config);
+    config.putAll(filteredCredentialProperties);
+    config.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredCredentialProperties));
+
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(upstream.tableMetadata())
+            .addAllConfig(config);
+    if (upstream.credentials() != null) {
+      for (org.apache.iceberg.rest.credentials.Credential credential : upstream.credentials()) {
+        builder.addCredential(
+            rewriteCredential(
+                catalogName, tableIdentifier, credential.prefix(), credential.config()));
+      }
+    }
+    return builder.build();
+  }
+
+  /**
+   * Rewrites credentials in a {@link PlanTableScanResponse} so their {@code
+   * refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
+   * catalog. Returns the response unchanged when no credentials are present.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param response the scan plan response returned by the upstream REST catalog
+   * @return the scan plan response with IRC-local refresh endpoints on any credentials
+   */
+  @SuppressWarnings("deprecation")
+  public static PlanTableScanResponse rewriteScanPlanCredentials(
+      String catalogName, TableIdentifier tableIdentifier, PlanTableScanResponse response) {
+    if (response.credentials() == null || response.credentials().isEmpty()) {
+      return response;
+    }
+    List<org.apache.iceberg.rest.credentials.Credential> rewritten = new ArrayList<>();
+    for (org.apache.iceberg.rest.credentials.Credential cred : response.credentials()) {
+      rewritten.add(rewriteCredential(catalogName, tableIdentifier, cred.prefix(), cred.config()));
+    }
+    return copyWithCredentials(response, rewritten);
+  }
+
+  /**
+   * Copies a {@link PlanTableScanResponse} with replacement credentials.
+   *
+   * <p>TODO: Remove when PlanTableScanResponse supports a native copy/toBuilder method.
+   */
+  @SuppressWarnings("deprecation")
+  static PlanTableScanResponse copyWithCredentials(
+      PlanTableScanResponse response,
+      List<org.apache.iceberg.rest.credentials.Credential> credentials) {
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(response.planStatus())
+        .withPlanId(response.planId())
+        .withPlanTasks(response.planTasks())
+        .withFileScanTasks(response.fileScanTasks())
+        .withSpecsById(response.specsById())
+        .withErrorResponse(response.errorResponse())
+        .withCredentials(credentials)
+        .build();
+  }
+
+>>>>>>> c01319187 ([#12949] fix(iceberg-rest): Forward access-delegation header on federated loadTable (#12950))
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
   }
