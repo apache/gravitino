@@ -165,9 +165,13 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     Assertions.assertFalse(
         properties(ADMIN, id(VISIBLE_CATALOG, VISIBLE_SCHEMA)).containsKey(MARKER_PROPERTY));
 
-    // exist_ok is a create, not a modification, so the create privilege is enough for it.
+    // exist_ok returns the existing object's metadata, so the caller needs read privileges.
+    // WRITER has UseCatalog so catalog-level exist_ok is allowed.
     assertStatus(200, create(WRITER, VISIBLE_CATALOG, "exist_ok", Map.of()));
     Assertions.assertFalse(properties(ADMIN, VISIBLE_CATALOG).containsKey(MARKER_PROPERTY));
+
+    // WRITER lacks UseSchema on VISIBLE_SCHEMA, so schema-level exist_ok is denied.
+    assertStatus(403, create(WRITER, id(VISIBLE_CATALOG, VISIBLE_SCHEMA), "exist_ok", Map.of()));
 
     assertStatus(403, drop(WRITER, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), null, null));
     assertStatus(200, post(ADMIN, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), "exists"));

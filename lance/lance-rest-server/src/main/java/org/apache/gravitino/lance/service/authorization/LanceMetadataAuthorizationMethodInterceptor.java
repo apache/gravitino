@@ -151,14 +151,16 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Returns the handler that authorizes an overwrite of an existing object. The mode of a Lance
-   * create request travels in the request body or in a query parameter rather than in the request
-   * path, so which privileges a create needs cannot be expressed by the method annotation alone.
+   * Returns the handler that authorizes a create request whose mode affects an existing object.
+   *
+   * <p>The mode of a Lance create request travels in the request body or in a query parameter
+   * rather than in the request path, so which privileges a create needs cannot be expressed by the
+   * method annotation alone.
    *
    * @param method invoked protocol method
    * @param parameters invoked method parameters
    * @param args invoked method arguments
-   * @return the overwrite handler for a create request, empty for every other operation
+   * @return the handler for a create request, empty for every other operation
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
@@ -167,8 +169,12 @@ public class LanceMetadataAuthorizationMethodInterceptor
         isTableOperation(method)
             ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
             : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
+    String existOkExpression =
+        isTableOperation(method)
+            ? LanceAuthorizationExpressions.EXIST_OK_TABLE_AUTHORIZATION_EXPRESSION
+            : LanceAuthorizationExpressions.EXIST_OK_NAMESPACE_AUTHORIZATION_EXPRESSION;
     return createMode(parameters, args)
-        .map(mode -> new OverwriteAuthzHandler(mode, overwriteExpression));
+        .map(mode -> new CreateModeAuthzHandler(mode, overwriteExpression, existOkExpression));
   }
 
   @Override
@@ -200,60 +206,82 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Authorizes a create request whose mode overwrites an object that already exists.
+   * Authorizes a create request whose mode affects an existing object.
    *
    * <p>An overwrite replaces an existing namespace or table, so it is a modification rather than a
    * creation and is authorized against the modification expression for the invoked resource instead
    * of the create expression on the method. Without this, CREATE_CATALOG, CREATE_SCHEMA, or
    * CREATE_TABLE would escalate into permission to replace an object the caller does not own.
    *
+   * <p>The {@code exist_ok} mode returns the existing object's metadata (location, properties,
+   * schema) when the object already exists. That is a read of the object, so the caller must hold
+   * the same read privilege that a describe/probe would require. Without this check, a caller with
+   * only CREATE_TABLE could obtain metadata that DescribeTable would deny.
+   *
    * <p>The mode alone decides this, without probing whether the object exists: an existence probe
    * at authorization time would race with the create that follows it, and the required privilege
    * would then depend on that race.
    */
-  private static final class OverwriteAuthzHandler implements AuthorizationHandler {
+  private static final class CreateModeAuthzHandler implements AuthorizationHandler {
 
     private static final String OVERWRITE_MODE = "OVERWRITE";
+    private static final String EXIST_OK_MODE = "EXIST_OK";
 
     private final boolean overwrite;
-    private final String authorizationExpression;
+    private final boolean existOk;
+    private final String overwriteExpression;
+    private final String existOkExpression;
 
-    private OverwriteAuthzHandler(String mode, String authorizationExpression) {
+    private CreateModeAuthzHandler(
+        String mode, String overwriteExpression, String existOkExpression) {
       // Read the mode through the same normalization the create operation applies, so a token the
-      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
-      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
-      // would not match, and a caller holding only a create privilege could replace an object owned
-      // by somebody else.
-      this.overwrite = OVERWRITE_MODE.equals(CommonUtil.normalizeToken(mode));
-      this.authorizationExpression = authorizationExpression;
+      // operation will act on as an overwrite or exist_ok cannot be authorized as a plain create.
+      String normalized = CommonUtil.normalizeToken(mode);
+      this.overwrite = OVERWRITE_MODE.equals(normalized);
+      this.existOk = EXIST_OK_MODE.equals(normalized);
+      this.overwriteExpression = overwriteExpression;
+      this.existOkExpression = existOkExpression;
     }
 
     @Override
     public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-      if (!overwrite) {
-        return;
-      }
-
       Entity.EntityType entityType = deepestEntityType(nameIdentifierMap);
-      boolean authorized =
-          new AuthorizationExpressionEvaluator(authorizationExpression)
-              .evaluate(
-                  nameIdentifierMap,
-                  new HashMap<>(),
-                  new AuthorizationRequestContext(),
-                  Optional.of(entityType.name()));
-      if (!authorized) {
-        throw new ForbiddenException(
-            "User '%s' is not authorized to overwrite '%s'",
-            PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+      if (overwrite) {
+        boolean authorized =
+            new AuthorizationExpressionEvaluator(overwriteExpression)
+                .evaluate(
+                    nameIdentifierMap,
+                    new HashMap<>(),
+                    new AuthorizationRequestContext(),
+                    Optional.of(entityType.name()));
+        if (!authorized) {
+          throw new ForbiddenException(
+              "User '%s' is not authorized to overwrite '%s'",
+              PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+        }
+      }
+      if (existOk) {
+        boolean authorized =
+            new AuthorizationExpressionEvaluator(existOkExpression)
+                .evaluate(
+                    nameIdentifierMap,
+                    new HashMap<>(),
+                    new AuthorizationRequestContext(),
+                    Optional.of(entityType.name()));
+        if (!authorized) {
+          throw new ForbiddenException(
+              "User '%s' is not authorized to read existing metadata for '%s' in exist_ok mode",
+              PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+        }
       }
     }
 
     @Override
     public boolean authorizationCompleted() {
-      // An overwrite is fully authorized here, so the create expression on the method must not be
-      // evaluated afterwards. A create that does not overwrite falls through to it unchanged.
-      return overwrite;
+      // Both overwrite and exist_ok are fully authorized here, so the create expression on the
+      // method must not be evaluated afterwards. A plain create (neither flag set) falls through
+      // to it unchanged.
+      return overwrite || existOk;
     }
 
     private static Entity.EntityType deepestEntityType(

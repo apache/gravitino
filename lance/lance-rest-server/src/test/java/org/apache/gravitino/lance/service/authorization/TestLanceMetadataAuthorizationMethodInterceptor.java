@@ -190,6 +190,9 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
 
     // The same privileges that authorize a create must not authorize an overwrite, which replaces
     // the properties of a namespace the caller does not own.
+    // exist_ok now requires read privileges; CREATE_CATALOG alone is not enough.
+    // WRITER has both CREATE_CATALOG and USE_CATALOG, so catalog-level exist_ok is allowed
+    // because USE_CATALOG satisfies the CAN_ACCESS_METADATA expression.
     assertEquals(PROCEEDED, interceptor.invoke(createInvocation(CATALOG, "$", "exist_ok")));
     assertErrorResponse(
         interceptor.invoke(createInvocation(CATALOG, "$", "overwrite")), Response.Status.FORBIDDEN);
@@ -346,12 +349,74 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   void testCreateTablePrivilegeCannotOverwriteAnExistingTable() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
 
-    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "exist_ok")));
+    // exist_ok now requires read privileges (SELECT_TABLE or ownership) because it returns
+    // the existing table's metadata when the table already exists. CREATE_TABLE alone is
+    // no longer enough — a caller who can create but not read must not learn the table's
+    // location and properties through this path.
+    MethodInvocation existOk = createTableInvocation(tableId(), "exist_ok");
+    assertErrorResponse(interceptor.invoke(existOk), Response.Status.FORBIDDEN);
+    verify(existOk, never()).proceed();
+
     MethodInvocation overwrite = createTableInvocation(tableId(), "overwrite");
     assertErrorResponse(interceptor.invoke(overwrite), Response.Status.FORBIDDEN);
     verify(overwrite, never()).proceed();
     assertErrorResponse(
         interceptor.invoke(registerTableInvocation(tableId(), "OVERWRITE")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testExistOkRequiresReadPrivilegeForTables() throws Throwable {
+    // A caller with only CREATE_TABLE must not obtain existing table metadata via exist_ok.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation existOk = createTableInvocation(tableId(), "exist_ok");
+    assertErrorResponse(interceptor.invoke(existOk), Response.Status.FORBIDDEN);
+    verify(existOk, never()).proceed();
+
+    // A caller with SELECT_TABLE (read privilege) may use exist_ok to obtain metadata.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.SELECT_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "exist_ok")));
+
+    // MODIFY_TABLE also satisfies the read check (it implies table access).
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "exist_ok")));
+
+    // Ownership satisfies the read check.
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "exist_ok")));
+  }
+
+  @Test
+  void testExistOkRequiresReadPrivilegeForNamespaces() throws Throwable {
+    // A caller with only CREATE_SCHEMA (no USE_SCHEMA) must not obtain existing schema metadata.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+    MethodInvocation existOk = createInvocation(CATALOG + "$" + SCHEMA, "$", "exist_ok");
+    assertErrorResponse(interceptor.invoke(existOk), Response.Status.FORBIDDEN);
+    verify(existOk, never()).proceed();
+
+    // A caller with USE_SCHEMA (read privilege) may use exist_ok for a schema.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+    assertEquals(
+        PROCEEDED, interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "exist_ok")));
+
+    // Ownership satisfies the read check.
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.USE_CATALOG);
+    assertEquals(
+        PROCEEDED, interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "exist_ok")));
+  }
+
+  @Test
+  void testExistOkRejectsIdentifiersOfTheWrongDepth() throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.values());
+
+    // A catalog or schema identifier must not be authorized as a table exist_ok.
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG, "exist_ok")), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG + "$" + SCHEMA, "exist_ok")),
         Response.Status.FORBIDDEN);
   }
 
