@@ -22,13 +22,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { StopOutlined } from '@ant-design/icons'
-import { Flex, Input, Spin, Table, Tag, Typography, theme as antdTheme } from 'antd'
+import { Flex, Input, Spin, Table, Tag, Tooltip, Typography, theme as antdTheme } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
 import { useSearchParams } from 'next/navigation'
-import { useAppDispatch } from '@/lib/hooks/useStore'
-import { getPolicyDetails } from '@/lib/store/policies'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { getPolicyDetails, associatePolicy } from '@/lib/store/policies'
 import { getMetadataObjectsForPolicy } from '@/lib/store/metalakes'
 
 const { Title, Paragraph } = Typography
@@ -79,6 +79,19 @@ export default function MetadataObjectsForPolicyPage() {
     setSearch(value)
   }
 
+  const showDeleteConfirm = async object => {
+    await dispatch(
+      associatePolicy({
+        metalake: currentMetalake,
+        metadataObjectType: object.type,
+        metadataObjectFullName: object.fullName,
+        data: { policiesToRemove: [policy] }
+      })
+    )
+    const { payload: metaDatas } = await dispatch(getMetadataObjectsForPolicy({ metalake: currentMetalake, policy }))
+    setMetaDatas(metaDatas)
+  }
+
   const columns = useMemo(
     () => [
       {
@@ -94,6 +107,22 @@ export default function MetadataObjectsForPolicyPage() {
         title: 'Type',
         dataIndex: 'type',
         key: 'type'
+      },
+      {
+        title: 'Actions',
+        key: 'action',
+        width: 100,
+        render: (_, record) => {
+          return (
+            <div className='flex gap-2'>
+              <a>
+                <Tooltip title='Remove Associate'>
+                  <Icons.Delete className='size-4' onClick={() => showDeleteConfirm(record)} />
+                </Tooltip>
+              </a>
+            </div>
+          )
+        }
       }
     ],
     [currentMetalake, isLoading]

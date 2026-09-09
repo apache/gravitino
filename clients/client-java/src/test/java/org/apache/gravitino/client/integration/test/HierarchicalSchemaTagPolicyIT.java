@@ -18,18 +18,25 @@
  */
 package org.apache.gravitino.client.integration.test;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -195,6 +202,68 @@ public class HierarchicalSchemaTagPolicyIT extends BaseIT {
   }
 
   @Test
+  public void testPolicyInheritanceThroughHierarchicalSchema() {
+    Set<MetadataObject.Type> types =
+        ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA);
+    PolicyContent content = PolicyContents.custom(ImmutableMap.of("rule", "value"), types, null);
+
+    String catalogPolicy = GravitinoITUtils.genRandomName("h_catalog_policy");
+    String rootPolicy = GravitinoITUtils.genRandomName("h_root_policy");
+    String midPolicy = GravitinoITUtils.genRandomName("h_mid_policy");
+    String leafPolicy = GravitinoITUtils.genRandomName("h_leaf_policy");
+    for (String policy : new String[] {catalogPolicy, rootPolicy, midPolicy, leafPolicy}) {
+      metalake.createPolicy(policy, "custom", "comment", true, content);
+    }
+
+    catalog.supportsPolicies().associatePolicies(new String[] {catalogPolicy}, null);
+    catalog
+        .asSchemas()
+        .loadSchema(ROOT_A)
+        .supportsPolicies()
+        .associatePolicies(new String[] {rootPolicy}, null);
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_AB)
+        .supportsPolicies()
+        .associatePolicies(new String[] {midPolicy}, null);
+    Schema leafSchema = catalog.asSchemas().loadSchema(SCHEMA_ABC);
+    leafSchema.supportsPolicies().associatePolicies(new String[] {leafPolicy}, null);
+
+    Map<String, Boolean> inheritedByName = policyInheritanceByName(leafSchema.supportsPolicies());
+
+    Assertions.assertTrue(inheritedByName.containsKey(leafPolicy), "leaf policy should be present");
+    Assertions.assertTrue(
+        inheritedByName.containsKey(midPolicy),
+        "policy on intermediate schema A:B should be inherited");
+    Assertions.assertTrue(
+        inheritedByName.containsKey(rootPolicy), "policy on ancestor schema A should be inherited");
+    Assertions.assertTrue(
+        inheritedByName.containsKey(catalogPolicy), "catalog policy should be inherited");
+
+    Assertions.assertFalse(inheritedByName.get(leafPolicy));
+    Assertions.assertTrue(inheritedByName.get(midPolicy));
+    Assertions.assertTrue(inheritedByName.get(rootPolicy));
+    Assertions.assertTrue(inheritedByName.get(catalogPolicy));
+
+    // Clean up associations and policies so the test is repeatable.
+    catalog.supportsPolicies().associatePolicies(null, new String[] {catalogPolicy});
+    catalog
+        .asSchemas()
+        .loadSchema(ROOT_A)
+        .supportsPolicies()
+        .associatePolicies(null, new String[] {rootPolicy});
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_AB)
+        .supportsPolicies()
+        .associatePolicies(null, new String[] {midPolicy});
+    leafSchema.supportsPolicies().associatePolicies(null, new String[] {leafPolicy});
+    for (String policy : new String[] {catalogPolicy, rootPolicy, midPolicy, leafPolicy}) {
+      metalake.deletePolicy(policy);
+    }
+  }
+
+  @Test
   public void testTagInheritanceForTableAndColumnUnderHierarchicalSchema() {
     String catalogTag = GravitinoITUtils.genRandomName("ht_catalog_tag");
     String rootTag = GravitinoITUtils.genRandomName("ht_root_tag");
@@ -275,9 +344,97 @@ public class HierarchicalSchemaTagPolicyIT extends BaseIT {
     }
   }
 
+  @Test
+  public void testPolicyInheritanceForTableUnderHierarchicalSchema() {
+    Set<MetadataObject.Type> types =
+        ImmutableSet.of(
+            MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
+    PolicyContent content = PolicyContents.custom(ImmutableMap.of("rule", "value"), types, null);
+
+    String catalogPolicy = GravitinoITUtils.genRandomName("ht_catalog_policy");
+    String rootPolicy = GravitinoITUtils.genRandomName("ht_root_policy");
+    String midPolicy = GravitinoITUtils.genRandomName("ht_mid_policy");
+    String leafPolicy = GravitinoITUtils.genRandomName("ht_leaf_policy");
+    for (String policy : new String[] {catalogPolicy, rootPolicy, midPolicy, leafPolicy}) {
+      metalake.createPolicy(policy, "custom", "comment", true, content);
+    }
+
+    catalog.supportsPolicies().associatePolicies(new String[] {catalogPolicy}, null);
+    catalog
+        .asSchemas()
+        .loadSchema(ROOT_A)
+        .supportsPolicies()
+        .associatePolicies(new String[] {rootPolicy}, null);
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_AB)
+        .supportsPolicies()
+        .associatePolicies(new String[] {midPolicy}, null);
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_ABC)
+        .supportsPolicies()
+        .associatePolicies(new String[] {leafPolicy}, null);
+
+    // A table under the deepest schema A:B:C inherits policies through the whole chain.
+    Map<String, Boolean> tablePolicies =
+        policyInheritanceByName(
+            catalog
+                .asTableCatalog()
+                .loadTable(NameIdentifier.of(SCHEMA_ABC, LEAF_TABLE))
+                .supportsPolicies());
+    for (String policy : new String[] {catalogPolicy, rootPolicy, midPolicy, leafPolicy}) {
+      Assertions.assertTrue(
+          tablePolicies.containsKey(policy), policy + " should be inherited by the table");
+      Assertions.assertTrue(
+          tablePolicies.get(policy), policy + " on an ancestor must be marked inherited");
+    }
+
+    // A table under the intermediate schema A:B does not inherit the policy assigned only to the
+    // deeper sibling schema A:B:C.
+    Map<String, Boolean> midTablePolicies =
+        policyInheritanceByName(
+            catalog
+                .asTableCatalog()
+                .loadTable(NameIdentifier.of(SCHEMA_AB, MID_TABLE))
+                .supportsPolicies());
+    Assertions.assertTrue(midTablePolicies.containsKey(catalogPolicy));
+    Assertions.assertTrue(midTablePolicies.containsKey(rootPolicy));
+    Assertions.assertTrue(midTablePolicies.containsKey(midPolicy));
+    Assertions.assertFalse(
+        midTablePolicies.containsKey(leafPolicy),
+        "policy on A:B:C must not leak to a table under A:B");
+
+    // Clean up associations and policies so the test is repeatable.
+    catalog.supportsPolicies().associatePolicies(null, new String[] {catalogPolicy});
+    catalog
+        .asSchemas()
+        .loadSchema(ROOT_A)
+        .supportsPolicies()
+        .associatePolicies(null, new String[] {rootPolicy});
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_AB)
+        .supportsPolicies()
+        .associatePolicies(null, new String[] {midPolicy});
+    catalog
+        .asSchemas()
+        .loadSchema(SCHEMA_ABC)
+        .supportsPolicies()
+        .associatePolicies(null, new String[] {leafPolicy});
+    for (String policy : new String[] {catalogPolicy, rootPolicy, midPolicy, leafPolicy}) {
+      metalake.deletePolicy(policy);
+    }
+  }
+
   private static Map<String, Boolean> tagInheritanceByName(SupportsTags supportsTags) {
     return Stream.of(supportsTags.listTagsInfo())
         .collect(Collectors.toMap(tag -> tag.name(), tag -> tag.inherited().get()));
+  }
+
+  private static Map<String, Boolean> policyInheritanceByName(SupportsPolicies supportsPolicies) {
+    return Stream.of(supportsPolicies.listPolicyInfos())
+        .collect(Collectors.toMap(policy -> policy.name(), policy -> policy.inherited().get()));
   }
 
   private static Column columnByName(Table table, String columnName) {

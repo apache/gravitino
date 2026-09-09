@@ -216,6 +216,23 @@ class MockFilesetOperation(FilesetOperation):
 
 
 class MockPolicyOperation(PolicyOperation):
+    async def associate_policy_with_metadata(
+        self,
+        metadata_full_name: str,
+        metadata_type: str,
+        policies_to_add: list,
+        policies_to_remove: list,
+    ) -> str:
+        return (
+            f"associate_policy_with_metadata: {metadata_full_name}, {metadata_type}, "
+            f"{policies_to_add}, {policies_to_remove}"
+        )
+
+    async def get_policy_for_metadata(
+        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    ) -> str:
+        return f"get_policy_for_metadata: {metadata_full_name}, {metadata_type}, {policy_name}"
+
     async def list_policies_for_metadata(
         self, metadata_full_name: str, metadata_type: str
     ) -> str:

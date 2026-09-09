@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -131,6 +132,12 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   @Override
   public Policy getPolicy(String name) throws NoSuchPolicyException {
     return objectPolicyOperations.getPolicy(name);
+  }
+
+  @Override
+  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
+      throws PolicyAlreadyAssociatedException {
+    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 
   @Override

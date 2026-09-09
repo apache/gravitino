@@ -138,10 +138,9 @@ ${SPARK_HOME}/bin/spark-sql \
 
 Without `spark.hadoop.fs.defaultFS=file:///`, Spark reaches for `hdfs://localhost:9000` and fails.
 
-### Step 4: Configure a Compaction Policy Through a Tag
+### Step 4: Attach a Compaction Policy
 
-Creating the policy is not enough. Associate it with a tag, then assign that tag to the table. The
-service resolves the table's effective policies from its effective tags.
+Creating the policy is not enough. It has to be attached to the table, and the attachment is what the service reads.
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -157,25 +156,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "iceberg_compaction",
-    "comment": "Tables eligible for automatic compaction",
-    "properties": {}
-  }' \
-  http://localhost:8090/api/metalakes/test/tags
-
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '{"selector": {"type": "ALL_VALUES"}}' \
-  http://localhost:8090/api/metalakes/test/tags/iceberg_compaction/policies/iceberg_compaction_default
-
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '{"tagsToAdd": ["iceberg_compaction"]}' \
-  http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/tags
+  -d '{"policiesToAdd": ["iceberg_compaction_default"]}' \
+  http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies
 ```
 
-Confirm the derived policy before moving on:
+Confirm the attachment before moving on:
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
