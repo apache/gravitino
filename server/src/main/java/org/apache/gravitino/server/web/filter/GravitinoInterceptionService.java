@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
@@ -74,6 +75,7 @@ import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
@@ -122,6 +124,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             JobOperations.class.getName(),
             MetadataObjectCredentialOperations.class.getName(),
             MetadataObjectSecretOperations.class.getName(),
+            SecretsProviderOperations.class.getName(),
             LineageOperations.class.getName()));
   }
 
@@ -262,6 +265,9 @@ public class GravitinoInterceptionService implements InterceptionService {
           }
         }
         return methodInvocation.proceed();
+      } catch (IllegalNameIdentifierException ex) {
+        LOG.warn("Invalid metadata object identifier during authorization", ex);
+        return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (Exception ex) {
         String currentUser = PrincipalUtils.getCurrentUserName();
         String methodName = methodInvocation.getMethod().getName();

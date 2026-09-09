@@ -32,9 +32,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.SchemaDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -78,13 +76,6 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities, so
-    // the entity is stored under the normalized identifier. Normalize here too so ownership is
-    // attached to the identifiers the manager sees and ancestor probing matches stored names.
-    NameIdentifier normalizedIdent =
-        CapabilityHelpers.applyCapabilities(
-            ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
-
     // Serialize probe -> create -> owner-assignment on the catalog so concurrent hierarchical
     // creates cannot both claim a shared, newly-created ancestor (which would let the later create
     // overwrite the first creator's ownership). We lock the catalog node -- the same node the inner
@@ -92,8 +83,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     // deeper (branch-scoped) lock would hold the catalog node in READ mode and deadlock against
     // that inner WRITE acquisition.
     NameIdentifier catalogIdent =
-        NameIdentifierUtil.ofCatalog(
-            normalizedIdent.namespace().level(0), normalizedIdent.namespace().level(1));
+        NameIdentifierUtil.ofCatalog(ident.namespace().level(0), ident.namespace().level(1));
     return TreeLockUtils.doWithTreeLock(
         catalogIdent,
         LockType.WRITE,
@@ -102,7 +92,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
           // missing ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so
           // ownership is assigned only to schemas this request actually creates and a pre-existing
           // ancestor's owner is never overwritten.
-          List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
+          List<NameIdentifier> newAncestors = findMissingAncestors(ident);
 
           Schema schema =
               dispatcher.createSchema(ident, comment, properties, secretBindings, secretReferences);
@@ -118,11 +108,10 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
               ownedObjects.add(
                   NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
             }
-            ownedObjects.add(
-                NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
+            ownedObjects.add(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA));
             // All objects are SCHEMA-typed, so the batch path (single object type) is valid.
             ownerManager.setOwners(
-                normalizedIdent.namespace().level(0),
+                ident.namespace().level(0),
                 ownedObjects,
                 PrincipalUtils.getCurrentUserName(),
                 Owner.Type.USER);

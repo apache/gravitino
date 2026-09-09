@@ -82,6 +82,11 @@ public class PolicyTagRelSQLProviderFactory {
     return getProvider().softDeleteByMetalakeId(metalakeId);
   }
 
+  /** Delegates policy deletion cleanup. */
+  public static String softDeleteByPolicyId(@Param("policyId") Long policyId) {
+    return getProvider().softDeleteByPolicyId(policyId);
+  }
+
   /** Delegates tag deletion cleanup. */
   public static String softDeleteByTagId(@Param("tagId") Long tagId) {
     return getProvider().softDeleteByTagId(tagId);

@@ -199,6 +199,7 @@ public class TestSecurableObjects {
     Privilege manageUsers = Privileges.ManageUsers.allow();
     Privilege manageGroups = Privileges.ManageGroups.allow();
     Privilege manageGrants = Privileges.ManageGrants.allow();
+    Privilege viewSecretProviders = Privileges.ViewSecretProviders.allow();
     Privilege createModel = Privileges.RegisterModel.allow();
     Privilege createModelVersion = Privileges.LinkModelVersion.allow();
     Privilege useModel = Privileges.UseModel.allow();
@@ -373,6 +374,15 @@ public class TestSecurableObjects {
     Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.COLUMN));
+
+    Assertions.assertTrue(viewSecretProviders.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.COLUMN));
 
     // Test manager groups
     Assertions.assertTrue(manageGroups.canBindTo(MetadataObject.Type.METALAKE));

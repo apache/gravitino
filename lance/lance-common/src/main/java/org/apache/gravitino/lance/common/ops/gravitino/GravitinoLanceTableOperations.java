@@ -168,11 +168,11 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
-    // Parser column information.
+    // Reject unsupported record batches before any metadata or storage mutation.
     List<Column> columns = Lists.newArrayList();
     if (arrowStreamBody != null) {
       org.apache.arrow.vector.types.pojo.Schema schema =
-          ArrowUtils.parseArrowIpcStream(arrowStreamBody);
+          ArrowUtils.parseSchemaOnlyIpcStream(arrowStreamBody);
       columns = extractColumns(schema);
     }
 

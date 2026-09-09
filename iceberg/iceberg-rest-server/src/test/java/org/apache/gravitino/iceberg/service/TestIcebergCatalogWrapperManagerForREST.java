@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
@@ -187,6 +188,70 @@ public class TestIcebergCatalogWrapperManagerForREST {
           manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
       Assertions.assertNotSame(original, replacement);
     }
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosWithoutTokenExpiryUsesAccessEviction() {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(1);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosCapsByGcsTokenExpiry() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.HOURS.toMillis(1); // token valid for 1h
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(2);
+    long expected =
+        TimeUnit.MILLISECONDS.toNanos(
+            TimeUnit.HOURS.toMillis(1) - IcebergCatalogWrapperManager.GCS_TOKEN_REFRESH_BUFFER_MS);
+    Assertions.assertEquals(
+        expected,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(config, accessEvictionNanos, now));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosExpiresImmediatelyWhenPastRefreshDeadline() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.MINUTES.toMillis(2); // within 5-minute buffer
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    Assertions.assertEquals(
+        0L,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, TimeUnit.HOURS.toNanos(1), now));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosIgnoresInvalidExpiresAt() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                "not-a-number"));
+    long accessEvictionNanos = TimeUnit.MINUTES.toNanos(30);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
   }
 
   private static IcebergCatalogWrapperManager newManager() {

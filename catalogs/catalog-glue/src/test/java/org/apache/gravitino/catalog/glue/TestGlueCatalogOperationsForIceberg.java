@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,11 +48,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
+import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
 class TestGlueCatalogOperationsForIceberg {
 
@@ -193,6 +198,10 @@ class TestGlueCatalogOperationsForIceberg {
     GlueColumn[] cols = {
       GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(false).build()
     };
+    // The database declares no location either, so there is nothing to derive the location from.
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(
+            GetDatabaseResponse.builder().database(Database.builder().name(DB).build()).build());
 
     assertThrows(
         IllegalArgumentException.class,
@@ -303,6 +312,43 @@ class TestGlueCatalogOperationsForIceberg {
 
     verify(mockIcebergCatalog).buildTable(any(TableIdentifier.class), any(Schema.class));
     verify(mockBuilder).create();
+  }
+
+  /**
+   * Glue stores table_type as a free-form string and different writers use different casing, so the
+   * register-mode check must not treat a lower-case "iceberg" as an externally registered table.
+   */
+  @Test
+  void testAlterIcebergTableWithLowerCaseTableTypeRoutesToIcebergSdk() {
+    String newName = "ice1_renamed";
+    software.amazon.awssdk.services.glue.model.Table rawTable =
+        software.amazon.awssdk.services.glue.model.Table.builder()
+            .name(TABLE)
+            .parameters(Map.of(TABLE_TYPE_PARAM, "iceberg", "metadata_location", LOCATION))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+    software.amazon.awssdk.services.glue.model.Table renamedTable =
+        software.amazon.awssdk.services.glue.model.Table.builder()
+            .name(newName)
+            .parameters(Map.of(TABLE_TYPE_PARAM, "iceberg"))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(rawTable).build())
+        .thenReturn(GetTableResponse.builder().table(renamedTable).build());
+    when(mockIcebergCatalog.loadTable(TableIdentifier.of(DB, newName)))
+        .thenThrow(new RuntimeException("no iceberg metadata"));
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(GetPartitionsResponse.builder().build());
+
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
+    GlueTable result = ops.alterTable(ident, TableChange.rename(newName));
+
+    verify(mockIcebergCatalog)
+        .renameTable(TableIdentifier.of(DB, TABLE), TableIdentifier.of(DB, newName));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+    assertEquals(newName, result.name());
   }
 
   @Test

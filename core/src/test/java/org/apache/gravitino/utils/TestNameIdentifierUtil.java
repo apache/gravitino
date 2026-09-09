@@ -174,6 +174,30 @@ public class TestNameIdentifierUtil {
   }
 
   @Test
+  public void testRejectDottedMetadataObjectName() {
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    IllegalNameIdentifierException tableException =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(table, Entity.EntityType.TABLE));
+    assertEquals(
+        "The TABLE name 'sales.2024' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        tableException.getMessage());
+
+    NameIdentifier topic =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "orders.created.v1");
+    IllegalNameIdentifierException topicException =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(topic, Entity.EntityType.TOPIC));
+    assertEquals(
+        "The TOPIC name 'orders.created.v1' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        topicException.getMessage());
+  }
+
+  @Test
   void testOfUser() {
     String userName = "userA";
     String metalake = "demo_metalake";
