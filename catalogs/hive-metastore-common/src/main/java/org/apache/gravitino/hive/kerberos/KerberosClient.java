@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
@@ -111,7 +112,7 @@ public class KerberosClient implements java.io.Closeable {
 
       return proxyUser;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create proxy user for Kerberos Hive client", e);
+      throw ExceptionMessages.wrap("Failed to create proxy user for Kerberos Hive client", e);
     }
   }
 
