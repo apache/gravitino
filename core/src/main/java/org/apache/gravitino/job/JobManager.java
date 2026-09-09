@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -103,17 +104,52 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
+  private final Consumer<JobEntity> jobDeletionListener;
+
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
   @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
 
   public JobManager(Config config, EntityStore entityStore, IdGenerator idGenerator) {
-    this(config, entityStore, idGenerator, JobExecutorFactory.create(config));
+    this(config, entityStore, idGenerator, job -> {});
+  }
+
+  /**
+   * Creates a job manager that reports the jobs its staging directory cleanup deletes.
+   *
+   * <p>That cleanup is the only path that removes a job, and it runs on a scheduler rather than for
+   * a request, so it never passes through the dispatcher chain that turns operations into events.
+   * The listener is how an observer, such as an event bus, learns that a job is gone.
+   *
+   * @param config The configuration to read the staging directory settings from.
+   * @param entityStore The entity store holding the jobs.
+   * @param idGenerator The generator for new job identifiers.
+   * @param jobDeletionListener Called once per job the cleanup deletes, after the deletion. It is
+   *     called on the cleanup thread, so it should return promptly, and a failure in it is logged
+   *     and does not stop the cleanup.
+   */
+  public JobManager(
+      Config config,
+      EntityStore entityStore,
+      IdGenerator idGenerator,
+      Consumer<JobEntity> jobDeletionListener) {
+    this(config, entityStore, idGenerator, JobExecutorFactory.create(config), jobDeletionListener);
   }
 
   @VisibleForTesting
   JobManager(
       Config config, EntityStore entityStore, IdGenerator idGenerator, JobExecutor jobExecutor) {
+    this(config, entityStore, idGenerator, jobExecutor, job -> {});
+  }
+
+  @VisibleForTesting
+  JobManager(
+      Config config,
+      EntityStore entityStore,
+      IdGenerator idGenerator,
+      JobExecutor jobExecutor,
+      Consumer<JobEntity> jobDeletionListener) {
+    this.jobDeletionListener = jobDeletionListener;
     this.entityStore = entityStore;
     this.jobExecutor = jobExecutor;
     this.idGenerator = idGenerator;
@@ -784,6 +820,7 @@ public class JobManager implements JobOperationDispatcher {
             try {
               entityStore.delete(
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
+              notifyJobDeleted(job);
 
               String jobStagingPath =
                   stagingDir.getAbsolutePath()
@@ -797,6 +834,18 @@ public class JobManager implements JobOperationDispatcher {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }
           });
+    }
+  }
+
+  /**
+   * Reports one deleted job to the listener. The job is already gone from the store by this point,
+   * so a listener that fails must not stop the cleanup from reaching the remaining jobs.
+   */
+  private void notifyJobDeleted(JobEntity job) {
+    try {
+      jobDeletionListener.accept(job);
+    } catch (RuntimeException e) {
+      LOG.warn("Job deletion listener failed for job {}", job.name(), e);
     }
   }
 

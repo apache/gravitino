@@ -185,6 +185,7 @@ public enum OperationType {
   RUN_JOB,
   GET_JOB,
   CANCEL_JOB,
+  DELETE_JOB,
 
   // Statistics operations
   LIST_STATISTICS,

@@ -1186,6 +1186,42 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCleanUpStagingDirsNotifiesDeletionListener() throws IOException {
+    // The reaper is the only path that deletes a job, and it runs on a scheduler rather than for a
+    // request, so a listener is the only way an observer can learn the job is gone.
+    List<JobEntity> deleted = Lists.newArrayList();
+    JobManager manager =
+        Mockito.spy(new JobManager(config, entityStore, idGenerator, jobExecutor, deleted::add));
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    JobEntity finishedJob = newJobEntity("shell_job", JobHandle.Status.SUCCEEDED);
+    when(manager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(finishedJob));
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              Assertions.assertDoesNotThrow(() -> manager.cleanUpStagingDirs());
+              return !deleted.isEmpty();
+            });
+
+    Assertions.assertEquals(1, deleted.size());
+    Assertions.assertEquals(finishedJob.name(), deleted.get(0).name());
+  }
+
+  @Test
   public void testUpdateShellJobTemplateEntity() {
     String jobTemplateName = "old_shell_job";
     String jobTemplateComment = "An old shell job template";

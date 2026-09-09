@@ -95,6 +95,8 @@ import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
 import org.apache.gravitino.listener.ViewEventDispatcher;
+import org.apache.gravitino.listener.api.event.job.DeleteJobEvent;
+import org.apache.gravitino.listener.api.info.JobInfo;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -1029,7 +1031,19 @@ public class GravitinoEnv {
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(policyManager);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
 
-    JobManager jobManager = new JobManager(config, entityStore, idGenerator);
+    // The staging directory cleanup deletes jobs on its own schedule, below the dispatcher chain
+    // that turns operations into events, so it reports them here instead.
+    JobManager jobManager =
+        new JobManager(
+            config,
+            entityStore,
+            idGenerator,
+            job ->
+                eventBus.dispatchEvent(
+                    new DeleteJobEvent(
+                        DeleteJobEvent.SYSTEM_USER,
+                        job.namespace().level(0),
+                        JobInfo.fromJobEntity(job))));
     JobTemplateValidationDispatcher validationDispatcher =
         new JobTemplateValidationDispatcher(jobManager);
     this.internalJobOperationDispatcher = validationDispatcher;

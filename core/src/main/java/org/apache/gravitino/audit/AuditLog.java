@@ -470,6 +470,8 @@ public interface AuditLog {
 
     CANCEL_JOB,
 
+    DELETE_JOB,
+
     LIST_STATISTICS,
 
     LIST_PARTITION_STATISTICS,

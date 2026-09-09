@@ -168,6 +168,7 @@ public class CompatibilityUtils {
           .put(OperationType.RUN_JOB, Operation.RUN_JOB)
           .put(OperationType.GET_JOB, Operation.GET_JOB)
           .put(OperationType.CANCEL_JOB, Operation.CANCEL_JOB)
+          .put(OperationType.DELETE_JOB, Operation.DELETE_JOB)
           .put(OperationType.LIST_STATISTICS, Operation.LIST_STATISTICS)
           .put(OperationType.LIST_PARTITION_STATISTICS, Operation.LIST_PARTITION_STATISTICS)
           .put(OperationType.DROP_STATISTICS, Operation.DROP_STATISTICS)
