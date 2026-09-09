@@ -31,6 +31,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
@@ -38,8 +39,10 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.lance.LanceRESTService;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -57,6 +60,7 @@ public class LanceStandaloneCallerIdentityIT extends BaseIT {
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private LanceRESTService standalone;
   private GravitinoMetalake metalake;
+  @Nullable private GravitinoEnv standaloneEnv;
   private int port;
 
   @BeforeAll
@@ -79,9 +83,16 @@ public class LanceStandaloneCallerIdentityIT extends BaseIT {
     metalake.grantRolesToUser(List.of(ROLE), ALICE);
 
     port = RESTUtils.findAvailablePort(20000, 30000);
+    if (ITUtils.DEPLOY_TEST_MODE.equals(testMode)) {
+      // The deployed Gravitino server runs in another JVM. Initialize the local environment
+      // and authenticator just as the standalone Lance server entry point does.
+      standaloneEnv = GravitinoEnv.getInstance();
+      standaloneEnv.initializeBaseComponents(serverConfig);
+      ServerAuthenticator.getInstance().initialize(serverConfig);
+      standaloneEnv.start();
+    }
     standalone = new LanceRESTService();
-    // The Gravitino test server owns the process-wide authenticator. Standalone mode still uses
-    // its HTTP client and bypasses the auxiliary metadata authorization interceptors.
+    // In embedded mode, reuse the environment and authenticator owned by the Gravitino test server.
     standalone.serviceInit(
         Map.of(
             "httpPort",
@@ -108,7 +119,13 @@ public class LanceStandaloneCallerIdentityIT extends BaseIT {
         client.dropMetalake(METALAKE, true);
       }
     } finally {
-      super.stopIntegrationTest();
+      try {
+        if (standaloneEnv != null) {
+          standaloneEnv.shutdown();
+        }
+      } finally {
+        super.stopIntegrationTest();
+      }
     }
   }
 
