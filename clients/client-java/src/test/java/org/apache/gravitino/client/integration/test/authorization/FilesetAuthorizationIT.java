@@ -20,6 +20,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -43,6 +45,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -364,6 +367,64 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     NameIdentifier[] filesetsListNormalUser =
         filesetCatalogNormalUser.listFilesets(Namespace.of(SCHEMA));
     assertArrayEquals(new NameIdentifier[] {}, filesetsListNormalUser);
+  }
+
+  @Test
+  @Order(8)
+  public void testUseSecretPrivilegeForGetSecrets() {
+    String filesetName = "secret_fileset";
+    String secretKey = "access_token";
+    String secretValue = "plain-token-value";
+    NameIdentifier filesetIdent = NameIdentifier.of(SCHEMA, filesetName);
+    MetadataObject filesetObject =
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, filesetName), MetadataObject.Type.FILESET);
+
+    FilesetCatalog adminFilesetCatalog =
+        client.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    adminFilesetCatalog.createFileset(
+        filesetIdent,
+        "comment",
+        Fileset.Type.MANAGED,
+        storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_secret_fileset")),
+        ImmutableMap.of(secretKey, secretValue, "visible-key", "visible-value"));
+
+    // Metalake owner receives plaintext secrets.
+    Fileset ownerFileset = adminFilesetCatalog.loadFileset(filesetIdent);
+    assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, ownerFileset.properties().get(secretKey));
+    assertEquals(secretValue, ownerFileset.supportsSecrets().getSecrets().get(secretKey));
+
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role, filesetObject, ImmutableList.of(Privileges.ReadFileset.allow()));
+
+    FilesetCatalog normalFilesetCatalog =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    Fileset readableFileset = normalFilesetCatalog.loadFileset(filesetIdent);
+    assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, readableFileset.properties().get(secretKey));
+    assertEquals("visible-value", readableFileset.properties().get("visible-key"));
+
+    // Can load the object but lacks USE_SECRET → empty secrets (not ForbiddenException).
+    Map<String, String> secretsWithoutPrivilege = readableFileset.supportsSecrets().getSecrets();
+    assertTrue(secretsWithoutPrivilege.isEmpty());
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role, filesetObject, ImmutableList.of(Privileges.UseSecret.allow()));
+    assertEquals(
+        secretValue,
+        normalFilesetCatalog
+            .loadFileset(filesetIdent)
+            .supportsSecrets()
+            .getSecrets()
+            .get(secretKey));
+
+    // DENY_USE_SECRET overrides allow → empty again.
+    gravitinoMetalake.grantPrivilegesToRole(
+        role, filesetObject, ImmutableList.of(Privileges.UseSecret.deny()));
+    assertTrue(
+        normalFilesetCatalog.loadFileset(filesetIdent).supportsSecrets().getSecrets().isEmpty());
+
+    adminFilesetCatalog.dropFileset(filesetIdent);
   }
 
   private String defaultBaseLocation() {
