@@ -35,7 +35,7 @@ This exercises the three governance moments:
 
 ---
 
-## 1. Prerequisites
+## 1. Check prerequisites
 
 - A built Gravitino distribution. If you don't have one:
   ```bash
