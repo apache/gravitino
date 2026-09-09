@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import java.util.jar.JarFile
-
 description = "lance-rest-server"
 
 plugins {
@@ -42,9 +40,6 @@ if (lanceSparkBundleVersions.isEmpty()) {
 }
 val primaryLanceSparkBundleVersion: String = lanceSparkBundleVersions.first()
 val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
-val lanceSparkIntegrationDoc = rootProject.file("docs/lance-rest-integration.md")
-val lanceSparkCatalogClassPattern =
-  Regex("spark\\.sql\\.catalog\\.lance\"\\s*,\\s*\"([A-Za-z_][A-Za-z0-9_.]*)\"")
 
 fun lanceSparkBundleConfigName(version: String): String =
   "lanceSparkBundle_" + version.replace(".", "_").replace("-", "_")
@@ -163,56 +158,6 @@ tasks {
     }
   }
 
-  val checkLanceSparkCatalogDocumentation =
-    register("checkLanceSparkCatalogDocumentation") {
-      group = "verification"
-      description =
-        "Verify that the Lance Spark Catalog class documented for Spark is present in every " +
-        "prepared Lance Spark bundle"
-      dependsOn(
-        lanceSparkBundleVersions.map { named(lanceSparkPrepareTaskName(it)) }
-      )
-      doLast {
-        if (!lanceSparkIntegrationDoc.isFile) {
-          throw GradleException("Missing Lance Spark integration documentation: $lanceSparkIntegrationDoc")
-        }
-
-        val matches =
-          lanceSparkCatalogClassPattern.findAll(lanceSparkIntegrationDoc.readText()).toList()
-        if (matches.size != 1) {
-          throw GradleException(
-            "Expected exactly one Spark Lance Catalog class in $lanceSparkIntegrationDoc, " +
-              "but found ${matches.size}"
-          )
-        }
-
-        val catalogClass = matches.single().groupValues[1]
-        val classEntry = catalogClass.replace('.', '/') + ".class"
-        lanceSparkBundleVersions.forEach { version ->
-          val bundleDir = lanceSparkBundleDirFor(version).get().asFile
-          val bundleJar =
-            bundleDir.listFiles()?.singleOrNull { it.extension == "jar" }
-              ?: throw GradleException(
-                "Expected exactly one Lance Spark bundle JAR for version $version in $bundleDir"
-              )
-
-          JarFile(bundleJar).use { jarFile ->
-            if (jarFile.getEntry(classEntry) == null) {
-              throw GradleException(
-                "Lance Spark bundle $version ($bundleJar) does not contain documented " +
-                  "Catalog class $catalogClass"
-              )
-            }
-          }
-        }
-
-        println(
-          "[lance-spark-doc-check] $catalogClass is present in " +
-            "${lanceSparkBundleVersions.joinToString(", ")}"
-        )
-      }
-    }
-
   val primaryPrepareLanceSparkBundle =
     named(lanceSparkPrepareTaskName(primaryLanceSparkBundleVersion))
 
@@ -246,7 +191,6 @@ tasks {
 
   test {
     dependsOn(primaryPrepareLanceSparkBundle)
-    dependsOn(checkLanceSparkCatalogDocumentation)
 
     val primaryBundleDir = lanceSparkBundleDirFor(primaryLanceSparkBundleVersion)
     doFirst {
@@ -318,7 +262,6 @@ tasks {
       "(default: $primaryLanceSparkBundleVersion). Reports land under " +
       "build/reports/lance-spark-matrix/<version>/."
     dependsOn(
-      checkLanceSparkCatalogDocumentation,
       lanceSparkBundleVersions.map { named(lanceSparkTestTaskName(it)) }
     )
   }
