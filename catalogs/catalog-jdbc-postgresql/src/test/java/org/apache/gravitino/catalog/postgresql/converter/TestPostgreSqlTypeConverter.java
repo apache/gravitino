@@ -37,12 +37,12 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
-import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL2;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SMALLSERIAL;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
