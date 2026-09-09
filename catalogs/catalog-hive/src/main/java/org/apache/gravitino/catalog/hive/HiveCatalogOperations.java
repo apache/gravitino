@@ -492,7 +492,8 @@ public class HiveCatalogOperations
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
-      throw ExceptionMessages.wrap("Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
+      throw ExceptionMessages.wrap(
+          "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
   }
 

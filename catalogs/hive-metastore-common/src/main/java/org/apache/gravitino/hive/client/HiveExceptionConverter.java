@@ -193,7 +193,8 @@ public class HiveExceptionConverter {
       return new ConnectionFailedException(
           cause,
           "%s",
-          ExceptionMessages.withCause("Failed to connect to Hive Metastore: " + target.name(), cause));
+          ExceptionMessages.withCause(
+              "Failed to connect to Hive Metastore: " + target.name(), cause));
     }
 
     if (cause instanceof RuntimeException) {

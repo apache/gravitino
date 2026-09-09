@@ -154,8 +154,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       adminClient = AdminClient.create(adminClientConfig);
     } catch (KafkaException e) {
       if (e.getCause() instanceof ConfigException) {
-        throw ExceptionMessages.illegalArgument(
-            "Invalid configuration for Kafka AdminClient", e);
+        throw ExceptionMessages.illegalArgument("Invalid configuration for Kafka AdminClient", e);
       }
       throw ExceptionMessages.wrap("Failed to create Kafka AdminClient", e);
     }
@@ -294,8 +293,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
 
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
-        throw ExceptionMessages.illegalArgument(
-            "Invalid replication factor for topic " + ident, e);
+        throw ExceptionMessages.illegalArgument("Invalid replication factor for topic " + ident, e);
 
       } else if (e.getCause() instanceof InvalidConfigurationException) {
         throw ExceptionMessages.illegalArgument("Invalid properties for topic " + ident, e);
@@ -536,12 +534,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         throw ExceptionMessages.illegalArgument(
             "Failed to increase partition count for topic " + topicName, e);
       }
-      throw ExceptionMessages.wrap(
-          "Failed to increase partition count for topic " + topicName, e);
+      throw ExceptionMessages.wrap("Failed to increase partition count for topic " + topicName, e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw ExceptionMessages.wrap(
-          "Failed to increase partition count for topic " + topicName, e);
+      throw ExceptionMessages.wrap("Failed to increase partition count for topic " + topicName, e);
     }
   }
 
@@ -561,12 +557,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         throw ExceptionMessages.illegalArgument(
             "Failed to alter topic properties for topic " + topicName, e);
       }
-      throw ExceptionMessages.wrap(
-          "Failed to alter topic properties for topic " + topicName, e);
+      throw ExceptionMessages.wrap("Failed to alter topic properties for topic " + topicName, e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw ExceptionMessages.wrap(
-          "Failed to alter topic properties for topic " + topicName, e);
+      throw ExceptionMessages.wrap("Failed to alter topic properties for topic " + topicName, e);
     }
   }
 
@@ -607,7 +601,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         return;
       }
     } catch (IOException e) {
-      throw ExceptionMessages.wrap("Failed to check if schema " + defaultSchemaIdent + " exists", e);
+      throw ExceptionMessages.wrap(
+          "Failed to check if schema " + defaultSchemaIdent + " exists", e);
     }
 
     // Create the default schema

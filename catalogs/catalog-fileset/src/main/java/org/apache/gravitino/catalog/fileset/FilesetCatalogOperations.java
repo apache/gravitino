@@ -719,7 +719,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
     } catch (AlreadyExistsException aee) {
       // This is happened when renaming a fileset to an existing fileset name.
-      throw ExceptionMessages.wrap("Fileset with the same name " + ident.name() + " already exists", aee);
+      throw ExceptionMessages.wrap(
+          "Fileset with the same name " + ident.name() + " already exists", aee);
     } finally {
       if (!alterCommitted) {
         secretManager.rollbackSecrets(writtenSecretMaterials.get());
@@ -863,7 +864,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               }
 
             } catch (IOException ioe) {
-              throw ExceptionMessages.wrap("Failed to create schema " + ident + " location " + schemaPath, ioe);
+              throw ExceptionMessages.wrap(
+                  "Failed to create schema " + ident + " location " + schemaPath, ioe);
             }
           }
         });
@@ -1191,7 +1193,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           + locationName);
                 }
               } catch (IOException e) {
-                throw ExceptionMessages.wrap("Failed to check if fileset catalog location exists: " + v, e);
+                throw ExceptionMessages.wrap(
+                    "Failed to check if fileset catalog location exists: " + v, e);
               }
             }
 

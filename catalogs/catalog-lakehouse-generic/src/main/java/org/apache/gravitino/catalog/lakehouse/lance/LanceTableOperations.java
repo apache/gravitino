@@ -811,7 +811,8 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
-      throw ExceptionMessages.wrap("Failed to handle alterations to Lance dataset at location " + location, e);
+      throw ExceptionMessages.wrap(
+          "Failed to handle alterations to Lance dataset at location " + location, e);
     }
   }
 

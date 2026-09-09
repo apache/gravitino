@@ -53,7 +53,8 @@ final class GlueExceptionConverter {
       return ExceptionMessages.illegalArgument(context, e);
     }
     if (e instanceof AccessDeniedException) {
-      return new ForbiddenException(e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
+      return new ForbiddenException(
+          e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
     }
     return ExceptionMessages.wrap("Glue error: " + context, e);
   }
@@ -76,7 +77,8 @@ final class GlueExceptionConverter {
       return ExceptionMessages.illegalArgument(context, e);
     }
     if (e instanceof AccessDeniedException) {
-      return new ForbiddenException(e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
+      return new ForbiddenException(
+          e, "%s", ExceptionMessages.withCause("Glue error: " + context, e));
     }
     return ExceptionMessages.wrap("Glue error: " + context, e);
   }

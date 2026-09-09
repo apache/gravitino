@@ -34,8 +34,7 @@ public class TestGlueExceptionConverter {
             .message("User is not authorized to perform glue:CreateDatabase")
             .build();
 
-    RuntimeException converted =
-        GlueExceptionConverter.toSchemaException(cause, "schema drop_me");
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "schema drop_me");
 
     Assertions.assertEquals(
         "Glue error: schema drop_me: User is not authorized to perform glue:CreateDatabase",
@@ -51,15 +50,15 @@ public class TestGlueExceptionConverter {
                 "User: arn:aws:iam::123:user/a is not authorized to perform: glue:CreateDatabase")
             .build();
 
-    RuntimeException converted =
-        GlueExceptionConverter.toTableException(cause, "table ctas_test");
+    RuntimeException converted = GlueExceptionConverter.toTableException(cause, "table ctas_test");
 
     Assertions.assertInstanceOf(ForbiddenException.class, converted);
     Assertions.assertTrue(
         converted
             .getMessage()
-            .contains("User: arn:aws:iam::123:user/a is not authorized to perform:"
-                + " glue:CreateDatabase"));
+            .contains(
+                "User: arn:aws:iam::123:user/a is not authorized to perform:"
+                    + " glue:CreateDatabase"));
   }
 
   @Test
@@ -67,8 +66,7 @@ public class TestGlueExceptionConverter {
     InvalidInputException cause =
         InvalidInputException.builder().message("Name is too long").build();
 
-    RuntimeException converted =
-        GlueExceptionConverter.toSchemaException(cause, "schema bad");
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "schema bad");
 
     Assertions.assertInstanceOf(IllegalArgumentException.class, converted);
     Assertions.assertEquals("schema bad: Name is too long", converted.getMessage());
