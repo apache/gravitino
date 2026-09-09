@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -297,10 +299,17 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-    return objectPolicyResolver.resolve(metalake, metadataObject);
+    Map<Long, PolicyEntity> policiesById = new LinkedHashMap<>();
+    Arrays.stream(listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject))
+        .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
+    Arrays.stream(objectPolicyResolver.resolve(metalake, metadataObject))
+        .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
+    return policiesById.values().toArray(new PolicyEntity[0]);
   }
 
   @Override
@@ -393,6 +402,35 @@ public class PolicyManager implements PolicyDispatcher {
       throw new NoSuchMetadataObjectException(
           e, "Failed to get policy for metadata object %s due to not found", metadataObject);
     }
+  }
+
+  private PolicyEntity[] listDirectPoliciesForMetadataObject(
+      NameIdentifier entityIdent, Entity.EntityType entityType, MetadataObject metadataObject) {
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return entityStore
+                .relationOperations()
+                .listEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+                    entityIdent,
+                    entityType,
+                    true /* allFields */)
+                .stream()
+                .map(entity -> (PolicyEntity) entity)
+                .toArray(PolicyEntity[]::new);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchMetadataObjectException(
+                e,
+                "Failed to list policies for metadata object %s due to not found",
+                metadataObject);
+          } catch (IOException e) {
+            LOG.error("Failed to list policies for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {

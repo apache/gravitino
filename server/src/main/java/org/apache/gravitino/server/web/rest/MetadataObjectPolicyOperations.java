@@ -22,19 +22,24 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -74,6 +79,7 @@ public class MetadataObjectPolicyOperations {
   }
 
   @Deprecated
+  @GET
   @Path("{policy}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -174,32 +180,48 @@ public class MetadataObjectPolicyOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            PolicyEntity[] policies =
+            Set<PolicyDTO> policies = Sets.newHashSet();
+            PolicyEntity[] nonInheritedPolicies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
-            policies =
+            nonInheritedPolicies =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.POLICY,
-                    policies,
+                    nonInheritedPolicies,
                     (policyEntity -> NameIdentifierUtil.ofPolicy(metalake, policyEntity.name())));
+            if (ArrayUtils.isNotEmpty(nonInheritedPolicies)) {
+              Collections.addAll(
+                  policies,
+                  Arrays.stream(nonInheritedPolicies)
+                      .map(t -> PolicyOperations.toDTO(t, Optional.of(false)))
+                      .toArray(PolicyDTO[]::new));
+            }
+
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
+              PolicyEntity[] inheritedPolicies =
+                  policyDispatcher.listPolicyInfosForMetadataObject(metalake, parentObject);
+              if (ArrayUtils.isNotEmpty(inheritedPolicies)) {
+                Collections.addAll(
+                    policies,
+                    Arrays.stream(inheritedPolicies)
+                        .map(t -> PolicyOperations.toDTO(t, Optional.of(true)))
+                        .toArray(PolicyDTO[]::new));
+              }
+            }
 
             if (verbose) {
-              PolicyDTO[] policyDTOs =
-                  Arrays.stream(policies)
-                      .map(policy -> PolicyOperations.toDTO(policy, Optional.empty()))
-                      .toArray(PolicyDTO[]::new);
               LOG.info(
                   "List {} policies info for object type: {}, full name: {} under metalake: {}",
-                  policyDTOs.length,
+                  policies.size(),
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyListResponse(policyDTOs));
+              return Utils.ok(new PolicyListResponse(policies.toArray(new PolicyDTO[0])));
 
             } else {
-              String[] policyNames =
-                  Arrays.stream(policies).map(PolicyEntity::name).toArray(String[]::new);
+              String[] policyNames = policies.stream().map(PolicyDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} policies for object type: {}, full name: {} under metalake: {}",
@@ -217,6 +239,7 @@ public class MetadataObjectPolicyOperations {
   }
 
   @Deprecated
+  @POST
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-policies", absolute = true)
