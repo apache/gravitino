@@ -408,8 +408,12 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     Map<String, String> secretsWithoutPrivilege = readableFileset.supportsSecrets().getSecrets();
     assertTrue(secretsWithoutPrivilege.isEmpty());
 
+    // Grant ALLOW on schema (parent). Same securable object cannot hold both ALLOW and DENY
+    // for the same privilege name — mirror TableAuthorizationIT's parent-allow / child-deny.
+    MetadataObject schemaObject =
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA);
     gravitinoMetalake.grantPrivilegesToRole(
-        role, filesetObject, ImmutableList.of(Privileges.UseSecret.allow()));
+        role, schemaObject, ImmutableList.of(Privileges.UseSecret.allow()));
     assertEquals(
         secretValue,
         normalFilesetCatalog
@@ -418,12 +422,18 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
             .getSecrets()
             .get(secretKey));
 
-    // DENY_USE_SECRET overrides allow → empty again.
+    // DENY on the fileset overrides schema-level allow → empty again.
     gravitinoMetalake.grantPrivilegesToRole(
         role, filesetObject, ImmutableList.of(Privileges.UseSecret.deny()));
     assertTrue(
         normalFilesetCatalog.loadFileset(filesetIdent).supportsSecrets().getSecrets().isEmpty());
 
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role, schemaObject, ImmutableSet.of(Privileges.UseSecret.allow()));
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        filesetObject,
+        ImmutableSet.of(Privileges.ReadFileset.allow(), Privileges.UseSecret.deny()));
     adminFilesetCatalog.dropFileset(filesetIdent);
   }
 
