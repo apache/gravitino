@@ -252,6 +252,8 @@ Because each call carries its own metalake, one server instance can serve severa
 
 Use the `list_metalakes` tool to discover which metalakes a caller may use. It is the one tool that does not need a metalake, so it works on a server started with no `--metalake` at all.
 
+The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) shipped their own `metalake_name` argument before metalake selection was unified. It is still accepted as a deprecated alias for `metalake`, so existing callers keep working; passing both with different values is rejected. New callers should use `metalake`.
+
 Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
 
 ### Examples

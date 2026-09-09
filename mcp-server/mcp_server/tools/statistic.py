@@ -36,7 +36,7 @@ def load_statistic_tools(mcp: FastMCP):
         Args:
             ctx (Context): The request context.
             metadata_type (str): The type of metadata (e.g., table, column). For
-                more, please refer to too 'metadata_type_to_fullname_formats'
+                more, please refer to the tool 'metadata_type_to_fullname_formats'
             metadata_fullname (str): The full name of the metadata object. For
                 more, please refer to tool 'metadata_type_to_fullname_formats'.
 

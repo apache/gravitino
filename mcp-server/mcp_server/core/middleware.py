@@ -27,6 +27,10 @@ from fastmcp.tools.base import Tool, ToolResult
 
 from mcp_server.core.context import (
     METALAKE_ARGUMENT,
+    MISSING_METALAKE,
+    InvalidMetalakeArgument,
+    begin_request_clients,
+    release_request_clients,
     reset_request_metalake,
     set_request_metalake,
 )
@@ -38,6 +42,15 @@ from mcp_server.core.context import (
 # Gravitino. A tool missing from this set only gets a harmless no-op argument.
 TOOLS_WITHOUT_METALAKE = frozenset(
     {"list_metalakes", "metadata_type_to_fullname_formats"}
+)
+
+# Tools that shipped their own `metalake_name` argument before metalake
+# selection was unified (v1.0.0). It is still accepted as a deprecated alias so
+# existing callers and clients holding a cached schema keep working, but it is
+# no longer advertised: new callers see only `metalake`.
+DEPRECATED_METALAKE_NAME_ARGUMENT = "metalake_name"
+_TOOLS_WITH_METALAKE_NAME_ALIAS = frozenset(
+    {"list_statistics_for_metadata", "list_statistics_for_partition"}
 )
 
 _METALAKE_ARGUMENT_DESCRIPTION = (
@@ -66,6 +79,31 @@ def _schema_with_metalake(parameters: Dict[str, Any]) -> Dict[str, Any]:
     }
     schema["properties"] = properties
     return schema
+
+
+def _apply_metalake_name_alias(tool_name, arguments, metalake):
+    """Fold a legacy ``metalake_name`` argument into the shared metalake.
+
+    Returns the metalake to publish: the alias when only it was given, the
+    canonical argument otherwise, or a rejection when a call supplies both
+    with different values - silently picking one could send a write to the
+    wrong tenant.
+    """
+    if tool_name not in _TOOLS_WITH_METALAKE_NAME_ALIAS or not isinstance(
+        arguments, dict
+    ):
+        return metalake
+    alias = arguments.pop(DEPRECATED_METALAKE_NAME_ARGUMENT, MISSING_METALAKE)
+    if alias is MISSING_METALAKE:
+        return metalake
+    if metalake is not MISSING_METALAKE and metalake != alias:
+        return InvalidMetalakeArgument(
+            f"'{METALAKE_ARGUMENT}' and the deprecated "
+            f"'{DEPRECATED_METALAKE_NAME_ARGUMENT}' were both given with "
+            f"different values ({metalake!r} and {alias!r}). Pass only "
+            f"'{METALAKE_ARGUMENT}'."
+        )
+    return alias
 
 
 class MetalakeArgumentMiddleware(Middleware):
@@ -106,16 +144,28 @@ class MetalakeArgumentMiddleware(Middleware):
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
         arguments = context.message.arguments
-        # Popped so the tool function never sees an argument it cannot accept.
+        # Popped so the tool function never sees an argument it cannot accept,
+        # and passed on verbatim: popping it here removes it from FastMCP's own
+        # schema validation, so _resolve_metalake() has to be able to tell an
+        # omitted argument from an explicitly supplied bad one.
         metalake = (
-            arguments.pop(METALAKE_ARGUMENT, "")
+            arguments.pop(METALAKE_ARGUMENT, MISSING_METALAKE)
             if isinstance(arguments, dict)
-            else ""
+            else MISSING_METALAKE
+        )
+        metalake = _apply_metalake_name_alias(
+            context.message.name if context.message else "",
+            arguments,
+            metalake,
         )
         token = set_request_metalake(metalake)
+        clients_token = begin_request_clients()
         try:
             return await call_next(context)
         finally:
+            # Release before the metalake reset so a client evicted while this
+            # call was running is closed now rather than leaking.
+            release_request_clients(clients_token)
             # Without this the metalake would leak into the next call served on
             # this context, turning per-call plumbing into implicit state.
             reset_request_metalake(token)

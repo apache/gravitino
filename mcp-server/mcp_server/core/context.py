@@ -20,6 +20,7 @@ import logging
 import re
 from collections import OrderedDict
 from contextvars import ContextVar
+from typing import Any
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.oauth import RefreshableBearerAuth
@@ -58,11 +59,58 @@ _CANONICAL_AUTH_SCHEMES = {
 # it from the incoming arguments, and publishes it on _REQUEST_METALAKE below.
 METALAKE_ARGUMENT = "metalake"
 
-# The metalake named by the tool call currently being served, or "" when the
-# call named none. Scoped to a single tool invocation (the middleware resets it
-# in a finally block), so this is request plumbing, not session state: nothing
-# is remembered between calls and no state is shared between server replicas.
-_REQUEST_METALAKE: ContextVar[str] = ContextVar("request_metalake", default="")
+# Sentinel for "the call did not pass the argument at all", so an explicitly
+# supplied bad value is never mistaken for an omitted one.
+MISSING_METALAKE = object()
+
+
+class InvalidMetalakeArgument:
+    """An argument the middleware rejected, carrying the reason to report.
+
+    The middleware runs outside the error-handling and audit middleware, so it
+    cannot raise directly without bypassing both. It publishes this instead and
+    _resolve_metalake() raises inside them, before any REST call is made.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+
+# The metalake argument of the tool call currently being served, exactly as the
+# client sent it, or MISSING_METALAKE when it sent none. Held raw rather than
+# validated so that _resolve_metalake() - which runs inside the error-handling
+# and audit middleware - is what rejects a bad value; validating in the
+# outermost middleware would bypass both. Scoped to a single tool invocation
+# (the middleware resets it in a finally block), so this is request plumbing,
+# not session state: nothing is remembered between calls and no state is
+# shared between server replicas.
+_REQUEST_METALAKE: ContextVar[Any] = ContextVar(
+    "request_metalake", default=MISSING_METALAKE
+)
+
+# Clients handed out during the tool call currently being served, as
+# (context, client) pairs. A client evicted from the cache while it is still
+# serving a call must not have its connection pool closed underneath that call,
+# so eviction defers the close until the last borrower releases it. None when
+# no call is in flight (lifespan setup, direct unit tests), in which case
+# nothing is tracked and eviction closes immediately as before.
+_BORROWED_CLIENTS: ContextVar[Any] = ContextVar(
+    "borrowed_clients", default=None
+)
+
+
+def begin_request_clients():
+    """Start tracking the clients this tool call borrows."""
+    return _BORROWED_CLIENTS.set([])
+
+
+def release_request_clients(token) -> None:
+    """Release every client this tool call borrowed, closing evicted ones."""
+    borrowed = _BORROWED_CLIENTS.get() or []
+    _BORROWED_CLIENTS.reset(token)
+    for owner, client in borrowed:
+        # pylint: disable=protected-access
+        owner._release_client(client)
 
 
 class ServiceIdentityFallbackDisabled(RuntimeError):
@@ -101,13 +149,15 @@ def _get_request_authorization() -> str:
         return ""
 
 
-def set_request_metalake(metalake: str):
-    """Publish the metalake named by the current tool call.
+def set_request_metalake(metalake):
+    """Publish the raw ``metalake`` argument of the current tool call.
 
-    Returns the token the caller must pass to :func:`reset_request_metalake`
-    once the call finishes, so nothing leaks into the next one.
+    Takes the value verbatim - validation happens in
+    :meth:`GravitinoContext._resolve_metalake`. Returns the token the caller
+    must pass to :func:`reset_request_metalake` once the call finishes, so
+    nothing leaks into the next one.
     """
-    return _REQUEST_METALAKE.set((metalake or "").strip())
+    return _REQUEST_METALAKE.set(metalake)
 
 
 def reset_request_metalake(token) -> None:
@@ -116,8 +166,13 @@ def reset_request_metalake(token) -> None:
 
 
 def get_request_metalake() -> str:
-    """The metalake named by the current tool call, or "" when it named none."""
-    return _REQUEST_METALAKE.get()
+    """The metalake this call named, or "" when it named none or named it badly.
+
+    Never raises: audit logging calls this on the failure path too, where the
+    value may be exactly the malformed input that caused the failure.
+    """
+    metalake = _REQUEST_METALAKE.get()
+    return metalake.strip() if isinstance(metalake, str) else ""
 
 
 def startup_authorization(setting: Setting) -> str:
@@ -185,6 +240,11 @@ class GravitinoContext:
         # on an invalid Setting.
         setting.validate_oauth()
         self._setting = setting
+        # Built once and shared by every service-identity client. Separate
+        # instances share the token cache key but each owns its own refresh
+        # lock and 401 retry state, so per-metalake instances would bypass
+        # refresh coalescing and hit the IdP once per metalake.
+        self._service_auth = _service_auth(setting)
         # Eagerly built only when a startup default is configured, so the
         # common single-metalake deployment pays no extra cost. Left unset
         # (None) when metalake resolution must come from a per-request header
@@ -194,7 +254,7 @@ class GravitinoContext:
                 setting.metalake,
                 setting.gravitino_uri,
                 startup_authorization(setting),
-                auth=_service_auth(setting),
+                auth=self._service_auth,
             )
             if setting.metalake
             else None
@@ -210,6 +270,10 @@ class GravitinoContext:
         self._clients_by_auth: "OrderedDict[tuple[str, str], object]" = (
             OrderedDict()
         )
+        # How many in-flight calls are using each handed-out client, and the
+        # clients evicted while still in use, to be closed once idle.
+        self._borrows: "dict" = {}
+        self._close_when_idle: "set" = set()
         # Strong references to in-flight background close tasks; the event loop
         # only keeps weak references, so without this they could be GC'd before
         # running. Entries are discarded when each task completes.
@@ -255,13 +319,13 @@ class GravitinoContext:
                     "HTTP request omitted Authorization and "
                     "--no-service-identity-fallback is set"
                 )
-            return self._service_client(metalake)
+            return self._borrow(self._service_client(metalake))
 
         key = (authorization, metalake)
         cached = self._clients_by_auth.get(key)
         if cached is not None:
             self._clients_by_auth.move_to_end(key)
-            return cached
+            return self._borrow(cached)
 
         client = RESTClientFactory.create_rest_client(
             metalake,
@@ -269,7 +333,7 @@ class GravitinoContext:
             authorization,
         )
         self._cache_put(key, client)
-        return client
+        return self._borrow(client)
 
     def _resolve_metalake(self) -> str:
         """Resolve the metalake for the current call, tool argument first.
@@ -281,6 +345,20 @@ class GravitinoContext:
         written for the agent that will read it: it names the recovery path so
         a model can correct itself instead of just reporting the failure.
         """
+        requested = _REQUEST_METALAKE.get()
+        if isinstance(requested, InvalidMetalakeArgument):
+            raise ValueError(requested.reason)
+        if requested is not MISSING_METALAKE and not isinstance(
+            requested, (str, type(None))
+        ):
+            # An explicitly supplied non-string must not be silently treated as
+            # an omitted argument: `false`, `0` and `[]` would otherwise route
+            # a call - including a mutation - to the default metalake.
+            raise ValueError(
+                f"The '{METALAKE_ARGUMENT}' argument must be a string naming a "
+                f"metalake, but got {type(requested).__name__}."
+            )
+
         metalake = get_request_metalake() or self._setting.metalake
         if not metalake:
             # Only point at the discovery tool when this deployment actually
@@ -315,17 +393,44 @@ class GravitinoContext:
             metalake,
             self._setting.gravitino_uri,
             startup_authorization(self._setting),
-            auth=_service_auth(self._setting),
+            auth=self._service_auth,
         )
         self._cache_put(key, client)
         return client
+
+    def _borrow(self, client):
+        """Mark ``client`` as in use for the duration of the current call."""
+        borrowed = _BORROWED_CLIENTS.get()
+        if borrowed is None:
+            # Not inside a tool call: nothing will release the borrow, so
+            # tracking it would pin the client forever.
+            return client
+        self._borrows[client] = self._borrows.get(client, 0) + 1
+        borrowed.append((self, client))
+        return client
+
+    def _release_client(self, client) -> None:
+        """Drop one borrow, closing the client if it was evicted while in use."""
+        remaining = self._borrows.get(client, 0) - 1
+        if remaining > 0:
+            self._borrows[client] = remaining
+            return
+        self._borrows.pop(client, None)
+        if client in self._close_when_idle:
+            self._close_when_idle.discard(client)
+            self._schedule_close(client)
 
     def _cache_put(self, key: "tuple[str, str]", client) -> None:
         """Cache a client, evicting (and closing) the oldest past the cap."""
         self._clients_by_auth[key] = client
         if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
             _, evicted = self._clients_by_auth.popitem(last=False)
-            self._schedule_close(evicted)
+            if self._borrows.get(evicted):
+                # Still serving a call: closing now would drop that call's
+                # connection mid-request. The last borrower closes it instead.
+                self._close_when_idle.add(evicted)
+            else:
+                self._schedule_close(evicted)
 
     def _schedule_close(self, client) -> None:
         """Best-effort close of an evicted client's connection pool.

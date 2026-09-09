@@ -264,6 +264,111 @@ class TestConcurrentToolCallsOverTheProtocol(unittest.TestCase):
         self.assertEqual(defaulted.content[0].text, "ml_default")
 
 
+class _RecordingClient(MockOperation):
+    """Records the metalake and auth object each client was built with."""
+
+    built = []
+    auths = []
+
+    def __init__(self, metalake, uri, authorization="", *, auth=None):
+        super().__init__(metalake, uri, authorization, auth=auth)
+        _RecordingClient.built.append(metalake)
+        _RecordingClient.auths.append(auth)
+
+
+class _ClosableClient(MockOperation):
+    """Records close() so a test can tell when a pool was actually torn down."""
+
+    # Reassigned per test in setUp; a list here so the type is unambiguous.
+    closed: list = []
+    park_on = None
+    parked = None
+    released = None
+
+    def __init__(self, metalake, uri, authorization="", *, auth=None):
+        super().__init__(metalake, uri, authorization, auth=auth)
+        self._metalake = metalake
+
+    def as_catalog_operation(self):
+        return _ClosableCatalogOperation(self._metalake, self)
+
+    async def close(self):
+        _ClosableClient.closed.append(self._metalake)
+
+
+class _ClosableCatalogOperation:
+    def __init__(self, metalake, owner):
+        self._metalake = metalake
+        self._owner = owner
+
+    async def get_list_of_catalogs(self) -> str:
+        if self._metalake == _ClosableClient.park_on:
+            _ClosableClient.parked.set()
+            await _ClosableClient.released.wait()
+        return self._metalake
+
+
+class TestEvictionDoesNotCloseAClientInUse(unittest.TestCase):
+    """A call in flight must keep its connection pool.
+
+    Eviction used to close immediately, so a slow call lost its connection as
+    soon as other calls filled the cache - and for a write, the backend may
+    already have committed, leaving an ambiguous outcome.
+    """
+
+    def setUp(self):
+        _ClosableClient.closed = []
+        _ClosableClient.park_on = "victim"
+        _ClosableClient.parked = asyncio.Event()
+        _ClosableClient.released = asyncio.Event()
+        RESTClientFactory.set_rest_client(_ClosableClient)
+        self.mcp = GravitinoMCPServer(Setting("ml_default")).mcp
+
+    def tearDown(self):
+        _ClosableClient.park_on = None
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_evicted_client_is_closed_only_after_its_call_finishes(self):
+        cap = context_module._MAX_CACHED_CLIENTS
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                slow = asyncio.ensure_future(
+                    client.call_tool(
+                        "get_list_of_catalogs", {METALAKE_ARGUMENT: "victim"}
+                    )
+                )
+                await _ClosableClient.parked.wait()
+
+                # Fill the cache past its bound while that call is parked.
+                for i in range(cap + 1):
+                    await client.call_tool(
+                        "get_list_of_catalogs", {METALAKE_ARGUMENT: f"ml_{i}"}
+                    )
+
+                evicted_while_in_flight = "victim" not in _ClosableClient.closed
+
+                _ClosableClient.released.set()
+                result = await slow
+                # Let the deferred close task run.
+                await asyncio.sleep(0)
+                return evicted_while_in_flight, result
+
+        still_open, result = asyncio.run(asyncio.wait_for(_run(), timeout=30))
+
+        self.assertTrue(
+            still_open,
+            "the client serving an in-flight call was closed by eviction",
+        )
+        # The call completed against its own metalake, not a recycled client.
+        self.assertEqual(result.content[0].text, "victim")
+        self.assertIn(
+            "victim",
+            _ClosableClient.closed,
+            "the evicted client should be closed once its call finished",
+        )
+
+
 class TestDiscoveryWithoutADefaultMetalake(unittest.TestCase):
     """A server with no --metalake must still be usable from a cold start.
 
@@ -526,6 +631,176 @@ class TestMetalakeResolution(unittest.TestCase):
                 reset_request_metalake(token)
 
         self.assertLessEqual(len(ctx._clients_by_auth), cap)
+
+
+class TestMetalakeArgumentValidation(unittest.TestCase):
+    """Popping the argument removes it from FastMCP's schema validation, so
+    this middleware has to reject bad values itself - and must do it where the
+    error handling and audit middleware still see the failure."""
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(_RecordingClient)
+        _RecordingClient.built = []
+        self.mcp = GravitinoMCPServer(Setting("prod")).mcp
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def _call(self, arguments):
+        # The server built its own default client at construction; only count
+        # the clients this call causes.
+        _RecordingClient.built = []
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool("get_list_of_catalogs", arguments)
+
+        return asyncio.run(_run())
+
+    def test_non_string_values_are_rejected_before_any_request(self):
+        """`false`, `0` and `[]` are falsy: without an explicit check they
+        would silently route the call to the default metalake."""
+        for value in (False, 0, [], 42):
+            with self.subTest(value=value):
+                with self.assertRaises(Exception) as raised:
+                    self._call({METALAKE_ARGUMENT: value})
+                self.assertIn("must be a string", str(raised.exception))
+                self.assertEqual(
+                    _RecordingClient.built,
+                    [],
+                    "no REST client should be built for a rejected argument",
+                )
+
+    def test_rejection_is_reported_as_a_client_error(self):
+        """It is the caller's argument that is wrong, not the server."""
+        with self.assertRaises(Exception) as raised:
+            self._call({METALAKE_ARGUMENT: 42})
+        self.assertIn("Invalid params", str(raised.exception))
+
+    def test_null_and_omitted_both_mean_the_default(self):
+        for arguments in ({METALAKE_ARGUMENT: None}, {}):
+            with self.subTest(arguments=arguments):
+                self.assertIsNotNone(self._call(arguments))
+
+
+class TestDeprecatedMetalakeNameAlias(unittest.TestCase):
+    """`metalake_name` shipped on the statistic tools in v1.0.0."""
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(_RecordingClient)
+        _RecordingClient.built = []
+        self.mcp = GravitinoMCPServer(Setting("prod")).mcp
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def _call(self, arguments):
+        # The server built its own default client at construction; only count
+        # the clients this call causes.
+        _RecordingClient.built = []
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool(
+                    "list_statistics_for_metadata", arguments
+                )
+
+        return asyncio.run(_run())
+
+    def _base(self):
+        return {"metadata_type": "table", "metadata_fullname": "c.s.t"}
+
+    def test_legacy_argument_still_selects_the_metalake(self):
+        self._call({**self._base(), "metalake_name": "legacy_ml"})
+        self.assertEqual(_RecordingClient.built, ["legacy_ml"])
+
+    def test_new_argument_works_the_same(self):
+        self._call({**self._base(), METALAKE_ARGUMENT: "new_ml"})
+        self.assertEqual(_RecordingClient.built, ["new_ml"])
+
+    def test_agreeing_values_are_accepted(self):
+        self._call(
+            {**self._base(), METALAKE_ARGUMENT: "ml", "metalake_name": "ml"}
+        )
+        self.assertEqual(_RecordingClient.built, ["ml"])
+
+    def test_conflicting_values_are_rejected_before_any_request(self):
+        """Silently picking one could send a write to the wrong tenant."""
+        with self.assertRaises(Exception) as raised:
+            self._call(
+                {
+                    **self._base(),
+                    METALAKE_ARGUMENT: "ml_a",
+                    "metalake_name": "ml_b",
+                }
+            )
+        self.assertIn("different values", str(raised.exception))
+        self.assertEqual(_RecordingClient.built, [])
+
+    def test_alias_is_not_advertised(self):
+        """Accepted for compatibility, but new callers should see one way."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return {
+                    t.name: t.inputSchema for t in await client.list_tools()
+                }
+
+        schema = asyncio.run(_run())["list_statistics_for_metadata"]
+        self.assertNotIn("metalake_name", schema.get("properties") or {})
+        self.assertIn(METALAKE_ARGUMENT, schema["properties"])
+
+    def test_alias_is_scoped_to_the_tools_that_shipped_it(self):
+        """Other tools must not silently accept an unknown argument."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                return await client.call_tool(
+                    "get_list_of_catalogs", {"metalake_name": "ml"}
+                )
+
+        with self.assertRaises(Exception):
+            asyncio.run(_run())
+
+
+class TestServiceAuthIsSharedAcrossMetalakes(unittest.TestCase):
+    """Separate RefreshableBearerAuth instances share a token cache key but
+    not the refresh lock, so per-metalake instances would hit the IdP once per
+    metalake on a cold cache."""
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(_RecordingClient)
+        _RecordingClient.auths = []
+        _RecordingClient.built = []
+
+    def tearDown(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_every_metalake_client_shares_one_auth_object(self):
+        ctx = GravitinoContext(
+            Setting(
+                metalake="ml_default",
+                gravitino_uri="http://localhost:8090",
+                transport="http",
+                oauth_token_endpoint="https://idp/token",
+                oauth_client_id="mcp",
+                oauth_client_secret="s",
+            )
+        )
+        for metalake in ("ml_a", "ml_b", "ml_c"):
+            token = set_request_metalake(metalake)
+            try:
+                ctx.rest_client()
+            finally:
+                reset_request_metalake(token)
+
+        auths = [a for a in _RecordingClient.auths if a is not None]
+        self.assertTrue(auths)
+        self.assertEqual(
+            len(set(id(a) for a in auths)),
+            1,
+            "each metalake built its own auth object",
+        )
 
 
 class TestSettingMetalake(unittest.TestCase):

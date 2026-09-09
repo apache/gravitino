@@ -75,10 +75,13 @@ def emit(
                    authorization denial being the common case), not only
                    authorization failures; inspect error_type to disambiguate.
         error_type: Exception class name when outcome is "deny", empty otherwise.
-        metalake:  Metalake the call named, empty when it used the server's
-                   configured default. Recorded because one server can now
-                   serve several metalakes, so "which tenant did this touch"
-                   is no longer answerable from the server config alone.
+        metalake:  Metalake the call operated on, resolved - so a call that
+                   relied on the server default records that default. Empty
+                   only for tools that are not metalake-scoped, such as the
+                   metalake listing, which spans every tenant the caller can
+                   see. Recorded because one server can now serve several
+                   metalakes, so "which tenant did this touch" is no longer
+                   answerable from the server config alone.
     """
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
