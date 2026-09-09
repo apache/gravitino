@@ -32,12 +32,8 @@ import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
-<<<<<<< HEAD
 import org.apache.gravitino.hive.kerberos.KerberosClient;
-=======
-import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
 import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
->>>>>>> ea1d960a0 ([#12986] fix(catalog): Release the ClassLoader of a dropped catalog (#12987))
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
