@@ -1,0 +1,1143 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - semantic-model
+      summary: List Semantic Models
+      description: >-
+        Lists the Semantic Models in a schema. Semantic Models are supported only for relational
+        catalogs. Each returned identifier uses the full metalake.catalog.schema.name namespace.
+      operationId: listSemanticModels
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
+        "405":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - semantic-model
+      summary: Create a Semantic Model
+      description: >-
+        Creates a schema-scoped Semantic Model in a relational catalog. The complete definition is
+        validated before the model is stored, including its Table or logical View sources.
+      operationId: createSemanticModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SemanticModelCreateRequest"
+            examples:
+              SemanticModelCreateRequest:
+                $ref: "#/components/examples/SemanticModelCreateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
+        "405":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "409":
+          $ref: "#/components/responses/SemanticModelAlreadyExistsResponse"
+        "502":
+          $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/semanticModel"
+
+    get:
+      tags:
+        - semantic-model
+      summary: Load a Semantic Model
+      description: Returns the specified Semantic Model with its nested definition and audit data.
+      operationId: loadSemanticModel
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelNotFoundResponse"
+        "405":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - semantic-model
+      summary: Alter a Semantic Model
+      description: >-
+        Applies the ordered updates atomically. The server validates and converts the complete
+        update batch before dispatch; if any update or the resulting model is invalid, none of the
+        updates is applied. Only replaceDefinition revalidates Table or logical View sources.
+      operationId: alterSemanticModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SemanticModelUpdatesRequest"
+            examples:
+              SemanticModelUpdatesRequest:
+                $ref: "#/components/examples/SemanticModelUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelNotFoundResponse"
+        "405":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "409":
+          $ref: "#/components/responses/SemanticModelAlterConflictResponse"
+        "502":
+          $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - semantic-model
+      summary: Drop a Semantic Model
+      description: >-
+        Drops the specified Semantic Model. A missing schema or Semantic Model is reported as a
+        successful response with dropped set to false.
+      operationId: dropSemanticModel
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          description: Not Found - The target metalake or catalog does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+        "405":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "409":
+          $ref: "#/components/responses/SemanticModelOptimisticLockResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    AIContext:
+      description: Additional context for AI tools, encoded as exactly one string or object value
+      oneOf:
+        - type: string
+        - $ref: "#/components/schemas/AIContextObject"
+
+    AIContextObject:
+      type: object
+      description: >-
+        Structured context for AI tools. Unknown properties may contain any JSON value and are
+        retained losslessly in input order.
+      properties:
+        instructions:
+          type: string
+          description: Instructions for AI tools on how to use the entity
+        synonyms:
+          type: array
+          description: >-
+            Alternative names and terms. Omitting the property differs from supplying an empty
+            array.
+          items:
+            type: string
+        examples:
+          type: array
+          description: >-
+            Sample questions or use cases. Omitting the property differs from supplying an empty
+            array.
+          items:
+            type: string
+      additionalProperties: true
+
+    SemanticModelSource:
+      type: object
+      description: >-
+        A governed Table or logical View expressed as catalog.schema.name. The endpoint metalake is
+        inherited and therefore is not included in this identifier.
+      required:
+        - namespace
+        - name
+      properties:
+        namespace:
+          type: array
+          minItems: 2
+          maxItems: 2
+          description: Exactly the catalog and schema containing the source, in that order
+          items:
+            type: string
+            minLength: 1
+        name:
+          type: string
+          minLength: 1
+          description: The source Table or logical View name
+      additionalProperties: false
+
+    Dataset:
+      type: object
+      description: A logical dataset backed by a governed Gravitino Table or logical View
+      required:
+        - name
+        - source
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The dataset name, unique within the Semantic Model
+        source:
+          $ref: "#/components/schemas/SemanticModelSource"
+        primary_key:
+          type: array
+          description: >-
+            Source columns that form the primary key. The property may be omitted; an explicitly
+            supplied empty array is retained as empty.
+          items:
+            type: string
+            minLength: 1
+        unique_keys:
+          type: array
+          description: >-
+            Source column sets that form unique keys. The property may be omitted; an explicitly
+            supplied empty array is retained as empty.
+          items:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+        description:
+          type: string
+          description: The human-readable dataset description
+        ai_context:
+          $ref: "#/components/schemas/AIContext"
+        fields:
+          type: array
+          description: >-
+            Ordered fields in the dataset. The property may be omitted; an explicitly supplied
+            empty array is retained as empty.
+          items:
+            $ref: "#/components/schemas/Field"
+        custom_extensions:
+          type: array
+          description: >-
+            Vendor-specific extensions. The property may be omitted; an explicitly supplied empty
+            array is retained as empty.
+          items:
+            $ref: "#/components/schemas/CustomExtension"
+      additionalProperties: false
+
+    Field:
+      type: object
+      description: A row-level semantic attribute in a dataset
+      required:
+        - name
+        - expression
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The field name, unique within its dataset
+        expression:
+          $ref: "#/components/schemas/Expression"
+        dimension:
+          $ref: "#/components/schemas/Dimension"
+        label:
+          type: string
+          description: The display label used to categorize the field
+        description:
+          type: string
+          description: The human-readable field description
+        datatype:
+          $ref: "#/components/schemas/SemanticModelDataType"
+        ai_context:
+          $ref: "#/components/schemas/AIContext"
+        custom_extensions:
+          type: array
+          description: >-
+            Vendor-specific extensions. The property may be omitted; an explicitly supplied empty
+            array is retained as empty.
+          items:
+            $ref: "#/components/schemas/CustomExtension"
+      additionalProperties: false
+
+    Relationship:
+      type: object
+      description: A relationship between two datasets in the same Semantic Model
+      required:
+        - name
+        - from
+        - to
+        - from_columns
+        - to_columns
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The relationship name, unique within the Semantic Model
+        from:
+          type: string
+          minLength: 1
+          description: The source dataset name
+        to:
+          type: string
+          minLength: 1
+          description: The target dataset name
+        from_columns:
+          type: array
+          minItems: 1
+          description: >-
+            Non-empty source columns. The array must have the same number of entries as to_columns.
+          items:
+            type: string
+            minLength: 1
+        to_columns:
+          type: array
+          minItems: 1
+          description: >-
+            Non-empty target columns. The array must have the same number of entries as
+            from_columns.
+          items:
+            type: string
+            minLength: 1
+        ai_context:
+          $ref: "#/components/schemas/AIContext"
+        custom_extensions:
+          type: array
+          description: >-
+            Vendor-specific extensions. The property may be omitted; an explicitly supplied empty
+            array is retained as empty.
+          items:
+            $ref: "#/components/schemas/CustomExtension"
+      additionalProperties: false
+
+    Metric:
+      type: object
+      description: A model-scoped quantitative measure
+      required:
+        - name
+        - expression
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The metric name, unique within the Semantic Model
+        expression:
+          $ref: "#/components/schemas/Expression"
+        description:
+          type: string
+          description: The human-readable metric description
+        datatype:
+          $ref: "#/components/schemas/SemanticModelDataType"
+        ai_context:
+          $ref: "#/components/schemas/AIContext"
+        custom_extensions:
+          type: array
+          description: >-
+            Vendor-specific extensions. The property may be omitted; an explicitly supplied empty
+            array is retained as empty.
+          items:
+            $ref: "#/components/schemas/CustomExtension"
+      additionalProperties: false
+
+    Expression:
+      type: object
+      description: An expression with one or more ordered dialect-specific representations
+      required:
+        - dialects
+      properties:
+        dialects:
+          type: array
+          minItems: 1
+          description: Each dialect identifier may occur at most once
+          items:
+            $ref: "#/components/schemas/DialectExpression"
+      additionalProperties: false
+
+    DialectExpression:
+      type: object
+      description: An expression written in a specific dialect
+      required:
+        - dialect
+        - expression
+      properties:
+        dialect:
+          type: string
+          minLength: 1
+          description: >-
+            An open dialect identifier. ANSI_SQL, SNOWFLAKE, MDX, TABLEAU, DATABRICKS, MAQL, and
+            BIGQUERY are well-known Apache Ossie values; other non-empty identifiers are accepted
+            and preserved without conversion or fallback.
+        expression:
+          type: string
+          minLength: 1
+          description: The non-empty dialect-specific expression text
+      additionalProperties: false
+
+    Dimension:
+      type: object
+      description: >-
+        Dimension metadata for a field. An empty object is valid and remains distinct from an
+        omitted dimension.
+      properties:
+        is_time:
+          type: boolean
+          description: Whether consumers should treat the field as a time dimension
+      additionalProperties: false
+
+    CustomExtension:
+      type: object
+      description: Vendor-specific attributes retained for Semantic Model interchange
+      required:
+        - vendor_name
+        - data
+      properties:
+        vendor_name:
+          type: string
+          description: The extension vendor name
+        data:
+          type: string
+          description: Vendor-specific data encoded as a JSON string
+      additionalProperties: false
+
+    SemanticModelDataType:
+      type: string
+      description: The exact wire value for a logical field or metric data type
+      enum:
+        - String
+        - Integer
+        - Decimal
+        - Float
+        - Boolean
+        - Date
+        - Time
+        - DateTime
+        - DateTimeTz
+        - Opaque
+
+    SemanticModelDefinition:
+      type: object
+      description: The complete replaceable semantic definition, without entity metadata
+      required:
+        - datasets
+      properties:
+        ai_context:
+          $ref: "#/components/schemas/AIContext"
+        datasets:
+          type: array
+          minItems: 1
+          description: The non-empty ordered datasets in the Semantic Model
+          items:
+            $ref: "#/components/schemas/Dataset"
+        relationships:
+          type: array
+          description: >-
+            Ordered relationships. The property may be omitted; an explicitly supplied empty array
+            is retained as empty.
+          items:
+            $ref: "#/components/schemas/Relationship"
+        metrics:
+          type: array
+          description: >-
+            Ordered metrics. The property may be omitted; an explicitly supplied empty array is
+            retained as empty.
+          items:
+            $ref: "#/components/schemas/Metric"
+        custom_extensions:
+          type: array
+          description: >-
+            Vendor-specific extensions. The property may be omitted; an explicitly supplied empty
+            array is retained as empty.
+          items:
+            $ref: "#/components/schemas/CustomExtension"
+      additionalProperties: false
+
+    SemanticModel:
+      type: object
+      description: A schema-scoped analytical Semantic Model with a nested semantic definition
+      required:
+        - name
+        - definition
+        - properties
+        - audit
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The Semantic Model name
+        comment:
+          type: string
+          nullable: true
+          description: The comment, or null when no comment is set
+        definition:
+          $ref: "#/components/schemas/SemanticModelDefinition"
+        properties:
+          type: object
+          description: Gravitino-specific Semantic Model properties; empty when none are set
+          additionalProperties:
+            type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+      additionalProperties: false
+
+    SemanticModelCreateRequest:
+      type: object
+      description: The request to create a Semantic Model
+      required:
+        - name
+        - definition
+        - properties
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The non-blank Semantic Model name
+        comment:
+          type: string
+          nullable: true
+          description: The optional Semantic Model comment
+        definition:
+          $ref: "#/components/schemas/SemanticModelDefinition"
+        properties:
+          type: object
+          description: Required Gravitino-specific properties; use an empty object when none are set
+          additionalProperties:
+            type: string
+      additionalProperties: false
+
+    SemanticModelUpdatesRequest:
+      type: object
+      description: A non-empty ordered update batch applied atomically
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SemanticModelUpdateRequest"
+      additionalProperties: false
+
+    SemanticModelUpdateRequest:
+      description: One polymorphic Semantic Model update
+      oneOf:
+        - $ref: "#/components/schemas/RenameSemanticModelRequest"
+        - $ref: "#/components/schemas/UpdateSemanticModelCommentRequest"
+        - $ref: "#/components/schemas/SetSemanticModelPropertyRequest"
+        - $ref: "#/components/schemas/RemoveSemanticModelPropertyRequest"
+        - $ref: "#/components/schemas/ReplaceSemanticModelDefinitionRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameSemanticModelRequest"
+          updateComment: "#/components/schemas/UpdateSemanticModelCommentRequest"
+          setProperty: "#/components/schemas/SetSemanticModelPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveSemanticModelPropertyRequest"
+          replaceDefinition: "#/components/schemas/ReplaceSemanticModelDefinitionRequest"
+
+    RenameSemanticModelRequest:
+      type: object
+      description: Renames the Semantic Model
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          minLength: 1
+          description: The new non-blank Semantic Model name
+      example: {
+        "@type": "rename",
+        "newName": "sales_model_v2"
+      }
+
+    UpdateSemanticModelCommentRequest:
+      type: object
+      description: >-
+        Replaces the comment. An omitted or null newComment clears the comment; an explicit empty
+        string is stored as an empty comment.
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          nullable: true
+          description: The new comment, null to clear it, or an empty string to retain empty
+      example: {
+        "@type": "updateComment",
+        "newComment": "Updated sales definitions"
+      }
+
+    SetSemanticModelPropertyRequest:
+      type: object
+      description: Sets or replaces one Gravitino-specific property
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          minLength: 1
+          description: The non-blank property name
+        value:
+          type: string
+          description: The property value; an empty string is valid
+      example: {
+        "@type": "setProperty",
+        "property": "domain",
+        "value": "sales"
+      }
+
+    RemoveSemanticModelPropertyRequest:
+      type: object
+      description: Removes one Gravitino-specific property if it exists
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          minLength: 1
+          description: The non-blank property name
+      example: {
+        "@type": "removeProperty",
+        "property": "legacy"
+      }
+
+    ReplaceSemanticModelDefinitionRequest:
+      type: object
+      description: Replaces the complete nested definition and revalidates its sources atomically
+      required:
+        - "@type"
+        - definition
+      properties:
+        "@type":
+          type: string
+          enum:
+            - replaceDefinition
+        definition:
+          $ref: "#/components/schemas/SemanticModelDefinition"
+      example: {
+        "@type": "replaceDefinition",
+        "definition": {
+          "datasets": [
+            {
+              "name": "orders",
+              "source": {
+                "namespace": ["sales", "mart"],
+                "name": "orders"
+              },
+              "fields": []
+            }
+          ],
+          "relationships": [],
+          "metrics": [],
+          "custom_extensions": []
+        }
+      }
+
+  responses:
+    SemanticModelListResponse:
+      description: Returns the Semantic Model identifiers in the schema
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required:
+              - code
+              - identifiers
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              identifiers:
+                type: array
+                description: Full Semantic Model identifiers
+                items:
+                  $ref: "./openapi.yaml#/components/schemas/NameIdentifier"
+            additionalProperties: false
+          examples:
+            SemanticModelListResponse:
+              $ref: "#/components/examples/SemanticModelListResponse"
+
+    SemanticModelResponse:
+      description: Returns the Semantic Model object with its nested definition
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required:
+              - code
+              - semanticModel
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              semanticModel:
+                $ref: "#/components/schemas/SemanticModel"
+            additionalProperties: false
+          examples:
+            SemanticModelResponse:
+              $ref: "#/components/examples/SemanticModelResponse"
+
+    SemanticModelBadRequestResponse:
+      description: >-
+        Bad Request - The request is malformed or a Semantic Model definition, source, or update is
+        invalid
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            IllegalSemanticModelException:
+              $ref: "#/components/examples/IllegalSemanticModelException"
+
+    SemanticModelForbiddenResponse:
+      description: Forbidden - The caller cannot access the requested or referenced metadata
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            ForbiddenException:
+              $ref: "#/components/examples/ForbiddenException"
+
+    SemanticModelParentNotFoundResponse:
+      description: Not Found - The target metalake, catalog, or schema does not exist
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            NoSuchMetalakeException:
+              $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+            NoSuchCatalogException:
+              $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+            NoSuchSchemaException:
+              $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+
+    SemanticModelNotFoundResponse:
+      description: Not Found - The parent or target Semantic Model does not exist
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            NoSuchMetalakeException:
+              $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+            NoSuchCatalogException:
+              $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+            NoSuchSchemaException:
+              $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+            NoSuchSemanticModelException:
+              $ref: "#/components/examples/NoSuchSemanticModelException"
+
+    SemanticModelUnsupportedCatalogResponse:
+      description: Method Not Allowed - Semantic Models are supported only by relational catalogs
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedOperationException:
+              $ref: "#/components/examples/UnsupportedOperationException"
+
+    SemanticModelAlreadyExistsResponse:
+      description: Conflict - The target Semantic Model already exists
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            SemanticModelAlreadyExistsException:
+              $ref: "#/components/examples/SemanticModelAlreadyExistsException"
+
+    SemanticModelAlterConflictResponse:
+      description: >-
+        Conflict - A rename target already exists or the internal transaction lost an
+        optimistic-lock race
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            SemanticModelAlreadyExistsException:
+              $ref: "#/components/examples/SemanticModelAlreadyExistsException"
+            OptimisticLockException:
+              $ref: "#/components/examples/OptimisticLockException"
+
+    SemanticModelOptimisticLockResponse:
+      description: Conflict - The internal transaction lost an optimistic-lock race
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            OptimisticLockException:
+              $ref: "#/components/examples/OptimisticLockException"
+
+    SemanticModelConnectionFailedResponse:
+      description: Bad Gateway - A referenced source catalog is temporarily unavailable
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            ConnectionFailedException:
+              $ref: "#/components/examples/ConnectionFailedException"
+
+  examples:
+    SemanticModelListResponse:
+      value: {
+        "code": 0,
+        "identifiers": [
+          {
+            "namespace": ["lake", "sales", "mart"],
+            "name": "sales_model"
+          }
+        ]
+      }
+
+    SemanticModelCreateRequest:
+      value: {
+        "name": "sales_model",
+        "comment": "Governed sales definitions",
+        "definition": {
+          "ai_context": {
+            "instructions": "Use certified sales metrics for revenue questions",
+            "synonyms": ["sales semantics"],
+            "confidence": 0.95
+          },
+          "datasets": [
+            {
+              "name": "orders",
+              "source": {
+                "namespace": ["sales", "mart"],
+                "name": "orders"
+              },
+              "primary_key": ["order_id"],
+              "unique_keys": [],
+              "description": "Governed order facts",
+              "ai_context": "Use completed orders for revenue",
+              "fields": [
+                {
+                  "name": "order_time",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_time"
+                      }
+                    ]
+                  },
+                  "dimension": {
+                    "is_time": true
+                  },
+                  "label": "Order time",
+                  "datatype": "DateTimeTz"
+                },
+                {
+                  "name": "order_amount",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "TRINO",
+                        "expression": "order_amount"
+                      }
+                    ]
+                  },
+                  "description": "Order amount before refunds",
+                  "datatype": "Decimal",
+                  "custom_extensions": [
+                    {
+                      "vendor_name": "example",
+                      "data": "{\"semantic_type\":\"money\"}"
+                    }
+                  ]
+                }
+              ],
+              "custom_extensions": []
+            },
+            {
+              "name": "customers",
+              "source": {
+                "namespace": ["sales", "mart"],
+                "name": "customers"
+              },
+              "fields": []
+            }
+          ],
+          "relationships": [
+            {
+              "name": "orders_to_customers",
+              "from": "orders",
+              "to": "customers",
+              "from_columns": ["customer_id"],
+              "to_columns": ["customer_id"]
+            }
+          ],
+          "metrics": [
+            {
+              "name": "total_revenue",
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "SUM(orders.order_amount)"
+                  }
+                ]
+              },
+              "description": "Total revenue across all orders",
+              "datatype": "Decimal",
+              "ai_context": {
+                "examples": ["What was revenue last month?"]
+              }
+            }
+          ],
+          "custom_extensions": [
+            {
+              "vendor_name": "example",
+              "data": "{\"certified\":true}"
+            }
+          ]
+        },
+        "properties": {
+          "domain": "sales"
+        }
+      }
+
+    SemanticModelUpdatesRequest:
+      value: {
+        "updates": [
+          {
+            "@type": "rename",
+            "newName": "sales_model_v2"
+          },
+          {
+            "@type": "updateComment",
+            "newComment": ""
+          },
+          {
+            "@type": "setProperty",
+            "property": "domain",
+            "value": "commerce"
+          },
+          {
+            "@type": "removeProperty",
+            "property": "legacy"
+          },
+          {
+            "@type": "replaceDefinition",
+            "definition": {
+              "datasets": [
+                {
+                  "name": "orders",
+                  "source": {
+                    "namespace": ["sales", "mart"],
+                    "name": "orders"
+                  },
+                  "fields": []
+                }
+              ],
+              "relationships": [],
+              "metrics": [],
+              "custom_extensions": []
+            }
+          }
+        ]
+      }
+
+    SemanticModelResponse:
+      value: {
+        "code": 0,
+        "semanticModel": {
+          "name": "sales_model",
+          "comment": "Governed sales definitions",
+          "definition": {
+            "ai_context": "Use certified sales definitions",
+            "datasets": [
+              {
+                "name": "orders",
+                "source": {
+                  "namespace": ["sales", "mart"],
+                  "name": "orders"
+                },
+                "fields": []
+              }
+            ],
+            "relationships": [],
+            "metrics": [],
+            "custom_extensions": []
+          },
+          "properties": {
+            "domain": "sales"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2026-01-01T00:00:00Z",
+            "lastModifier": "gravitino",
+            "lastModifiedTime": "2026-01-01T00:00:00Z"
+          }
+        }
+      }
+
+    IllegalSemanticModelException:
+      value: {
+        "code": 1001,
+        "type": "IllegalSemanticModelException",
+        "message": "datasets[0].source: source must use catalog.schema.name",
+        "stack": [
+          "org.apache.gravitino.exceptions.IllegalSemanticModelException: datasets[0].source: source must use catalog.schema.name",
+          "..."
+        ]
+      }
+
+    NoSuchSemanticModelException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchSemanticModelException",
+        "message": "Semantic Model does not exist: sales_model",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchSemanticModelException: Semantic Model does not exist: sales_model",
+          "..."
+        ]
+      }
+
+    SemanticModelAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "SemanticModelAlreadyExistsException",
+        "message": "Semantic Model already exists: sales_model",
+        "stack": [
+          "org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException: Semantic Model already exists: sales_model",
+          "..."
+        ]
+      }
+
+    UnsupportedOperationException:
+      value: {
+        "code": 1006,
+        "type": "UnsupportedOperationException",
+        "message": "The catalog does not support Semantic Model operations",
+        "stack": [
+          "java.lang.UnsupportedOperationException: The catalog does not support Semantic Model operations",
+          "..."
+        ]
+      }
+
+    ConnectionFailedException:
+      value: {
+        "code": 1007,
+        "type": "ConnectionFailedException",
+        "message": "A referenced source catalog is unavailable",
+        "stack": [
+          "org.apache.gravitino.exceptions.ConnectionFailedException: A referenced source catalog is unavailable",
+          "..."
+        ]
+      }
+
+    ForbiddenException:
+      value: {
+        "code": 1008,
+        "type": "ForbiddenException",
+        "message": "The caller cannot access referenced source metadata",
+        "stack": [
+          "org.apache.gravitino.exceptions.ForbiddenException: The caller cannot access referenced source metadata",
+          "..."
+        ]
+      }
+
+    OptimisticLockException:
+      value: {
+        "code": 1012,
+        "type": "OptimisticLockException",
+        "message": "The Semantic Model changed during the internal transaction",
+        "stack": [
+          "org.apache.gravitino.exceptions.OptimisticLockException: The Semantic Model changed during the internal transaction",
+          "..."
+        ]
+      }
