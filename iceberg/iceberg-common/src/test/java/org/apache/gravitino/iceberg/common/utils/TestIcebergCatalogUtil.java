@@ -381,6 +381,43 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
+  void testIsJdbcAuthorizationFailureRecognizesMysqlAndPostgres() {
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException(
+                "Access denied for user 'gravitino'@'%' (using password: YES)", "28000", 1045)),
+        "MySQL 1045 should be treated as an authorization failure");
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException(
+                "FATAL: password authentication failed for user \"gravitino\"", "28P01")),
+        "PostgreSQL 28P01 should be treated as an authorization failure");
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException("FATAL: role \"missing\" does not exist", "28000")),
+        "PostgreSQL unknown-role 28000 should be treated as an authorization failure");
+    // Drivers that omit SQLState still need message fallbacks.
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException("Access denied for user 'gravitino'@'%'")));
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException("FATAL: password authentication failed for user \"gravitino\"")));
+  }
+
+  @Test
+  void testIsJdbcAuthorizationFailureRejectsUnrelatedErrors() {
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(
+            new SQLException("Communications link failure", "08S01")));
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(new SQLException((String) null)));
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isJdbcAuthorizationFailure(new RuntimeException("Access denied")));
+    Assertions.assertFalse(IcebergCatalogUtil.isJdbcAuthorizationFailure(null));
+  }
+
+  @Test
   void testIsConcurrentViewMigrationConflictAcrossDatabases() {
     // The duplicate `iceberg_type` column error wording differs per backend database; each of these
     // means another Iceberg JDBC catalog on the same `uri` already ran the V1 view migration.

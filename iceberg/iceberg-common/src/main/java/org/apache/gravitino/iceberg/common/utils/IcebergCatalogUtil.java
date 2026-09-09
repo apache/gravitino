@@ -186,10 +186,7 @@ public class IcebergCatalogUtil {
       jdbcCatalog.setConf(hdfsConfiguration);
       jdbcCatalog.initialize(icebergCatalogName, properties);
     } catch (UncheckedSQLException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof SQLException
-          && cause.getMessage() != null
-          && cause.getMessage().contains("Access denied")) {
+      if (isJdbcAuthorizationFailure(e.getCause())) {
         throw new ConnectionFailedException(e, e.getMessage());
       }
       if (!isConcurrentViewMigrationConflict(e)) {
@@ -212,6 +209,38 @@ public class IcebergCatalogUtil {
       jdbcCatalog.initialize(icebergCatalogName, properties);
     }
     return jdbcCatalog;
+  }
+
+  /**
+   * Whether a JDBC failure from {@code JdbcCatalog.initialize} is an authorization / credential
+   * error that should surface as {@link ConnectionFailedException}.
+   *
+   * <p>MySQL reports SQLState {@code 28000} with message {@code Access denied for user ...};
+   * PostgreSQL uses SQLState class {@code 28} ({@code 28P01}, {@code 28000}) with messages such as
+   * {@code password authentication failed} or {@code role "..." does not exist}. Prefer SQLState
+   * class {@code 28}; fall back to known message fragments when the driver omits SQLState.
+   *
+   * @param cause the cause of an {@link UncheckedSQLException}, may be null
+   * @return {@code true} if the failure is an invalid-authorization error
+   */
+  @VisibleForTesting
+  static boolean isJdbcAuthorizationFailure(Throwable cause) {
+    if (!(cause instanceof SQLException)) {
+      return false;
+    }
+    SQLException sqlException = (SQLException) cause;
+    String sqlState = sqlException.getSQLState();
+    if (sqlState != null && sqlState.regionMatches(true, 0, "28", 0, 2)) {
+      return true;
+    }
+    String message = sqlException.getMessage();
+    if (message == null) {
+      return false;
+    }
+    String lower = message.toLowerCase(Locale.ROOT);
+    return lower.contains("access denied")
+        || lower.contains("password authentication failed")
+        || (lower.contains("role ") && lower.contains("does not exist"));
   }
 
   /**
