@@ -731,18 +731,19 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Direct object-policy relations belong to the legacy model and must not affect resolution.
+    // Direct object-policy relations remain visible during the compatibility period.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policy3.name()}, null);
 
     String[] policies = policyManager.listPoliciesForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(1, policies.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies));
+    Assertions.assertEquals(2, policies.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies));
 
     PolicyEntity[] policiesInfo =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(1, policiesInfo.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1), ImmutableSet.copyOf(policiesInfo));
+    Assertions.assertEquals(2, policiesInfo.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1, policy3), ImmutableSet.copyOf(policiesInfo));
 
     String[] policies1 = policyManager.listPoliciesForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, policies1.length);
@@ -803,7 +804,7 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Keep one legacy direct relation to verify it is not returned by object policy lookup.
+    // Keep one legacy direct relation to verify it remains available during migration.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policyName3}, null);
 
@@ -836,14 +837,9 @@ public class TestPolicyManager {
                     METALAKE, catalogObject, "non_existent_policy"));
     Assertions.assertTrue(e.getMessage().contains("Policy non_existent_policy does not exist"));
 
-    Throwable e1 =
-        Assertions.assertThrows(
-            NoSuchPolicyException.class,
-            () ->
-                policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name()));
-    Assertions.assertTrue(
-        e1.getMessage().contains("Policy " + policyName3 + " does not exist"),
-        "Actual message: " + e1.getMessage());
+    PolicyEntity directPolicy =
+        policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name());
+    Assertions.assertEquals(policy3, directPolicy);
 
     Throwable e2 =
         Assertions.assertThrows(
