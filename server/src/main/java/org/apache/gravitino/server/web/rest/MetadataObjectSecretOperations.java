@@ -65,7 +65,8 @@ public class MetadataObjectSecretOperations {
           MetadataObject.Type.TABLE,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.VIEW,
-          MetadataObject.Type.MODEL);
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.MODEL_VERSION);
 
   private final SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
