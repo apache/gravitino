@@ -32,7 +32,12 @@ import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
+<<<<<<< HEAD
 import org.apache.gravitino.hive.kerberos.KerberosClient;
+=======
+import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
+import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
+>>>>>>> ea1d960a0 ([#12986] fix(catalog): Release the ClassLoader of a dropped catalog (#12987))
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -260,6 +265,12 @@ public final class HiveClientFactory {
 
       synchronized (classLoaderLock) {
         if (backendClassLoader != null) {
+          // The backend ClassLoader is a second, nested isolation layer that holds the catalog's
+          // own ClassLoader as its base. Closing it releases its jars but not the references other
+          // threads still hold to it: Hadoop's Shell runs sub-processes, and the JDK's pooled
+          // "process reaper" threads inherit the spawning thread's context ClassLoader, which is a
+          // GC root. Cleaning the nested loader clears those, so both layers become collectable.
+          ClassLoaderResourceCleanerUtils.closeClassLoaderResource(backendClassLoader);
           backendClassLoader.close();
           backendClassLoader = null;
         }
