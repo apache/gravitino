@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -47,7 +48,7 @@ import org.mockito.ArgumentCaptor;
 
 public class TestModelHookDispatcher {
 
-  private ModelHookDispatcher hookDispatcher;
+  private ModelDispatcher hookDispatcher;
   private ModelDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
@@ -74,7 +75,8 @@ public class TestModelHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    hookDispatcher = new ModelHookDispatcher(mockDispatcher);
+    hookDispatcher =
+        new ModelNormalizeDispatcher(new ModelHookDispatcher(mockDispatcher), mockCatalogManager);
   }
 
   @AfterEach
