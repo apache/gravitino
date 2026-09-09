@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.utils;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -25,12 +26,76 @@ import org.junit.jupiter.api.Test;
 public class TestExceptionMessages {
 
   @Test
-  public void testUsefulMessagePrefersDeepestCause() {
+  public void testUsefulMessageUnwrapsTransparentWrappers() {
+    Throwable root = new IllegalArgumentException("root reason");
+    Throwable mid = new ExecutionException(root);
+    Throwable top = new RuntimeException(mid);
+
+    Assertions.assertEquals("root reason", ExceptionMessages.usefulMessage(top));
+  }
+
+  @Test
+  public void testUsefulMessageKeepsImmediateContextAndAppendsDeeperReason() {
     Throwable root = new IllegalArgumentException("root reason");
     Throwable mid = new ExecutionException(root);
     Throwable top = new RuntimeException("wrapper", mid);
 
-    Assertions.assertEquals("root reason", ExceptionMessages.usefulMessage(top));
+    Assertions.assertEquals("wrapper: root reason", ExceptionMessages.usefulMessage(top));
+  }
+
+  @Test
+  public void testUsefulMessageIgnoresBlankMessages() {
+    Throwable blankCause = new IOException("   ");
+    Throwable cause = new IOException("HMS connection refused", blankCause);
+
+    Assertions.assertEquals(
+        "Failed to load table: HMS connection refused",
+        ExceptionMessages.withCause("Failed to load table", cause));
+    Assertions.assertEquals("HMS connection refused", ExceptionMessages.usefulMessage(cause));
+  }
+
+  @Test
+  public void testUsefulMessageBlankOnlyChainReturnsNull() {
+    Throwable blank = new IOException("\n\t ");
+    Assertions.assertNull(ExceptionMessages.usefulMessage(blank));
+    Assertions.assertEquals(
+        "Failed to load table", ExceptionMessages.withCause("Failed to load table", blank));
+  }
+
+  @Test
+  public void testUsefulMessageStopsOnTwoNodeCycle() {
+    RuntimeException a = new RuntimeException("a");
+    RuntimeException b = new RuntimeException("b");
+    a.initCause(b);
+    b.initCause(a);
+
+    Assertions.assertEquals("a: b", ExceptionMessages.usefulMessage(a));
+  }
+
+  @Test
+  public void testUsefulMessageStopsOnThreeNodeCycle() {
+    RuntimeException a = new RuntimeException("a");
+    RuntimeException b = new RuntimeException("b");
+    RuntimeException c = new RuntimeException("c");
+    a.initCause(b);
+    b.initCause(c);
+    c.initCause(a);
+
+    Assertions.assertEquals("a: c", ExceptionMessages.usefulMessage(a));
+  }
+
+  @Test
+  public void testNestedWrapPreservesIntermediatePropertyContext() {
+    Throwable root = new IOException("write failed");
+    Throwable inner = ExceptionMessages.wrap("Failed to write property: fs.s3a.endpoint", root);
+    RuntimeException outer = ExceptionMessages.wrap("Failed to create configuration", inner);
+
+    Assertions.assertTrue(
+        outer.getMessage().contains("fs.s3a.endpoint"),
+        "nested wrap must keep intermediate property context, got: " + outer.getMessage());
+    Assertions.assertEquals(
+        "Failed to create configuration: Failed to write property: fs.s3a.endpoint: write failed",
+        outer.getMessage());
   }
 
   @Test

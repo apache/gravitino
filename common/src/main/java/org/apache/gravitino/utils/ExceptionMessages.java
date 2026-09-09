@@ -18,7 +18,15 @@
  */
 package org.apache.gravitino.utils;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Helpers for preserving underlying system error messages when wrapping exceptions.
@@ -31,10 +39,16 @@ public final class ExceptionMessages {
   private ExceptionMessages() {}
 
   /**
-   * Returns the most specific non-blank message from {@code throwable} or its cause chain.
+   * Returns a non-blank diagnostic message from {@code throwable} or its cause chain.
+   *
+   * <p>Transparent wrappers such as {@link ExecutionException} are skipped when selecting candidate
+   * messages. Among remaining frames, the shallowest non-blank message is preferred so nested
+   * {@link #wrap(String, Throwable)} / {@link #withCause(String, Throwable)} context is not
+   * discarded. When a deeper non-blank reason is not already contained in that message, it is
+   * appended.
    *
    * @param throwable the throwable to inspect, may be null
-   * @return the deepest useful message, or null if none is available
+   * @return a useful message, or null if none is available
    */
   @Nullable
   public static String usefulMessage(@Nullable Throwable throwable) {
@@ -42,20 +56,46 @@ public final class ExceptionMessages {
       return null;
     }
 
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    String firstUseful = null;
     String lastUseful = null;
     Throwable current = throwable;
     while (current != null) {
-      String message = current.getMessage();
-      if (message != null && !message.isEmpty()) {
-        lastUseful = message;
+      if (!visited.add(current)) {
+        break;
       }
+
       Throwable cause = current.getCause();
+      if (!isTransparentWrapper(current)) {
+        String message = current.getMessage();
+        // new RuntimeException(executionException) copies cause.toString() as the detail
+        // message; ignore that synthetic text and keep walking into the real cause.
+        boolean syntheticTransparentMessage =
+            cause != null
+                && isTransparentWrapper(cause)
+                && message != null
+                && message.equals(cause.toString());
+        if (StringUtils.isNotBlank(message) && !syntheticTransparentMessage) {
+          if (firstUseful == null) {
+            firstUseful = message;
+          }
+          lastUseful = message;
+        }
+      }
+
       if (cause == null || cause == current) {
         break;
       }
       current = cause;
     }
-    return lastUseful;
+
+    if (firstUseful == null) {
+      return null;
+    }
+    if (lastUseful == null || firstUseful.equals(lastUseful) || firstUseful.contains(lastUseful)) {
+      return firstUseful;
+    }
+    return firstUseful + ": " + lastUseful;
   }
 
   /**
@@ -70,10 +110,10 @@ public final class ExceptionMessages {
    */
   public static String withCause(String context, @Nullable Throwable throwable) {
     String useful = usefulMessage(throwable);
-    if (useful == null || useful.isEmpty()) {
+    if (StringUtils.isBlank(useful)) {
       return context;
     }
-    if (context == null || context.isEmpty()) {
+    if (StringUtils.isBlank(context)) {
       return useful;
     }
     if (context.contains(useful)) {
@@ -104,5 +144,12 @@ public final class ExceptionMessages {
    */
   public static IllegalArgumentException illegalArgument(String context, Throwable throwable) {
     return new IllegalArgumentException(withCause(context, throwable), throwable);
+  }
+
+  private static boolean isTransparentWrapper(Throwable throwable) {
+    return throwable instanceof ExecutionException
+        || throwable instanceof CompletionException
+        || throwable instanceof InvocationTargetException
+        || throwable instanceof UndeclaredThrowableException;
   }
 }
