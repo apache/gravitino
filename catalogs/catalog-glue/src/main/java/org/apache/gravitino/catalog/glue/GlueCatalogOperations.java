@@ -365,10 +365,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       software.amazon.awssdk.services.glue.model.Table rawGlueTable =
           glueClient.getTable(req.build()).table();
-      if (isView(rawGlueTable)) {
-        throw new NoSuchTableException(
-            "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
-      }
+      rejectIfView(rawGlueTable, ident, dbName);
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
 
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
@@ -511,10 +508,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
 
-    if (isView(rawGlueTable)) {
-      throw new NoSuchTableException(
-          "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
-    }
+    rejectIfView(rawGlueTable, ident, dbName);
 
     if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
       return alterIcebergTable(ident, dbName, rawGlueTable, changes);
@@ -655,10 +649,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         GetTableRequest.builder().databaseName(dbName).name(ident.name());
     applyCatalogId(catalogId, getReq::catalogId);
     try {
-      if (isView(glueClient.getTable(getReq.build()).table())) {
-        throw new NoSuchTableException(
-            "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
-      }
+      rejectIfView(glueClient.getTable(getReq.build()).table(), ident, dbName);
     } catch (EntityNotFoundException e) {
       return false;
     } catch (GlueException e) {
@@ -693,6 +684,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   private static boolean isView(Table table) {
     return GlueConstants.VIRTUAL_VIEW_TABLE_TYPE.equalsIgnoreCase(table.tableType());
+  }
+
+  /** Rejects a Glue object that is a view, so that it is not acted on through the table API. */
+  private static void rejectIfView(Table table, NameIdentifier ident, String dbName) {
+    if (isView(table)) {
+      throw new NoSuchTableException(
+          "No table named %s in schema %s (it is a view, not a table)", ident.name(), dbName);
+    }
   }
 
   // NOTE: parameter type is the Glue SDK Table, not GlueTable (our domain class).

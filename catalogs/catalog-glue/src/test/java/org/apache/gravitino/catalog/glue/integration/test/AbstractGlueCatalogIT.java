@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -204,7 +203,7 @@ abstract class AbstractGlueCatalogIT {
                         .tableType(GlueConstants.VIRTUAL_VIEW_TABLE_TYPE)
                         .viewOriginalText("/* Presto View: dGVzdA== */")
                         .viewExpandedText("/* Presto View */")
-                        .parameters(ImmutableMap.of("presto_view", "true"))
+                        .parameters(Map.of("presto_view", "true"))
                         .storageDescriptor(
                             StorageDescriptor.builder()
                                 .columns(
