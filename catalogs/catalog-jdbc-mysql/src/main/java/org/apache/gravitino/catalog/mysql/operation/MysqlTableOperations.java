@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -55,6 +57,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for MySQL. */
@@ -64,6 +67,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Mysql does not support nested column names.";
+
+  // MySQL's JDBC driver reduces these types to a bare name and/or an unusable COLUMN_SIZE via
+  // DatabaseMetaData.getColumns, so the JdbcTypeConverter maps them to Types.BinaryType or a
+  // bare Types.ExternalType, losing the length/enumerated values. See correctLossyTypeColumns.
+  private static final String VARBINARY = "varbinary";
+  private static final String ENUM = "enum";
+  private static final String SET = "set";
+  private static final Pattern LENGTH_PATTERN = Pattern.compile("\\((\\d+)\\)");
 
   @Override
   protected String generateCreateTableSql(
@@ -203,6 +214,95 @@ public class MysqlTableOperations extends JdbcTableOperations {
       tableBuilder.withComment(
           tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
     }
+    correctLossyTypeColumns(connection, databaseName, tableName, tableBuilder);
+  }
+
+  /**
+   * VARBINARY/ENUM/SET fall back to a bare Types.ExternalType, and BIT/BINARY of any width both
+   * collapse to plain Types.BinaryType, because JdbcTypeConverter only sees TYPE_NAME/COLUMN_SIZE.
+   * If any column needs it, this queries information_schema.columns once for the whole table to
+   * recover the full declaration (e.g. "enum('a','b','c')", "binary(16)") and fixes those columns.
+   */
+  private static void correctLossyTypeColumns(
+      Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
+      throws SQLException {
+    Column[] columns = tableBuilder.columns();
+    if (ArrayUtils.isEmpty(columns)
+        || Arrays.stream(columns).noneMatch(MysqlTableOperations::isLossyTypeCandidate)) {
+      return;
+    }
+
+    Map<String, String> fullTypesByColumn =
+        fetchColumnFullTypes(connection, databaseName, tableName);
+    JdbcColumn[] correctedColumns = new JdbcColumn[columns.length];
+    for (int i = 0; i < columns.length; i++) {
+      JdbcColumn column = (JdbcColumn) columns[i];
+      correctedColumns[i] =
+          isLossyTypeCandidate(column)
+              ? correctColumnType(column, fullTypesByColumn.get(column.name()))
+              : column;
+    }
+    tableBuilder.withColumns(correctedColumns);
+  }
+
+  private static boolean isLossyTypeCandidate(Column column) {
+    Type type = column.dataType();
+    if (type instanceof Types.BinaryType) {
+      return true;
+    }
+    if (type instanceof Types.ExternalType) {
+      String catalogString = ((Types.ExternalType) type).catalogString();
+      return VARBINARY.equalsIgnoreCase(catalogString)
+          || ENUM.equalsIgnoreCase(catalogString)
+          || SET.equalsIgnoreCase(catalogString);
+    }
+    return false;
+  }
+
+  private static JdbcColumn correctColumnType(JdbcColumn column, String fullType) {
+    if (StringUtils.isEmpty(fullType)) {
+      return column;
+    }
+    // A plain BINARY(1) (or unspecified length) already round-trips to Types.BinaryType as-is.
+    if (column.dataType() instanceof Types.BinaryType && parseLength(fullType) <= 1) {
+      return column;
+    }
+    return JdbcColumn.builder()
+        .withName(column.name())
+        .withType(Types.ExternalType.of(fullType))
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .build();
+  }
+
+  private static int parseLength(String fullType) {
+    Matcher matcher = LENGTH_PATTERN.matcher(fullType);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : 1;
+  }
+
+  private static Map<String, String> fetchColumnFullTypes(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    Map<String, String> columnTypes = new HashMap<>();
+    // TABLE_SCHEMA/TABLE_NAME comparisons in information_schema use a case-insensitive collation,
+    // so with lower_case_table_names=0 a schema holding both "a_b" and "A_B" would return rows for
+    // both; re-check TABLE_NAME exactly, matching the pattern used in getColumnBuilder.
+    String query =
+        "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.columns "
+            + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    try (PreparedStatement statement = connection.prepareStatement(query)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
+            columnTypes.put(resultSet.getString("COLUMN_NAME"), resultSet.getString("COLUMN_TYPE"));
+          }
+        }
+      }
+    }
+    return columnTypes;
   }
 
   @Override
