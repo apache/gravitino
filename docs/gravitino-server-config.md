@@ -210,8 +210,8 @@ reach them without credentials.
 
 | Endpoint                | Root Alias          | Description                                                                                                                                 | HTTP Status |
 |-------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 as long as an HTTP server thread can respond. Use it to decide whether to restart a pod.                              | 200         |
-| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when the entity store answers within the probe timeout, 503 when it is unavailable or slow. Use it to route traffic. | 200 or 503  |
+| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 if an HTTP thread can respond and no OOM has been observed; otherwise 503. Use it to decide whether to restart a pod.                              | 200 or 503  |
+| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when no OOM has been observed and the entity store answers within the probe timeout; otherwise 503. Use it to route traffic. | 200 or 503  |
 | `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                     | 200 or 503  |
 
 | Configuration Item                                   | Description                                                         | Default Value |
@@ -220,7 +220,8 @@ reach them without credentials.
 
 Every endpoint returns the same JSON shape, but not the same checks. `code` is always `0`,
 `status` is `UP` or `DOWN`, and `checks` carries one entry per component probed. `/live` reports
-`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both:
+`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both
+while no OOM has been observed:
 
 ```json
 {
@@ -235,6 +236,11 @@ Every endpoint returns the same JSON shape, but not the same checks. `code` is a
 
 A failing `entityStore` check reports `timeout`, `interrupted`, `probe-rejected`,
 `entity store not initialized`, or the simple class name of an unexpected exception.
+
+After an observed `OutOfMemoryError` (including Metaspace OOM), all three endpoints and their root
+aliases return 503 with a single `jvm: DOWN` check and the reason `OutOfMemoryError; restart required`.
+This state persists until process restart; successful requests do not reset it. See
+[Out-of-memory failures](./health-and-readiness.md#out-of-memory-failures) for detection scope.
 
 #### JVM Memory
 

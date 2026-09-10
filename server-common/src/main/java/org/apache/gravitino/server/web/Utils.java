@@ -100,6 +100,7 @@ public class Utils {
   }
 
   public static Response internalError(String message, Throwable throwable) {
+    ServerHealth.getInstance().recordFailure(throwable);
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
         .entity(ErrorResponse.internalError(message, throwable))
         .type(MediaType.APPLICATION_JSON)
@@ -268,7 +269,13 @@ public class Utils {
     if (principal == null) {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
-    return PrincipalUtils.doAs(principal, action);
+    try {
+      return PrincipalUtils.doAs(principal, action);
+    } catch (Exception | Error failure) {
+      // Record before a resource converts a wrapped failure into an ordinary error response.
+      ServerHealth.getInstance().recordFailure(failure);
+      throw failure;
+    }
   }
 
   public static Map<String, String> filterFilesetAuditHeaders(HttpServletRequest httpRequest) {

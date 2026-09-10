@@ -47,6 +47,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +58,10 @@ import org.slf4j.LoggerFactory;
  * managers can distinguish "restart this pod" from "route traffic elsewhere."
  *
  * <ul>
- *   <li>{@code GET /api/health/live} — liveness, 200 as long as the HTTP thread can respond
- *   <li>{@code GET /api/health/ready} — readiness, 200 when entity store is reachable
+ *   <li>{@code GET /api/health/live} — liveness, 200 when the HTTP thread can respond and no OOM
+ *       has been observed
+ *   <li>{@code GET /api/health/ready} — readiness, 200 when entity store is reachable and no OOM
+ *       has been observed
  *   <li>{@code GET /api/health} — aggregate, 200 when both pass
  * </ul>
  *
@@ -96,12 +99,20 @@ public class HealthOperations {
   private static final String CHECK_HTTP_SERVER = "httpServer";
   private static final String CHECK_ENTITY_STORE = "entityStore";
 
+  private final ServerHealth serverHealth;
+
   /**
    * Default constructor for Jersey auto-discovery. The entity store is resolved lazily at request
    * time via {@link #getEntityStore()} so that probes issued before {@link GravitinoEnv} has
    * finished initializing report DOWN rather than throwing NullPointerException.
    */
-  public HealthOperations() {}
+  public HealthOperations() {
+    this(ServerHealth.getInstance());
+  }
+
+  HealthOperations(ServerHealth serverHealth) {
+    this.serverHealth = serverHealth;
+  }
 
   @GET
   @Path("/live")
@@ -109,6 +120,9 @@ public class HealthOperations {
   @Timed(name = "health.live." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "health.live", absolute = true)
   public Response live() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return outOfMemoryResponse();
+    }
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
     return Utils.ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
   }
@@ -119,7 +133,13 @@ public class HealthOperations {
   @Timed(name = "health.ready." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "health.ready", absolute = true)
   public Response ready() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return outOfMemoryResponse();
+    }
     HealthCheckDTO entityStoreCheck = checkEntityStore();
+    if (serverHealth.hasOutOfMemoryError()) {
+      return outOfMemoryResponse();
+    }
     HealthCheckDTO.Status overall = entityStoreCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(entityStoreCheck));
     return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
@@ -130,9 +150,15 @@ public class HealthOperations {
   @Timed(name = "health." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "health", absolute = true)
   public Response health() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return outOfMemoryResponse();
+    }
     List<HealthCheckDTO> checks = new ArrayList<>(2);
     checks.add(up(CHECK_HTTP_SERVER, Collections.emptyMap()));
     checks.add(checkEntityStore());
+    if (serverHealth.hasOutOfMemoryError()) {
+      return outOfMemoryResponse();
+    }
 
     HealthCheckDTO.Status overall =
         checks.stream().anyMatch(c -> c.getStatus() == HealthCheckDTO.Status.DOWN)
@@ -141,6 +167,12 @@ public class HealthOperations {
 
     HealthResponse body = new HealthResponse(overall, checks);
     return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
+  }
+
+  private Response outOfMemoryResponse() {
+    HealthCheckDTO check = down("jvm", "reason", "OutOfMemoryError; restart required");
+    return Utils.serviceUnavailable(
+        new HealthResponse(HealthCheckDTO.Status.DOWN, Collections.singletonList(check)));
   }
 
   private HealthCheckDTO checkEntityStore() {
@@ -158,8 +190,14 @@ public class HealthOperations {
                 try {
                   return entityStore.exists(
                       NameIdentifier.of(HEALTH_PROBE_SENTINEL), EntityType.METALAKE);
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
+                } catch (IOException failure) {
+                  serverHealth.recordFailure(failure);
+                  throw new RuntimeException(failure);
+                } catch (RuntimeException | Error failure) {
+                  // CompletableFuture captures Errors too. Record here even if the caller has
+                  // already timed out and will never inspect the future's exception.
+                  serverHealth.recordFailure(failure);
+                  throw failure;
                 }
               },
               HEALTH_PROBE_EXECUTOR);
@@ -184,6 +222,7 @@ public class HealthOperations {
       return down(CHECK_ENTITY_STORE, "reason", "interrupted");
 
     } catch (ExecutionException e) {
+      serverHealth.recordFailure(e);
       Throwable cause = e.getCause() != null ? e.getCause() : e;
       // Unwrap RuntimeException wrappers introduced by supplyAsync tunneling checked exceptions.
       if (cause instanceof RuntimeException && cause.getCause() != null) {

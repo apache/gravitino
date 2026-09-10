@@ -484,6 +484,7 @@ public class JettyServer {
                     thread.setName(getName() + "-" + thread.getId());
                     thread.setUncaughtExceptionHandler(
                         (t, throwable) -> {
+                          ServerHealth.getInstance().recordFailure(throwable);
                           LOG.error("{} uncaught exception:", t.getName(), throwable);
                         });
                     // JettyServer maybe used by Gravitino server and Iceberg REST server with

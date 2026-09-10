@@ -10,15 +10,17 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 Gravitino exposes separate liveness and readiness endpoints so that a caller can tell "restart this
-process" apart from "send traffic somewhere else." Liveness answers whether the server can respond
-at all. Readiness answers whether it can reach the entity store and therefore do useful work.
+process" apart from "send traffic somewhere else." Liveness checks whether the server can respond
+and has not observed an out-of-memory error. Readiness also checks whether it can reach the entity
+store.
 
 The endpoints follow MicroProfile Health semantics. A healthy check returns 200 and an unhealthy one
 returns 503, both with a JSON body naming the individual checks that ran.
 
 ## Quick Start
 
-**1. Check liveness.** This returns 200 whenever an HTTP thread is able to answer.
+**1. Check liveness.** This returns 200 when an HTTP thread can answer and no out-of-memory error
+has been observed.
 
 ```shell
 GRAVITINO_URL=http://localhost:8090
@@ -26,7 +28,8 @@ GRAVITINO_URL=http://localhost:8090
 curl -i "${GRAVITINO_URL}/api/health/live"
 ```
 
-**2. Check readiness.** This returns 200 only when the entity store responds.
+**2. Check readiness.** This returns 200 only when the entity store responds and no out-of-memory
+error has been observed.
 
 ```shell
 curl -i "${GRAVITINO_URL}/api/health/ready"
@@ -43,9 +46,9 @@ curl -i "${GRAVITINO_URL}/api/health"
 
 | Path                | Checks                       | Returns 503 when                  |
 |---------------------|------------------------------|-----------------------------------|
-| `/api/health/live`  | HTTP server                  | Never, if the request is answered |
-| `/api/health/ready` | Entity store                 | The entity store check fails      |
-| `/api/health`       | HTTP server and entity store | Either check fails                |
+| `/api/health/live`  | HTTP server and OOM state     | An out-of-memory error was observed |
+| `/api/health/ready` | Entity store and OOM state    | An out-of-memory error was observed or the entity store check fails |
+| `/api/health`       | HTTP server, entity store and OOM state | Any check fails |
 
 Each path is also served at the root of the server, without the `/api` prefix, for load balancers
 and traffic managers that require probes at well-known locations. The root aliases are `/health`,
@@ -54,7 +57,42 @@ endpoint rather than to a check of its own.
 
 The response body carries an overall status and a list of individual checks. Each check has a name,
 a status of UP or DOWN, and a details map that explains a failure. On the Gravitino server the two
-check names are `httpServer` and `entityStore`.
+normal check names are `httpServer` and `entityStore`. After an observed out-of-memory error, all
+three endpoints instead report the `jvm` failure described below.
+
+## Out-of-memory Failures
+
+A Metaspace or heap `OutOfMemoryError` can leave already-loaded endpoints responding successfully
+while other operations fail. A successful HTTP response or entity-store lookup therefore does not
+prove recovery after OOM.
+
+The main server records OOM observed by its Jersey exception listener, error mapper, shared request
+execution/error-response helpers, health-probe tasks, and Jetty worker uncaught-exception handler.
+Wrapped causes are checked too. Once recorded, `/api/health`, `/api/health/live`, `/api/health/ready`,
+and all their root aliases return HTTP 503 with this body:
+
+```json
+{
+  "code": 0,
+  "status": "down",
+  "checks": [
+    {
+      "name": "jvm",
+      "status": "down",
+      "details": { "reason": "OutOfMemoryError; restart required" }
+    }
+  ]
+}
+```
+
+This state lasts until process restart, even if subsequent ordinary API requests succeed. Health
+checks skip the entity-store probe once OOM is recorded. A database outage, ordinary HTTP 500,
+`StackOverflowError`, or missing connector class alone does not set this state.
+
+Detection covers errors reaching these server boundaries; it cannot detect an OOM swallowed
+entirely by a connector or unrelated background executor. This is not a JVM-wide OOM trap. If the
+JVM cannot allocate enough memory to answer a probe, the probe may fail without a JSON response.
+The Iceberg and Lance REST health endpoints retain their separate checks.
 
 ## What Readiness Actually Tests
 
