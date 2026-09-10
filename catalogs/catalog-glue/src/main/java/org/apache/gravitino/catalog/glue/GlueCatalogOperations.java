@@ -122,7 +122,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting String defaultTableFormat;
 
-  /** Warehouse storage path. Table location is derived as {@code warehouse/db/table}. */
+  /**
+   * Warehouse storage path. Table location is derived as {@code warehouse/db/table} for databases
+   * that declare no {@code LocationUri}.
+   */
   @VisibleForTesting String warehouseLocation;
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
@@ -824,16 +827,23 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         .build();
   }
 
+  /**
+   * Resolves the storage location of a table, in order of precedence: the explicit {@code location}
+   * property, the {@code LocationUri} the Glue database declares, and finally the catalog warehouse
+   * path. A database location already identifies the database, so the table name is appended
+   * directly to it, whereas the warehouse path is shared by all databases and needs the database
+   * name in between.
+   */
   private String resolveTableLocation(String explicitLocation, String dbName, String tableName) {
     if (explicitLocation != null) {
       return explicitLocation;
     }
+    String databaseLocation = databaseLocationUri(dbName);
+    if (StringUtils.isNotBlank(databaseLocation)) {
+      return StringUtils.stripEnd(databaseLocation, "/") + "/" + tableName;
+    }
     if (StringUtils.isNotBlank(warehouseLocation)) {
-      String base =
-          warehouseLocation.endsWith("/")
-              ? warehouseLocation.substring(0, warehouseLocation.length() - 1)
-              : warehouseLocation;
-      return base + "/" + dbName + "/" + tableName;
+      return StringUtils.stripEnd(warehouseLocation, "/") + "/" + dbName + "/" + tableName;
     }
     throw new IllegalArgumentException(
         "Table location is required: either set the '"
@@ -841,6 +851,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             + "' property or configure '"
             + GlueConstants.WAREHOUSE
             + "' on the catalog.");
+  }
+
+  /** Returns the {@code LocationUri} of the given Glue database, or null when it declares none. */
+  private String databaseLocationUri(String dbName) {
+    GetDatabaseRequest.Builder req = GetDatabaseRequest.builder().name(dbName);
+    applyCatalogId(catalogId, req::catalogId);
+    try {
+      return glueClient.getDatabase(req.build()).database().locationUri();
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toSchemaException(e, "schema " + dbName);
+    }
   }
 
   private static void applyColumnChange(
