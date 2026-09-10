@@ -68,6 +68,7 @@ import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -1000,5 +1001,48 @@ class TestHiveCatalogOperations {
 
     boolean dropped = op.dropView(NameIdentifier.of("db", "t1"));
     Assertions.assertFalse(dropped);
+  }
+
+  @Test
+  void testCanSkipStatsUpdate() {
+    // Property-only and comment-only changes can skip the metastore statistics recomputation.
+    Assertions.assertTrue(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.setProperty("k", "v")}));
+    Assertions.assertTrue(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.removeProperty("k")}));
+    Assertions.assertTrue(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.updateComment("new comment")}));
+    Assertions.assertTrue(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {
+              TableChange.setProperty("k", "v"),
+              TableChange.removeProperty("k2"),
+              TableChange.updateComment("c")
+            }));
+
+    // Column changes and renames must not skip the statistics recomputation.
+    Assertions.assertFalse(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.addColumn(new String[] {"c"}, Types.StringType.get())}));
+    Assertions.assertFalse(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.deleteColumn(new String[] {"c"}, true)}));
+    Assertions.assertFalse(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {TableChange.rename("newName")}));
+    // A mix that contains a column change falls back to the default behavior.
+    Assertions.assertFalse(
+        HiveCatalogOperations.canSkipStatsUpdate(
+            new TableChange[] {
+              TableChange.setProperty("k", "v"),
+              TableChange.addColumn(new String[] {"c"}, Types.StringType.get())
+            }));
+
+    // No changes: nothing to optimize, keep the default behavior.
+    Assertions.assertFalse(HiveCatalogOperations.canSkipStatsUpdate(new TableChange[] {}));
+    Assertions.assertFalse(HiveCatalogOperations.canSkipStatsUpdate(null));
   }
 }

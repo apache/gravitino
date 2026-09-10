@@ -148,7 +148,9 @@ public class TestHive2HMS {
       Assertions.assertEquals(
           1, loadedTable.partitioning().length, "Table should have 1 partition key");
 
-      hiveClient.alterTable(catalogName, dbName, tableName, loadedTable);
+      // Use skipStatsUpdate=true so the metastore does not recompute statistics or access the
+      // table's storage location for this property-only alter.
+      hiveClient.alterTable(catalogName, dbName, tableName, loadedTable, true);
       HiveTable alteredTable = hiveClient.getTable(catalogName, dbName, tableName);
       Assertions.assertNotNull(alteredTable, "Altered table should not be null");
 
