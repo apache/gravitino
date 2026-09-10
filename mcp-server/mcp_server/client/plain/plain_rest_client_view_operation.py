@@ -49,3 +49,63 @@ class PlainRESTClientViewOperation(ViewOperation):
             f"/views/{encode_path_segment(view_name)}"
         )
         return extract_content_from_response(response, "view", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_view(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        representations: list,
+        properties: dict,
+        default_catalog: str = None,
+        default_schema: str = None,
+    ) -> str:
+        request = {
+            "name": name,
+            "comment": comment,
+            "columns": columns,
+            "representations": representations,
+            "properties": properties,
+        }
+        optional_fields = {
+            "defaultCatalog": default_catalog,
+            "defaultSchema": default_schema,
+        }
+        request.update({k: v for k, v in optional_fields.items() if v})
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/views",
+            json=request,
+        )
+        return extract_content_from_response(response, "view", {})
+
+    async def alter_view(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        view_name: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/views/{encode_path_segment(view_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "view", {})
+
+    async def drop_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/views/{encode_path_segment(view_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
