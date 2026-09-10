@@ -28,9 +28,12 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -856,6 +859,20 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
     Assertions.assertEquals(NoSuchJobException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testCancelJobIsResponseMetered() throws Exception {
+    Method cancelJob = JobOperations.class.getMethod("cancelJob", String.class, String.class);
+    ResponseMetered metered = cancelJob.getAnnotation(ResponseMetered.class);
+    Assertions.assertNotNull(metered);
+    Assertions.assertEquals("cancel-job", metered.name());
+    Assertions.assertTrue(metered.absolute());
+
+    Timed timed = cancelJob.getAnnotation(Timed.class);
+    Assertions.assertNotNull(timed);
+    Assertions.assertTrue(timed.name().startsWith("cancel-job."));
+    Assertions.assertTrue(timed.absolute());
   }
 
   private String jobTemplatePath() {
