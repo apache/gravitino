@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.service.rest;
+package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,51 +28,49 @@ import java.util.function.Supplier;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
-import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
+import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
-public class TestIcebergHealthOperations {
+public class TestLanceHealthOperations {
 
   /** Verifies the documented status casing with the service's actual JSON mapper. */
   @Test
   public void testSerializedHealthStatus() throws Exception {
     ServerHealth health = new ServerHealth();
-    IcebergHealthOperations operations = new IcebergHealthOperations(health);
-    ObjectMapper mapper = IcebergObjectMapper.getInstance();
+    LanceHealthOperations operations = new LanceHealthOperations(health);
+    ObjectMapper mapper = new JsonNullableMapperProvider().getContext(HealthResponse.class);
     try (Response response = operations.live()) {
       JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
-      Assertions.assertEquals("UP", json.path("status").asText());
-      Assertions.assertEquals("UP", json.path("checks").get(0).path("status").asText());
+      Assertions.assertEquals("up", json.path("status").asText());
+      Assertions.assertEquals("up", json.path("checks").get(0).path("status").asText());
     }
     health.recordFailure(new OutOfMemoryError("Metaspace"));
     try (Response response = operations.live()) {
       JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
       Assertions.assertEquals(503, response.getStatus());
-      Assertions.assertEquals("DOWN", json.path("status").asText());
-      Assertions.assertEquals("DOWN", json.path("checks").get(0).path("status").asText());
+      Assertions.assertEquals("down", json.path("status").asText());
+      Assertions.assertEquals("down", json.path("checks").get(0).path("status").asText());
       Assertions.assertEquals("jvm", json.path("checks").get(0).path("name").asText());
     }
   }
 
-  private static IcebergHealthOperations operationsWithManager(
-      IcebergCatalogWrapperManager manager) {
-    return new IcebergHealthOperations(new ServerHealth()) {
+  private static LanceHealthOperations operationsWithWrapper(NamespaceWrapper wrapper) {
+    return new LanceHealthOperations(new ServerHealth()) {
       @Override
-      IcebergCatalogWrapperManager getCatalogWrapperManager() {
-        return manager;
+      NamespaceWrapper getNamespaceWrapper() {
+        return wrapper;
       }
     };
   }
 
   @Test
   public void testLiveReturns200() {
-    IcebergHealthOperations ops = operationsWithManager(null);
+    LanceHealthOperations ops = operationsWithWrapper(null);
     Response resp = ops.live();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     HealthResponse body = (HealthResponse) resp.getEntity();
@@ -79,9 +78,10 @@ public class TestIcebergHealthOperations {
   }
 
   @Test
-  public void testReadyReturns200WhenManagerInitialized() {
-    IcebergCatalogWrapperManager manager = mock(IcebergCatalogWrapperManager.class);
-    IcebergHealthOperations ops = operationsWithManager(manager);
+  public void testReadyReturns200WhenWrapperInitialized() {
+    NamespaceWrapper wrapper = mock(NamespaceWrapper.class);
+    when(wrapper.isInitialized()).thenReturn(true);
+    LanceHealthOperations ops = operationsWithWrapper(wrapper);
     Response resp = ops.ready();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     HealthResponse body = (HealthResponse) resp.getEntity();
@@ -89,20 +89,21 @@ public class TestIcebergHealthOperations {
   }
 
   @Test
-  public void testReadyReturns503WhenManagerNotInitialized() {
-    IcebergHealthOperations ops = operationsWithManager(null);
+  public void testReadyReturns503WhenWrapperNotInitialized() {
+    LanceHealthOperations ops = operationsWithWrapper(null);
     Response resp = ops.ready();
     Assertions.assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), resp.getStatus());
     HealthResponse body = (HealthResponse) resp.getEntity();
     Assertions.assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
     Assertions.assertFalse(body.getChecks().isEmpty());
-    Assertions.assertEquals("catalogWrapperManager", body.getChecks().get(0).getName());
+    Assertions.assertEquals("namespaceWrapper", body.getChecks().get(0).getName());
   }
 
   @Test
-  public void testHealthReturns200WhenManagerInitialized() {
-    IcebergCatalogWrapperManager manager = mock(IcebergCatalogWrapperManager.class);
-    IcebergHealthOperations ops = operationsWithManager(manager);
+  public void testHealthReturns200WhenWrapperInitialized() {
+    NamespaceWrapper wrapper = mock(NamespaceWrapper.class);
+    when(wrapper.isInitialized()).thenReturn(true);
+    LanceHealthOperations ops = operationsWithWrapper(wrapper);
     Response resp = ops.health();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     HealthResponse body = (HealthResponse) resp.getEntity();
@@ -111,15 +112,15 @@ public class TestIcebergHealthOperations {
   }
 
   @Test
-  public void testHealthReturns503WhenManagerNotInitialized() {
-    IcebergHealthOperations ops = operationsWithManager(null);
+  public void testHealthReturns503WhenWrapperNotInitialized() {
+    LanceHealthOperations ops = operationsWithWrapper(null);
     Response resp = ops.health();
     Assertions.assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), resp.getStatus());
     HealthResponse body = (HealthResponse) resp.getEntity();
     Assertions.assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
-    boolean hasCatalogCheck =
-        body.getChecks().stream().anyMatch(c -> "catalogWrapperManager".equals(c.getName()));
-    Assertions.assertTrue(hasCatalogCheck);
+    boolean hasNamespaceCheck =
+        body.getChecks().stream().anyMatch(c -> "namespaceWrapper".equals(c.getName()));
+    Assertions.assertTrue(hasNamespaceCheck);
   }
 
   /** Verifies mapped direct and wrapped OOM disable all health probes. */
@@ -131,17 +132,17 @@ public class TestIcebergHealthOperations {
           new IllegalStateException(new OutOfMemoryError("Java heap space"))
         }) {
       ServerHealth health = new ServerHealth();
-      IcebergHealthOperations ops =
-          new IcebergHealthOperations(health) {
+      LanceHealthOperations ops =
+          new LanceHealthOperations(health) {
             @Override
-            IcebergCatalogWrapperManager getCatalogWrapperManager() {
+            NamespaceWrapper getNamespaceWrapper() {
               Assertions.fail("Readiness must skip initialization checks after OOM");
               return null;
             }
           };
       try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
         shared.when(ServerHealth::getInstance).thenReturn(health);
-        try (Response response = IcebergExceptionMapper.toRESTResponse(failure)) {
+        try (Response response = LanceExceptionMapper.toRESTResponse("test", failure)) {
           Assertions.assertEquals(500, response.getStatus());
         }
       }
@@ -169,11 +170,11 @@ public class TestIcebergHealthOperations {
     Throwable failure = new IllegalStateException("ordinary failure");
     try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
       shared.when(ServerHealth::getInstance).thenReturn(health);
-      try (Response response = IcebergExceptionMapper.toRESTResponse(failure)) {
+      try (Response response = LanceExceptionMapper.toRESTResponse("test", failure)) {
         Assertions.assertEquals(500, response.getStatus());
       }
     }
-    try (Response response = new IcebergHealthOperations(health).live()) {
+    try (Response response = new LanceHealthOperations(health).live()) {
       Assertions.assertEquals(200, response.getStatus());
     }
   }
@@ -183,11 +184,12 @@ public class TestIcebergHealthOperations {
   public void testOutOfMemoryObservedDuringReadinessOverridesSuccess() {
     for (boolean aggregate : new boolean[] {false, true}) {
       ServerHealth health = new ServerHealth();
-      IcebergCatalogWrapperManager dependency = mock(IcebergCatalogWrapperManager.class);
-      IcebergHealthOperations ops =
-          new IcebergHealthOperations(health) {
+      NamespaceWrapper dependency = mock(NamespaceWrapper.class);
+      when(dependency.isInitialized()).thenReturn(true);
+      LanceHealthOperations ops =
+          new LanceHealthOperations(health) {
             @Override
-            IcebergCatalogWrapperManager getCatalogWrapperManager() {
+            NamespaceWrapper getNamespaceWrapper() {
               health.recordFailure(new OutOfMemoryError("Metaspace"));
               return dependency;
             }

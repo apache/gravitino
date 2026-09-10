@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.HealthCheckPathMatcher;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,8 @@ import org.slf4j.LoggerFactory;
 public class AuthenticationFilter implements Filter {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticationFilter.class);
+
+  private final ServerHealth health = ServerHealth.getInstance();
 
   private final List<Authenticator> filterAuthenticators;
 
@@ -118,6 +121,7 @@ public class AuthenticationFilter implements Filter {
             return null;
           });
     } catch (UnauthorizedException ue) {
+      health.recordFailure(ue);
       HttpServletResponse resp = (HttpServletResponse) response;
       if (!ue.getChallenges().isEmpty()) {
         // For some authentication, HTTP response can provide some challenge information
@@ -131,6 +135,7 @@ public class AuthenticationFilter implements Filter {
       }
       sendAuthErrorResponse(resp, ue);
     } catch (Exception e) {
+      health.recordFailure(e);
       HttpServletResponse resp = (HttpServletResponse) response;
       sendAuthErrorResponse(resp, e);
     }

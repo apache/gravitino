@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
@@ -132,6 +133,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   }
 
   public static Response toRESTResponse(Throwable ex) {
+    ServerHealth.getInstance().recordFailure(ex);
     int status =
         EXCEPTION_ERROR_CODES.getOrDefault(
             ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
