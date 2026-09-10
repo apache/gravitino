@@ -219,17 +219,17 @@ reach them without credentials.
 | `gravitino.server.health.entityStore.probeTimeoutMs` | Timeout in milliseconds for the entity store probe behind `/ready`. | `2000`        |
 
 Every endpoint returns the same JSON shape, but not the same checks. `code` is always `0`,
-`status` is `UP` or `DOWN`, and `checks` carries one entry per component probed. `/live` reports
+`status` is `up` or `down`, and `checks` carries one entry per component probed. `/live` reports
 `httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both
 while no OOM has been observed:
 
 ```json
 {
   "code": 0,
-  "status": "DOWN",
+  "status": "down",
   "checks": [
-    { "name": "httpServer", "status": "UP", "details": {} },
-    { "name": "entityStore", "status": "DOWN", "details": { "reason": "timeout" } }
+    { "name": "httpServer", "status": "up", "details": {} },
+    { "name": "entityStore", "status": "down", "details": { "reason": "timeout" } }
   ]
 }
 ```
@@ -238,7 +238,7 @@ A failing `entityStore` check reports `timeout`, `interrupted`, `probe-rejected`
 `entity store not initialized`, or the simple class name of an unexpected exception.
 
 After an observed `OutOfMemoryError` (including Metaspace OOM), all three endpoints and their root
-aliases return 503 with a single `jvm: DOWN` check and the reason `OutOfMemoryError; restart required`.
+aliases return 503 with a single `jvm: down` check and the reason `OutOfMemoryError; restart required`.
 This state persists until process restart; successful requests do not reset it. See
 [Out-of-memory failures](./health-and-readiness.md#out-of-memory-failures) for detection scope.
 

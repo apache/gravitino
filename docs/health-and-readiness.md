@@ -56,7 +56,7 @@ and traffic managers that require probes at well-known locations. The root alias
 endpoint rather than to a check of its own.
 
 The response body carries an overall status and a list of individual checks. Each check has a name,
-a status of UP or DOWN, and a details map that explains a failure. On the Gravitino server the two
+a status of `up` or `down`, and a details map that explains a failure. On the Gravitino server the two
 normal check names are `httpServer` and `entityStore`. After an observed out-of-memory error, all
 three endpoints instead report the `jvm` failure described below.
 
@@ -67,10 +67,15 @@ while other operations fail. A successful HTTP response or entity-store lookup t
 prove recovery after OOM.
 
 The Gravitino, Iceberg REST, and Lance REST servers record OOM observed by their Jersey exception
-listeners, error mappers, shared request execution/error-response helpers, and Jetty worker
-uncaught-exception handlers. The main server also records failures in health-probe tasks.
+listeners, error mappers, and a servlet filter installed before other filters and servlets.
+Authentication error handling and request execution/error-response helpers (including the built-in
+IdP helpers) also record errors they consume. The main server also records failures in health-probe
+tasks. The Jetty worker uncaught-exception handler is an additional fallback, not the request
+exception boundary.
 Wrapped causes are checked too. Once recorded, the affected service’s health endpoints and root
-aliases return HTTP 503 with this body (the main server uses the `/api/health` prefix):
+aliases return HTTP 503. Gravitino and Lance REST serialize status values as `up`/`down`;
+Iceberg REST uses `UP`/`DOWN`. The following body shows the Gravitino and Lance REST format
+(the main server uses the `/api/health` prefix); Iceberg REST uses `"DOWN"` for both status fields:
 
 ```json
 {
@@ -93,8 +98,14 @@ checks skip the entity-store probe once OOM is recorded. A database outage, ordi
 Detection covers errors reaching these server boundaries; it cannot detect an OOM swallowed
 entirely by a connector or unrelated background executor. This is not a JVM-wide OOM trap. If the
 JVM cannot allocate enough memory to answer a probe, the probe may fail without a JSON response.
-Each service tracks errors observed within its own runtime. Auxiliary services with isolated
-classloaders do not propagate this state between services.
+Only the throwable itself and its cause chain are inspected. An OOM present only in suppressed
+exceptions (for example, from resource cleanup) is not detected, avoiding defensive array copies
+while examining failures.
+
+When Iceberg REST and Lance REST run embedded in the main server, the default auxiliary
+classloaders share the same `ServerHealth` marker. An OOM recorded by any of these services makes
+all of their health endpoints report unhealthy. Services running in separate JVM processes track
+OOM independently.
 
 ## What Readiness Actually Tests
 
@@ -109,9 +120,9 @@ and queues at most twenty probes before rejecting further ones.
 ## Iceberg REST and Lance REST Endpoints
 
 The Iceberg REST service and the Lance REST service each run their own HTTP server on their own
-port, including when they run inside the Gravitino server process, so the Gravitino server's
-endpoints do not report on them. A deployment that runs either service needs probes against its
-port as well.
+port, including when they run inside the Gravitino server process. Embedded services share the
+OOM marker, but HTTP availability and initialization checks remain specific to each service.
+A deployment that runs either service therefore needs probes against its port as well.
 
 Both services return 503 from all health endpoints and root aliases after observing OOM, with the
 `jvm` failure described above, until restart. Before OOM, their existing initialization checks apply.

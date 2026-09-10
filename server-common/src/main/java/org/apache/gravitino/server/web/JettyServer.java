@@ -179,6 +179,9 @@ public class JettyServer {
       webUiEnabled = false;
     }
 
+    // Install before authentication, custom filters, and servlet mappings on every service.
+    addFilter(new OutOfMemoryErrorFilter(), "/*");
+
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     // Metrics System could be null in UT.
     if (metricsSystem != null) {

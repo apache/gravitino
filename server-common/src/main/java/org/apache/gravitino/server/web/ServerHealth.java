@@ -45,7 +45,9 @@ public final class ServerHealth {
   }
 
   /**
-   * Records an out-of-memory error, including one wrapped in another throwable.
+   * Records an out-of-memory error, including one wrapped in another throwable. Suppressed
+   * exceptions are not inspected, avoiding the array copies made by {@link
+   * Throwable#getSuppressed()}.
    *
    * @param failure the observed failure, or null
    */

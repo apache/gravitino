@@ -724,8 +724,8 @@ The Iceberg REST server exposes three health check endpoints following the same 
 
 | Endpoint                    | Description                                                                                                                | HTTP status |
 |-----------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /iceberg/health/live`  | Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed.                                 | 200 / 503   |
-| `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
+| `GET /iceberg/health/live`  | Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed; 503 after an observed OOM.                                 | 200 / 503   |
+| `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized and no OOM has been observed; 503 otherwise. | 200 / 503   |
 | `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
 
 Root-level aliases are also available for global traffic managers that require probes at well-known root paths:

@@ -21,33 +21,47 @@ package org.apache.gravitino.server.web.rest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.HealthAliasServlet;
+import org.apache.gravitino.server.web.JettyServer;
+import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.mapper.ErrorExceptionMapper;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 /** Exercises an OOM on a separate HTTP request before checking every health alias. */
 class TestOutOfMemoryHealthHttp {
@@ -124,6 +138,12 @@ class TestOutOfMemoryHealthHttp {
     assertHealthAfterFailure("wrapped");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"filter-oom", "filter-wrapped", "servlet-oom", "servlet-wrapped"})
+  void errorsOutsideJerseyPoisonAllHealthPaths(String kind) throws Exception {
+    assertHealthAfterFailure(kind);
+  }
+
   private void assertHealthAfterFailure(String failureKind) throws Exception {
     ServerHealth health = new ServerHealth();
     EntityStore store = mock(EntityStore.class);
@@ -137,23 +157,74 @@ class TestOutOfMemoryHealthHttp {
             .register(RuntimeMapper.class)
             .register(ObjectMapperProvider.class)
             .register(JacksonFeature.class);
-    Server server = new Server(0);
-    ServletContextHandler context = new ServletContextHandler();
-    context.setContextPath("/");
-    server.setHandler(context);
-    context.addServlet(new ServletHolder(new ServletContainer(config)), "/api/*");
-    context.addServlet(new ServletHolder(new HealthAliasServlet()), "/health/*");
-    context.addServlet(new ServletHolder(new HealthAliasServlet()), "/health.html");
+    int port = RESTUtils.findAvailablePort(0, 0);
+    Config serverConfig = new Config(false) {};
+    serverConfig.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    JettyServer server = new JettyServer();
+    // Capture an independent health state when the production filter is constructed.
+    try (MockedStatic<ServerHealth> state = mockStatic(ServerHealth.class)) {
+      state.when(ServerHealth::getInstance).thenReturn(health);
+      server.initialize(JettyServerConfig.fromConfig(serverConfig), "oom-test", false);
+    }
+    server.addServlet(new ServletContainer(config), "/api/*");
+    server.addServlet(new HealthAliasServlet(), "/health/*");
+    server.addServlet(new HealthAliasServlet(), "/health.html");
+    server.addFilter(
+        new Filter() {
+          /** {@inheritDoc} */
+          @Override
+          public void init(FilterConfig config) {}
+
+          /** {@inheritDoc} */
+          @Override
+          public void destroy() {}
+
+          /** {@inheritDoc} */
+          @Override
+          public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+              throws IOException, ServletException {
+            String path = ((HttpServletRequest) request).getRequestURI();
+            if (path.endsWith("filter-oom")) {
+              throw new OutOfMemoryError("Metaspace");
+            }
+            if (path.endsWith("filter-wrapped")) {
+              throw new IllegalStateException(new OutOfMemoryError("Java heap space"));
+            }
+            if (path.endsWith("filter-ordinary")) {
+              throw new IllegalStateException("ordinary filter failure");
+            }
+            chain.doFilter(request, response);
+          }
+        },
+        "/*");
+    server.addServlet(
+        new HttpServlet() {
+          /** {@inheritDoc} */
+          @Override
+          protected void doGet(HttpServletRequest request, HttpServletResponse response)
+              throws IOException {
+            if (request.getRequestURI().endsWith("servlet-oom")) {
+              throw new OutOfMemoryError("Metaspace");
+            }
+            if (request.getRequestURI().endsWith("servlet-wrapped")) {
+              throw new IllegalStateException(new OutOfMemoryError("Java heap space"));
+            }
+            throw new IOException("ordinary servlet failure");
+          }
+        },
+        "/outside/*");
     try {
       server.start();
-      int port = ((ServerConnector) server.getConnectors()[0]).getLocalPort();
       HttpClient client = HttpClient.newHttpClient();
       for (String path : HEALTH_PATHS) {
         assertEquals(200, get(client, port, path).statusCode(), path);
       }
       assertEquals(500, get(client, port, "/api/test/ordinary").statusCode());
+      assertEquals(500, get(client, port, "/api/test/filter-ordinary").statusCode());
+      assertEquals(500, get(client, port, "/outside/ordinary").statusCode());
       assertEquals(200, get(client, port, "/api/health").statusCode());
-      assertEquals(500, get(client, port, "/api/test/" + failureKind).statusCode());
+      String failurePath = failureKind.startsWith("servlet-") ? "/outside/" : "/api/test/";
+      assertEquals(500, get(client, port, failurePath + failureKind).statusCode());
       // This is the production failure mode: a successful warm endpoint is not proof of recovery.
       assertEquals(200, get(client, port, "/api/test/warm").statusCode());
       for (String path : HEALTH_PATHS) {

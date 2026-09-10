@@ -20,6 +20,8 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import static org.mockito.Mockito.mock;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.core.Response;
@@ -27,6 +29,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,6 +37,27 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestIcebergHealthOperations {
+
+  /** Verifies the documented status casing with the service's actual JSON mapper. */
+  @Test
+  public void testSerializedHealthStatus() throws Exception {
+    ServerHealth health = new ServerHealth();
+    IcebergHealthOperations operations = new IcebergHealthOperations(health);
+    ObjectMapper mapper = IcebergObjectMapper.getInstance();
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals("UP", json.path("status").asText());
+      Assertions.assertEquals("UP", json.path("checks").get(0).path("status").asText());
+    }
+    health.recordFailure(new OutOfMemoryError("Metaspace"));
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals(503, response.getStatus());
+      Assertions.assertEquals("DOWN", json.path("status").asText());
+      Assertions.assertEquals("DOWN", json.path("checks").get(0).path("status").asText());
+      Assertions.assertEquals("jvm", json.path("checks").get(0).path("name").asText());
+    }
+  }
 
   private static IcebergHealthOperations operationsWithManager(
       IcebergCatalogWrapperManager manager) {

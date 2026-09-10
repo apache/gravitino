@@ -21,6 +21,8 @@ package org.apache.gravitino.lance.service.rest;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.core.Response;
@@ -35,6 +37,27 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestLanceHealthOperations {
+
+  /** Verifies the documented status casing with the service's actual JSON mapper. */
+  @Test
+  public void testSerializedHealthStatus() throws Exception {
+    ServerHealth health = new ServerHealth();
+    LanceHealthOperations operations = new LanceHealthOperations(health);
+    ObjectMapper mapper = new JsonNullableMapperProvider().getContext(HealthResponse.class);
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals("up", json.path("status").asText());
+      Assertions.assertEquals("up", json.path("checks").get(0).path("status").asText());
+    }
+    health.recordFailure(new OutOfMemoryError("Metaspace"));
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals(503, response.getStatus());
+      Assertions.assertEquals("down", json.path("status").asText());
+      Assertions.assertEquals("down", json.path("checks").get(0).path("status").asText());
+      Assertions.assertEquals("jvm", json.path("checks").get(0).path("name").asText());
+    }
+  }
 
   private static LanceHealthOperations operationsWithWrapper(NamespaceWrapper wrapper) {
     return new LanceHealthOperations(new ServerHealth()) {
