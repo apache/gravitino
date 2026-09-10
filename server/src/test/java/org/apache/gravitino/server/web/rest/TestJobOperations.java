@@ -28,9 +28,12 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -858,6 +861,187 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchJobException.class.getSimpleName(), errorResp.getType());
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  public void testCancelJobWithMalformedRuntimeJobTemplateDoesNotFail() {
+    // By the time toDTO() runs here, jobOperationDispatcher.cancelJob() has already cancelled
+    // the job and updated its stored entity - a malformed stored runtime job template must not
+    // turn that already-completed cancellation into a 500 for the caller. The response should
+    // just omit the runtime job template.
+    JobEntity job =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-cancel-malformed")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_template_1")
+            .withStatus(JobHandle.Status.CANCELLED)
+            .withStartedAt(0L)
+            .withFinishedAt(Instant.now().toEpochMilli())
+            .withRuntimeJobTemplate("{not-valid-json")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    when(jobOperationDispatcher.cancelJob(metalake, job.name())).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, jobResp.getJob().status());
+    Assertions.assertNull(jobResp.getJob().runtimeJobTemplate());
+  }
+
+  @Test
+  public void testCancelJobIsResponseMetered() throws Exception {
+    Method cancelJob = JobOperations.class.getMethod("cancelJob", String.class, String.class);
+    ResponseMetered metered = cancelJob.getAnnotation(ResponseMetered.class);
+    Assertions.assertNotNull(metered);
+    Assertions.assertEquals("cancel-job", metered.name());
+    Assertions.assertTrue(metered.absolute());
+
+    Timed timed = cancelJob.getAnnotation(Timed.class);
+    Assertions.assertNotNull(timed);
+    Assertions.assertTrue(timed.name().startsWith("cancel-job."));
+    Assertions.assertTrue(timed.absolute());
+  }
+
+  @Test
+  public void testToDTOFinishedAt() {
+    // Sentinel value (<= 0) used by the storage layer means "not finished".
+    JobEntity sentinelJob = newJobEntity("shell_template_1", JobHandle.Status.STARTED, 0L);
+    JobDTO sentinelJobDTO = JobOperations.toDTO(sentinelJob);
+    Assertions.assertNull(sentinelJobDTO.finishedAt());
+
+    // Finished, finishedAt is converted from epoch millis to an Instant.
+    long epochMilli = Instant.now().toEpochMilli();
+    JobEntity finishedJob =
+        newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED, epochMilli);
+    JobDTO finishedJobDTO = JobOperations.toDTO(finishedJob);
+    Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), finishedJobDTO.finishedAt());
+  }
+
+  @Test
+  public void testToDTOStartedAt() {
+    // Sentinel value (<= 0) used by the storage layer means "not started".
+    JobEntity sentinelJob = newJobEntity("shell_template_1", JobHandle.Status.QUEUED, 0L, 0L);
+    JobDTO sentinelJobDTO = JobOperations.toDTO(sentinelJob);
+    Assertions.assertNull(sentinelJobDTO.startedAt());
+
+    // Started, startedAt is converted from epoch millis to an Instant.
+    long epochMilli = Instant.now().toEpochMilli();
+    JobEntity startedJob =
+        newJobEntity("shell_template_1", JobHandle.Status.STARTED, epochMilli, 0L);
+    JobDTO startedJobDTO = JobOperations.toDTO(startedJob);
+    Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), startedJobDTO.startedAt());
+  }
+
+  @Test
+  public void testToDTOQueuedAt() {
+    // queuedAt is always present - it's the job's creation time, not a sentinel-backed field.
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.QUEUED);
+    JobDTO jobDTO = JobOperations.toDTO(job);
+    Assertions.assertEquals(job.auditInfo().createTime(), jobDTO.queuedAt());
+    Assertions.assertNotNull(jobDTO.queuedAt());
+  }
+
+  @Test
+  public void testToDTORuntimeJobTemplate() {
+    // No runtime job template stored (e.g. a job run before this field was introduced) - must
+    // round-trip as null rather than failing to convert.
+    JobEntity jobWithoutTemplate = newJobEntity("shell_template_1", JobHandle.Status.QUEUED);
+    JobDTO jobDTOWithoutTemplate = JobOperations.toDTO(jobWithoutTemplate);
+    Assertions.assertNull(jobDTOWithoutTemplate.runtimeJobTemplate());
+
+    // A stored runtime job template must be deserialized back into a JobTemplateDTO, with
+    // Shell/Spark dispatch handled automatically by JobTemplateDTO's @JsonTypeInfo.
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"shell_template_1\",\"comment\":\"resolved\","
+            + "\"executable\":\"/bin/echo\",\"arguments\":[\"resolved-arg\"]}";
+    JobEntity jobWithTemplate =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-with-template")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_template_1")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobDTO jobDTO = JobOperations.toDTO(jobWithTemplate);
+
+    Assertions.assertNotNull(jobDTO.runtimeJobTemplate());
+    Assertions.assertInstanceOf(ShellJobTemplateDTO.class, jobDTO.runtimeJobTemplate());
+    ShellJobTemplateDTO runtimeJobTemplateDTO = (ShellJobTemplateDTO) jobDTO.runtimeJobTemplate();
+    Assertions.assertEquals("shell_template_1", runtimeJobTemplateDTO.name());
+    Assertions.assertEquals("resolved", runtimeJobTemplateDTO.comment());
+    Assertions.assertEquals("/bin/echo", runtimeJobTemplateDTO.executable());
+    Assertions.assertEquals(Lists.newArrayList("resolved-arg"), runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testListJobsWithMalformedRuntimeJobTemplateDoesNotFailWholeList() {
+    // A single job whose stored runtime job template fails to deserialize (e.g. corrupted or
+    // written by a future, incompatible version) must not fail the entire listJobs response -
+    // it should come back with a null runtimeJobTemplate while every other job is unaffected.
+    String templateName = "shell_template_1";
+    JobEntity healthyJob = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobEntity malformedJob =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-malformed")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName(templateName)
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate("{not-valid-json")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
+        .thenReturn(Lists.newArrayList(healthyJob, malformedJob));
+
+    Response resp =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
+    Assertions.assertEquals(0, jobListResponse.getCode());
+    Assertions.assertEquals(2, jobListResponse.getJobs().size());
+
+    JobDTO healthyJobDTO =
+        jobListResponse.getJobs().stream()
+            .filter(dto -> dto.jobId().equals(healthyJob.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Healthy job missing from response"));
+    Assertions.assertEquals(JobOperations.toDTO(healthyJob), healthyJobDTO);
+
+    JobDTO malformedJobDTO =
+        jobListResponse.getJobs().stream()
+            .filter(dto -> dto.jobId().equals(malformedJob.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Malformed job missing from response"));
+    Assertions.assertNull(malformedJobDTO.runtimeJobTemplate());
+    Assertions.assertEquals(JobHandle.Status.QUEUED, malformedJobDTO.status());
+  }
+
+>>>>>>> 2fc069301 ([#13041] fix(server): Add @ResponseMetered to JobOperations#cancelJob (#13046))
   private String jobTemplatePath() {
     return "/metalakes/" + metalake + "/jobs/templates";
   }
