@@ -722,11 +722,11 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 
 The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized. It performs no I/O and has no configurable timeout.
 
-| Endpoint                    | Description                                                                                                                | HTTP status |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /iceberg/health/live`  | Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed; 503 after an observed OOM.                                 | 200 / 503   |
+| Endpoint                    | Description                                                                                                               | HTTP status |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`  | Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed; 503 after an observed OOM.     | 200 / 503   |
 | `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized and no OOM has been observed; 503 otherwise. | 200 / 503   |
-| `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+| `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                             | 200 / 503   |
 
 Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
 
