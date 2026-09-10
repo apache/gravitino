@@ -245,6 +245,18 @@ class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
 
 
+class NoSuchSemanticModelException(NotFoundException):
+    """An exception thrown when a Semantic Model with specified name is not found."""
+
+
+class SemanticModelAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a Semantic Model already exists."""
+
+
+class IllegalSemanticModelException(IllegalArgumentException):
+    """An exception thrown when a Semantic Model definition is invalid."""
+
+
 class IllegalPrivilegeException(IllegalArgumentException):
     """An exception thrown when a privilege is invalid."""
 
