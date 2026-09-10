@@ -45,6 +45,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
@@ -256,6 +257,10 @@ public class GravitinoInterceptionService implements InterceptionService {
           }
         }
         return methodInvocation.proceed();
+      } catch (IllegalMetadataObjectException ex) {
+        LOG.warn("Invalid metadata object type during authorization", ex);
+        return Utils.illegalArguments(
+            IllegalArgumentException.class.getSimpleName(), ex.getMessage(), ex);
       } catch (IllegalNameIdentifierException ex) {
         LOG.warn("Invalid metadata object identifier during authorization", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);
