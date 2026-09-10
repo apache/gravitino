@@ -139,7 +139,7 @@ public class TestMultipleJDBCLoad extends BaseIT {
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
 
     // test wrong password
-    Exception exception =
+    ConnectionFailedException exception =
         Assertions.assertThrows(
             ConnectionFailedException.class,
             () ->
@@ -149,7 +149,10 @@ public class TestMultipleJDBCLoad extends BaseIT {
                     "lakehouse-iceberg",
                     "comment",
                     icebergMysqlConf));
-    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
+    Assertions.assertEquals(ConnectionFailedException.class, exception.getClass());
+    Assertions.assertEquals(
+        "Failed to connect: " + icebergMysqlConf.get(IcebergConfig.CATALOG_URI.getKey()),
+        exception.getMessage());
 
     // test correct password
     icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
