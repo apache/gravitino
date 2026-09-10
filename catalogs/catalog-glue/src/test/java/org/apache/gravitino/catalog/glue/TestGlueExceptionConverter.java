@@ -19,10 +19,7 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-<<<<<<< HEAD
-=======
 import static org.junit.jupiter.api.Assertions.assertFalse;
->>>>>>> 172c9031d ([#13012] fix(catalog-glue): Fail fast and give actionable errors on missing AWS credentials (#13013))
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;

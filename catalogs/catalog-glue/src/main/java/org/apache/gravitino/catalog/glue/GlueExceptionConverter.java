@@ -24,11 +24,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
-<<<<<<< HEAD
-=======
 import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.services.glue.model.AccessDeniedException;
->>>>>>> 172c9031d ([#13012] fix(catalog-glue): Fail fast and give actionable errors on missing AWS credentials (#13013))
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
