@@ -114,9 +114,10 @@ when it ignores one.
 The connector sets `iceberg.rest-catalog.session=USER` automatically when both hold:
 
 - `gravitino.client.session.forwardUser=true`
-- the IRC authenticates with OAuth2 — either `gravitino.client.authType=oauth2`, or
-  `gravitino.iceberg.rest-catalog.security=OAUTH2` (or `trino.bypass.iceberg.rest-catalog.security`
-  on a catalog with its own REST backend)
+- the IRC authenticates with OAuth2, through any one of:
+  - `gravitino.client.authType=oauth2`
+  - `gravitino.iceberg.rest-catalog.security=OAUTH2`
+  - `trino.bypass.iceberg.rest-catalog.security=OAUTH2`, on a catalog with its own REST backend
 
 Each query then carries the end user's identity to the IRC, keeping per-user credential vending and
 per-user authorization intact. Otherwise the session mode is deliberately left off: the forwarded
