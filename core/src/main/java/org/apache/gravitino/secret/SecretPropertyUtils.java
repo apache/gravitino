@@ -23,7 +23,9 @@ import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -35,7 +37,33 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class SecretPropertyUtils {
 
+  /**
+   * Property keys whose names look like credentials. Matching is case-insensitive. Used to mask API
+   * responses and to expose plaintext via {@code getSecrets} for undeclared / mistyped credential
+   * properties.
+   */
+  private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
+      Pattern.compile(".*(secret|password|token|credential|access|account).*");
+
   private SecretPropertyUtils() {}
+
+  /**
+   * Returns whether a property key name looks sensitive (credential-like).
+   *
+   * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
+   * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
+   * storage account key/name and GCS service-account file paths). Underscores and hyphens are not
+   * normalized; they are irrelevant because the matched keywords contain neither.
+   *
+   * @param key the property key
+   * @return true when the key name matches the sensitive pattern
+   */
+  public static boolean isSensitivePropertyKey(@Nullable String key) {
+    if (key == null || key.isEmpty()) {
+      return false;
+    }
+    return SENSITIVE_PROPERTY_KEY_PATTERN.matcher(key.toLowerCase(Locale.ROOT)).matches();
+  }
 
   /**
    * Returns whether a property value is a Gravitino secret URN for the given key.
@@ -49,19 +77,25 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Builds a map of secret-manager plaintext properties only.
+   * Builds a map of plaintext secret properties for {@code getSecrets}.
    *
    * <p>Starting from raw entity properties:
    *
    * <ol>
-   *   <li>Include every entry where {@link #isSecretProperty} is true, including keys that may also
-   *       appear in credential vending (for example {@code jdbc-password} or {@code
-   *       s3-secret-access-key}).
-   *   <li>Resolve secret URN values to plaintext via {@link SecretManager#readSecret}.
+   *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
+   *       {@link SecretManager#readSecret}.
+   *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
+   *       not a secret URN, returning the stored plaintext.
    * </ol>
    *
-   * <p>Normal non-secret properties are not included. Plaintext values that are not secret URNs are
-   * not included even when the key is sensitive.
+   * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
+   * hidden. A hidden key is recovered only when it is a secret URN or its name matches {@link
+   * #isSensitivePropertyKey} (for example {@code jdbc-password}). A hidden key whose name does not
+   * look sensitive (for example a path-like {@code auth-file}) stays masked as {@code ******} on
+   * list/get and is absent from this map.
+   *
+   * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
+   * properties()} so undeclared credential keys remain usable without leaking on list/get.
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
@@ -82,6 +116,8 @@ public final class SecretPropertyUtils {
       }
       if (isSecretProperty(key, value)) {
         secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
+      } else if (isSensitivePropertyKey(key)) {
+        secrets.put(key, value);
       }
     }
     return secrets;

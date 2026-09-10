@@ -82,6 +82,7 @@ import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
@@ -171,8 +172,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, CatalogException {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
+      Map<String, String> schemaProperties =
+          PropertyUtils.propertiesWithSecrets(schema.properties(), schema::supportsSecrets);
       Map<String, String> properties =
-          schemaAndTablePropertiesConverter.toFlinkDatabaseProperties(schema.properties());
+          schemaAndTablePropertiesConverter.toFlinkDatabaseProperties(schemaProperties);
       return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), databaseName);
@@ -804,10 +807,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(table.columns());
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
     flinkPrimaryKey.ifPresent(builder::primaryKey);
+    Map<String, String> tableProperties =
+        PropertyUtils.propertiesWithSecrets(table.properties(), table::supportsSecrets);
     Map<String, String> flinkTableProperties =
         new HashMap<>(
             schemaAndTablePropertiesConverter.toFlinkTableProperties(
-                catalogOptions, table.properties(), tablePath));
+                catalogOptions, tableProperties, tablePath));
     flinkTableProperties.putAll(fromGravitinoDistribution(table.distribution()));
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     CatalogTable baseTable =
@@ -1083,11 +1088,13 @@ public abstract class BaseCatalog extends AbstractCatalog {
                             "View '%s' in catalog '%s' has no SQL representation for dialects %s",
                             view.name(), catalogName(), dialects)));
 
-    Map<String, String> properties =
-        view.properties() != null
-            ? Collections.unmodifiableMap(view.properties())
-            : Collections.emptyMap();
+    Map<String, String> properties = viewPropertiesWithSecrets(view);
     return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
+  }
+
+  private static Map<String, String> viewPropertiesWithSecrets(View view) {
+    return Collections.unmodifiableMap(
+        PropertyUtils.propertiesWithSecrets(view.properties(), view::supportsSecrets));
   }
 
   @VisibleForTesting
