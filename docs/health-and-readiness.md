@@ -95,6 +95,13 @@ This state lasts until process restart, even if subsequent ordinary API requests
 checks skip the entity-store probe once OOM is recorded. A database outage, ordinary HTTP 500,
 `StackOverflowError`, or missing connector class alone does not set this state.
 
+This policy also applies to an OOM caused by a single request, such as an oversized list response
+or `Requested array size exceeds VM limit`. The server does not distinguish recoverable allocation
+failures from persistent memory exhaustion: even if memory becomes available again, the health
+state remains unhealthy until restart. If liveness probes trigger automatic restarts, repeatedly
+retrying the same oversized request against different replicas can cause those replicas to restart
+in succession. Account for this behavior when configuring request limits and retry policies.
+
 Detection covers errors reaching these server boundaries; it cannot detect an OOM swallowed
 entirely by a connector or unrelated background executor. This is not a JVM-wide OOM trap. If the
 JVM cannot allocate enough memory to answer a probe, the probe may fail without a JSON response.
