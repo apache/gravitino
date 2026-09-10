@@ -47,6 +47,9 @@ import org.apache.gravitino.listener.api.event.DropCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogPreEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionPreEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogPreEvent;
@@ -218,14 +221,33 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws Exception {
-    // TODO(#12566): Support event dispatching for testConnection
-    dispatcher.testConnection(ident, type, provider, comment, properties);
+    // Do not put properties on the event payload - they may contain credentials (#12566).
+    eventBus.dispatchEvent(
+        new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.testConnection(ident, type, provider, comment, properties);
+      eventBus.dispatchEvent(
+          new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
   public void testConnection(NameIdentifier ident) throws Exception {
-    // TODO(#12566): Support event dispatching for testConnection
-    dispatcher.testConnection(ident);
+    eventBus.dispatchEvent(
+        new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.testConnection(ident);
+      eventBus.dispatchEvent(
+          new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
