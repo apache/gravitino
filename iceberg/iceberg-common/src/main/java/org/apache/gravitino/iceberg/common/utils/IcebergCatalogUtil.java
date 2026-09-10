@@ -58,6 +58,27 @@ public class IcebergCatalogUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
+<<<<<<< HEAD
+=======
+  /**
+   * Column that Iceberg adds to the {@code iceberg_tables} control table in its V1 view-support
+   * migration (see {@code JdbcUtil} in iceberg-core).
+   */
+  private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
+
+  /**
+   * SQLSTATE {@code 28000}: MySQL error 1045 (Access denied), H2 wrong user/password, and
+   * PostgreSQL {@code invalid_authorization_specification} (for example unknown role).
+   */
+  private static final String SQLSTATE_INVALID_AUTHORIZATION = "28000";
+
+  /** SQLSTATE {@code 28P01}: PostgreSQL {@code invalid_password}. */
+  private static final String SQLSTATE_INVALID_PASSWORD = "28P01";
+
+  private static final String GCS_CLOUD_PLATFORM_SCOPE =
+      "https://www.googleapis.com/auth/cloud-platform";
+
+>>>>>>> e7fee4319 ([#13033] fix(iceberg): Map PostgreSQL JDBC auth failures to ConnectionFailedException (#13034))
   private static final ConcurrentHashMap<String, InMemoryCatalog> MEMORY_CATALOGS =
       new ConcurrentHashMap<>();
 
@@ -170,9 +191,19 @@ public class IcebergCatalogUtil {
     try {
       jdbcCatalog.initialize(icebergCatalogName, properties);
     } catch (UncheckedSQLException e) {
+<<<<<<< HEAD
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {
         throw new ConnectionFailedException(e, e.getMessage());
+=======
+      Throwable cause = e.getCause();
+      if (cause instanceof SQLException) {
+        String sqlState = ((SQLException) cause).getSQLState();
+        if (SQLSTATE_INVALID_AUTHORIZATION.equals(sqlState)
+            || SQLSTATE_INVALID_PASSWORD.equals(sqlState)) {
+          throw new ConnectionFailedException(e, e.getMessage());
+        }
+>>>>>>> e7fee4319 ([#13033] fix(iceberg): Map PostgreSQL JDBC auth failures to ConnectionFailedException (#13034))
       }
       throw e;
     }
