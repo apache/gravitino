@@ -22,6 +22,7 @@ import httpx
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    MetalakeOperation,
     ModelOperation,
     PolicyOperation,
     SchemaOperation,
@@ -37,6 +38,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
+)
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
 )
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
@@ -134,10 +138,17 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._view_operation = PlainRESTClientViewOperation(
             metalake_name, _rest_client
         )
+        # Not metalake-scoped: addresses the server's top-level endpoint.
+        self._metalake_operation = PlainRESTClientMetalakeOperation(
+            _rest_client
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client and release its connection pool."""
         await self._rest_client.aclose()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return self._metalake_operation
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self._catalog_operation

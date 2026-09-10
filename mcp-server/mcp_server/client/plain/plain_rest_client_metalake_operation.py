@@ -15,13 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.client.catalog_operation import CatalogOperation
-from mcp_server.client.gravitino_operation import GravitinoOperation
-from mcp_server.client.job_operation import JobOperation
+from httpx import AsyncClient
+
 from mcp_server.client.metalake_operation import MetalakeOperation
-from mcp_server.client.model_operation import ModelOperation
-from mcp_server.client.policy_operation import PolicyOperation
-from mcp_server.client.schema_operation import SchemaOperation
-from mcp_server.client.table_operation import TableOperation
-from mcp_server.client.tag_operation import TagOperation
-from mcp_server.client.topic_operation import TopicOperation
+from mcp_server.client.plain.utils import extract_content_from_response
+
+
+class PlainRESTClientMetalakeOperation(MetalakeOperation):
+    """Metalake operations against the server's top-level endpoint.
+
+    Takes no metalake name: this is the one operation that must work before a
+    metalake has been chosen.
+    """
+
+    def __init__(self, rest_client: AsyncClient):
+        self.rest_client = rest_client
+
+    async def get_list_of_metalakes(self) -> str:
+        response = await self.rest_client.get("/api/metalakes")
+        return extract_content_from_response(response, "metalakes", [])

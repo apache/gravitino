@@ -49,6 +49,8 @@ public enum MySQLExternalDataType {
   SET("set", VarcharType.VARCHAR),
   JSON("json", JSON_TYPE),
   VARBINARY("varbinary", VarbinaryType.VARBINARY),
+  BINARY("binary", VarbinaryType.VARBINARY),
+  BIT("bit", VarbinaryType.VARBINARY),
   TINYBLOB("tinyblob", VarbinaryType.VARBINARY),
   BLOB("blob", VarbinaryType.VARBINARY),
   MEDIUMBLOB("mediumblob", VarbinaryType.VARBINARY),
@@ -84,11 +86,19 @@ public enum MySQLExternalDataType {
   }
 
   public static MySQLExternalDataType safeValueOf(String mysqlTypeName) {
+    // catalogString may carry type parameters, e.g. "varbinary(100)" or "enum('a','b','c')", so
+    // match on the bare type name.
+    String baseTypeName = stripTypeParameters(mysqlTypeName);
     for (MySQLExternalDataType mySQLExternalDataType : MySQLExternalDataType.values()) {
-      if (mySQLExternalDataType.mysqlTypeName.equalsIgnoreCase(mysqlTypeName)) {
+      if (mySQLExternalDataType.mysqlTypeName.equalsIgnoreCase(baseTypeName)) {
         return mySQLExternalDataType;
       }
     }
     return UNKNOWN;
+  }
+
+  private static String stripTypeParameters(String mysqlTypeName) {
+    int parenIndex = mysqlTypeName.indexOf('(');
+    return parenIndex == -1 ? mysqlTypeName.trim() : mysqlTypeName.substring(0, parenIndex).trim();
   }
 }

@@ -15,13 +15,24 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.client.catalog_operation import CatalogOperation
-from mcp_server.client.gravitino_operation import GravitinoOperation
-from mcp_server.client.job_operation import JobOperation
-from mcp_server.client.metalake_operation import MetalakeOperation
-from mcp_server.client.model_operation import ModelOperation
-from mcp_server.client.policy_operation import PolicyOperation
-from mcp_server.client.schema_operation import SchemaOperation
-from mcp_server.client.table_operation import TableOperation
-from mcp_server.client.tag_operation import TagOperation
-from mcp_server.client.topic_operation import TopicOperation
+from abc import ABC, abstractmethod
+
+
+class MetalakeOperation(ABC):
+    """
+    Abstract base class for Gravitino metalake operations.
+
+    Unlike every other operation, these are not scoped to a single metalake:
+    they address the server's top-level ``/api/metalakes`` endpoint, so an
+    agent can discover which metalakes it may operate on before naming one.
+    """
+
+    @abstractmethod
+    async def get_list_of_metalakes(self) -> str:
+        """
+        Retrieve the list of metalakes the caller is allowed to see.
+
+        Returns:
+            str: JSON-formatted string containing metalake information.
+        """
+        pass

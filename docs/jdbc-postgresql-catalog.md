@@ -118,6 +118,16 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-o
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
+
+An unconstrained `Numeric` column, that is one declared without precision and scale, accepts values of up to
+131072 digits before and 16383 digits after the decimal point, and its precision and scale vary per row.
+Gravitino `Decimal` caps precision at 38 and is fixed per column, so such a column is mapped to the External
+Type `numeric` instead. A `Numeric(p, s)` column is mapped to `Decimal(p, s)` and a `Numeric(p)` column to
+`Decimal(p, 0)` as usual.
+
+PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
+mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and
+produces an ordinary array whose elements accept NULL.
 :::
 
 ### Table Column Auto-Increment

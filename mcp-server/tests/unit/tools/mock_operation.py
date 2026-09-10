@@ -27,6 +27,7 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.view_operation import ViewOperation
@@ -71,6 +72,14 @@ class MockOperation(GravitinoOperation):
 
     def as_view_operation(self) -> ViewOperation:
         return MockViewOperation()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return MockMetalakeOperation()
+
+
+class MockMetalakeOperation(MetalakeOperation):
+    async def get_list_of_metalakes(self) -> str:
+        return "mock_metalakes"
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -429,14 +438,13 @@ class MockJobOperation(JobOperation):
 
 class MockStatisticOperation(StatisticOperation):
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
-        return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
+        return f"mock_statistics: {metadata_type}, {metadata_fullname}"
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -445,7 +453,7 @@ class MockStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         return (
-            f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
+            f"mock_statistics_for_partition: {metadata_type}, {metadata_fullname},"
             f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
         )
 
