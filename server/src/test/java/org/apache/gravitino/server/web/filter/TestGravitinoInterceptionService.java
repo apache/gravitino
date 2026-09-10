@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -48,11 +49,8 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
+import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
->>>>>>> b6b0f24f9 ([#12727] fix(server): Return 400 for invalid metadata object types (#13059))
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -61,7 +59,10 @@ import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailure
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
@@ -261,65 +262,14 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  public void testRejectsUnheldActiveRolesWith403() throws Throwable {
-    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
-            mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class);
-        MockedStatic<MetalakeManager> metalakeManagerMocked = mockStatic(MetalakeManager.class)) {
-      // The caller declares an active role via the header; the authorizer reports it as unheld.
-      UserPrincipal principal =
-          new UserPrincipal("tester")
-              .withActiveRoles(ActiveRoles.of(Collections.singletonList("ghostRole")));
-      principalUtilsMocked.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
-      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
-
-      MethodInvocation methodInvocation = mock(MethodInvocation.class);
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
-      when(authorizer.findUnheldRoles(
-              ArgumentMatchers.any(),
-              ArgumentMatchers.eq("testMetalake"),
-              ArgumentMatchers.any(),
-              ArgumentMatchers.any()))
-          .thenReturn(Collections.singleton("ghostRole"));
-
-      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
-      EntityStore mockStore = mock(EntityStore.class);
-      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-      when(mockEnv.entityStore()).thenReturn(mockStore);
-      metalakeManagerMocked
-          .when(() -> MetalakeManager.checkMetalake(ArgumentMatchers.any(), ArgumentMatchers.any()))
-          .thenAnswer(invocation -> null);
-
-      GravitinoInterceptionService service = new GravitinoInterceptionService();
-      Method testMethod = TestOperations.class.getMethods()[0];
-      MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
-      when(methodInvocation.getMethod()).thenReturn(testMethod);
-      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
-
-      Response response = (Response) interceptor.invoke(methodInvocation);
-
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      Assertions.assertTrue(
-          ((ErrorResponse) response.getEntity()).getMessage().contains("ghostRole"));
-      verify(methodInvocation, never()).proceed();
-    }
-  }
-
-  @Test
   public void testInvalidMetadataObjectTypeReturnsBadRequest() throws Throwable {
     Method method =
         TestMetadataObjectTagAssociationOperations.class.getMethod(
-            "associateTagValuesForObject",
+            "associateTagsForObject",
             String.class,
             String.class,
             String.class,
-            TagValuesAssociateRequest.class);
+            TagsAssociateRequest.class);
     MethodInvocation invocation = mock(MethodInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
     when(invocation.getArguments())
@@ -340,7 +290,6 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
->>>>>>> b6b0f24f9 ([#12727] fix(server): Return 400 for invalid metadata object types (#13059))
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
@@ -735,6 +684,19 @@ public class TestGravitinoInterceptionService {
       Assertions.assertFalse(
           RequestContext.isOperationFailureFired(),
           "operationFailureFired must stay false so HttpAuditFilter emits the HTTP-level event");
+    }
+  }
+
+  public static class TestMetadataObjectTagAssociationOperations {
+
+    @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+    public Response associateTagsForObject(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationObjectType String type,
+        @AuthorizationFullName String fullName,
+        @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+            TagsAssociateRequest request) {
+      return Utils.ok("unused");
     }
   }
 
