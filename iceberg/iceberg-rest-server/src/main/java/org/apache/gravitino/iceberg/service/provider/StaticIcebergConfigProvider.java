@@ -43,8 +43,11 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
+  private Map<String, String> properties;
+
   @Override
   public void initialize(Map<String, String> properties) {
+    this.properties = properties;
     this.catalogConfigs =
         properties.keySet().stream()
             .map(this::getCatalogName)
@@ -69,6 +72,12 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void close() {}
+
+  @Override
+  public String getMetalakeName() {
+    return properties.getOrDefault(
+        IcebergConstants.GRAVITINO_METALAKE, IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE);
+  }
 
   private Optional<String> getCatalogName(String catalogConfigKey) {
     if (!catalogConfigKey.startsWith("catalog.")) {
