@@ -27,10 +27,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -52,7 +49,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class TableHookDispatcher implements TableDispatcher {
   private final TableDispatcher dispatcher;
   private final Supplier<OwnerDispatcher> ownerDispatcher;
-  private final CatalogManager catalogManager;
 
   /**
    * Creates a table hook dispatcher.
@@ -60,15 +56,11 @@ public class TableHookDispatcher implements TableDispatcher {
    * @param dispatcher the underlying table dispatcher
    * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
    *     disabled
-   * @param catalogManager the catalog manager used to apply catalog capabilities
    */
   public TableHookDispatcher(
-      TableDispatcher dispatcher,
-      Supplier<OwnerDispatcher> ownerDispatcher,
-      CatalogManager catalogManager) {
+      TableDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
     this.ownerDispatcher = ownerDispatcher;
-    this.catalogManager = catalogManager;
   }
 
   @Override
@@ -99,15 +91,9 @@ public class TableHookDispatcher implements TableDispatcher {
     // Set the creator as the owner of the table.
     OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the table name (and its schema namespace)
-      // based on catalog capabilities, so the entity is stored under the normalized identifier.
-      // Apply the same normalization here so the owner is attached to the same identifier the
-      // manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(ident, Capability.Scope.TABLE, catalogManager);
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TABLE),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }

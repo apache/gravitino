@@ -187,6 +187,37 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         self.assertEqual(record["outcome"], "allow")
         self.assertEqual(record["principal"], "anonymous")
 
+    def test_record_carries_the_resolved_metalake(self):
+        """Defaulted calls must record the metalake too, not just named ones -
+        otherwise the log cannot say which tenant was touched without also
+        knowing the server's startup configuration."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+                await client.call_tool(
+                    "get_list_of_catalogs", {"metalake": "named_ml"}
+                )
+
+        asyncio.run(_run())
+
+        metalakes = [json.loads(r)["metalake"] for r in self.log_records]
+        self.assertEqual(metalakes, ["mock_metalake", "named_ml"])
+
+    def test_non_metalake_scoped_tool_records_no_metalake(self):
+        """list_metalakes spans every metalake the caller can see, so tagging
+        it with the server default would claim a tenant it never touched."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("list_metalakes")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["tool"], "list_metalakes")
+        self.assertNotIn("metalake", record)
+
     def test_principal_falls_back_to_startup_token(self):
         """With no request header, the audit principal uses the startup --token."""
         RESTClientFactory.set_rest_client(MockOperation)

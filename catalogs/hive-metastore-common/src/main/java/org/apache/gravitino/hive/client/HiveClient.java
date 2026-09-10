@@ -51,8 +51,33 @@ public interface HiveClient extends AutoCloseable {
 
   HiveTable getTable(String catalogName, String databaseName, String tableName);
 
+  default void alterTable(
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+    alterTable(catalogName, databaseName, tableName, alteredHiveTable, false);
+  }
+
+  /**
+   * Alters a table in the Hive metastore.
+   *
+   * <p>When {@code skipStatsUpdate} is {@code true}, the metastore is instructed (via the {@code
+   * DO_NOT_UPDATE_STATS} environment context) not to recompute table statistics for this alter.
+   * This avoids the metastore accessing the table's storage location (for example an {@code
+   * getFileInfo} call against the NameNode), which is unnecessary for property-only or comment-only
+   * changes and can otherwise make a lightweight alter hang when the underlying filesystem is slow
+   * or unavailable.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param tableName The table name.
+   * @param alteredHiveTable The altered table definition.
+   * @param skipStatsUpdate Whether to skip metastore statistics recomputation for this alter.
+   */
   void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate);
 
   void dropTable(
       String catalogName,

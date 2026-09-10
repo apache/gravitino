@@ -71,14 +71,16 @@ public class SparkPartitionUtils {
           ident.getDecimal(ordinal, decimalType.precision(), decimalType.scale());
       return Literals.decimalLiteral(
           org.apache.gravitino.rel.types.Decimal.of(decimal.toJavaBigDecimal()));
-    } else if (sparkType instanceof StringType) {
-      return Literals.stringLiteral(ident.getString(ordinal));
     } else if (sparkType instanceof VarcharType) {
+      // Varchar and Char are checked before StringType because Spark 4 made both extend it; on 3.5
+      // they extend AtomicType, so this order is correct for every supported version.
       VarcharType varcharType = (VarcharType) sparkType;
       return Literals.varcharLiteral(varcharType.length(), ident.getString(ordinal));
     } else if (sparkType instanceof CharType) {
       CharType charType = (CharType) sparkType;
       return Literals.of(ident.get(ordinal, sparkType), Types.FixedCharType.of(charType.length()));
+    } else if (sparkType instanceof StringType) {
+      return Literals.stringLiteral(ident.getString(ordinal));
     } else if (sparkType instanceof BooleanType) {
       return Literals.booleanLiteral(ident.getBoolean(ordinal));
     } else if (sparkType instanceof DateType) {
@@ -99,12 +101,12 @@ public class SparkPartitionUtils {
       return String.valueOf(ident.getShort(ordinal));
     } else if (dataType instanceof IntegerType) {
       return String.valueOf(ident.getInt(ordinal));
+    } else if (dataType instanceof VarcharType || dataType instanceof CharType) {
+      // Ahead of StringType for the same reason as above. Order matters here because each branch
+      // uses a different getter, unlike getSparkPartitionValue where all three share one body.
+      return ident.get(ordinal, dataType).toString();
     } else if (dataType instanceof StringType) {
       return ident.getUTF8String(ordinal).toString();
-    } else if (dataType instanceof VarcharType) {
-      return ident.get(ordinal, dataType).toString();
-    } else if (dataType instanceof CharType) {
-      return ident.get(ordinal, dataType).toString();
     } else if (dataType instanceof DateType) {
       // DateType spark use int store.
       LocalDate localDate = LocalDate.ofEpochDay(ident.getInt(ordinal));
@@ -141,7 +143,11 @@ public class SparkPartitionUtils {
         return Integer.parseInt(hivePartitionValue);
       } else if (dataType instanceof LongType) {
         return Long.parseLong(hivePartitionValue);
-      } else if (dataType instanceof StringType) {
+      } else if (dataType instanceof StringType
+          || dataType instanceof VarcharType
+          || dataType instanceof CharType) {
+        // One branch for all three: they yield the same UTF8String from a string input, so order
+        // does not matter. Spark 4 needs only the first check; 3.5 needs the other two.
         return UTF8String.fromString(hivePartitionValue);
       } else if (dataType instanceof DateType) {
         LocalDate localDate = LocalDate.parse(hivePartitionValue);
@@ -155,10 +161,6 @@ public class SparkPartitionUtils {
         return Float.parseFloat(hivePartitionValue);
       } else if (dataType instanceof DecimalType) {
         return Decimal.apply(hivePartitionValue);
-      } else if (dataType instanceof VarcharType) {
-        return UTF8String.fromString(hivePartitionValue);
-      } else if (dataType instanceof CharType) {
-        return UTF8String.fromString(hivePartitionValue);
       } else {
         throw new UnsupportedOperationException("Unsupported partition type: " + dataType);
       }

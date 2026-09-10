@@ -17,13 +17,13 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Requirement
 
-* Spark 3.3 or 3.4 or 3.5
-* Scala 2.12 or 2.13
-* JDK 8, 11 or 17
+* Spark 3.5 or 4.0
+* Scala 2.12 or 2.13 on Spark 3.5; Spark 4 is Scala 2.13 only
+* JDK 8, 11 or 17 on Spark 3.5; Spark 4 requires JDK 17
 
 ## Usage
 
-1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or download the package matching your Spark minor version and Scala version ([gravitino-spark-connector-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.12), [gravitino-spark-connector-runtime-3.5_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.13), [gravitino-spark-connector-runtime-4.0_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.0_2.13)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
 | Property                                         | Type    | Default Value | Description                                                                                                                                                              | Required |
@@ -132,7 +132,7 @@ Gravitino spark connector support the following datatype mapping between Spark a
 | `CharType`                        | `char`                        |
 | `VarcharType`                     | `varchar`                     |
 | `TimestampType`                   | `timestamp with time zone`    |
-| `TimestampNTZType` *(Spark 3.4+)* | `timestamp without time zone` |
+| `TimestampNTZType`                | `timestamp without time zone` |
 | `DateType`                        | `date`                        |
 | `BinaryType`                      | `binary`                      |
 | `ArrayType`                       | `array`                       |

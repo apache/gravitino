@@ -563,7 +563,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
 
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    StringBuilder sqlBuilder =
+        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
@@ -592,7 +593,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (null == column) {
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    StringBuilder sqlBuilder =
+        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
@@ -619,7 +621,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     return ALTER_TABLE
+        + PG_QUOTE
         + tableName
+        + PG_QUOTE
         + " RENAME COLUMN "
         + PG_QUOTE
         + renameColumn.fieldName()[0]
@@ -644,7 +648,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append(ALTER_TABLE)
+        .append(PG_QUOTE)
         .append(lazyLoadTable.name())
+        .append(PG_QUOTE)
         .append(SPACE)
         .append("ADD COLUMN ")
         .append(PG_QUOTE)

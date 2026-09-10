@@ -46,31 +46,40 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.BulkGroupAddRequest;
 import org.apache.gravitino.dto.requests.BulkRemoveRequest;
+import org.apache.gravitino.dto.requests.BulkRoleAddRequest;
 import org.apache.gravitino.dto.requests.BulkUserAddRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BulkGroupResponse;
 import org.apache.gravitino.dto.responses.BulkRemoveResponse;
+import org.apache.gravitino.dto.responses.BulkRoleResponse;
 import org.apache.gravitino.dto.responses.BulkUserResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -305,6 +314,72 @@ public class TestBulkOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testBulkAddRolesBestEffort() {
+    Role role1 = buildRole("role1");
+    when(manager.createRoles(any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, "role1", role1),
+                BulkItemResult.failure(
+                    1, "role2", new RoleAlreadyExistsException("Role already exists: role2"))));
+
+    BulkRoleAddRequest request =
+        new BulkRoleAddRequest(
+            new RoleCreateRequest[] {
+              new RoleCreateRequest(
+                  "role1", Collections.singletonMap("k1", "v1"), new SecurableObjectDTO[] {}),
+              new RoleCreateRequest("role2", Collections.emptyMap(), new SecurableObjectDTO[] {})
+            });
+    Response response =
+        target("/bulk/metalakes/metalake1/roles/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    BulkRoleResponse bulkResponse = response.readEntity(BulkRoleResponse.class);
+    Assertions.assertEquals(1, bulkResponse.getRoles().length);
+    Assertions.assertEquals("role1", bulkResponse.getRoles()[0].name());
+    Assertions.assertEquals(1, bulkResponse.getErrors().length);
+    Assertions.assertEquals(1, bulkResponse.getErrors()[0].getIndex());
+    Assertions.assertEquals("role2", bulkResponse.getErrors()[0].getName());
+    Assertions.assertEquals(
+        ErrorConstants.ALREADY_EXISTS_CODE, bulkResponse.getErrors()[0].getCode());
+    Assertions.assertEquals(2, bulkResponse.getSummary().getTotal());
+    Assertions.assertEquals(1, bulkResponse.getSummary().getSucceeded());
+    Assertions.assertEquals(1, bulkResponse.getSummary().getFailed());
+
+    ArgumentCaptor<List<RoleAdd>> rolesCaptor = ArgumentCaptor.forClass(List.class);
+    Mockito.verify(manager).createRoles(eq("metalake1"), rolesCaptor.capture());
+    Assertions.assertEquals("role1", rolesCaptor.getValue().get(0).name());
+    Assertions.assertEquals("v1", rolesCaptor.getValue().get(0).properties().get("k1"));
+  }
+
+  @Test
+  public void testBulkRemoveRolesBestEffort() {
+    when(manager.deleteRoles(any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, "role1"),
+                BulkItemResult.failure(
+                    1, "ghost", new NoSuchRoleException("Role does not exist: ghost"))));
+
+    BulkRemoveRequest request = new BulkRemoveRequest(new String[] {"role1", "ghost"});
+    Response response =
+        target("/bulk/metalakes/metalake1/roles/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    BulkRemoveResponse bulkResponse = response.readEntity(BulkRemoveResponse.class);
+    Assertions.assertArrayEquals(new String[] {"role1"}, bulkResponse.getNames());
+    Assertions.assertEquals(1, bulkResponse.getErrors().length);
+    Assertions.assertEquals("ghost", bulkResponse.getErrors()[0].getName());
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, bulkResponse.getErrors()[0].getCode());
+  }
+
+  @Test
   public void testRemoveUsersWithNullRequest() {
     Response response =
         target("/bulk/metalakes/metalake1/users/remove")
@@ -360,6 +435,17 @@ public class TestBulkOperations extends BaseOperationsTest {
                     MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(
         Response.Status.BAD_REQUEST.getStatusCode(), emptyGroupResponse.getStatus());
+
+    Response emptyRoleResponse =
+        target("/bulk/metalakes/metalake1/roles/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(
+                Entity.entity(
+                    new BulkRoleAddRequest(new RoleCreateRequest[] {}),
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), emptyRoleResponse.getStatus());
   }
 
   private User buildUser(String user) {
@@ -377,6 +463,17 @@ public class TestBulkOperations extends BaseOperationsTest {
         .withId(1L)
         .withName(group)
         .withRoleNames(Collections.emptyList())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private Role buildRole(String role) {
+    return RoleEntity.builder()
+        .withId(1L)
+        .withName(role)
+        .withProperties(Collections.emptyMap())
+        .withSecurableObjects(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

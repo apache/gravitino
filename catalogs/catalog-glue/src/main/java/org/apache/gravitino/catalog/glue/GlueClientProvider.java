@@ -18,13 +18,16 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.GlueClientBuilder;
@@ -52,7 +55,8 @@ public final class GlueClientProvider {
    * @param config Catalog configuration properties.
    * @return A configured and ready-to-use {@link GlueClient}.
    * @throws IllegalArgumentException if {@code aws-region} is missing or blank, if only one of the
-   *     credential keys is provided, or if {@code aws-glue-endpoint} is not a valid URI.
+   *     credential keys is provided, if {@code aws-glue-endpoint} is not a valid URI, or if no
+   *     usable AWS credential source can be resolved.
    */
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
@@ -76,12 +80,12 @@ public final class GlueClientProvider {
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     boolean hasStaticCredentials = hasAwsStaticCredentials(accessKey, secretKey);
 
-    if (hasStaticCredentials) {
-      builder.credentialsProvider(
-          StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
-    } else {
-      builder.credentialsProvider(DefaultCredentialsProvider.builder().build());
-    }
+    AwsCredentialsProvider credentialsProvider =
+        hasStaticCredentials
+            ? StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
+            : DefaultCredentialsProvider.builder().build();
+    validateCredentials(credentialsProvider);
+    builder.credentialsProvider(credentialsProvider);
 
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
@@ -90,6 +94,35 @@ public final class GlueClientProvider {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Eagerly resolves {@code credentialsProvider} to confirm a usable credential source exists,
+   * instead of leaving resolution to the first real Glue API call. Without this check, a catalog
+   * created with no static credentials and no usable default-chain source (env vars, instance
+   * profile, etc.) is stored successfully and then fails on every operation with a raw AWS SDK
+   * error that never mentions this connector's own credential properties.
+   *
+   * @throws IllegalArgumentException if no credentials can be resolved
+   */
+  @VisibleForTesting
+  static void validateCredentials(AwsCredentialsProvider credentialsProvider) {
+    try {
+      credentialsProvider.resolveCredentials();
+    } catch (SdkClientException e) {
+      if (!GlueExceptionConverter.isCredentialFailure(e)) {
+        throw new IllegalArgumentException(
+            "Failed to resolve AWS credentials for the Glue catalog: " + e.getMessage(), e);
+      }
+      throw new IllegalArgumentException(
+          String.format(
+              "No usable AWS credentials found for the Glue catalog. Set both '%s' and '%s' "
+                  + "catalog properties for static authentication, or ensure the default AWS "
+                  + "credential chain (environment variables, instance profile, web identity "
+                  + "token, etc.) can resolve credentials.",
+              GlueConstants.AWS_ACCESS_KEY_ID, GlueConstants.AWS_SECRET_ACCESS_KEY),
+          e);
+    }
   }
 
   static boolean hasAwsStaticCredentials(String accessKey, String secretKey) {

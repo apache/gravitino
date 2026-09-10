@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * An interface representing a single model checkpoint under a model {@link Model}. A model version
@@ -94,5 +95,15 @@ public interface ModelVersion extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the model version supports secret property operations.
+   * @throws UnsupportedOperationException if the model version does not support secret property
+   *     operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException(
+        "Model version does not support secret property operations.");
   }
 }
