@@ -66,10 +66,11 @@ A Metaspace or heap `OutOfMemoryError` can leave already-loaded endpoints respon
 while other operations fail. A successful HTTP response or entity-store lookup therefore does not
 prove recovery after OOM.
 
-The main server records OOM observed by its Jersey exception listener, error mapper, shared request
-execution/error-response helpers, health-probe tasks, and Jetty worker uncaught-exception handler.
-Wrapped causes are checked too. Once recorded, `/api/health`, `/api/health/live`, `/api/health/ready`,
-and all their root aliases return HTTP 503 with this body:
+The Gravitino, Iceberg REST, and Lance REST servers record OOM observed by their Jersey exception
+listeners, error mappers, shared request execution/error-response helpers, and Jetty worker
+uncaught-exception handlers. The main server also records failures in health-probe tasks.
+Wrapped causes are checked too. Once recorded, the affected service’s health endpoints and root
+aliases return HTTP 503 with this body (the main server uses the `/api/health` prefix):
 
 ```json
 {
@@ -92,7 +93,8 @@ checks skip the entity-store probe once OOM is recorded. A database outage, ordi
 Detection covers errors reaching these server boundaries; it cannot detect an OOM swallowed
 entirely by a connector or unrelated background executor. This is not a JVM-wide OOM trap. If the
 JVM cannot allocate enough memory to answer a probe, the probe may fail without a JSON response.
-The Iceberg and Lance REST health endpoints retain their separate checks.
+Each service tracks errors observed within its own runtime. Auxiliary services with isolated
+classloaders do not propagate this state between services.
 
 ## What Readiness Actually Tests
 
@@ -110,6 +112,9 @@ The Iceberg REST service and the Lance REST service each run their own HTTP serv
 port, including when they run inside the Gravitino server process, so the Gravitino server's
 endpoints do not report on them. A deployment that runs either service needs probes against its
 port as well.
+
+Both services return 503 from all health endpoints and root aliases after observing OOM, with the
+`jvm` failure described above, until restart. Before OOM, their existing initialization checks apply.
 
 | Server               | Default Port | Health Path Prefix | Readiness Check         |
 |----------------------|--------------|--------------------|-------------------------|

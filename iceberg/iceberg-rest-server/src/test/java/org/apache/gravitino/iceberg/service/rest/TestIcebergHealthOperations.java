@@ -20,18 +20,24 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import static org.mockito.Mockito.mock;
 
+import java.util.List;
+import java.util.function.Supplier;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergHealthOperations {
 
   private static IcebergHealthOperations operationsWithManager(
       IcebergCatalogWrapperManager manager) {
-    return new IcebergHealthOperations() {
+    return new IcebergHealthOperations(new ServerHealth()) {
       @Override
       IcebergCatalogWrapperManager getCatalogWrapperManager() {
         return manager;
@@ -90,5 +96,83 @@ public class TestIcebergHealthOperations {
     boolean hasCatalogCheck =
         body.getChecks().stream().anyMatch(c -> "catalogWrapperManager".equals(c.getName()));
     Assertions.assertTrue(hasCatalogCheck);
+  }
+
+  /** Verifies mapped direct and wrapped OOM disable all health probes. */
+  @Test
+  public void testMappedOutOfMemoryMakesAllProbesUnhealthy() {
+    for (Throwable failure :
+        new Throwable[] {
+          new OutOfMemoryError("Metaspace"),
+          new IllegalStateException(new OutOfMemoryError("Java heap space"))
+        }) {
+      ServerHealth health = new ServerHealth();
+      IcebergHealthOperations ops =
+          new IcebergHealthOperations(health) {
+            @Override
+            IcebergCatalogWrapperManager getCatalogWrapperManager() {
+              Assertions.fail("Readiness must skip initialization checks after OOM");
+              return null;
+            }
+          };
+      try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+        shared.when(ServerHealth::getInstance).thenReturn(health);
+        try (Response response = IcebergExceptionMapper.toRESTResponse(failure)) {
+          Assertions.assertEquals(500, response.getStatus());
+        }
+      }
+      for (Supplier<Response> probe :
+          List.<Supplier<Response>>of(ops::live, ops::ready, ops::health)) {
+        try (Response response = probe.get()) {
+          Assertions.assertEquals(503, response.getStatus());
+          HealthResponse body = (HealthResponse) response.getEntity();
+          Assertions.assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
+          Assertions.assertEquals(1, body.getChecks().size());
+          Assertions.assertEquals("jvm", body.getChecks().get(0).getName());
+          Assertions.assertEquals(
+              "OutOfMemoryError; restart required",
+              body.getChecks().get(0).getDetails().get("reason"));
+        }
+      }
+      Assertions.assertTrue(health.hasOutOfMemoryError());
+    }
+  }
+
+  /** Verifies an ordinary mapped failure leaves liveness healthy. */
+  @Test
+  public void testOrdinaryMappedFailureDoesNotPoisonLiveness() {
+    ServerHealth health = new ServerHealth();
+    Throwable failure = new IllegalStateException("ordinary failure");
+    try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+      shared.when(ServerHealth::getInstance).thenReturn(health);
+      try (Response response = IcebergExceptionMapper.toRESTResponse(failure)) {
+        Assertions.assertEquals(500, response.getStatus());
+      }
+    }
+    try (Response response = new IcebergHealthOperations(health).live()) {
+      Assertions.assertEquals(200, response.getStatus());
+    }
+  }
+
+  /** Verifies OOM recorded during initialization checks overrides their successful result. */
+  @Test
+  public void testOutOfMemoryObservedDuringReadinessOverridesSuccess() {
+    for (boolean aggregate : new boolean[] {false, true}) {
+      ServerHealth health = new ServerHealth();
+      IcebergCatalogWrapperManager dependency = mock(IcebergCatalogWrapperManager.class);
+      IcebergHealthOperations ops =
+          new IcebergHealthOperations(health) {
+            @Override
+            IcebergCatalogWrapperManager getCatalogWrapperManager() {
+              health.recordFailure(new OutOfMemoryError("Metaspace"));
+              return dependency;
+            }
+          };
+      try (Response response = aggregate ? ops.health() : ops.ready()) {
+        Assertions.assertEquals(503, response.getStatus());
+        HealthResponse body = (HealthResponse) response.getEntity();
+        Assertions.assertEquals("jvm", body.getChecks().get(0).getName());
+      }
+    }
   }
 }

@@ -121,7 +121,7 @@ public class HealthOperations {
   @ResponseMetered(name = "health.live", absolute = true)
   public Response live() {
     if (serverHealth.hasOutOfMemoryError()) {
-      return outOfMemoryResponse();
+      return Utils.outOfMemoryResponse();
     }
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
     return Utils.ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
@@ -134,11 +134,11 @@ public class HealthOperations {
   @ResponseMetered(name = "health.ready", absolute = true)
   public Response ready() {
     if (serverHealth.hasOutOfMemoryError()) {
-      return outOfMemoryResponse();
+      return Utils.outOfMemoryResponse();
     }
     HealthCheckDTO entityStoreCheck = checkEntityStore();
     if (serverHealth.hasOutOfMemoryError()) {
-      return outOfMemoryResponse();
+      return Utils.outOfMemoryResponse();
     }
     HealthCheckDTO.Status overall = entityStoreCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(entityStoreCheck));
@@ -151,13 +151,13 @@ public class HealthOperations {
   @ResponseMetered(name = "health", absolute = true)
   public Response health() {
     if (serverHealth.hasOutOfMemoryError()) {
-      return outOfMemoryResponse();
+      return Utils.outOfMemoryResponse();
     }
     List<HealthCheckDTO> checks = new ArrayList<>(2);
     checks.add(up(CHECK_HTTP_SERVER, Collections.emptyMap()));
     checks.add(checkEntityStore());
     if (serverHealth.hasOutOfMemoryError()) {
-      return outOfMemoryResponse();
+      return Utils.outOfMemoryResponse();
     }
 
     HealthCheckDTO.Status overall =
@@ -167,12 +167,6 @@ public class HealthOperations {
 
     HealthResponse body = new HealthResponse(overall, checks);
     return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
-  }
-
-  private Response outOfMemoryResponse() {
-    HealthCheckDTO check = down("jvm", "reason", "OutOfMemoryError; restart required");
-    return Utils.serviceUnavailable(
-        new HealthResponse(HealthCheckDTO.Status.DOWN, Collections.singletonList(check)));
   }
 
   private HealthCheckDTO checkEntityStore() {

@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Parameter;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +38,9 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class Utils {
@@ -259,6 +262,21 @@ public class Utils {
         .entity(t)
         .type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  /**
+   * Returns the health response used after an observed out-of-memory failure.
+   *
+   * @return HTTP 503 with a JVM failure requiring process restart
+   */
+  public static Response outOfMemoryResponse() {
+    HealthCheckDTO check =
+        new HealthCheckDTO(
+            "jvm",
+            HealthCheckDTO.Status.DOWN,
+            Collections.singletonMap("reason", "OutOfMemoryError; restart required"));
+    return serviceUnavailable(
+        new HealthResponse(HealthCheckDTO.Status.DOWN, Collections.singletonList(check)));
   }
 
   public static Response doAs(
