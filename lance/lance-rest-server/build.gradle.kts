@@ -157,6 +157,7 @@ tasks {
       into(lanceSparkBundleDirFor(version))
     }
   }
+
   val primaryPrepareLanceSparkBundle =
     named(lanceSparkPrepareTaskName(primaryLanceSparkBundleVersion))
 
