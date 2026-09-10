@@ -65,6 +65,9 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
   private static final String TRINO_ICEBERG_REST_VENDED_CREDENTIALS =
       "iceberg.rest-catalog.vended-credentials-enabled";
   private static final String TRINO_ICEBERG_REST_SESSION = "iceberg.rest-catalog.session";
+  private static final String TRINO_ICEBERG_REST_SECURITY = "iceberg.rest-catalog.security";
+  private static final String TRINO_ICEBERG_REST_SECURITY_OAUTH2 = "OAUTH2";
+  private static final String TRINO_ICEBERG_REST_SESSION_USER = "USER";
   private static final String TRINO_FS_HADOOP_ENABLED = "fs.hadoop.enabled";
   private static final String TRINO_FS_NATIVE_S3_ENABLED = "fs.native-s3.enabled";
   private static final String TRINO_FS_NATIVE_GCS_ENABLED = "fs.native-gcs.enabled";
@@ -174,15 +177,15 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     // precedence, unrelated to HashMap's (unspecified) iteration order.
     config.putAll(buildStorageProperties(catalog.getProperties()));
     config.put(TRINO_ICEBERG_REST_VENDED_CREDENTIALS, "true");
-    if (gravitinoConfig.isForwardUser()) {
-      config.put(TRINO_ICEBERG_REST_SESSION, "USER");
-    }
     // The catalog's own trino.bypass properties override the defaults above, so that a Trino
     // release renaming one of them can be worked around without a connector change.
     config.putAll(super.gravitinoToEngineProperties(catalog.getProperties()));
     // The IRC's own authentication is a cluster-level operational setting, so it takes precedence
     // over anything set on a single catalog.
     config.putAll(gravitinoConfig.getIcebergRestCatalogConfig());
+    // Runs after the two putAll calls above, because it depends on both the security mode and
+    // any explicit session value they settle.
+    applyForwardUserSession(gravitinoConfig, config);
 
     warnOnReservedOverrides(catalog, config);
 
@@ -241,6 +244,27 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
         IcebergPropertiesUtils.getCatalogBackendName(properties));
 
     return jdbcProperties;
+  }
+
+  /**
+   * Turns on Trino's per-user Iceberg REST sessions when user forwarding is enabled and the REST
+   * catalog authenticates with OAuth2. In that session mode Trino signs a subject JWT for the
+   * session user and attaches it to every request; the Iceberg client consumes such a token through
+   * an OAuth2 token exchange. Under any other security mode there is no token endpoint to exchange
+   * it at, so the token carries no user identity and the mode buys nothing.
+   *
+   * <p>An explicit {@code iceberg.rest-catalog.session} coming from the catalog or the connector
+   * config is left untouched.
+   */
+  private void applyForwardUserSession(
+      GravitinoConfig gravitinoConfig, Map<String, String> config) {
+    if (!gravitinoConfig.isForwardUser() || config.containsKey(TRINO_ICEBERG_REST_SESSION)) {
+      return;
+    }
+    if (TRINO_ICEBERG_REST_SECURITY_OAUTH2.equalsIgnoreCase(
+        config.get(TRINO_ICEBERG_REST_SECURITY))) {
+      config.put(TRINO_ICEBERG_REST_SESSION, TRINO_ICEBERG_REST_SESSION_USER);
+    }
   }
 
   // Called before the reserved keys (type/uri/warehouse/prefix) are put into `config` below, so
