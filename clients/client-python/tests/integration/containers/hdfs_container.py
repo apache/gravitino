@@ -15,58 +15,57 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import asyncio
 import logging
 import os
 import time
 
 from docker.errors import DockerException
 from gravitino.exceptions.base import GravitinoRuntimeException
-from gravitino.exceptions.base import InternalError
 
 from tests.integration.containers.base_container import BaseContainer
 
 logger = logging.getLogger(__name__)
 
 
-async def check_hdfs_status(hdfs_container):
-    retry_limit = 15
-    for _ in range(retry_limit):
+def check_hdfs_container_status(hdfs_container, timeout_sec=150, interval_sec=10):
+    """Wait for HDFS and the remote Hive Metastore, with bounded probe commands."""
+    deadline = time.monotonic() + timeout_sec
+    last_output = b"No readiness probe completed"
+    while (remaining := deadline - time.monotonic()) > 0:
+        # The image's Hive CLI check can use an embedded metastore. Also query the
+        # Thrift service used by Gravitino before allowing catalog tests to start.
+        # A synchronous Docker exec and time.sleep cannot be bounded by asyncio.wait_for.
+        command = [
+            "timeout",
+            "--signal=KILL",
+            f"{remaining}s",
+            "bash",
+            "-c",
+            "bash /tmp/check-status.sh && exec hive "
+            "--hiveconf hive.metastore.uris=thrift://localhost:9083 "
+            "-e 'show databases;'",
+        ]
         try:
-            command_and_args = ["bash", "/tmp/check-status.sh"]
-            exec_result = hdfs_container.exec_run(command_and_args)
-            if exec_result.exit_code != 0:
-                message = (
-                    f"Command {command_and_args} exited with {exec_result.exit_code}"
-                )
-                logger.warning(message)
-                logger.warning("output: %s", exec_result.output)
-                output_status_command = ["hdfs", "dfsadmin", "-report"]
-                exec_result = hdfs_container.exec_run(output_status_command)
-                logger.info("HDFS report, output: %s", exec_result.output)
-            else:
-                logger.info("HDFS startup successfully!")
-                return True
-        except DockerException as e:
-            logger.error(
-                "Exception occurred while checking HDFS container status: %s", e
+            result = hdfs_container.exec_run(command)
+            last_output = result.output
+            if result.exit_code == 0:
+                logger.info("HDFS and Hive Metastore are ready")
+                return
+            logger.warning(
+                "HDFS/Hive readiness probe exited with %s: %s",
+                result.exit_code,
+                last_output,
             )
-        time.sleep(10)
-    return False
-
-
-async def check_hdfs_container_status(hdfs_container):
-    timeout_sec = 150
-    try:
-        result = await asyncio.wait_for(
-            check_hdfs_status(hdfs_container), timeout=timeout_sec
-        )
-        if not result:
-            raise InternalError("HDFS container startup failed!")
-    except asyncio.TimeoutError as e:
-        raise GravitinoRuntimeException(
-            "Timeout occurred while waiting for checking HDFS container status."
-        ) from e
+        except DockerException as error:
+            last_output = str(error)
+            logger.warning("Failed to check HDFS/Hive readiness: %s", error)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval_sec, remaining))
+    raise GravitinoRuntimeException(
+        f"HDFS/Hive Metastore did not become ready within {timeout_sec}s. "
+        f"Last probe output: {last_output}"
+    )
 
 
 class HDFSContainer(BaseContainer):
@@ -81,5 +80,9 @@ class HDFSContainer(BaseContainer):
 
         super().__init__(container_name, image_name, environment)
 
-        asyncio.run(check_hdfs_container_status(self._container))
-        self._fetch_ip()
+        try:
+            check_hdfs_container_status(self._container)
+            self._fetch_ip()
+        except Exception:
+            self.close()
+            raise
