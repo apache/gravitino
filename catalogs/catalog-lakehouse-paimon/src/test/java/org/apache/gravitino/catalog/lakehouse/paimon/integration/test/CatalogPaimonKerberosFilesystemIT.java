@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authe
 import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -227,15 +228,14 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-paimon", "comment", properties);
 
     // Test create schema
-    RuntimeException exception =
+    Exception exception =
         Assertions.assertThrows(
-            RuntimeException.class,
+            Exception.class,
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    assertPublicClientInternalError(
-        exception,
-        String.format(
-            "Failed to operate object [%s] operation [CREATE] under [%s]",
-            SCHEMA_NAME, CATALOG_NAME));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+
+    // Make sure the real user is 'cli' because no impersonation here.
+    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
@@ -283,11 +283,5 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
     Column col2 = Column.of(FILESYSTEM_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(FILESYSTEM_COL_NAME3, Types.StringType.get(), "col_3_comment");
     return new Column[] {col1, col2, col3};
-  }
-
-  private static void assertPublicClientInternalError(
-      RuntimeException exception, String expectedMessageFragment) {
-    Assertions.assertEquals(RuntimeException.class, exception.getClass());
-    Assertions.assertTrue(exception.getMessage().contains(expectedMessageFragment));
   }
 }

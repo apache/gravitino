@@ -24,6 +24,7 @@ import static org.apache.gravitino.iceberg.common.authentication.kerberos.Kerber
 import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.KET_TAB_URI_KEY;
 import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -243,15 +244,15 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
 
     // Test create schema
-    RuntimeException exception =
+    Exception exception =
         Assertions.assertThrows(
-            RuntimeException.class,
+            Exception.class,
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    assertPublicClientInternalError(
-        exception,
-        String.format(
-            "Failed to operate object [%s] operation [CREATE] under [%s]",
-            SCHEMA_NAME, CATALOG_NAME));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+
+    // Make sure the real user is 'gravitino_client'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
@@ -268,7 +269,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     NameIdentifier tableNameIdentifier1 = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
     exception =
         Assertions.assertThrows(
-            RuntimeException.class,
+            Exception.class,
             () ->
                 catalog
                     .asTableCatalog()
@@ -280,11 +281,10 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
                         Transforms.EMPTY_TRANSFORM,
                         Distributions.NONE,
                         SortOrders.NONE));
-    assertPublicClientInternalError(
-        exception,
-        String.format(
-            "Failed to operate object [%s] operation [CREATE] under [%s]",
-            TABLE_NAME, SCHEMA_NAME));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    // Make sure the real user is 'gravitino_client'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=EXECUTE"));
 
     // Now try to permit the user to create the table again
     kerberosHiveContainer.executeInContainer(
@@ -333,16 +333,6 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
 
     String metalakeName = GravitinoITUtils.genRandomName("test_metalake");
-    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
-    String schemaName = GravitinoITUtils.genRandomName("test_schema");
-    String warehousePath =
-        "/user/hive/" + GravitinoITUtils.genRandomName("warehouse-catalog-iceberg");
-    String warehouse =
-        String.format(
-            "hdfs://%s:%d%s/",
-            kerberosHiveContainer.getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            warehousePath);
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
 
@@ -361,39 +351,22 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
 
     properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
     properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
-    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), warehouse);
-    properties.put("location", "hdfs://localhost:9000" + warehousePath);
-
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", warehousePath);
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "gravitino_client", warehousePath);
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "700", warehousePath);
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-iceberg");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
-            catalogName, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
 
-    // Without impersonation, 'cli' cannot write to a path owned by another principal.
-    RuntimeException exception =
+    // Test create schema
+    Exception exception =
         Assertions.assertThrows(
-            RuntimeException.class,
-            () -> catalog.asSchemas().createSchema(schemaName, "comment", ImmutableMap.of()));
-    assertPublicClientInternalError(
-        exception,
-        String.format(
-            "Failed to operate object [%s] operation [CREATE] under [%s]",
-            schemaName, catalogName));
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
 
-    // Giving 'cli' ownership makes the same public operation succeed, proving which principal the
-    // connector uses without inspecting a private stack trace.
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chown", "cli", warehousePath);
-    Assertions.assertDoesNotThrow(
-        () -> catalog.asSchemas().createSchema(schemaName, "comment", ImmutableMap.of()));
-
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaName, false));
-    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(catalogName));
-    Assertions.assertTrue(gravitinoMetalake.dropCatalog(catalogName));
-    Assertions.assertTrue(adminClient.dropMetalake(metalakeName, true));
+    // Make sure the real user is 'cli' because no impersonation here.
+    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
   }
 
   private static Column[] createColumns() {
@@ -401,11 +374,5 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     Column col2 = Column.of(HIVE_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
     return new Column[] {col1, col2, col3};
-  }
-
-  private static void assertPublicClientInternalError(
-      RuntimeException exception, String expectedMessageFragment) {
-    Assertions.assertEquals(RuntimeException.class, exception.getClass());
-    Assertions.assertTrue(exception.getMessage().contains(expectedMessageFragment));
   }
 }

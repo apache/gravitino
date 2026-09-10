@@ -47,7 +47,7 @@ public class TestObjectMapperProvider {
 
   @Test
   public void testErrorResponseStackIsRedactedOnSerialization() throws JsonProcessingException {
-    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    ObjectMapper objectMapper = new ObjectMapperProvider(false).getContext(ErrorResponse.class);
     ErrorResponse errorResponse =
         ErrorResponse.internalError(
             "public error message", new RuntimeException("private error details"));
@@ -62,8 +62,20 @@ public class TestObjectMapperProvider {
   }
 
   @Test
+  public void testErrorResponseStackCanBeIncludedOnSerialization() throws JsonProcessingException {
+    ObjectMapper objectMapper = new ObjectMapperProvider().getContext(ErrorResponse.class);
+    ErrorResponse errorResponse =
+        ErrorResponse.internalError(
+            "public error message", new RuntimeException("private error details"));
+
+    JsonNode responseJson = objectMapper.readTree(objectMapper.writeValueAsString(errorResponse));
+    assertTrue(responseJson.has("stack"));
+    assertTrue(responseJson.get("stack").get(0).asText().contains("private error details"));
+  }
+
+  @Test
   public void testErrorResponseStackIsAcceptedOnDeserialization() throws JsonProcessingException {
-    ObjectMapper serverObjectMapper = ObjectMapperProvider.objectMapper();
+    ObjectMapper serverObjectMapper = ObjectMapperProvider.objectMapper(false);
     ObjectMapper clientObjectMapper = new ObjectMapper();
     ErrorResponse errorResponse =
         ErrorResponse.internalError(

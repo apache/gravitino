@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.authentication;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +53,8 @@ public class AuthenticationFilter implements Filter {
 
   private final List<Authenticator> filterAuthenticators;
 
+  private final ObjectMapper objectMapper;
+
   /**
    * The matcher used to identify health check paths that bypass authentication. Subclasses may
    * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
@@ -59,12 +62,32 @@ public class AuthenticationFilter implements Filter {
   protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   public AuthenticationFilter() {
-    filterAuthenticators = null;
+    this(null, ObjectMapperProvider.objectMapper());
+  }
+
+  /**
+   * Creates an authentication filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether authentication error responses should include diagnostic
+   *     stack traces
+   */
+  public AuthenticationFilter(boolean includeErrorStackTrace) {
+    this(null, ObjectMapperProvider.objectMapper(includeErrorStackTrace));
   }
 
   @VisibleForTesting
   AuthenticationFilter(List<Authenticator> authenticators) {
+    this(authenticators, ObjectMapperProvider.objectMapper());
+  }
+
+  @VisibleForTesting
+  AuthenticationFilter(List<Authenticator> authenticators, boolean includeErrorStackTrace) {
+    this(authenticators, ObjectMapperProvider.objectMapper(includeErrorStackTrace));
+  }
+
+  private AuthenticationFilter(List<Authenticator> authenticators, ObjectMapper objectMapper) {
     this.filterAuthenticators = authenticators;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -183,7 +206,7 @@ public class AuthenticationFilter implements Filter {
     response.setStatus(httpStatus);
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    ObjectMapperProvider.objectMapper().writeValue(response.getWriter(), errorResponse);
+    objectMapper.writeValue(response.getWriter(), errorResponse);
   }
 
   /**

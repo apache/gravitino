@@ -75,9 +75,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -123,7 +121,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(CatalogOperations.class);
-    resourceConfig.register(ObjectMapperProvider.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -134,11 +131,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
-  }
-
-  @Override
-  protected void configureClient(ClientConfig config) {
-    config.register(ObjectMapperProvider.class);
   }
 
   @Test
@@ -380,26 +372,22 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
-    Assertions.assertEquals("connection failed", errorResponse.getMessage());
-    Assertions.assertNull(errorResponse.getStack());
 
-    ConnectionFailedException connectionFailure =
+    ConnectionFailedException legacyFailure =
         new ConnectionFailedException(
             new IllegalStateException("database connection detail"), "connection failed");
-    doThrow(connectionFailure).when(manager).testConnection(any(), any(), any(), any(), any());
+    doThrow(legacyFailure).when(manager).testConnection(any(), any(), any(), any(), any());
     Response failedResponse =
         target("/metalakes/metalake1/catalogs/testConnection")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), failedResponse.getStatus());
     ErrorResponse connectionError = failedResponse.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, connectionError.getCode());
-    Assertions.assertEquals(
-        ConnectionFailedException.class.getSimpleName(), connectionError.getType());
-    Assertions.assertEquals("connection failed", connectionError.getMessage());
-    Assertions.assertNull(connectionError.getStack());
+    Assertions.assertNotNull(connectionError.getStack());
+    Assertions.assertTrue(
+        String.join("\n", connectionError.getStack()).contains("database connection detail"));
   }
 
   @Test

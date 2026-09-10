@@ -69,7 +69,7 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
     Map<String, String> props = initPaimonCatalogProperties();
     props.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, "wrong_password");
 
-    ConnectionFailedException exception =
+    Exception exception =
         Assertions.assertThrows(
             ConnectionFailedException.class,
             () ->
@@ -79,7 +79,6 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
                     provider,
                     null,
                     props));
-    Assertions.assertEquals(ConnectionFailedException.class, exception.getClass());
-    Assertions.assertEquals("Failed to connect: " + URI, exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
   }
 }

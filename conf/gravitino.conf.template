@@ -23,7 +23,6 @@ gravitino.server.shutdown.timeout = 3000
 # gravitino.server.health.entityStore.probeTimeoutMs = 2000
 # Maximum number of items allowed in a single bulk request
 gravitino.server.bulk.maxItems = 100
-
 # THE CONFIGURATION FOR Gravitino WEB SERVER
 # The host name of the built-in web server
 gravitino.server.webserver.host = 0.0.0.0
@@ -43,6 +42,9 @@ gravitino.server.webserver.threadPoolWorkQueueSize = 100
 gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
+# Whether to include server-side stack traces in HTTP error responses. Set this to false in new
+# deployments. It remains true by default only to avoid breaking legacy clients that expect stack.
+gravitino.server.webserver.includeErrorStackTrace = true
 # UI inactivity timeout in milliseconds. The UI environment variable
 # NEXT_PUBLIC_IDLE_TIMEOUT_MS is used when this config is not set.
 # gravitino.ui.sessionIdleTimeoutMs = 900000

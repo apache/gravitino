@@ -116,7 +116,7 @@ public class JettyServer {
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
-    errorHandler.setShowStacks(true);
+    errorHandler.setShowStacks(serverConfig.isIncludeErrorStackTrace());
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
@@ -542,6 +542,6 @@ public class JettyServer {
    * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
    */
   protected Filter createAuthenticationFilter() {
-    return new AuthenticationFilter();
+    return new AuthenticationFilter(serverConfig.isIncludeErrorStackTrace());
   }
 }
