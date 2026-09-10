@@ -16,8 +16,9 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 
 :::info
 The Paimon catalog is available on Spark 3.5 only. Paimon first published `paimon-spark-4.0` in
-Paimon 1.3.0, above the version Gravitino currently depends on, so the Spark 4 connector builds
-without the Paimon classes.
+Paimon 1.3.0, above the version Gravitino currently depends on, and has published no
+`paimon-spark-4.1` in any release so far, so the Spark 4 connectors build without the Paimon
+classes.
 :::
 
 ## Capabilities

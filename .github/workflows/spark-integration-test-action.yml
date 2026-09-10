@@ -59,10 +59,11 @@ jobs:
         id: integrationTest
         run: |
           ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PscalaVersion=${{ inputs.scala-version }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-3.5:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
-          # Spark 4 is Scala 2.13 only, so its module ignores -PscalaVersion. Guard on 2.12 so that
-          # adding a 2.13 entry to the matrix later does not run the Spark 4 suite twice.
+          # The Spark 4 modules are Scala 2.13 only, so they ignore -PscalaVersion. Guard on 2.12 so
+          # that adding a 2.13 entry to the matrix later does not run those suites twice.
           if [ "${{ inputs.scala-version }}" == "2.12" ]; then
             ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-4.0:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
+            ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-4.1:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
           fi
 
       - name: Upload integrate tests reports
@@ -74,5 +75,6 @@ jobs:
             build/reports
             spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
             spark-connector/v4.0/spark/build/spark-4.0-integration-test.log
+            spark-connector/v4.1/spark/build/spark-4.1-integration-test.log
             distribution/package/logs/*.out
             distribution/package/logs/*.log
