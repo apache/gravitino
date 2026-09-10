@@ -198,7 +198,7 @@ For an Iceberg catalog reached through the Gravitino Iceberg REST server (IRC) â
 catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog) â€” the IRC's own authentication is
 configured once per Trino cluster with the `gravitino.iceberg.rest-catalog.` prefix, and
 `iceberg.rest-catalog.session=USER` is set automatically when `forwardUser=true` and the IRC is
-configured with `security=OAUTH2` (as below):
+configured with `gravitino.iceberg.rest-catalog.security=OAUTH2` (as below):
 
 ```properties
 gravitino.iceberg.rest-catalog.security=OAUTH2
