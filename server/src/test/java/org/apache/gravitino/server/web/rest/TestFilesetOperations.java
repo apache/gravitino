@@ -400,13 +400,8 @@ public class TestFilesetOperations extends BaseOperationsTest {
     Mockito.doThrow(error)
         .doReturn(fileset)
         .when(dispatcher)
-<<<<<<< HEAD
         .createMultipleLocationFileset(any(), any(), any(), any(), any());
-    Response resp4 =
-=======
-        .createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any());
     try (Response errorResponse =
->>>>>>> 7478ab48e ([#12975] fix(core): Preserve errors thrown by PrincipalUtils.doAs (#12976))
         target(filesetPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
