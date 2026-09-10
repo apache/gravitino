@@ -133,43 +133,6 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
 
-**Authentication to the Gravitino Server**
-
-Standalone Lance REST forwards the authenticated caller's `Authorization` header and
-`X-Gravitino-Active-Roles` to Gravitino by default. The remote server authenticates the caller and
-applies its own authorization, ownership, and audit rules to these metadata requests. Auxiliary
-mode uses the caller's identity directly through internal APIs.
-
-| Configuration Property                             | Description                                                                                  | Default Value       | Required          |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------|---------------------|-------------------|
-| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `caller`, `simple`, `oauth2` | `caller`            | No                |
-| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                           | `lance-rest-server` | No                |
-| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                            | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                                  | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                          | (none)              | Yes, for `oauth2` |
-| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                          | (none)              | Yes, for `oauth2` |
-
-The default `caller` mode reads credentials and active roles separately for every request, including
-requests made through a shared Gravitino client. It forwards Basic or Bearer credentials recorded by
-the incoming authenticator; it does not forward arbitrary client-supplied identity headers.
-Anonymous callers, callers without recorded credentials, and Kerberos negotiation tokens are
-rejected with HTTP 401. Remote authentication and authorization failures retain HTTP 401 and 403.
-
-Configure incoming authentication separately with `gravitino.authenticators` in
-`gravitino-lance-rest-server.conf`. Both services must accept the forwarded credentials. For OAuth,
-the token's issuer, signature, and audience must be valid at both services; this mode does not
-perform token exchange. Simple authentication accepts a supplied username without checking a
-password.
-
-To retain the previous service-account behavior, explicitly set
-`gravitino.lance-rest.gravitino-auth-type=simple` or `oauth2` and configure its service credentials.
-Those modes use the service account's permissions and identity at Gravitino. Caller mode never
-falls back to them when credentials are missing or rejected.
-
-This forwarding covers remote Gravitino metadata requests. It does not add the auxiliary-mode
-Lance authorization interceptors to standalone mode or implement delegation for direct storage
-operations.
-
 **Example Configuration:**
 
 ```properties
@@ -180,8 +143,11 @@ gravitino.lance-rest.namespace-backend = gravitino
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
 
-In auxiliary mode, `gravitino.lance-rest.gravitino-uri` is not required because the Lance
-REST service uses Gravitino's internal API.
+In auxiliary mode, Lance REST uses Gravitino's internal API with the current caller's identity.
+No remote HTTP client or separate service-account credentials are needed.
+`gravitino.lance-rest.gravitino-uri` and the outbound authentication settings described under
+standalone mode are not used, including `gravitino.lance-rest.gravitino-simple.user-name` and
+`gravitino.lance-rest.gravitino-oauth2.*`.
 
 ### Run Standalone
 
@@ -207,6 +173,49 @@ In standalone deployments, you only need to configure `gravitino.lance-rest.grav
 credentials accepted by both Lance REST and Gravitino when using the default `caller` mode.
 :::
 
+**Authentication to the Gravitino Server**
+
+Standalone Lance REST forwards the authenticated caller's `Authorization` header and
+`X-Gravitino-Active-Roles` to Gravitino by default. The remote server authenticates the caller and
+applies its own authorization, ownership, and audit rules to these metadata requests. The following
+settings apply only to standalone requests to the Gravitino backend.
+
+| Configuration Property                             | Description                                                                                  | Default Value       | Required          |
+|----------------------------------------------------|----------------------------------------------------------------------------------------------|---------------------|-------------------|
+| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `caller`, `simple`, `oauth2` | `caller`            | No                |
+| `gravitino.lance-rest.gravitino-simple.user-name`  | Service username used only when `gravitino-auth-type=simple`                                 | `lance-rest-server` | No                |
+| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                            | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                                  | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                          | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                          | (none)              | Yes, for `oauth2` |
+
+The default `caller` mode reads credentials and active roles separately for every request, including
+requests made through a shared Gravitino client. It forwards Basic or Bearer credentials recorded by
+the incoming authenticator; it does not forward arbitrary client-supplied identity headers.
+Anonymous callers, callers without recorded credentials, and Kerberos negotiation tokens are
+rejected with HTTP 401. Remote authentication and authorization failures retain HTTP 401 and 403.
+
+Configure incoming authentication separately with `gravitino.authenticators` in
+`gravitino-lance-rest-server.conf`. Both services must accept the forwarded credentials. For OAuth,
+the token's issuer, signature, and audience must be valid at both services; this mode does not
+perform token exchange. Simple authentication accepts a supplied username without checking a
+password.
+
+To retain the previous service-account behavior, explicitly set
+`gravitino.lance-rest.gravitino-auth-type=simple` or `oauth2` and configure its service credentials.
+Those modes use the service account's permissions and identity at Gravitino. With explicit `simple`
+mode, `gravitino.lance-rest.gravitino-simple.user-name` is optional and defaults to
+`lance-rest-server`. This is the username sent to Gravitino for every request in that mode; setting
+it does not create a user or grant permissions. With explicit `oauth2` mode, the
+`gravitino.lance-rest.gravitino-oauth2.*` properties supply the service's OAuth2 credentials.
+
+The default `caller` mode uses neither of these service-account configurations and has no shared
+default username. It never falls back to a service account when caller credentials are missing or
+rejected.
+
+This forwarding covers remote Gravitino metadata requests. It does not add the auxiliary-mode
+Lance authorization interceptors to standalone mode or implement delegation for direct storage
+operations.
 
 ### Run with Docker
 
