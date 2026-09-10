@@ -33,16 +33,12 @@ import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergExceptionMapper {
   private final IcebergExceptionMapper icebergExceptionMapper = new IcebergExceptionMapper();
-
-  private void checkExceptionStatus(Exception exception, int statusCode) {
-    Response response = icebergExceptionMapper.toResponse(exception);
-    Assertions.assertEquals(statusCode, response.getStatus());
-  }
 
   @Test
   public void testIcebergExceptionMapper() {
@@ -64,5 +60,31 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new CommitStateUnknownException("", new RuntimeException()), 500);
     checkExceptionStatus(new ServiceUnavailableException(""), 503);
     checkExceptionStatus(new RuntimeException(), 500);
+  }
+
+  /** Checks that errors retain their type and nested causes in the response. */
+  @Test
+  public void testErrorsRetainTypeAndCause() {
+    for (Error error :
+        new Error[] {
+          new OutOfMemoryError("Metaspace"), new StackOverflowError(),
+          new NoClassDefFoundError("catalog class"), new AssertionError("assertion")
+        }) {
+      error.initCause(new IllegalStateException("root cause"));
+      try (Response response = icebergExceptionMapper.toResponse(error)) {
+        Assertions.assertEquals(500, response.getStatus());
+        ErrorResponse entity = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(error.getClass().getSimpleName(), entity.type());
+        Assertions.assertEquals(error.getMessage(), entity.message());
+        Assertions.assertTrue(
+            String.join("\n", entity.stack())
+                .contains("Caused by: java.lang.IllegalStateException: root cause"));
+      }
+    }
+  }
+
+  private void checkExceptionStatus(Exception exception, int statusCode) {
+    Response response = icebergExceptionMapper.toResponse(exception);
+    Assertions.assertEquals(statusCode, response.getStatus());
   }
 }
