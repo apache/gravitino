@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -48,6 +49,8 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
+import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -56,7 +59,10 @@ import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailure
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
@@ -256,6 +262,34 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testInvalidMetadataObjectTypeReturnsBadRequest() throws Throwable {
+    Method method =
+        TestMetadataObjectTagAssociationOperations.class.getMethod(
+            "associateTagsForObject",
+            String.class,
+            String.class,
+            String.class,
+            TagsAssociateRequest.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {"testMetalake", "bogusType", "a.b.c", null});
+
+    MethodInterceptor interceptor =
+        new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+    Response response = (Response) interceptor.invoke(invocation);
+
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("bogusType"));
+    Assertions.assertFalse(
+        errorResponse.getMessage().contains("Authorization failed due to system internal error"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
@@ -294,6 +328,40 @@ public class TestGravitinoInterceptionService {
           errorResponse.getMessage());
 
       // Verify correct HTTP status
+      assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+    }
+  }
+
+  @Test
+  public void testUnexpectedIllegalArgumentExceptionRemainsInternalError() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer())
+          .thenThrow(new IllegalArgumentException("Invalid authorizer configuration"));
+
+      GravitinoInterceptionService gravitinoInterceptionService =
+          new GravitinoInterceptionService();
+      Method testMethod = TestOperations.class.getMethods()[0];
+      MethodInterceptor methodInterceptor =
+          gravitinoInterceptionService.getMethodInterceptors(testMethod).get(0);
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(
+          "Authorization failed due to system internal error. Please contact administrator.",
+          errorResponse.getMessage());
       assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
     }
   }
@@ -616,6 +684,19 @@ public class TestGravitinoInterceptionService {
       Assertions.assertFalse(
           RequestContext.isOperationFailureFired(),
           "operationFailureFired must stay false so HttpAuditFilter emits the HTTP-level event");
+    }
+  }
+
+  public static class TestMetadataObjectTagAssociationOperations {
+
+    @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+    public Response associateTagsForObject(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationObjectType String type,
+        @AuthorizationFullName String fullName,
+        @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+            TagsAssociateRequest request) {
+      return Utils.ok("unused");
     }
   }
 
