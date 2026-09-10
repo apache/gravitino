@@ -47,38 +47,11 @@ jobs:
               - 'core/src/main/java/org/apache/gravitino/authorization/**'
               - 'server-common/src/main/java/org/apache/gravitino/server/authentication/**'
               - '.github/workflows/mcp-integration-test.yml'
+              - '.github/workflows/mcp-integration-test-action.yml'
 
   mcp-authz-integration-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
     needs: changes
     if: needs.changes.outputs.mcp_or_authz_changes == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-java-toolchains
-        with:
-          java-version: 17
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-
-      - name: Build Gravitino distribution
-        run: ./gradlew compileDistribution -x test -PskipWeb=true
-
-      - name: Run MCP authorization integration test
-        env:
-          GRAVITINO_HOME: ${{ github.workspace }}/distribution/package
-        run: |
-          ./mcp-server/dev/run_authz_integration_test.sh
-
-      - name: Upload server logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcp-authz-it-logs
-          path: |
-            distribution/package/logs/**
-            mcp-server/gravitino-mcp-audit.log
-            mcp-server/gravitino-mcp.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/mcp-integration-test-action.yml
+    with:
+      java-version: '17'
