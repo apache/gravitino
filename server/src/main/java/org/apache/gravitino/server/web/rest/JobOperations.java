@@ -403,6 +403,7 @@ public class JobOperations {
   @Path("runs/{jobId}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "cancel-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "cancel-job", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || JOB::OWNER")
   public Response cancelJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
