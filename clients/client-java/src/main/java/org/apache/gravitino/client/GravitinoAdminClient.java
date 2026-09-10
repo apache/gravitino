@@ -50,7 +50,8 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   * Constructs a new GravitinoAdminClient with the given URI, authenticator, AuthDataProvider, and
+   * tlsConfigurer.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
@@ -58,14 +59,16 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The configurer to apply for the underlying TLS settings.
    */
   private GravitinoAdminClient(
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers,
-      Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+      Map<String, String> properties,
+      TLSConfigurer tlsConfigurer) {
+    super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
   }
 
   /**
@@ -259,7 +262,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
       return new GravitinoAdminClient(
-          uri, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri, authDataProvider, isVersionCheckEnabled(), headers, properties, tlsConfigurer);
     }
   }
 }

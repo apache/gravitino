@@ -20,20 +20,22 @@ install it in your local.
 Customize the Gravitino Java client by using `withClientConfig` like this:
 
 ```java
- Map<String, String> properties =
+Map<String, String> properties =
         ImmutableMap.of(
             "gravitino.client.connectionTimeoutMs", "10", 
             "gravitino.client.socketTimeoutMs", "10"
         );
 
-GravitinoClient gravitinoClient = GravitinoClient.builder("http://localhost:8090")
-.withMetalake("metalake")
-.withClientConfig(properties) // add custom client config (optional)
-.builder();
+GravitinoClient gravitinoClient = 
+   GravitinoClient.builder("http://localhost:8090")
+      .withMetalake("metalake")
+      .withClientConfig(properties) // add custom client config (optional)
+      .build();
 
-GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http://localhost:8090")
-.withClientConfig(properties) // add custom client config (optional)
-.builder();
+GravitinoAdminClient gravitinoAdminClient = 
+   GravitinoAdminClient.builder("http://localhost:8090")
+      .withClientConfig(properties) // add custom client config (optional)
+      .build();
 // ...
 ```
 
@@ -45,6 +47,60 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 | `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | `180000`(3 minutes) | No       |
 
 **Note:** Invalid configuration properties will result in exceptions.
+
+### Java Client TLS Configuration
+
+To connect to a Gravitino server over HTTPS using a private certificate authority or a custom trust store, configure a `TLSConfigurer` and pass it to the client builder:
+
+```java
+import java.nio.file.Path;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.TLSConfigurer;
+import org.apache.gravitino.client.TLSConfigurers;
+
+TLSConfigurer tlsConfigurer =
+    TLSConfigurers.builder()
+        .trustStore(
+            Path.of("/path/to/client-truststore.p12"),
+            "truststore-password")
+        .build();
+
+GravitinoClient gravitinoClient =
+    GravitinoClient.builder("https://localhost:8433")
+        .withMetalake("metalake")
+        .withTlsConfigurer(tlsConfigurer)
+        .build();
+
+GravitinoAdminClient gravitinoAdminClient =
+    GravitinoAdminClient.builder("https://localhost:8433")
+        .withTlsConfigurer(tlsConfigurer)
+        .build();
+```
+
+The trust store contains certificates that the client trusts when verifying the Gravitino server.
+
+For mutual TLS (mTLS), configure both a trust store and a client key store:
+
+```java
+TLSConfigurer tlsConfigurer =
+    TLSConfigurers.builder()
+        .trustStore(
+            Path.of("/path/to/client-truststore.p12"),
+            "truststore-password")
+        .keyStore(
+            Path.of("/path/to/client-keystore.p12"),
+            "keystore-password")
+        .build();
+
+GravitinoClient gravitinoClient =
+    GravitinoClient.builder("https://localhost:8433")
+        .withMetalake("metalake")
+        .withTlsConfigurer(tlsConfigurer)
+        .build();
+```
+
+The key store contains the client certificate and private key used when the Gravitino server requires client certificate authentication.
 
 ## Python Client
 
