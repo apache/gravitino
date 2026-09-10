@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -58,7 +58,7 @@ public class TestGlueExceptionConverter {
 
     RuntimeException converted = GlueExceptionConverter.toSchemaException(e, "schema drop_me");
 
-    assertEquals(RuntimeException.class, converted.getClass());
+    assertInstanceOf(ForbiddenException.class, converted);
     assertSame(e, converted.getCause());
     String message = converted.getMessage();
     assertTrue(message.contains("schema drop_me"), message);
@@ -81,7 +81,7 @@ public class TestGlueExceptionConverter {
 
     RuntimeException converted = GlueExceptionConverter.toTableException(e, "table ctas_test");
 
-    assertEquals(RuntimeException.class, converted.getClass());
+    assertInstanceOf(ForbiddenException.class, converted);
     assertSame(e, converted.getCause());
     String message = converted.getMessage();
     assertTrue(message.contains("table ctas_test"), message);

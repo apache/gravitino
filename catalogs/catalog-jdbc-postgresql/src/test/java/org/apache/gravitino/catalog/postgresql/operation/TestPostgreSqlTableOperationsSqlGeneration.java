@@ -64,7 +64,17 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withColumns(
+              new JdbcColumn[] {
+                JdbcColumn.builder()
+                    .withName("col1")
+                    .withType(Types.VarCharType.of(255))
+                    .withNullable(true)
+                    .build()
+              })
+          .build();
     }
   }
 
@@ -145,5 +155,43 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
         alterSql.contains(
             "COMMENT ON COLUMN \"test_table\".\"col2\" IS E'owner\\\\''s \"comment\"; --';"),
         alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnAddColumn() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl", TableChange.addColumn(new String[] {"extra"}, Types.IntegerType.get()));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnUpdateColumnDefaultValue() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl",
+            TableChange.updateColumnDefaultValue(
+                new String[] {"col1"}, Literals.of("abc", Types.VarCharType.of(255))));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnUpdateColumnType() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl",
+            TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(255)));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnRenameColumn() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql("MixedCaseTbl", TableChange.renameColumn(new String[] {"col1"}, "col2"));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
   }
 }

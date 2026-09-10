@@ -38,13 +38,12 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "list_statistics_for_metadata",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "mock_type",
                         "metadata_fullname": "mock_fullname",
                     },
                 )
                 self.assertEqual(
-                    "mock_statistics: mock_metalake, mock_type, mock_fullname",
+                    "mock_statistics: mock_type, mock_fullname",
                     result.content[0].text,
                 )
 
@@ -56,7 +55,6 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "list_statistics_for_partition",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "mock_type",
                         "metadata_fullname": "mock_fullname",
                         "from_partition_name": "from_partition",
@@ -64,7 +62,7 @@ class TestStatisticTool(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    "mock_statistics_for_partition: mock_metalake, mock_type, mock_fullname, "
+                    "mock_statistics_for_partition: mock_type, mock_fullname, "
                     "from_partition, to_partition, True, False",
                     result.content[0].text,
                 )

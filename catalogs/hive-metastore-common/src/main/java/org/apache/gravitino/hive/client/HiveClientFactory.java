@@ -34,6 +34,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
 import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
 import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -110,7 +111,7 @@ public final class HiveClientFactory {
           "Failed to connect to Hive Metastore using cached Hive version {}",
           classLoader.getHiveVersion(),
           e);
-      throw new RuntimeException("Failed to connect to Hive Metastore", e);
+      throw ExceptionMessages.wrap("Failed to connect to Hive Metastore", e);
     }
   }
 
@@ -247,7 +248,7 @@ public final class HiveClientFactory {
       kerberosClient.login();
 
     } catch (Exception e) {
-      throw new RuntimeException("Failed to initialize kerberos client", e);
+      throw ExceptionMessages.wrap("Failed to initialize kerberos client", e);
     }
   }
 

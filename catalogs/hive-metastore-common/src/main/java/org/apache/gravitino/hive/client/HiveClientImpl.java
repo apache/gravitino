@@ -23,6 +23,7 @@ import java.util.Properties;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -180,7 +181,7 @@ public class HiveClientImpl implements HiveClient {
     try {
       shim.close();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to close HiveClient", e);
+      throw ExceptionMessages.wrap("Failed to close HiveClient", e);
     }
   }
 
@@ -189,7 +190,7 @@ public class HiveClientImpl implements HiveClient {
     try {
       return UserGroupInformation.getCurrentUser();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to get current user", e);
+      throw ExceptionMessages.wrap("Failed to get current user", e);
     }
   }
 }
