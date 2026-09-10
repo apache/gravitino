@@ -62,6 +62,7 @@ import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
+import org.apache.gravitino.server.web.mapper.ErrorExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -181,6 +182,7 @@ public class GravitinoServer extends ResourceConfig {
           }
         });
     register(JsonProcessingExceptionMapper.class);
+    register(ErrorExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
     register(ParamExceptionMapper.class);

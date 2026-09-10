@@ -30,6 +30,7 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -80,6 +81,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
+    resourceConfig.register(LanceExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
