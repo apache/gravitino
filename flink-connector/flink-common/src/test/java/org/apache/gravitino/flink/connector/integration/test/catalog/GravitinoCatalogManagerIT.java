@@ -64,8 +64,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
 
   @BeforeAll
   void startUp() throws Exception {
-    // Start Gravitino server
-    super.startIntegrationTest();
+    // JUnit starts the server through BaseIT before this method.
     initGravitinoEnv();
     initMetalake();
     initFlinkEnv();
@@ -75,7 +74,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
   @AfterAll
   void stop() throws Exception {
     stopFlinkEnv();
-    super.stopIntegrationTest();
+    // JUnit stops the server through BaseIT after this method.
     LOG.info("Stop Flink env successfully.");
   }
 
