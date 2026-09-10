@@ -54,6 +54,7 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -326,6 +327,34 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testInvalidMetadataObjectTypeReturnsBadRequest() throws Throwable {
+    Method method =
+        TestMetadataObjectTagAssociationOperations.class.getMethod(
+            "associateTagValuesForObject",
+            String.class,
+            String.class,
+            String.class,
+            TagValuesAssociateRequest.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {"testMetalake", "bogusType", "a.b.c", null});
+
+    MethodInterceptor interceptor =
+        new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+    Response response = (Response) interceptor.invoke(invocation);
+
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("bogusType"));
+    Assertions.assertFalse(
+        errorResponse.getMessage().contains("Authorization failed due to system internal error"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
@@ -364,6 +393,40 @@ public class TestGravitinoInterceptionService {
           errorResponse.getMessage());
 
       // Verify correct HTTP status
+      assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+    }
+  }
+
+  @Test
+  public void testUnexpectedIllegalArgumentExceptionRemainsInternalError() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer())
+          .thenThrow(new IllegalArgumentException("Invalid authorizer configuration"));
+
+      GravitinoInterceptionService gravitinoInterceptionService =
+          new GravitinoInterceptionService();
+      Method testMethod = TestOperations.class.getMethods()[0];
+      MethodInterceptor methodInterceptor =
+          gravitinoInterceptionService.getMethodInterceptors(testMethod).get(0);
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(
+          "Authorization failed due to system internal error. Please contact administrator.",
+          errorResponse.getMessage());
       assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
     }
   }
