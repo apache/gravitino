@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -34,6 +35,10 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
@@ -52,6 +57,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
 import org.lance.namespace.LanceNamespace;
 import org.lance.namespace.client.apache.ApiClient;
 import org.lance.namespace.client.apache.ApiException;
@@ -447,6 +453,45 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.namespaceExists(nonExistentSchemaReq));
     assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
+  }
+
+  /** Verifies unsupported input cannot silently discard records or destroy an existing table. */
+  @Test
+  void testCreateRejectsNonEmptyArrowWithoutSideEffects() throws IOException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+    byte[] data = arrowStreamWithEmptyThenNonEmptyBatch();
+    for (String mode : List.of("create", "exist_ok")) {
+      String name = "nonempty_" + mode;
+      Path location = tempDir.resolve(name);
+      assertNonEmptyCreateRejected(
+          List.of(CATALOG_NAME, SCHEMA_NAME, name), location.toString(), data, mode);
+      Assertions.assertFalse(
+          catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, name)));
+      Assertions.assertFalse(Files.exists(location));
+    }
+
+    String original = "nonempty_overwrite";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, original);
+    String location = tempDir.resolve(original).toString();
+    try (VectorSchemaRoot root =
+        VectorSchemaRoot.of(
+            new IntVector("id", allocator), new VarCharVector("value", allocator))) {
+      createTable(
+          ids, location, Map.of(), ArrowUtils.generateIpcStream(root.getSchema()), "create");
+    }
+    assertNonEmptyCreateRejected(ids, location, data, "overwrite");
+    DescribeTableRequest describe = new DescribeTableRequest();
+    describe.setId(ids);
+    Assertions.assertEquals(
+        List.of("id", "value"),
+        ns.describeTable(describe).getSchema().getFields().stream()
+            .map(JsonArrowField::getName)
+            .toList());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals(0, dataset.countRows());
+      Assertions.assertEquals(2, dataset.getSchema().getFields().size());
+    }
   }
 
   @Test
@@ -966,6 +1011,40 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(anotherLocation, anotherResponse.getLocation());
     // Will not touch storage, so the path should not be created.
     Assertions.assertFalse(new File(anotherLocation).exists());
+  }
+
+  private void assertNonEmptyCreateRejected(
+      List<String> ids, String location, byte[] data, String mode) {
+    ApiException error =
+        Assertions.assertThrows(
+            ApiException.class,
+            () ->
+                createTableApi()
+                    .createTable(
+                        String.join(DELIMITER, ids),
+                        data,
+                        DELIMITER,
+                        mode,
+                        null,
+                        null,
+                        Map.of(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location)));
+    Assertions.assertEquals(406, error.getCode());
+  }
+
+  private byte[] arrowStreamWithEmptyThenNonEmptyBatch() throws IOException {
+    try (VectorSchemaRoot root = VectorSchemaRoot.of(new IntVector("id", allocator));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ArrowStreamWriter writer = new ArrowStreamWriter(root, null, output)) {
+      root.allocateNew();
+      root.setRowCount(0);
+      writer.start();
+      writer.writeBatch();
+      ((IntVector) root.getVector("id")).setSafe(0, 42);
+      root.setRowCount(1);
+      writer.writeBatch();
+      writer.end();
+      return output.toByteArray();
+    }
   }
 
   private CreateTableResponse createTable(

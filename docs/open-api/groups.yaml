@@ -163,9 +163,6 @@ components:
         name:
           type: string
           description: The name of the group
-        externalId:
-          type: string
-          description: The external identifier of the group
         roles:
           type: array
           items:
@@ -182,9 +179,6 @@ components:
         name:
           type: string
           description: The name of the group
-        externalId:
-          type: string
-          description: The external identifier of the group
 
   responses:
     GroupResponse:
@@ -217,8 +211,7 @@ components:
   examples:
     GroupAddRequest:
       value: {
-        "name": "group",
-        "externalId": "ext-group"
+        "name": "group"
       }
 
     NameListResponse:

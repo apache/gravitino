@@ -18,27 +18,18 @@
  */
 package org.apache.gravitino.bulk;
 
-import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
-
 /** Represents one user to add in a bulk operation. */
 public final class UserAdd {
 
   private final String name;
-  @Nullable private final String externalId;
-  @Nullable private final Boolean enabled;
 
   /**
    * Creates a user add item.
    *
    * @param name The user name.
-   * @param externalId The external identifier, or null if unset.
-   * @param enabled Whether the user is enabled, or null to use the default value.
    */
-  public UserAdd(String name, @Nullable String externalId, @Nullable Boolean enabled) {
+  public UserAdd(String name) {
     this.name = name;
-    this.externalId = externalId;
-    this.enabled = enabled;
   }
 
   /**
@@ -48,34 +39,5 @@ public final class UserAdd {
    */
   public String name() {
     return name;
-  }
-
-  /**
-   * Returns the external identifier.
-   *
-   * @return The external identifier, or null if unset.
-   */
-  @Nullable
-  public String externalId() {
-    return externalId;
-  }
-
-  /**
-   * Returns whether the user has an external identifier.
-   *
-   * @return True if the user has an external identifier, otherwise false.
-   */
-  public boolean hasExternalId() {
-    return StringUtils.isNotBlank(externalId);
-  }
-
-  /**
-   * Returns whether the user is enabled.
-   *
-   * @return Whether the user is enabled, or null to use the default value.
-   */
-  @Nullable
-  public Boolean enabled() {
-    return enabled;
   }
 }

@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.authorization;
 
 import static org.mockito.Answers.CALLS_REAL_METHODS;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -216,7 +217,8 @@ public class TestMetadataIdConverter {
     MetadataObject fileset =
         MetadataObjects.of(
             ImmutableList.of("missing_catalog", "schema", "fileset"), MetadataObject.Type.FILESET);
-    when(mockCatalogManager.loadCatalogAndWrap(NameIdentifier.of("metalake", "missing_catalog")))
+    when(mockCatalogManager.doWithCatalog(
+            eq(NameIdentifier.of("metalake", "missing_catalog")), any()))
         .thenThrow(
             new NoSuchCatalogException("Catalog %s does not exist", "metalake.missing_catalog"));
 

@@ -88,6 +88,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -491,7 +492,7 @@ public class HiveCatalogOperations
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
-      throw new RuntimeException(
+      throw ExceptionMessages.wrap(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
   }

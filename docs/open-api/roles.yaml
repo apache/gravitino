@@ -220,11 +220,16 @@ components:
             - MODIFY_FUNCTION
             - CREATE_TAG
             - APPLY_TAG
+            - VIEW_TAG
             - CREATE_POLICY
             - APPLY_POLICY
+            - VIEW_POLICY
+            - VIEW_SECRET_PROVIDERS
             - REGISTER_JOB_TEMPLATE
             - USE_JOB_TEMPLATE
             - RUN_JOB
+            - CREATE_VIEW
+            - SELECT_VIEW
           description: The name of the privilege
         condition:
           type: string

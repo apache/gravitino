@@ -23,8 +23,6 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -32,6 +30,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -44,7 +44,6 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -89,8 +88,9 @@ public abstract class OperationDispatcher {
       throws E {
     try {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
-      return c.doWithPartitionOps(tableIdent, fn);
+      return catalogManager.doWithCatalogWrapper(
+          catalogIdent,
+          wrapper -> wrapper.detachConnectorResult(wrapper.doWithPartitionOps(tableIdent, fn)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -106,8 +106,8 @@ public abstract class OperationDispatcher {
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      return catalogManager.doWithCatalogWrapper(
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -126,8 +126,8 @@ public abstract class OperationDispatcher {
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      return catalogManager.doWithCatalogWrapper(
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex1.isInstance(exception)) {
         throw ex1.cast(exception);
@@ -142,25 +142,33 @@ public abstract class OperationDispatcher {
     }
   }
 
-  protected Set<String> getHiddenPropertyNames(
+  protected MaskAndOmitKeys getMaskAndOmitKeys(
       NameIdentifier catalogIdent,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties) {
     return doWithCatalog(
         catalogIdent,
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  PropertiesMetadata propertiesMetadata = provider.apply(p);
-                  return properties.entrySet().stream()
-                      .filter(
-                          e ->
-                              propertiesMetadata.isHiddenProperty(e.getKey())
-                                  || SecretPropertyUtils.isSecretProperty(e.getKey(), e.getValue()))
-                      .map(Map.Entry::getKey)
-                      .collect(Collectors.toSet());
-                }),
+        c -> getMaskAndOmitKeys(c, provider, properties),
         IllegalArgumentException.class);
+  }
+
+  /**
+   * Classifies hidden properties using metadata from the supplied leased catalog wrapper.
+   *
+   * @param catalog the leased catalog wrapper
+   * @param provider the metadata provider for the entity type
+   * @param properties the properties to classify
+   * @return the keys to mask and omit
+   * @throws Exception if reading the connector metadata fails
+   */
+  protected MaskAndOmitKeys getMaskAndOmitKeys(
+      CatalogManager.CatalogWrapper catalog,
+      ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
+      Map<String, String> properties)
+      throws Exception {
+    return catalog.doWithPropertiesMeta(
+        metadata ->
+            HiddenPropertyMaskUtils.classifyHiddenProperties(properties, provider.apply(metadata)));
   }
 
   protected <T> void validateAlterProperties(
@@ -169,15 +177,34 @@ public abstract class OperationDispatcher {
       T... changes) {
     doWithCatalog(
         getCatalogIdentifier(ident),
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  Map<String, String> upserts = getPropertiesForSet(changes);
-                  Map<String, String> deletes = getPropertiesForDelete(changes);
-                  validatePropertyForAlter(provider.apply(p), upserts, deletes);
-                  return null;
-                }),
+        c -> {
+          validateAlterProperties(c, provider, changes);
+          return null;
+        },
         IllegalArgumentException.class);
+  }
+
+  /**
+   * Validates property changes using metadata from the supplied leased catalog wrapper.
+   *
+   * @param catalog the leased catalog wrapper
+   * @param provider the metadata provider for the entity type
+   * @param changes the requested changes
+   * @param <T> the change type
+   * @throws Exception if reading the connector metadata fails
+   */
+  protected <T> void validateAlterProperties(
+      CatalogManager.CatalogWrapper catalog,
+      ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
+      T... changes)
+      throws Exception {
+    catalog.doWithPropertiesMeta(
+        metadata -> {
+          Map<String, String> upserts = getPropertiesForSet(changes);
+          Map<String, String> deletes = getPropertiesForDelete(changes);
+          validatePropertyForAlter(provider.apply(metadata), upserts, deletes);
+          return null;
+        });
   }
 
   private <T> Map<String, String> getPropertiesForDelete(T... t) {
@@ -261,9 +288,14 @@ public abstract class OperationDispatcher {
 
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
     return doWithCatalog(
-        catalogIdent,
-        c -> c.capabilities().managedStorage(scope).supported(),
-        IllegalArgumentException.class);
+        catalogIdent, c -> isManagedEntity(c, scope), IllegalArgumentException.class);
+  }
+
+  boolean isManagedEntity(CatalogManager.CatalogWrapper catalog, Capability.Scope scope)
+      throws Exception {
+    // Read the capability and interpret it in one pass under the catalog ClassLoader: a connector
+    // CapabilityResult can load classes of its own on the first call.
+    return catalog.doWithCatalog(c -> c.capability().managedStorage(scope).supported());
   }
 
   protected <E extends Entity & HasIdentifier> E getEntity(

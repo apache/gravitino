@@ -75,6 +75,8 @@ public class CompatibilityUtils {
               Operation.LIST_TAGS_INFO_FOR_METADATA_OBJECT)
           .put(OperationType.LIST_METADATA_OBJECTS_FOR_TAG, Operation.LIST_METADATA_OBJECTS_FOR_TAG)
           .put(OperationType.LIST_TAGS_INFO, Operation.LIST_TAGS_INFO)
+          .put(OperationType.ADD_POLICY_FOR_TAG, Operation.ADD_POLICY_FOR_TAG)
+          .put(OperationType.REMOVE_POLICY_FROM_TAG, Operation.REMOVE_POLICY_FROM_TAG)
           .put(OperationType.DROP_FILESET, Operation.DROP_FILESET)
           .put(OperationType.ALTER_FILESET, Operation.ALTER_FILESET)
           .put(OperationType.CREATE_FILESET, Operation.CREATE_FILESET)

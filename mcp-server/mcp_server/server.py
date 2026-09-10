@@ -37,9 +37,15 @@ from fastmcp.tools.base import ToolResult
 
 from mcp_server.core import audit
 from mcp_server.core.context import (
+    METALAKE_ARGUMENT,
     GravitinoContext,
     _get_request_authorization,
+    get_request_metalake,
     service_fallback_authorization,
+)
+from mcp_server.core.middleware import (
+    TOOLS_WITHOUT_METALAKE,
+    MetalakeArgumentMiddleware,
 )
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
@@ -62,9 +68,25 @@ def _get_principal_from_request(fallback_authorization: str = "") -> str:
 class AuditMiddleware(Middleware):
     """Emit a structured audit record for every tool invocation."""
 
-    def __init__(self, fallback_authorization: str = ""):
+    def __init__(
+        self, fallback_authorization: str = "", default_metalake: str = ""
+    ):
         super().__init__()
         self._fallback_authorization = fallback_authorization
+        self._default_metalake = default_metalake
+
+    def _metalake(self, tool_name: str) -> str:
+        """The metalake the call actually used, named or defaulted.
+
+        Recording the resolved value keeps each record self-contained: an
+        auditor can tell which tenant was touched without joining against the
+        server's startup configuration. Tools that are not metalake-scoped
+        record nothing rather than the default, which they never touch - a
+        metalake listing spans every tenant the caller can see.
+        """
+        if tool_name in TOOLS_WITHOUT_METALAKE:
+            return ""
+        return get_request_metalake() or self._default_metalake
 
     async def on_call_tool(
         self,
@@ -75,7 +97,12 @@ class AuditMiddleware(Middleware):
         principal = _get_principal_from_request(self._fallback_authorization)
         try:
             result = await call_next(context)
-            audit.emit(principal=principal, tool=tool_name, outcome="allow")
+            audit.emit(
+                principal=principal,
+                tool=tool_name,
+                outcome="allow",
+                metalake=self._metalake(tool_name),
+            )
             return result
         except Exception as exc:
             audit.emit(
@@ -83,6 +110,7 @@ class AuditMiddleware(Middleware):
                 tool=tool_name,
                 outcome="deny",
                 error_type=type(exc).__name__,
+                metalake=self._metalake(tool_name),
             )
             raise
 
@@ -106,7 +134,14 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
         # Allowlist mode: disable everything, then re-enable the wanted tags.
         mcp.enable(tags=setting.tags, only=True)
 
-    mcp.add_middleware(AuditMiddleware(service_fallback_authorization(setting)))
+    # Added first so it wraps the others: it must publish the call's metalake
+    # before AuditMiddleware records it.
+    mcp.add_middleware(MetalakeArgumentMiddleware())
+    mcp.add_middleware(
+        AuditMiddleware(
+            service_fallback_authorization(setting), setting.metalake
+        )
+    )
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
@@ -150,6 +185,29 @@ def log_service_identity_fallback_policy(setting: Setting) -> None:
             "this endpoint to untrusted callers.",
             setting.oauth_client_id.strip(),
         )
+
+
+def log_metalake_policy(setting: Setting) -> None:
+    """Log how the metalake is resolved for tool calls at startup."""
+    if setting.metalake:
+        logging.info(
+            "Default metalake '%s' configured; a tool call may override it "
+            "with the '%s' argument.",
+            setting.metalake,
+            METALAKE_ARGUMENT,
+        )
+        return
+    logging.info(
+        "No default --metalake configured; every tool call must name one "
+        "with the '%s' argument%s.",
+        METALAKE_ARGUMENT,
+        (
+            " (see the 'list_metalakes' tool)"
+            if setting.exposes_metalake_discovery()
+            else ", and --include-tool-tags hides the 'list_metalakes' tool "
+            "that would let an agent discover them"
+        ),
+    )
 
 
 def _parse_mcp_url(url: str) -> tuple[str, int, str]:

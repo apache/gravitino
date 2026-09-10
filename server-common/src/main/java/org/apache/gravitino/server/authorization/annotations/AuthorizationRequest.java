@@ -33,6 +33,7 @@ public @interface AuthorizationRequest {
     ASSOCIATE_TAG,
     ASSOCIATE_POLICY,
     RUN_JOB,
+    LINEAGE,
     LOAD_TABLE,
     CREATE_SCHEMA
   }

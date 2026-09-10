@@ -17,17 +17,9 @@
 -- under the License.
 --
 
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
 
-ALTER TABLE group_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
 
-COMMENT ON COLUMN user_meta.external_id IS 'external identifier from an upstream identity system';
-COMMENT ON COLUMN user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
-COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstream identity system';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_ueid_del ON user_meta (metalake_id, external_id, deleted_at);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, external_id, deleted_at);
 
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
@@ -48,6 +40,15 @@ COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is di
 
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
+
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_meta.audit_info IS 'idp user audit info';
+
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_group_meta.audit_info IS 'idp group audit info';
+
+ALTER TABLE idp_user_group_rel ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_group_rel.audit_info IS 'idp user group relation audit info';
 
 ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;
 

@@ -24,6 +24,7 @@ import java.util.Collections;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.function.FunctionParamDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -78,5 +79,51 @@ public class TestFunctionUpdatesRequest {
         new FunctionUpdatesRequest(Collections.singletonList(invalidInner));
 
     Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+  }
+
+  @Test
+  public void testAddDefinitionValidationIncludesUpdatePath() throws JsonProcessingException {
+    FunctionUpdatesRequest request =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {
+                  "updates": [{
+                    "@type": "addDefinition",
+                    "definition": {
+                      "parameters": [{"name": "value", "dataType": "future_type"}],
+                      "returnType": "integer"
+                    }
+                  }]
+                }
+                """,
+                FunctionUpdatesRequest.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertTrue(
+        exception.getMessage().contains("updates[0].definition.parameters[0].dataType"));
+  }
+
+  @Test
+  public void testSelectorValidationAllowsLegacyUnparsedDataType() throws JsonProcessingException {
+    FunctionUpdatesRequest request =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {
+                  "updates": [{
+                    "@type": "removeDefinition",
+                    "parameters": [{"name": "value", "dataType": "future_type"}]
+                  }]
+                }
+                """,
+                FunctionUpdatesRequest.class);
+
+    Assertions.assertDoesNotThrow(request::validate);
+    FunctionUpdateRequest.RemoveDefinitionRequest update =
+        (FunctionUpdateRequest.RemoveDefinitionRequest) request.getUpdates().get(0);
+    Assertions.assertEquals(
+        Types.UnparsedType.of("future_type"), update.getParameters()[0].getDataType());
   }
 }

@@ -23,12 +23,22 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TagMetaMapper {
 
   String TAG_TABLE_NAME = "tag_meta";
+
+  /**
+   * Counts deleted rows that still reserve the requested tag ID.
+   *
+   * @param tagId The tag ID.
+   * @return The number of deleted rows with this ID.
+   */
+  @Select("SELECT COUNT(*) FROM " + TAG_TABLE_NAME + " WHERE tag_id = #{tagId} AND deleted_at > 0")
+  int countDeletedTagMetasById(@Param("tagId") Long tagId);
 
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByMetalake")
   List<TagPO> listTagPOsByMetalake(@Param("metalakeName") String metalakeName);
@@ -53,22 +63,37 @@ public interface TagMetaMapper {
   TagPO selectTagMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("name") String tagName);
 
+  /**
+   * Selects and exclusively locks an active tag by its natural key.
+   *
+   * @param metalakeId The metalake ID.
+   * @param tagName The tag name.
+   * @return The locked tag, or null if the natural key is not active.
+   */
+  @SelectProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "selectTagMetaByMetalakeIdAndNameForUpdate")
+  TagPO selectTagMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("name") String tagName);
+
   @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
-
-  @InsertProvider(
-      type = TagMetaSQLProviderFactory.class,
-      method = "insertTagMetaOnDuplicateKeyUpdate")
-  void insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO);
 
   @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "updateTagMeta")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
 
+  /**
+   * Soft-deletes an active tag when its OCC version still matches.
+   *
+   * @param tagId The tag ID.
+   * @param currentVersion The version observed by the caller.
+   * @return The number of affected rows.
+   */
   @UpdateProvider(
       type = TagMetaSQLProviderFactory.class,
-      method = "softDeleteTagMetaByMetalakeAndTagName")
-  Integer softDeleteTagMetaByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+      method = "softDeleteTagMetaByIdAndVersion")
+  Integer softDeleteTagMetaByIdAndVersion(
+      @Param("tagId") Long tagId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "softDeleteTagMetasByMetalakeId")
   void softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
@@ -91,6 +116,15 @@ public interface TagMetaMapper {
 
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIds")
   List<TagPO> listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds);
+
+  /**
+   * Selects and exclusively locks the active tags with the given IDs, in ascending ID order.
+   *
+   * @param tagIds The tag IDs to lock.
+   * @return The locked tags. Tags that are not active are absent from the result.
+   */
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIdsForUpdate")
+  List<TagPO> listTagPOsByTagIdsForUpdate(@Param("tagIds") List<Long> tagIds);
 
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "batchSelectTagByIdentifier")
   List<TagPO> batchSelectTagByIdentifier(

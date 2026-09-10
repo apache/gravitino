@@ -253,8 +253,15 @@ public class PolicyOperations {
           String metalake,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
       PolicySetRequest request) {
-    LOG.info("Received set policy request for policy: {} under metalake: {}", name, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handlePolicyException(
+          OperationType.SET,
+          name,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
+    LOG.info("Received set policy request for policy: {} under metalake: {}", name, metalake);
     OperationType op = request.isEnable() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {

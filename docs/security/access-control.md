@@ -176,7 +176,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table       | Read any table in scope                                            |
 | `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table       | Read and write to, and alter the schema of, any table in scope     |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema              | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read any view in scope                                             |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read view metadata in scope                                        |
 | `CREATE_TOPIC`       | Metalake, Catalog, Schema              | Create topics in any schema in scope                               |
 | `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from any topic in scope                                    |
 | `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from, produce to, and alter any topic in scope             |
@@ -190,8 +190,9 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function    | Read the metadata of, and execute, any function in scope           |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function    | Alter or drop any function in scope                                |
 
-Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata, and the same pairing
-holds for views, topics, and filesets.
+Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
+have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
+view metadata, while altering or dropping a view is owner-only.
 
 `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated aliases for `REGISTER_MODEL` and
 `LINK_MODEL_VERSION`. They resolve to identical authorization, so existing grants keep working, but
@@ -209,6 +210,7 @@ they will be removed in a future release. Use the current names in new roles.
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
 | `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
 | `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
@@ -235,52 +237,71 @@ Three rules apply throughout, so they are not repeated below:
 - Reaching an object inside a catalog and a schema also requires `USE_CATALOG` and `USE_SCHEMA`.
 - A privilege counts whether it is held on the object itself or on any ancestor.
 
-List operations never fail. They return the entries the caller is entitled to see, which for a
-metalake owner is all of them.
+List operations first require access to their parent scope. After that gateway check succeeds, they
+return only the entries the caller is entitled to see, which for a metalake owner is all of them.
 
 #### Data Objects
 
-| Object   | Create              | Load                                 | Alter             | Drop  |
-|----------|---------------------|--------------------------------------|-------------------|-------|
-| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                        | Owner             | Owner |
-| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                         | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`     | `MODIFY_TABLE`    | Owner |
-| View     | `CREATE_VIEW`       | `SELECT_VIEW`                        | Owner             | Owner |
-| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`   | `PRODUCE_TOPIC`   | Owner |
-| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`    | `WRITE_FILESET`   | Owner |
-| Model    | `REGISTER_MODEL`    | `USE_MODEL`                          | Owner             | Owner |
+| Object   | Create              | Load                                    | Alter             | Drop  |
+|----------|---------------------|-----------------------------------------|-------------------|-------|
+| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                           | Owner             | Owner |
+| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                            | Owner             | Owner |
+| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`        | `MODIFY_TABLE`    | Owner |
+| View     | `CREATE_VIEW`       | `SELECT_VIEW`                           | Owner             | Owner |
+| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`      | `PRODUCE_TOPIC`   | Owner |
+| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
+| Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching a credential takes whatever loading the object takes.
 
-Renaming a table or view into a different schema is the one operation needing a privilege on a second
-object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on the target schema.
+The View row applies to metadata operations through both the native Gravitino REST API and the
+Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and
+then filters individual views by ownership or `SELECT_VIEW`. Creating a view makes the caller its
+owner, which is the path used for later alter and drop operations.
+
+These checks authorize View metadata operations only. They do not grant access to referenced tables
+or authorize SQL execution. The current Iceberg engine path uses invoker semantics, so the caller
+still needs access to the underlying data. The View API has no explicit `INVOKER`/`DEFINER` option,
+and Gravitino does not implement `DEFINER` execution or a new engine integration as part of this
+authorization behavior.
+
+The native View rename operation changes only the name within the existing schema and remains
+owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object       | Create                  | Read                                   | Alter or delete | Use                                       |
-|--------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------|
-| Metalake     | Service administrator   | Membership                             | Owner           |                                           |
-| User         | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                           |
-| Group        | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                           |
-| Role         | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`          |
-| Tag          | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object |
-| Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
-| Job          |                         | Owner                                  | Owner           |                                           |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
+|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
+| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
+| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
+| Job              |                         | Owner                                  | Owner           |                                                 |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
 
-Bulk access-control APIs use the same privileges as the matching single-entity operations. These
-bulk operations are authorized once before processing the request. Bulk requests report item-level
-failures in `errors`.
+The secrets-provider registry is process-global server configuration; the metalake path only scopes
+authorization. Listing providers does not return secret material.
 
-| API                                                 | Required privilege                         |
-|-----------------------------------------------------|--------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS` |
-| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` |
+Bulk access-control APIs use the same privileges as the matching single-entity operations. Most
+bulk operations are authorized once before processing the request. Role removal is authorized per
+item because each role can be removed by the metalake owner or by the owner of that role. Bulk
+requests report item-level failures in `errors`.
+
+| API                                                 | Required privilege                                 |
+|-----------------------------------------------------|----------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`           |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role    |
+| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS` |
 
 For example, add users in bulk:
 
@@ -336,6 +357,33 @@ curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/remove"
 }'
 ```
 
+For example, add roles in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/roles/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "roles": [
+    {"name": "analyst", "properties": {}, "securableObjects": []},
+    {"name": "developer", "properties": {}, "securableObjects": []}
+  ]
+}'
+```
+
+Remove roles in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/roles/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
+
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
 Granting or revoking a role, and overriding a role's privileges, takes `MANAGE_GRANTS` on the
 metalake. Setting an owner takes ownership.
@@ -380,9 +428,9 @@ as before.
 
 | Condition                                                          | Response          |
 |--------------------------------------------------------------------|-------------------|
-| An empty entry, such as the trailing comma in `analyst,`             | `400 Bad Request` |
-| `ALL` or `NONE` combined with anything else, such as `ALL,analyst`   | `400 Bad Request` |
-| A well-formed value naming a role the caller does not hold           | `403 Forbidden`   |
+| An empty entry, such as the trailing comma in `analyst,`           | `400 Bad Request` |
+| `ALL` or `NONE` combined with anything else, such as `ALL,analyst` | `400 Bad Request` |
+| A well-formed value naming a role the caller does not hold         | `403 Forbidden`   |
 
 A role that does not exist and a role the caller was never granted both return `403`, so the response
 cannot be used to discover which role names exist. An unheld role is rejected rather than ignored,
@@ -659,10 +707,10 @@ schemas, see the [Gravitino REST API](https://gravitino.apache.org/docs/latest/a
 Users, groups, and roles share one shape. Substitute `users`, `groups`, or `roles` for
 `{collection}`, and the user, group, or role name for `{name}`:
 
-| Operation | Method   | Path                  |
-|-----------|----------|-----------------------|
-| Create    | `POST`   | `/{collection}`       |
-| List      | `GET`    | `/{collection}`       |
+| Operation | Method   | Path                   |
+|-----------|----------|------------------------|
+| Create    | `POST`   | `/{collection}`        |
+| List      | `GET`    | `/{collection}`        |
 | Get       | `GET`    | `/{collection}/{name}` |
 | Delete    | `DELETE` | `/{collection}/{name}` |
 
@@ -670,15 +718,15 @@ Add `?details=true` to a list path to get full objects instead of names.
 
 The rest are one of a kind:
 
-| Operation                          | Method       | Path                                                            |
-|------------------------------------|--------------|-----------------------------------------------------------------|
-| Grant privileges to a role         | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`   |
-| Revoke privileges from a role      | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke`  |
-| Replace a role's privileges        | `PUT`        | `/permissions/roles/{role}/`                                    |
-| Grant roles to a user or group     | `PUT`        | `/permissions/{collection}/{name}/grant`                        |
-| Revoke roles from a user or group  | `PUT`        | `/permissions/{collection}/{name}/revoke`                       |
-| List the roles bound to an object  | `GET`        | `/objects/{object_type}/{object_name}/roles`                    |
-| Get or set an object's owner       | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                           |
+| Operation                         | Method       | Path                                                           |
+|-----------------------------------|--------------|----------------------------------------------------------------|
+| Grant privileges to a role        | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`  |
+| Revoke privileges from a role     | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke` |
+| Replace a role's privileges       | `PUT`        | `/permissions/roles/{role}/`                                   |
+| Grant roles to a user or group    | `PUT`        | `/permissions/{collection}/{name}/grant`                       |
+| Revoke roles from a user or group | `PUT`        | `/permissions/{collection}/{name}/revoke`                      |
+| List the roles bound to an object | `GET`        | `/objects/{object_type}/{object_name}/roles`                   |
+| Get or set an object's owner      | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                          |
 
 Replacing a role's privileges is destructive: afterwards the role holds exactly what the request body
 contains, and any object absent from it is dropped.

@@ -212,7 +212,7 @@ allprojects {
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.7")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_FE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_FE_IMAGE") ?: "")
       param.environment("GRAVITINO_CI_DORIS_BE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_BE_IMAGE") ?: "")
@@ -394,8 +394,18 @@ subprojects {
     ":flink-connector"
   )
 
+  // Spark 4 requires JDK 17, so the Spark 4 connector modules opt out of the JDK 8 target even
+  // though the rest of :spark-connector (3.x) stays on Java 8.
+  val jdk17OnlyProjectPaths = setOf(
+    ":spark-connector:spark-4.0",
+    ":spark-connector:spark-runtime-4.0"
+  )
+
   fun compatibleWithJDK8(project: Project): Boolean {
     val path = project.path.lowercase()
+    if (jdk17OnlyProjectPaths.any { path == it.lowercase() }) {
+      return false
+    }
     return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)

@@ -18,16 +18,5 @@
  */
 package org.apache.gravitino.spark.connector.hive;
 
-import java.util.Set;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.connector.catalog.Identifier;
-import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
-
-public class GravitinoHiveCatalogSpark35 extends GravitinoHiveCatalogSpark34 {
-  @Override
-  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
-      throws NoSuchTableException {
-    return loadTableForWriting(ident);
-  }
-}
+/** Spark 3.5 specific Gravitino Hive catalog implementation. */
+public class GravitinoHiveCatalogSpark35 extends GravitinoHiveCatalog {}

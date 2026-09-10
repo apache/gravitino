@@ -32,6 +32,7 @@ import java.util.ServiceLoader;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -158,7 +159,7 @@ public class FileSystemUtils {
       gravitinoFileSystemCredentialsProvider.setConf(conf);
       return gravitinoFileSystemCredentialsProvider;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+      throw ExceptionMessages.wrap("Failed to create GravitinoFileSystemCredentialProvider", e);
     }
   }
 
@@ -220,7 +221,7 @@ public class FileSystemUtils {
 
       return configuration;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create configuration", e);
+      throw ExceptionMessages.wrap("Failed to create configuration", e);
     }
   }
 
@@ -231,7 +232,7 @@ public class FileSystemUtils {
       writeElement(writer, VALUE_TAG, value);
       writer.writeEndElement();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to write property: " + key, e);
+      throw ExceptionMessages.wrap("Failed to write property: " + key, e);
     }
   }
 
