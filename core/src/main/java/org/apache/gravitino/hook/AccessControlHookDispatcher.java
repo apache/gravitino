@@ -234,7 +234,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
       throws NoSuchMetalakeException {
     List<BulkItemResult<Role>> results = dispatcher.createRoles(metalake, roles);
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerDispatcher != null) {
       results.stream()
           .filter(BulkItemResult::succeeded)

@@ -21,19 +21,36 @@ package org.apache.gravitino.secret;
 import java.util.Map;
 
 /**
- * Interface to retrieve secret-manager plaintext properties for a metadata object.
+ * Interface to retrieve plaintext secret properties for a metadata object.
  *
- * <p>Every secret-URN property value is resolved and returned, including keys that may also be
- * delivered via {@link org.apache.gravitino.credential.SupportsCredentials} (for example {@code
- * jdbc-password}). Normal non-secret properties are not included; combine with {@code
- * load*().properties()} on the client.
+ * <p>Returns:
+ *
+ * <ul>
+ *   <li>Every secret-URN property value, resolved via the secret manager (including keys that may
+ *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
+ *   <li>Stored plaintext for property keys whose names look sensitive (contain {@code secret},
+ *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
+ *       case-insensitive), so mistyped / undeclared credential properties remain usable after API
+ *       responses mask them as {@code ******}.
+ * </ul>
+ *
+ * <p>Properties that are only declared {@code hidden} in property metadata, and whose names do
+ * <em>not</em> match the sensitive-name pattern above, are masked as {@code ******} on list/get but
+ * are <strong>not</strong> returned by {@link #getSecrets()}. Clients must not treat a remaining
+ * {@code ******} value as a usable credential for those keys.
+ *
+ * <p>Normal non-sensitive properties are not included; combine with {@code load*().properties()} on
+ * the client.
  */
 public interface SupportsSecrets {
 
   /**
-   * Returns secret-manager plaintext properties for this metadata object.
+   * Returns plaintext secret properties for this metadata object.
    *
-   * @return a map of property key to resolved plaintext value; never null, may be empty
+   * <p>Does not recover values for properties that are only metadata-{@code hidden} without a
+   * sensitive-looking name or a secret URN. See the interface javadoc.
+   *
+   * @return a map of property key to plaintext value; never null, may be empty
    */
   Map<String, String> getSecrets();
 }

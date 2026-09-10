@@ -52,12 +52,13 @@ public class PrincipalUtils {
       subject.getPrincipals().add(principal);
       return Subject.doAs(subject, action);
     } catch (PrivilegedActionException pae) {
+      LOG.error("doAs method encountered an exception", pae);
       Throwable cause = pae.getCause();
       Throwables.propagateIfPossible(cause, Exception.class);
       throw new RuntimeException("doAs method encountered an unexpected exception", pae);
-    } catch (Error t) {
-      LOG.warn("doAs method encountered an unexpected error", t);
-      throw new RuntimeException("doAs method encountered an unexpected exception", t);
+    } catch (Error error) {
+      LOG.error("doAs method encountered an unexpected error", error);
+      throw error;
     }
   }
 

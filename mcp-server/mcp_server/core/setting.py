@@ -18,6 +18,11 @@
 from dataclasses import dataclass, field
 from typing import Set
 
+# Tag carried by the metalake discovery tools. Defined here because
+# Setting is what interprets --include-tool-tags; tools/metalake.py
+# imports it so the tag and the check below cannot drift apart.
+METALAKE_TOOL_TAG = "metalake"
+
 
 @dataclass
 class DefaultSetting:
@@ -28,7 +33,10 @@ class DefaultSetting:
 
 @dataclass
 class Setting:  # pylint: disable=too-many-instance-attributes
-    metalake: str
+    # Default metalake, used by any tool call that does not name one itself
+    # via the `metalake` argument. Optional on every transport: a deployment
+    # serving several metalakes can leave it unset and let each call choose.
+    metalake: str = ""
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
@@ -56,6 +64,12 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     # --token is configured instead of falling back to the service identity.
     no_service_identity_fallback: bool = False
 
+    def __post_init__(self) -> None:
+        # A whitespace-only --metalake (e.g. a shell-quoting mistake) must be
+        # treated as "no default configured", the same as an empty string,
+        # rather than silently used as a nonsensical metalake name.
+        self.metalake = self.metalake.strip()
+
     def has_oauth_client(self) -> bool:
         """Return True when client-credentials is fully configured."""
         return bool(
@@ -63,6 +77,15 @@ class Setting:  # pylint: disable=too-many-instance-attributes
             and self.oauth_client_id.strip()
             and self.oauth_client_secret.strip()
         )
+
+    def exposes_metalake_discovery(self) -> bool:
+        """Whether the `list_metalakes` tool is reachable in this deployment.
+
+        --include-tool-tags is an allowlist, so a tag filter that omits
+        "metalake" hides the discovery tool. Callers use this to avoid telling
+        an agent to call a tool it cannot see.
+        """
+        return not self.tags or METALAKE_TOOL_TAG in self.tags
 
     def has_service_identity(self) -> bool:
         """Return True when a static token or OAuth client-credentials is set."""

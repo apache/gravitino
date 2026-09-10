@@ -572,10 +572,14 @@ public class IcebergTableOperations {
     }
     TableMetadata filteredMetadata =
         TableMetadata.buildFrom(metadata).suppressHistoricalSnapshots().build();
-    return LoadTableResponse.builder()
-        .withTableMetadata(filteredMetadata)
-        .addAllConfig(loadTableResponse.config())
-        .build();
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(filteredMetadata)
+            .addAllConfig(loadTableResponse.config());
+    if (loadTableResponse.credentials() != null) {
+      builder.addAllCredentials(loadTableResponse.credentials());
+    }
+    return builder.build();
   }
 
   private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
