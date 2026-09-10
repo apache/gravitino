@@ -208,11 +208,11 @@ Gravitino exposes three health endpoints following
 of them are exempt from authentication, so Kubernetes probes, load balancers, and traffic managers
 reach them without credentials.
 
-| Endpoint                | Root Alias          | Description                                                                                                                                 | HTTP Status |
-|-------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 if an HTTP thread can respond and no OOM has been observed; otherwise 503. Use it to decide whether to restart a pod.                              | 200 or 503  |
+| Endpoint                | Root Alias          | Description                                                                                                                                         | HTTP Status |
+|-------------------------|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 if an HTTP thread can respond and no OOM has been observed; otherwise 503. Use it to decide whether to restart a pod.         | 200 or 503  |
 | `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when no OOM has been observed and the entity store answers within the probe timeout; otherwise 503. Use it to route traffic. | 200 or 503  |
-| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                     | 200 or 503  |
+| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                             | 200 or 503  |
 
 | Configuration Item                                   | Description                                                         | Default Value |
 |------------------------------------------------------|---------------------------------------------------------------------|---------------|

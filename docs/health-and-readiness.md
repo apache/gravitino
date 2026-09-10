@@ -44,11 +44,11 @@ curl -i "${GRAVITINO_URL}/api/health"
 
 ## Endpoints
 
-| Path                | Checks                       | Returns 503 when                  |
-|---------------------|------------------------------|-----------------------------------|
-| `/api/health/live`  | HTTP server and OOM state     | An out-of-memory error was observed |
-| `/api/health/ready` | Entity store and OOM state    | An out-of-memory error was observed or the entity store check fails |
-| `/api/health`       | HTTP server, entity store and OOM state | Any check fails |
+| Path                | Checks                                  | Returns 503 when                                                    |
+|---------------------|-----------------------------------------|---------------------------------------------------------------------|
+| `/api/health/live`  | HTTP server and OOM state               | An out-of-memory error was observed                                 |
+| `/api/health/ready` | Entity store and OOM state              | An out-of-memory error was observed or the entity store check fails |
+| `/api/health`       | HTTP server, entity store and OOM state | Any check fails                                                     |
 
 Each path is also served at the root of the server, without the `/api` prefix, for load balancers
 and traffic managers that require probes at well-known locations. The root aliases are `/health`,
