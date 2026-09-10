@@ -532,6 +532,14 @@ public class TestIcebergCatalogPropertyConverter {
                     "gravitino.iceberg.rest-catalog.session", "NONE")));
     Assertions.assertEquals("NONE", explicitConfig.get("iceberg.rest-catalog.session"));
 
+    // OAuth2 alone does not enable the mode; forwarding has to be asked for.
+    Map<String, String> noForwardingConfig =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(ImmutableMap.of("gravitino.client.authType", "oauth2")));
+    Assertions.assertNull(noForwardingConfig.get("iceberg.rest-catalog.session"));
+
     Map<String, String> defaultConfig =
         buildConnectorConfig(
             "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
@@ -547,8 +555,9 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-driver", "org.postgresql.Driver")
             .build();
 
-    // Under simple authentication the Iceberg REST catalog has no token endpoint to exchange
-    // Trino's subject JWT at, so the per-user session mode must stay off.
+    // With authType=simple no iceberg.rest-catalog.security is emitted, so the REST catalog has no
+    // token endpoint to exchange Trino's subject JWT at and the per-user session mode must stay
+    // off.
     Map<String, String> config =
         buildConnectorConfig(
             "catalog1",
