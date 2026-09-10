@@ -99,8 +99,12 @@ public class HiveClientImpl implements HiveClient {
 
   @Override
   public void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
-    shim.alterTable(catalogName, databaseName, tableName, alteredHiveTable);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate) {
+    shim.alterTable(catalogName, databaseName, tableName, alteredHiveTable, skipStatsUpdate);
   }
 
   @Override
