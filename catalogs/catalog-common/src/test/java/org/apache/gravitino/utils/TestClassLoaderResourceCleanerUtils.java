@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.ref.SoftReference;
@@ -51,6 +52,108 @@ class TestClassLoaderResourceCleanerUtils {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  /** A thread whose unrelated field type can become unavailable during classloader cleanup. */
+  public static class ThreadWithMissingDependency extends Thread {
+    /** A field whose type the isolated test loader deliberately cannot resolve. */
+    public Leaky dependency;
+
+    /**
+     * Creates a thread with the supplied runnable.
+     *
+     * @param runnable the actual thread target
+     */
+    public ThreadWithMissingDependency(Runnable runnable) {
+      super(runnable);
+    }
+  }
+
+  private static class ThreadWithShadowedTarget extends Thread {
+    @SuppressWarnings("unused")
+    private final Runnable target;
+
+    private ThreadWithShadowedTarget(Runnable actualTarget, Runnable shadowedTarget) {
+      super(actualTarget);
+      target = shadowedTarget;
+      setContextClassLoader(null);
+    }
+  }
+
+  @Test
+  void testThreadInspectionDoesNotResolveSubclassFieldTypes() throws Exception {
+    URL location = getClass().getProtectionDomain().getCodeSource().getLocation();
+    try (URLClassLoader child =
+        new URLClassLoader(new URL[] {location}, null) {
+          @Override
+          protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (name.equals(Leaky.class.getName())) {
+              throw new ClassNotFoundException(name);
+            }
+            return super.loadClass(name, resolve);
+          }
+        }) {
+      Thread thread =
+          (Thread)
+              child
+                  .loadClass(ThreadWithMissingDependency.class.getName())
+                  .getConstructor(Runnable.class)
+                  .newInstance((Runnable) () -> {});
+      thread.setContextClassLoader(null);
+      assertThrows(NoClassDefFoundError.class, () -> thread.getClass().getDeclaredFields());
+      assertTrue(
+          ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+              thread, getClass().getClassLoader()));
+    }
+  }
+
+  @Test
+  void testThreadInspectionIgnoresShadowedTarget() throws Exception {
+    try (URLClassLoader child = childLoaderOwning(LeakyTask.class)) {
+      Runnable owned =
+          (Runnable)
+              child.loadClass(LeakyTask.class.getName()).getDeclaredConstructor().newInstance();
+      Runnable unrelated = () -> {};
+      assertTrue(
+          ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+              new ThreadWithShadowedTarget(owned, unrelated), child));
+      assertFalse(
+          ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+              new ThreadWithShadowedTarget(unrelated, owned), child));
+    }
+  }
+
+  @Test
+  void testThreadInspectionToleratesLinkageErrors() {
+    Thread thread =
+        new Thread() {
+          @Override
+          public ClassLoader getContextClassLoader() {
+            throw new NoClassDefFoundError("unavailable driver dependency");
+          }
+        };
+    assertFalse(
+        ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+            thread, getClass().getClassLoader()));
+  }
+
+  @Test
+  void testThreadInspectionDoesNotSwallowFatalErrors() {
+    OutOfMemoryError failure = new OutOfMemoryError("test error");
+    Thread thread =
+        new Thread() {
+          @Override
+          public ClassLoader getContextClassLoader() {
+            throw failure;
+          }
+        };
+    assertSame(
+        failure,
+        assertThrows(
+            OutOfMemoryError.class,
+            () ->
+                ClassLoaderResourceCleanerUtils.runningWithClassLoader(
+                    thread, getClass().getClassLoader())));
   }
 
   private static URLClassLoader childLoaderOwning(Class<?> clazz) throws Exception {
