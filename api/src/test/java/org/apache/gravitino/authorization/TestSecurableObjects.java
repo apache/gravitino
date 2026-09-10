@@ -217,6 +217,7 @@ public class TestSecurableObjects {
     Privilege registerFunction = Privileges.RegisterFunction.allow();
     Privilege executeFunction = Privileges.ExecuteFunction.allow();
     Privilege modifyFunction = Privileges.ModifyFunction.allow();
+    Privilege useSecret = Privileges.UseSecret.allow();
 
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.TAG));
@@ -438,6 +439,19 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
+
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL_VERSION));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.FUNCTION));
 
     Assertions.assertTrue(createTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(createTag.canBindTo(MetadataObject.Type.CATALOG));
