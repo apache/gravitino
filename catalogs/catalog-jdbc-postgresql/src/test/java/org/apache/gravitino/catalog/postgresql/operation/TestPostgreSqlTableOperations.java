@@ -356,7 +356,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_16")
-            .withType(Types.ListType.of(Types.IntegerType.get(), false))
+            .withType(Types.ListType.of(Types.IntegerType.get(), true))
             .withNullable(true)
             .build());
 
