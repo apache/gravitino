@@ -226,11 +226,25 @@ dependencies {
 val s3aTestLibDirectory =
   "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
 val copyS3ATestDependencies =
-  tasks.register<Copy>("copyS3ATestDependencies") {
-    from(s3aTestRuntime) {
-      include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+  tasks.register("copyS3ATestDependencies") {
+    inputs.files(s3aTestRuntime)
+    outputs.files(
+      provider {
+        s3aTestRuntime.files.filter {
+          it.name.startsWith("hadoop-aws-") || it.name.startsWith("aws-java-sdk-bundle-")
+        }.map { file("$s3aTestLibDirectory/${it.name}") }
+      }
+    )
+    // Copy tasks targeting the distribution depend on cleanDistributionPackage. Test setup
+    // must preserve the existing deployment, so copy the optional jars in a regular task.
+    doLast {
+      copy {
+        from(s3aTestRuntime) {
+          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+        }
+        into(s3aTestLibDirectory)
+      }
     }
-    into(s3aTestLibDirectory)
   }
 val cleanS3ATestDependencies =
   tasks.register<Delete>("cleanS3ATestDependencies") {
