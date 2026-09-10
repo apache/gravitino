@@ -499,13 +499,27 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-driver", "org.postgresql.Driver")
             .build();
 
-    Map<String, String> config =
+    Map<String, String> oauth2Config =
         buildConnectorConfig(
             "catalog1",
             properties,
             icebergRestConfiguredConfig(
-                ImmutableMap.of("gravitino.client.session.forwardUser", "true")));
-    Assertions.assertEquals("USER", config.get("iceberg.rest-catalog.session"));
+                ImmutableMap.of(
+                    "gravitino.client.session.forwardUser", "true",
+                    "gravitino.client.authType", "oauth2")));
+    Assertions.assertEquals("USER", oauth2Config.get("iceberg.rest-catalog.session"));
+
+    // The session mode can also be reached without the Gravitino client itself using OAuth2, by
+    // pointing the REST catalog at its own OAuth2 provider.
+    Map<String, String> restOnlyOauth2Config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(
+                ImmutableMap.of(
+                    "gravitino.client.session.forwardUser", "true",
+                    "gravitino.iceberg.rest-catalog.security", "OAUTH2")));
+    Assertions.assertEquals("USER", restOnlyOauth2Config.get("iceberg.rest-catalog.session"));
 
     Map<String, String> explicitConfig =
         buildConnectorConfig(
@@ -514,6 +528,7 @@ public class TestIcebergCatalogPropertyConverter {
             icebergRestConfiguredConfig(
                 ImmutableMap.of(
                     "gravitino.client.session.forwardUser", "true",
+                    "gravitino.client.authType", "oauth2",
                     "gravitino.iceberg.rest-catalog.session", "NONE")));
     Assertions.assertEquals("NONE", explicitConfig.get("iceberg.rest-catalog.session"));
 
@@ -521,6 +536,28 @@ public class TestIcebergCatalogPropertyConverter {
         buildConnectorConfig(
             "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
     Assertions.assertNull(defaultConfig.get("iceberg.rest-catalog.session"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesSkipsSessionUserWithoutOauth2() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    // Under simple authentication the Iceberg REST catalog has no token endpoint to exchange
+    // Trino's subject JWT at, so the per-user session mode must stay off.
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(
+                ImmutableMap.of(
+                    "gravitino.client.session.forwardUser", "true",
+                    "gravitino.client.authType", "simple")));
+    Assertions.assertNull(config.get("iceberg.rest-catalog.session"));
   }
 
   @Test
