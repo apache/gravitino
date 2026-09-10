@@ -20,6 +20,7 @@ import os
 import time
 
 from docker.errors import DockerException
+from docker.models.containers import Container
 from gravitino.exceptions.base import GravitinoRuntimeException
 
 from tests.integration.containers.base_container import BaseContainer
@@ -27,7 +28,9 @@ from tests.integration.containers.base_container import BaseContainer
 logger = logging.getLogger(__name__)
 
 
-def check_hdfs_container_status(hdfs_container, timeout_sec=150, interval_sec=10):
+def check_hdfs_container_status(
+    hdfs_container: Container, timeout_sec: float = 150, interval_sec: float = 10
+) -> None:
     """Wait for HDFS and the remote Hive Metastore, with bounded probe commands."""
     deadline = time.monotonic() + timeout_sec
     last_output = b"No readiness probe completed"
