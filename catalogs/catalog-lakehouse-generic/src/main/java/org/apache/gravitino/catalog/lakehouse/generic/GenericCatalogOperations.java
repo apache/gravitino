@@ -66,6 +66,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.ExceptionMessages;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
 public class GenericCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
@@ -352,11 +353,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       } else if (t instanceof IllegalArgumentException) {
         throw (IllegalArgumentException) t;
       } else if (t instanceof IOException) {
-        throw new RuntimeException(
-            String.format("Failed to load table %s: %s", tableIdent, t.getMessage()), t);
+        throw ExceptionMessages.wrap("Failed to load table " + tableIdent, t);
       } else {
-        throw new RuntimeException(
-            String.format("Unexpected exception when loading table %s", tableIdent), t);
+        throw ExceptionMessages.wrap("Unexpected exception when loading table " + tableIdent, t);
       }
     }
   }

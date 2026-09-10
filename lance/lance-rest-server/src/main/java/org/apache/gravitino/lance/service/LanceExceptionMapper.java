@@ -44,11 +44,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Provider
-public class LanceExceptionMapper implements ExceptionMapper<Exception> {
+public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
-  public static Response toRESTResponse(String instance, Exception ex) {
+  public static Response toRESTResponse(String instance, Throwable ex) {
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex
@@ -63,11 +63,11 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
   }
 
   @Override
-  public Response toResponse(Exception ex) {
+  public Response toResponse(Throwable ex) {
     return toRESTResponse("", ex);
   }
 
-  private static LanceNamespaceException toLanceNamespaceException(String instance, Exception ex) {
+  private static LanceNamespaceException toLanceNamespaceException(String instance, Throwable ex) {
     if (ex instanceof ForbiddenException) {
       return new PermissionDeniedException(ex.getMessage(), "", instance);
 

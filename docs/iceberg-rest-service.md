@@ -577,16 +577,17 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 Supports using static GCS credential file or generating GCS token to access GCS data.
 
-| Configuration item               | Description                                                                                                                  | Default value                           | Required |
-|----------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
-| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| Configuration item                                | Description                                                                                                                  | Default value                           | Required |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `gravitino.iceberg-rest.gcs-service-account-file` | Path of the GCS service account JSON file. Used for server-side FileIO and for `gcs-token` credential vending.               | GCS Application default credential.     | No       |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
 Refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
-Ensure that the credential file is accessible by the Gravitino server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
+When `gcs-service-account-file` is set, Gravitino loads it at catalog initialization and injects Iceberg `gcs.oauth2.token` for FileIO. The IRC catalog cache evicts that catalog before the token expires so the next request recreates the catalog and mints a fresh token. If unset, use Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 :::
 
 :::info

@@ -285,4 +285,31 @@ public class TestTypeUtils {
         DataTypes.MULTISET(DataTypes.BIGINT()),
         TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<BIGINT>")));
   }
+
+  @Test
+  public void testExternalTypeFromOtherCatalogConversion() {
+    // A type name of another data source that parses as a Flink type by accident: a PostgreSQL
+    // numeric parses as DECIMAL(10, 0)
+    Assertions.assertEquals(
+        DataTypes.STRING(), TypeUtils.toFlinkType(Types.ExternalType.of("numeric")));
+
+    // A type name that is no Flink type at all
+    Assertions.assertEquals(
+        DataTypes.STRING(), TypeUtils.toFlinkType(Types.ExternalType.of("money")));
+    Assertions.assertEquals(
+        DataTypes.STRING(), TypeUtils.toFlinkType(Types.ExternalType.of("json")));
+  }
+
+  @Test
+  public void testMultisetSpellingsConversion() {
+    // The Paimon catalog writes the external type with asSQLString, which spells the element type
+    // STRING rather than VARCHAR(2147483647)
+    Assertions.assertEquals(
+        DataTypes.MULTISET(DataTypes.STRING()),
+        TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<STRING>")));
+
+    Assertions.assertEquals(
+        DataTypes.MULTISET(DataTypes.BIGINT()),
+        TypeUtils.toFlinkType(Types.ExternalType.of("multiset<bigint>")));
+  }
 }

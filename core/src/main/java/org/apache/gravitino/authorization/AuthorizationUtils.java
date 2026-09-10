@@ -227,7 +227,8 @@ public class AuthorizationUtils {
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    List<NameIdentifier> catalogIdents = getMetadataObjectCatalogs(metalake, metadataObject);
+    List<NameIdentifier> catalogIdents =
+        getMetadataObjectCatalogs(catalogManager, metalake, metadataObject);
     for (NameIdentifier catalogIdent : catalogIdents) {
       callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
     }
@@ -344,16 +345,19 @@ public class AuthorizationUtils {
     }
   }
 
+  /**
+   * Removes catalog privileges using the live catalog's name while its operation lease is held.
+   *
+   * @param catalogIdent the identifier used to load the catalog
+   * @param locations the catalog storage locations
+   */
   public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
-    // If we enable authorization, we should remove the privileges about the entity in the
-    // authorization plugin.
-    MetadataObject metadataObject =
-        MetadataObjects.of(null, catalogIdent.name(), MetadataObject.Type.CATALOG);
-    MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject, locations);
-
     callAuthorizationPluginImpl(
-        authorizationPlugin -> {
-          authorizationPlugin.onMetadataUpdated(removeObject);
+        (authorizationPlugin, catalogName) -> {
+          MetadataObject metadataObject =
+              MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+          authorizationPlugin.onMetadataUpdated(
+              MetadataObjectChange.remove(metadataObject, locations));
         },
         GravitinoEnv.getInstance().catalogManager(),
         catalogIdent);
@@ -485,8 +489,7 @@ public class AuthorizationUtils {
   }
 
   private static List<NameIdentifier> getMetadataObjectCatalogs(
-      String metalake, MetadataObject metadataObject) {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+      CatalogManager catalogManager, String metalake, MetadataObject metadataObject) {
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
       return Arrays.asList(catalogManager.listCatalogs(Namespace.of(metalake)));
     }

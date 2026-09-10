@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -31,7 +32,10 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
@@ -40,6 +44,7 @@ import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
@@ -99,6 +104,7 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
+          enforceSelfPasswordUpdateRules(user, request);
           if (request.getPassword() != null) {
             userGroupManager.changePassword(user, request.getPassword());
           }
@@ -110,6 +116,27 @@ public class IdpUserOperations {
         "user",
         IdpOperationType.UPDATE,
         user);
+  }
+
+  /**
+   * Non-service-admins may only change their own password and cannot update {@code enabled}.
+   *
+   * @param user the path username being updated
+   * @param request the update request
+   */
+  private static void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+      return;
+    }
+    if (!user.equals(currentUser)) {
+      throw new ForbiddenException(
+          "Only service admins can update another user's password or enabled flag");
+    }
+    if (request.getEnabled() != null) {
+      throw new ForbiddenException("Only service admins can update the enabled flag");
+    }
   }
 
   @DELETE
