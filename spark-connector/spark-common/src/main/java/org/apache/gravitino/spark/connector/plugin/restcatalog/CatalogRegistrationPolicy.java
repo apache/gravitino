@@ -21,15 +21,20 @@ package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Decides whether an advertised REST catalog is registered, and under what Spark name. */
+/**
+ * Decides whether a discovered REST catalog is registered, and under what Spark name.
+ *
+ * <p>If no policy is configured, every discovered catalog is registered under its discovered name.
+ * A configured implementation must provide a public no-argument constructor.
+ */
 @DeveloperApi
 public interface CatalogRegistrationPolicy {
 
   /**
-   * Returns whether to register an advertised catalog automatically.
+   * Returns whether to register a discovered catalog automatically.
    *
-   * @param format the lakehouse format that advertised the catalog
-   * @param catalogName the catalog name advertised by the format's REST server
+   * @param format the lakehouse format that discovered the catalog
+   * @param catalogName the catalog name returned by the format's REST server
    * @return true to register the catalog, false to skip it
    */
   boolean shouldRegister(String format, String catalogName);
@@ -37,7 +42,7 @@ public interface CatalogRegistrationPolicy {
   /**
    * Returns the Spark catalog name for an accepted catalog.
    *
-   * @param format the lakehouse format that advertised the catalog
+   * @param format the lakehouse format that discovered the catalog
    * @param catalogName the accepted catalog name
    * @return the Spark catalog name
    */

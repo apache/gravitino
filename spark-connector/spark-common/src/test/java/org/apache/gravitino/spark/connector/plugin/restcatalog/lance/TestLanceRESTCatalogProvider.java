@@ -62,11 +62,12 @@ public class TestLanceRESTCatalogProvider {
         "/lance/v1/namespace/$/list",
         exchange -> {
           int request = requests.getAndIncrement();
+          String query = exchange.getRequestURI().getQuery();
           if (request == 0) {
-            assertFalse(exchange.getRequestURI().getQuery().contains("page_token"));
+            assertFalse(query.contains("page_token"));
             respond(exchange, 200, "{\"namespaces\":[\"catalog_b\"],\"page_token\":\"next\"}");
           } else {
-            assertTrue(exchange.getRequestURI().getQuery().contains("page_token=next"));
+            assertTrue(query.contains("page_token=next"));
             respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
           }
         });
@@ -77,6 +78,41 @@ public class TestLanceRESTCatalogProvider {
 
     assertEquals(2, requests.get());
     assertEquals(Arrays.asList("catalog_b", "catalog_a"), catalogs);
+  }
+
+  @Test
+  void testUsesConfiguredNamespaceDelimiter() {
+    server.createContext(
+        "/lance/v1/namespace/$/list",
+        exchange -> {
+          assertTrue(exchange.getRequestURI().getQuery().contains("delimiter=%23"));
+          respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
+        });
+    server.start();
+
+    List<String> catalogs =
+        new LanceRESTCatalogProvider()
+            .listCatalogs(
+                serverUri,
+                Collections.singletonMap(
+                    LanceRESTCatalogProvider.NAMESPACE_DELIMITER_PROPERTY, "#"));
+
+    assertEquals(Collections.singletonList("catalog_a"), catalogs);
+  }
+
+  @Test
+  void testRejectsBlankNamespaceDelimiter() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new LanceRESTCatalogProvider()
+                    .listCatalogs(
+                        serverUri,
+                        Collections.singletonMap(
+                            LanceRESTCatalogProvider.NAMESPACE_DELIMITER_PROPERTY, " ")));
+
+    assertTrue(exception.getMessage().contains("delimiter must not be blank"));
   }
 
   @Test

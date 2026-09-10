@@ -102,7 +102,7 @@ dependencies {
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
-  testImplementation(project(":spark-connector:spark-common"))
+  testImplementation(project(":spark-connector:spark-3.5"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.lance)
