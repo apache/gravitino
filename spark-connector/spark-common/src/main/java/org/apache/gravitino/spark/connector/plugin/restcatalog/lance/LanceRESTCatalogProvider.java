@@ -44,6 +44,7 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
 
   private static final String ROOT_NAMESPACE_ID = "$";
   private static final String NAMESPACE_DELIMITER = "$";
+  static final String NAMESPACE_DELIMITER_PROPERTY = "namespaceDelimiter";
 
   @Override
   public String format() {
@@ -54,6 +55,10 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
   public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
     List<String> catalogs = new ArrayList<>();
     Set<String> seenPageTokens = new HashSet<>();
+    String namespaceDelimiter =
+        catalogProperties.getOrDefault(NAMESPACE_DELIMITER_PROPERTY, NAMESPACE_DELIMITER);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(namespaceDelimiter), "Lance namespace delimiter must not be blank");
     String pageToken = null;
 
     ApiClient apiClient = new ApiClient().setBasePath(normalizeUri(uri));
@@ -61,7 +66,7 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
       NamespaceApi namespaceApi = new NamespaceApi(apiClient);
       do {
         ListNamespacesResponse response =
-            namespaceApi.listNamespaces(ROOT_NAMESPACE_ID, NAMESPACE_DELIMITER, pageToken, null);
+            namespaceApi.listNamespaces(ROOT_NAMESPACE_ID, namespaceDelimiter, pageToken, null);
         Preconditions.checkState(response != null, "Lance REST server returned an empty response");
         Preconditions.checkState(
             response.getNamespaces() != null,
@@ -87,8 +92,8 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
   }
 
   @Override
-  public Map<String, String> generatedCatalogProperties(String uri, String advertisedCatalogName) {
-    return ImmutableMap.of("impl", "rest", "uri", uri, "parent", advertisedCatalogName);
+  public Map<String, String> generatedCatalogProperties(String uri, String discoveredCatalogName) {
+    return ImmutableMap.of("impl", "rest", "uri", uri, "parent", discoveredCatalogName);
   }
 
   @Override

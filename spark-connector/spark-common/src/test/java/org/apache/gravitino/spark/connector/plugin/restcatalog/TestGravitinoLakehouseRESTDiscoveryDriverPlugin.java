@@ -250,8 +250,8 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
 
     @Override
     public Map<String, String> generatedCatalogProperties(
-        String uri, String advertisedCatalogName) {
-      return ImmutableMap.of("impl", "rest", "uri", uri, "parent", advertisedCatalogName);
+        String uri, String discoveredCatalogName) {
+      return ImmutableMap.of("impl", "rest", "uri", uri, "parent", discoveredCatalogName);
     }
 
     @Override
@@ -299,7 +299,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
 
     @Override
     public Map<String, String> generatedCatalogProperties(
-        String uri, String advertisedCatalogName) {
+        String uri, String discoveredCatalogName) {
       throw new AssertionError("Provider must not be called without a configured URI");
     }
 

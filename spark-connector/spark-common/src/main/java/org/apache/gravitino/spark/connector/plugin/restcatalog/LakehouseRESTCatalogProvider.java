@@ -33,11 +33,11 @@ public interface LakehouseRESTCatalogProvider {
   String format();
 
   /**
-   * Lists the catalog names advertised by the format's REST server.
+   * Lists the catalog names discovered from the format's REST server.
    *
    * @param uri the configured REST server URI
    * @param catalogProperties global catalog properties configured for the format
-   * @return advertised catalog names
+   * @return discovered catalog names
    */
   List<String> listCatalogs(String uri, Map<String, String> catalogProperties);
 
@@ -52,10 +52,10 @@ public interface LakehouseRESTCatalogProvider {
    * Returns provider-generated Spark catalog property suffixes and values.
    *
    * @param uri the configured REST server URI
-   * @param advertisedCatalogName the catalog name advertised by the REST server
+   * @param discoveredCatalogName the catalog name discovered from the REST server
    * @return generated property suffixes and values
    */
-  Map<String, String> generatedCatalogProperties(String uri, String advertisedCatalogName);
+  Map<String, String> generatedCatalogProperties(String uri, String discoveredCatalogName);
 
   /**
    * Returns Spark session extension class names required by the provider.
