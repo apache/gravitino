@@ -563,6 +563,7 @@ class TestGlueCatalogTableOperations {
   @Test
   void testDropTableSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
+    stubGetTable(Table.builder().name("t").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
 
     boolean result = ops.dropTable(ident);
 
@@ -573,6 +574,18 @@ class TestGlueCatalogTableOperations {
   @Test
   void testDropTableNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenThrow(EntityNotFoundException.builder().message("not found").build());
+
+    assertFalse(ops.dropTable(ident));
+  }
+
+  /** The table is dropped by another client between the type check and the delete. */
+  @Test
+  void testDropTableVanishesBeforeDelete() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
+    stubGetTable(
+        Table.builder().name("missing").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
     when(mockClient.deleteTable(any(DeleteTableRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
 
@@ -583,6 +596,7 @@ class TestGlueCatalogTableOperations {
   void testDropTableWithCatalogId() {
     ops.catalogId = "123456789012";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
+    stubGetTable(Table.builder().name("t").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
     ArgumentCaptor<DeleteTableRequest> captor = ArgumentCaptor.forClass(DeleteTableRequest.class);
 
     ops.dropTable(ident);
@@ -591,5 +605,77 @@ class TestGlueCatalogTableOperations {
     assertEquals("123456789012", captor.getValue().catalogId());
     assertEquals("mydb", captor.getValue().databaseName());
     assertEquals("t", captor.getValue().name());
+  }
+
+  // -------------------------------------------------------------------------
+  // views are not tables
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testListTablesExcludesViews() {
+    Namespace ns = Namespace.of("metalake", "catalog", "mydb");
+    Table table = Table.builder().name("iceberg_test").build();
+
+    when(mockClient.getTables(any(GetTablesRequest.class)))
+        .thenReturn(
+            GetTablesResponse.builder()
+                .tableList(table, viewObject("iceberg_view"))
+                .nextToken(null)
+                .build());
+
+    NameIdentifier[] result = ops.listTables(ns);
+
+    assertEquals(1, result.length);
+    assertEquals("iceberg_test", result[0].name());
+  }
+
+  @Test
+  void testLoadTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    NoSuchTableException e = assertThrows(NoSuchTableException.class, () -> ops.loadTable(ident));
+    assertTrue(e.getMessage().contains("it is a view, not a table"));
+  }
+
+  @Test
+  void testAlterTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    assertThrows(
+        NoSuchTableException.class, () -> ops.alterTable(ident, TableChange.updateComment("x")));
+  }
+
+  @Test
+  void testDropTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    assertThrows(NoSuchTableException.class, () -> ops.dropTable(ident));
+    verify(mockClient, never()).deleteTable(any(DeleteTableRequest.class));
+  }
+
+  /** Glue stores tableType as a free-form string; casing must not decide whether it is a view. */
+  @Test
+  void testViewDetectionIsCaseInsensitive() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "v");
+    stubGetTable(Table.builder().name("v").tableType("virtual_view").build());
+
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(ident));
+  }
+
+  private void stubGetTable(Table table) {
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(table).build());
+  }
+
+  private static Table viewObject(String name) {
+    return Table.builder()
+        .name(name)
+        .tableType(GlueConstants.VIRTUAL_VIEW_TABLE_TYPE)
+        .viewOriginalText("/* Presto View: abc */")
+        .parameters(Map.of("presto_view", "true"))
+        .build();
   }
 }

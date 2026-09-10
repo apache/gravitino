@@ -148,5 +148,12 @@ public final class GlueConstants {
   /** Glue {@code tableType} value for external tables. */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
 
+  /**
+   * Glue {@code tableType} value for views. Both Hive-compatible views (whose definition lives in
+   * {@code Table.viewOriginalText()}) and Glue multi-dialect views (whose definition lives in
+   * {@code Table.viewDefinition()}) carry this type.
+   */
+  public static final String VIRTUAL_VIEW_TABLE_TYPE = "VIRTUAL_VIEW";
+
   private GlueConstants() {}
 }
