@@ -234,14 +234,28 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public void testConnection(NameIdentifier ident) throws Exception {
-    // TODO(#12566): Support event dispatching for testConnection
-    dispatcher.testConnection(ident);
+    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.testConnection(ident);
+      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
   public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
-    // TODO(#12566): Support event dispatching for testConnection
-    dispatcher.testConnection(ident, changes);
+    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.testConnection(ident, changes);
+      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
