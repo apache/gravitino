@@ -76,6 +76,15 @@ public class IcebergCatalogUtil {
    */
   private static final String ICEBERG_TYPE_COLUMN = "iceberg_type";
 
+  /**
+   * SQLSTATE {@code 28000}: MySQL error 1045 (Access denied), H2 wrong user/password, and
+   * PostgreSQL {@code invalid_authorization_specification} (for example unknown role).
+   */
+  private static final String SQLSTATE_INVALID_AUTHORIZATION = "28000";
+
+  /** SQLSTATE {@code 28P01}: PostgreSQL {@code invalid_password}. */
+  private static final String SQLSTATE_INVALID_PASSWORD = "28P01";
+
   private static final String GCS_CLOUD_PLATFORM_SCOPE =
       "https://www.googleapis.com/auth/cloud-platform";
 
@@ -201,10 +210,12 @@ public class IcebergCatalogUtil {
       jdbcCatalog.initialize(icebergCatalogName, properties);
     } catch (UncheckedSQLException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof SQLException
-          && cause.getMessage() != null
-          && cause.getMessage().contains("Access denied")) {
-        throw new ConnectionFailedException(e, e.getMessage());
+      if (cause instanceof SQLException) {
+        String sqlState = ((SQLException) cause).getSQLState();
+        if (SQLSTATE_INVALID_AUTHORIZATION.equals(sqlState)
+            || SQLSTATE_INVALID_PASSWORD.equals(sqlState)) {
+          throw new ConnectionFailedException(e, e.getMessage());
+        }
       }
       if (!isConcurrentViewMigrationConflict(e)) {
         throw e;
