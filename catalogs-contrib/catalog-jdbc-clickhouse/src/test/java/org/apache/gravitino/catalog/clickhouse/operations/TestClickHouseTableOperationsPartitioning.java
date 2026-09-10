@@ -40,9 +40,9 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(1, yearPartitions.length);
     assertSingleFieldTransform(yearPartitions[0], Transforms.NAME_OF_YEAR, "event_time");
 
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> operations.parsePartitioning("cityHash64(user_id) % 16"));
+    // A native expression that cannot be structured returns an empty transform array. The raw
+    // expression is instead exposed through the read-only partition-key property during load.
+    Assertions.assertEquals(0, operations.parsePartitioning("cityHash64(user_id) % 16").length);
 
     Transform[] identityPartitions = operations.parsePartitioning("metric_type");
     Assertions.assertEquals(1, identityPartitions.length);
@@ -55,6 +55,27 @@ public class TestClickHouseTableOperationsPartitioning {
 
     Assertions.assertEquals(0, operations.parsePartitioning("tuple()").length);
     Assertions.assertEquals(0, operations.parsePartitioning("  ").length);
+  }
+
+  @Test
+  public void testNestedExpressionInsideKnownTransformIsNotMisrepresented() {
+    // A nested expression inside toYear cannot be mapped to a single-field year transform, so the
+    // whole partition key is treated as unsupported and returns an empty transform array rather
+    // than misrepresenting it as year("f(x)").
+    Assertions.assertEquals(0, operations.parsePartitioning("toYear(toString(event_time))").length);
+  }
+
+  @Test
+  public void testBacktickQuotedColumnNameIsStructured() {
+    // A backtick-quoted column name (which may contain special characters such as "-") is a real
+    // column reference and must be structured rather than rejected.
+    Transform[] monthPartitions = operations.parsePartitioning("toYYYYMM(`event-time`)");
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "event-time");
+
+    Transform[] identityPartitions = operations.parsePartitioning("`event-time`");
+    Assertions.assertEquals(1, identityPartitions.length);
+    assertSingleFieldTransform(identityPartitions[0], Transforms.NAME_OF_IDENTITY, "event-time");
   }
 
   private void assertSingleFieldTransform(
