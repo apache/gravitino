@@ -103,7 +103,8 @@ public class CatalogPaimonS3AIT extends BaseIT {
     catalogProperties.put(
         S3A_PROPERTY_PREFIX + "endpoint",
         String.format(
-            "http://localhost:%d",
+            "http://%s:%d",
+            localStackContainer.getContainer().getHost(),
             localStackContainer.getMappedPort(GravitinoLocalStackContainer.PORT)));
     catalogProperties.put(S3A_PROPERTY_PREFIX + "path.style.access", "true");
     catalogProperties.put(S3A_PROPERTY_PREFIX + "connection.ssl.enabled", "false");
