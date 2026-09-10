@@ -197,17 +197,22 @@ public class ClassLoaderResourceCleanerUtils {
     if (thread == null) {
       return false;
     }
-    if (thread.getContextClassLoader() == targetClassLoader
-        || thread.getClass().getClassLoader() == targetClassLoader) {
-      return true;
-    }
     try {
-      Object runnable = FieldUtils.readField(thread, "target", true);
+      if (thread.getContextClassLoader() == targetClassLoader
+          || thread.getClass().getClassLoader() == targetClassLoader) {
+        return true;
+      }
+      // Inspect Thread's own target, not a subclass's fields. Reflecting on a driver thread
+      // subclass can resolve unavailable field types, or find a shadowed target field.
+      Field targetField = Thread.class.getDeclaredField("target");
+      targetField.setAccessible(true);
+      Object runnable = targetField.get(thread);
       if (runnable != null && runnable.getClass().getClassLoader() == targetClassLoader) {
         return true;
       }
-    } catch (Exception e) {
-      LOG.debug("Cannot read the runnable of thread {}", thread.getName(), e);
+    } catch (Exception | LinkageError e) {
+      // A stale thread's dependencies must not abort cleanup of the remaining threads.
+      LOG.debug("Cannot inspect the classloader ownership of thread {}", thread.getName(), e);
     }
 
     return false;
