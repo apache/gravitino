@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupRoleRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider {
@@ -74,6 +75,39 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  /**
+   * Builds a PostgreSQL batch upsert for group-role relations.
+   *
+   * @param groupRoleRelPOs the group-role relations to insert or update
+   * @return the MyBatis SQL script
+   */
+  @Override
+  public String batchInsertGroupRoleRelOnDuplicateKeyUpdate(List<GroupRoleRelPO> groupRoleRelPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " (group_id, role_id,"
+        + " audit_info,"
+        + " current_version, last_version, deleted_at)"
+        + " VALUES "
+        + "<foreach collection='groupRoleRels' item='item' separator=','>"
+        + "(#{item.groupId},"
+        + " #{item.roleId},"
+        + " #{item.auditInfo},"
+        + " #{item.currentVersion},"
+        + " #{item.lastVersion},"
+        + " #{item.deletedAt})"
+        + "</foreach>"
+        + " ON CONFLICT (group_id, role_id, deleted_at) DO UPDATE SET"
+        + " group_id = EXCLUDED.group_id,"
+        + " role_id = EXCLUDED.role_id,"
+        + " audit_info = EXCLUDED.audit_info,"
+        + " current_version = EXCLUDED.current_version,"
+        + " last_version = EXCLUDED.last_version,"
+        + " deleted_at = EXCLUDED.deleted_at"
+        + "</script>";
   }
 
   @Override
