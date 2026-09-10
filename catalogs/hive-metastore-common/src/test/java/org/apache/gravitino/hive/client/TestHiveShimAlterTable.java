@@ -97,7 +97,8 @@ class TestHiveShimAlterTable {
     verify(client)
         .alter_table_with_environmentContext(eq(DB), eq(TABLE), any(Table.class), captor.capture());
     Assertions.assertEquals(
-        "true", captor.getValue().getProperties().get(StatsSetupConst.DO_NOT_UPDATE_STATS));
+        StatsSetupConst.TRUE,
+        captor.getValue().getProperties().get(StatsSetupConst.DO_NOT_UPDATE_STATS));
     verify(client, never()).alter_table(any(), any(), any());
   }
 

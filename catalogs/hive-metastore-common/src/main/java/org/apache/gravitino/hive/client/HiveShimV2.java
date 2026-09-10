@@ -317,9 +317,7 @@ class HiveShimV2 extends HiveShim {
    * @return An environment context with {@code DO_NOT_UPDATE_STATS} set to {@code true}.
    */
   protected EnvironmentContext doNotUpdateStatsContext() {
-    // The value is the literal "true" instead of StatsSetupConst.TRUE because that constant does
-    // not exist in all supported Hive versions (for example, it is absent in Hive 3.1.3).
     return new EnvironmentContext(
-        Collections.singletonMap(StatsSetupConst.DO_NOT_UPDATE_STATS, "true"));
+        Collections.singletonMap(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE));
   }
 }
