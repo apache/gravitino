@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.TokenExpiredException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
@@ -36,6 +37,8 @@ import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergExceptionMapper {
   private final IcebergExceptionMapper icebergExceptionMapper = new IcebergExceptionMapper();
@@ -71,14 +74,19 @@ public class TestIcebergExceptionMapper {
           new NoClassDefFoundError("catalog class"), new AssertionError("assertion")
         }) {
       error.initCause(new IllegalStateException("root cause"));
-      try (Response response = icebergExceptionMapper.toResponse(error)) {
-        Assertions.assertEquals(500, response.getStatus());
-        ErrorResponse entity = (ErrorResponse) response.getEntity();
-        Assertions.assertEquals(error.getClass().getSimpleName(), entity.type());
-        Assertions.assertEquals(error.getMessage(), entity.message());
-        Assertions.assertTrue(
-            String.join("\n", entity.stack())
-                .contains("Caused by: java.lang.IllegalStateException: root cause"));
+      try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+        ServerHealth health = new ServerHealth();
+        shared.when(ServerHealth::getInstance).thenReturn(health);
+        try (Response response = icebergExceptionMapper.toResponse(error)) {
+          Assertions.assertEquals(500, response.getStatus());
+          ErrorResponse entity = (ErrorResponse) response.getEntity();
+          Assertions.assertEquals(error.getClass().getSimpleName(), entity.type());
+          Assertions.assertEquals(error.getMessage(), entity.message());
+          Assertions.assertTrue(
+              String.join("\n", entity.stack())
+                  .contains("Caused by: java.lang.IllegalStateException: root cause"));
+        }
+        Assertions.assertEquals(error instanceof OutOfMemoryError, health.hasOutOfMemoryError());
       }
     }
   }

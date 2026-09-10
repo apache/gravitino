@@ -218,6 +218,17 @@ Access the service at `http://localhost:9101`.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
+## Health Checks
+
+The Lance REST service exposes `/lance/health/live`, `/lance/health/ready`, and
+`/lance/health` on its own port. Root aliases `/health/live`, `/health/ready`, `/health`,
+and `/health.html` are also available. Readiness checks whether the namespace wrapper
+is initialized.
+
+After an observed `OutOfMemoryError`, all these endpoints return HTTP 503 with a
+`jvm` failure until restart, even if the wrapper remains initialized. See
+[health and readiness](health-and-readiness.md) for response details and detection scope.
+
 ## Usage Guidelines
 
 When using Lance REST service with Gravitino backend, keep the following considerations in mind:
