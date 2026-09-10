@@ -234,13 +234,18 @@ public class LanceRESTServiceIT extends BaseIT {
     describeNamespaceReq.addIdItem(catalog.name());
     DescribeNamespaceResponse describeNamespaceResp = ns.describeNamespace(describeNamespaceReq);
 
-    Assertions.assertEquals(catalog.properties(), describeNamespaceResp.getProperties());
+    // Lance describe returns properties merged with plaintext secrets so storage options work.
+    Map<String, String> expectedCatalogProps = new HashMap<>(catalog.properties());
+    expectedCatalogProps.putAll(catalog.supportsSecrets().getSecrets());
+    Assertions.assertEquals(expectedCatalogProps, describeNamespaceResp.getProperties());
 
     // test describe schema via lance rest namespace client
     describeNamespaceReq.addIdItem(schema.name());
     describeNamespaceResp = ns.describeNamespace(describeNamespaceReq);
 
-    Assertions.assertEquals(schema.properties(), describeNamespaceResp.getProperties());
+    Map<String, String> expectedSchemaProps = new HashMap<>(schema.properties());
+    expectedSchemaProps.putAll(schema.supportsSecrets().getSecrets());
+    Assertions.assertEquals(expectedSchemaProps, describeNamespaceResp.getProperties());
 
     // test describe a non-existent catalog namespace
     DescribeNamespaceRequest nonExistentCatalogReq = new DescribeNamespaceRequest();
