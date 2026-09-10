@@ -238,6 +238,11 @@ const tableLevelPropInfoMap = {
     reserved: [],
     immutable: ['default-location-name'],
     allowAdd: true
+  },
+  'jdbc-clickhouse': {
+    reserved: [],
+    immutable: ['engine'],
+    allowAdd: true
   }
 }
 
@@ -328,7 +333,7 @@ export const indexesInfoMap = {
   'jdbc-oceanbase': ['primary_key', 'unique_key'],
   'jdbc-postgresql': ['primary_key', 'unique_key'],
   'lakehouse-paimon': ['primary_key'],
-  'jdbc-clickhouse': ['primary_key']
+  'jdbc-clickhouse': ['primary_key', 'data_skipping_minmax', 'data_skipping_bloom_filter', 'data_skipping_set']
 }
 
 export const autoIncrementInfoMap = {
@@ -347,3 +352,53 @@ export const autoIncrementInfoMap = {
 }
 
 export const defaultValueSupported = ['jdbc-doris', 'jdbc-mysql', 'jdbc-oceanbase', 'jdbc-postgresql', 'jdbc-starrocks']
+
+export const clickHouseMergeTreeEngines = [
+  'MergeTree',
+  'ReplacingMergeTree',
+  'SummingMergeTree',
+  'AggregatingMergeTree',
+  'CollapsingMergeTree',
+  'VersionedCollapsingMergeTree',
+  'GraphiteMergeTree'
+]
+
+export const clickHouseLogEngines = ['TinyLog', 'StripeLog', 'Log']
+
+export const clickHouseIntegrationEngines = [
+  'ODBC',
+  'JDBC',
+  'MySQL',
+  'MongoDB',
+  'Redis',
+  'HDFS',
+  'S3',
+  'Kafka',
+  'EmbeddedRocksDB',
+  'RabbitMQ',
+  'PostgreSQL',
+  'S3Queue',
+  'TimeSeries'
+]
+
+export const clickHouseSpecialEngines = [
+  'Distributed',
+  'Dictionary',
+  'Merge',
+  'File',
+  'Null',
+  'Set',
+  'Join',
+  'URL',
+  'View',
+  'Memory',
+  'Buffer',
+  'KeeperMap'
+]
+
+export const clickHouseEngineGroups = [
+  { label: 'MergeTree Family', options: clickHouseMergeTreeEngines },
+  { label: 'Log Family', options: clickHouseLogEngines },
+  { label: 'Integration Engines', options: clickHouseIntegrationEngines },
+  { label: 'Special Engines', options: clickHouseSpecialEngines }
+]
