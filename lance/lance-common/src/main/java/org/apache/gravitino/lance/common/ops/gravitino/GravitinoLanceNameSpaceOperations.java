@@ -42,12 +42,15 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.lance.namespace.errors.InvalidInputException;
@@ -251,15 +254,39 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Catalog catalog;
     try {
       catalog = namespaceWrapper.loadCatalog(catalogName);
-    } catch (NoSuchCatalogException e) {
-      // Catalog does not exist, create it
-      Catalog createdCatalog =
-          namespaceWrapper.createCatalog(
-              catalogName,
-              Catalog.Type.RELATIONAL,
-              "lakehouse-generic",
-              "created by Lance REST server",
-              properties);
+    } catch (NoSuchCatalogException | ForbiddenException e) {
+      // Remote load authorization can reject an absent catalog before checking its existence.
+      // The create endpoint independently checks create privileges. Never treat a denied read
+      // as proof that an existing catalog may be overwritten or exposed through EXIST_OK.
+      Catalog createdCatalog;
+      try {
+        createdCatalog =
+            namespaceWrapper.createCatalog(
+                catalogName,
+                Catalog.Type.RELATIONAL,
+                "lakehouse-generic",
+                "created by Lance REST server",
+                properties);
+      } catch (CatalogAlreadyExistsException conflict) {
+        // The conflict is deliberately not attached to the exception thrown for a denied read:
+        // reporting that the create failed because the catalog exists would disclose a catalog
+        // the caller may not see.
+        if (e instanceof ForbiddenException) {
+          throw e;
+        }
+        if (mode == CreateMode.CREATE) {
+          throw new NamespaceAlreadyExistsException(
+              "Catalog already exists: " + catalogName,
+              CommonUtil.formatCurrentStackTrace(),
+              catalogName);
+        }
+        // Another writer created the catalog between the failed load and this create. EXIST_OK
+        // and OVERWRITE still have to act on the catalog that now exists, so read it again and
+        // continue with the shared handling below. A read denied at this point is reported as
+        // denied, exactly as it would have been without the race.
+        catalog = namespaceWrapper.loadCatalog(catalogName);
+        return applyCatalogMode(catalogName, catalog, mode, properties, response);
+      }
       response.setProperties(
           createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
       return response;
@@ -273,7 +300,16 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
           catalogName);
     }
 
-    // Catalog exists, handle based on mode
+    return applyCatalogMode(catalogName, catalog, mode, properties, response);
+  }
+
+  /** Applies the requested create mode to a catalog that already exists. */
+  private CreateNamespaceResponse applyCatalogMode(
+      String catalogName,
+      Catalog catalog,
+      CreateMode mode,
+      Map<String, String> properties,
+      CreateNamespaceResponse response) {
     switch (mode) {
       case EXIST_OK:
         response.setProperties(
@@ -323,16 +359,44 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Schema schema;
     try {
       schema = namespaceWrapper.loadSchema(loadedCatalog, schemaName);
-    } catch (NoSuchSchemaException e) {
-      // Schema does not exist, create it
-      Schema createdSchema =
-          namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
+    } catch (NoSuchSchemaException | ForbiddenException e) {
+      // As with catalogs, let the remote create endpoint check create privileges when a missing
+      // schema cannot be loaded. An existing but hidden schema must remain inaccessible.
+      Schema createdSchema;
+      try {
+        createdSchema = namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
+      } catch (SchemaAlreadyExistsException conflict) {
+        // As for catalogs, the conflict is not attached when the read was denied, so a hidden
+        // schema is not disclosed through the error.
+        if (e instanceof ForbiddenException) {
+          throw e;
+        }
+        if (mode == CreateMode.CREATE) {
+          throw new NamespaceAlreadyExistsException(
+              "Schema already exists: " + schemaName,
+              CommonUtil.formatCurrentStackTrace(),
+              schemaName);
+        }
+        // Another writer won the race; EXIST_OK and OVERWRITE act on the schema that now exists.
+        schema = namespaceWrapper.loadSchema(loadedCatalog, schemaName);
+        return applySchemaMode(loadedCatalog, schemaName, schema, mode, properties, response);
+      }
       response.setProperties(
           createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
       return response;
     }
 
-    // Schema exists, handle based on mode
+    return applySchemaMode(loadedCatalog, schemaName, schema, mode, properties, response);
+  }
+
+  /** Applies the requested create mode to a schema that already exists. */
+  private CreateNamespaceResponse applySchemaMode(
+      Catalog loadedCatalog,
+      String schemaName,
+      Schema schema,
+      CreateMode mode,
+      Map<String, String> properties,
+      CreateNamespaceResponse response) {
     switch (mode) {
       case EXIST_OK:
         response.setProperties(

@@ -21,7 +21,6 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,9 +35,9 @@ public class TestGravitinoLanceClientAuth {
   }
 
   @Test
-  void testAuthTypeDefaultsToSimple() {
+  void testAuthTypeDefaultsToCaller() {
     LanceConfig config = configOf(ImmutableMap.of("gravitino-metalake", METALAKE));
-    Assertions.assertEquals(AuthProperties.SIMPLE_AUTH_TYPE, config.getGravitinoAuthType());
+    Assertions.assertEquals(LanceConfig.CALLER_AUTH_TYPE, config.getGravitinoAuthType());
     Assertions.assertEquals(
         LanceConfig.DEFAULT_SIMPLE_USERNAME, config.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME));
   }

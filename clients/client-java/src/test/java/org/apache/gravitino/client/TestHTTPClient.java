@@ -38,7 +38,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -81,6 +83,43 @@ public class TestHTTPClient {
   public static void stopServer() throws IOException {
     mockServer.stop();
     restClient.close();
+  }
+
+  /** Verifies shared clients resolve authentication headers independently for each request. */
+  @Test
+  public void testAuthenticationHeadersAreResolvedForEveryRequest() throws IOException {
+    AtomicReference<String> role = new AtomicReference<>("reader");
+    CustomTokenProvider provider =
+        new CustomTokenProvider() {
+          @Override
+          protected String getCustomTokenInfo() {
+            return "token";
+          }
+
+          @Override
+          public Map<String, String> getRequestHeaders() {
+            return ImmutableMap.of(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, role.get());
+          }
+        };
+    provider.schemeName = "Bearer";
+    String path = "/per-request-auth-headers";
+    mockServer.when(request().withPath(path)).respond(response().withStatusCode(204));
+    try (RESTClient client =
+        HTTPClient.builder(ImmutableMap.of())
+            .uri("http://127.0.0.1:" + mockServer.getPort())
+            .withAuthDataProvider(provider)
+            .build()) {
+      for (String value : new String[] {"reader", "NONE", "ALL"}) {
+        role.set(value);
+        client.get(
+            path.substring(1), null, null, ImmutableMap.of(), ErrorHandlers.restErrorHandler());
+        mockServer.verify(
+            request()
+                .withPath(path)
+                .withHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION, "Bearer token")
+                .withHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, value));
+      }
+    }
   }
 
   @Test
