@@ -91,6 +91,82 @@ public class TestCatalogConnectorMetadataAdapterView {
   }
 
   @Test
+  public void testGetViewDefinitionIsRunAsInvokerWhenNoOwnerProperty() {
+    GravitinoColumn column = new GravitinoColumn(Column.of("id", Types.StringType.get()), 0);
+    GravitinoView view =
+        new GravitinoView("s", "v1", List.of(column), null, Map.of(), "select 1", null, null);
+
+    ConnectorViewDefinition definition =
+        adapter.getViewDefinition(view, "current_catalog", /* singleMetalakeMode= */ true);
+
+    assertEquals(Optional.empty(), definition.getOwner());
+    assertEquals(true, definition.isRunAsInvoker());
+  }
+
+  @Test
+  public void testGetViewDefinitionIsRunAsDefinerWhenOwnerPropertyPresent() {
+    GravitinoColumn column = new GravitinoColumn(Column.of("id", Types.StringType.get()), 0);
+    GravitinoView view =
+        new GravitinoView(
+            "s",
+            "v1",
+            List.of(column),
+            null,
+            Map.of("trino.internal.view.owner", "alice"),
+            "select 1",
+            null,
+            null);
+
+    ConnectorViewDefinition definition =
+        adapter.getViewDefinition(view, "current_catalog", /* singleMetalakeMode= */ true);
+
+    assertEquals(Optional.of("alice"), definition.getOwner());
+    assertEquals(false, definition.isRunAsInvoker());
+  }
+
+  @Test
+  public void testCreateViewPersistsOwnerAsReservedProperty() {
+    ViewColumn column = new ViewColumn("id", VarcharType.VARCHAR.getTypeId(), Optional.empty());
+    ConnectorViewDefinition definition =
+        new ConnectorViewDefinition(
+            "select 1",
+            Optional.empty(),
+            Optional.empty(),
+            List.of(column),
+            Optional.empty(),
+            Optional.of("alice"),
+            false,
+            List.of());
+
+    GravitinoView view = adapter.createView(new SchemaTableName("s", "v1"), definition, Map.of());
+
+    assertEquals("alice", view.getProperties().get("trino.internal.view.owner"));
+  }
+
+  @Test
+  public void testCreateViewIgnoresCallerSuppliedOwnerProperty() {
+    ViewColumn column = new ViewColumn("id", VarcharType.VARCHAR.getTypeId(), Optional.empty());
+    ConnectorViewDefinition definition =
+        new ConnectorViewDefinition(
+            "select 1",
+            Optional.empty(),
+            Optional.empty(),
+            List.of(column),
+            Optional.empty(),
+            Optional.empty(),
+            true,
+            List.of());
+
+    GravitinoView view =
+        adapter.createView(
+            new SchemaTableName("s", "v1"),
+            definition,
+            Map.of("trino.internal.view.owner", "spoofed"));
+
+    assertEquals(null, view.getProperties().get("trino.internal.view.owner"));
+  }
+
+  @Test
   public void testCreateViewRejectsNonEmptyPath() {
     ViewColumn column = new ViewColumn("id", VarcharType.VARCHAR.getTypeId(), Optional.empty());
     ConnectorViewDefinition definition =

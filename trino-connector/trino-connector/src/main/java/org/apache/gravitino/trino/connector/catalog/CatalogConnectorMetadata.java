@@ -564,7 +564,8 @@ public class CatalogConnectorMetadata {
    * Lists the names of all views in the specified schema.
    *
    * @param schemaName the name of the schema
-   * @return a list of view names, or an empty list if the catalog does not support views
+   * @return a list of view names, or an empty list if the catalog does not support views or the
+   *     schema does not exist
    */
   public List<String> listViews(String schemaName) {
     if (!supportsViews()) {
@@ -581,8 +582,10 @@ public class CatalogConnectorMetadata {
           "Catalog {} does not support listing views for schema {}", catalogName, schemaName, e);
       return List.of();
     } catch (NoSuchSchemaException e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+      // ConnectorMetadata.listViews() must return an empty list for a non-existent schema rather
+      // than fail, matching the contract Trino relies on for catalog-wide SHOW/information_schema
+      // scans.
+      return List.of();
     }
   }
 

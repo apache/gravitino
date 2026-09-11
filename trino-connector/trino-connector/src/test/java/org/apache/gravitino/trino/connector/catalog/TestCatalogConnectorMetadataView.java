@@ -43,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
@@ -139,6 +140,16 @@ public class TestCatalogConnectorMetadataView {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.listViews(any(Namespace.class)))
         .thenThrow(new UnsupportedOperationException("unsupported"));
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    assertTrue(metadata.listViews("db").isEmpty());
+  }
+
+  @Test
+  public void testListViewsReturnsEmptyWhenSchemaDoesNotExist() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.listViews(any(Namespace.class)))
+        .thenThrow(new NoSuchSchemaException("schema does not exist"));
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     assertTrue(metadata.listViews("db").isEmpty());

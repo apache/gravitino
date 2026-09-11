@@ -54,6 +54,14 @@ public class CatalogConnectorMetadataAdapter {
 
   private static final Logger LOG = Logger.get(CatalogConnectorMetadataAdapter.class);
 
+  /**
+   * Reserved, namespaced Gravitino view property used to round-trip a Trino native view's {@code
+   * SECURITY DEFINER} owner through {@code createView}/{@code getViewDefinition}; it is stripped
+   * from and never settable via caller-supplied {@code viewProperties} ({@code WITH (...)}) so it
+   * cannot be spoofed. Its absence means the view is {@code SECURITY INVOKER}.
+   */
+  private static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
+
   /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
 
@@ -157,9 +165,11 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   /**
-   * Transform Gravitino view metadata to Trino ConnectorViewDefinition. Owner is not supported by
-   * Gravitino views, so the resulting definition always has an empty owner; since Trino requires an
-   * owner for run-as-definer views, {@code runAsInvoker} is always {@code true}.
+   * Transform Gravitino view metadata to Trino ConnectorViewDefinition. The view's {@code SECURITY
+   * DEFINER} owner, if any, is read back from the {@link #RESERVED_VIEW_OWNER_PROPERTY} reserved
+   * property (set by {@link #createView}); its absence means the view is {@code SECURITY INVOKER},
+   * matching Trino's own invariant that {@code runAsInvoker} and a present owner are mutually
+   * exclusive.
    *
    * <p>{@link ConnectorViewDefinition} requires a catalog to be present whenever a schema is
    * present. Some catalogs (e.g. Iceberg) can store a default schema without a default catalog; in
@@ -203,20 +213,23 @@ public class CatalogConnectorMetadataAdapter {
       defaultCatalog = catalogName;
     }
 
+    String ownerProperty = view.getProperties().get(RESERVED_VIEW_OWNER_PROPERTY);
     return new ConnectorViewDefinition(
         view.getSql(),
         Optional.ofNullable(defaultCatalog),
         Optional.ofNullable(view.getDefaultSchema()),
         columns,
         Optional.ofNullable(view.getComment()),
-        Optional.empty(),
-        true,
+        Optional.ofNullable(ownerProperty),
+        ownerProperty == null,
         List.of());
   }
 
   /**
    * Transform Trino ConnectorViewDefinition to Gravitino view metadata. The {@code viewProperties}
-   * are merged as-is into the resulting view's generic properties.
+   * are merged as-is into the resulting view's generic properties; the caller cannot set {@link
+   * #RESERVED_VIEW_OWNER_PROPERTY} directly through them since it is reserved to round-trip the
+   * definition's own owner/{@code runAsInvoker}.
    *
    * <p>Gravitino views have no field to persist the view's {@code path} (the catalogs/schemas used
    * to resolve unqualified function names, set via {@code SET PATH}), so a definition with a
@@ -254,7 +267,9 @@ public class CatalogConnectorMetadataAdapter {
               Map.of()));
     }
 
-    Map<String, String> properties = toGravitinoTableProperties(viewProperties);
+    Map<String, String> properties = new HashMap<>(toGravitinoTableProperties(viewProperties));
+    properties.remove(RESERVED_VIEW_OWNER_PROPERTY);
+    definition.getOwner().ifPresent(owner -> properties.put(RESERVED_VIEW_OWNER_PROPERTY, owner));
     return new GravitinoView(
         viewName.getSchemaName(),
         viewName.getTableName(),
