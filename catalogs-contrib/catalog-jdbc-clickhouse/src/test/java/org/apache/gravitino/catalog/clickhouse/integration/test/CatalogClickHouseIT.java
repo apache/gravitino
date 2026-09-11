@@ -2802,7 +2802,7 @@ public class CatalogClickHouseIT extends BaseIT {
     String sourceName = GravitinoITUtils.genRandomName("settings_quoted_comma_source");
     String recreatedName = GravitinoITUtils.genRandomName("settings_quoted_comma_recreated");
     String settingName = "merge_workload";
-    String settingValue = "'gravitino,quoted,comma'";
+    String settingValue = "'gravitino,COMMENT,comma'";
     String settingProperty = TableConstants.SETTINGS_PREFIX + settingName;
 
     clickhouseService.executeQuery(

@@ -411,7 +411,7 @@ public class TestClickHouseTableOperationsUnit {
     Map<String, String> settings =
         ops.parseSettingsFromEngineFull(
             "MergeTree ORDER BY id SETTINGS "
-                + "quoted =  'id,name,val', "
+                + "quoted =  'id,COMMENT,name,val', "
                 + "escaped = 'a\\'b\\\\c', "
                 + "doubled = 'a''b,c', "
                 + "double_quoted = \"a,b\"\"c\", "
@@ -419,7 +419,7 @@ public class TestClickHouseTableOperationsUnit {
 
     Assertions.assertEquals(5, settings.size());
     Assertions.assertEquals(
-        "'id,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
+        "'id,COMMENT,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
     Assertions.assertEquals(
         "'a\\'b\\\\c'", settings.get(TableConstants.SETTINGS_PREFIX + "escaped"));
     Assertions.assertEquals("'a''b,c'", settings.get(TableConstants.SETTINGS_PREFIX + "doubled"));
@@ -428,6 +428,44 @@ public class TestClickHouseTableOperationsUnit {
     Assertions.assertEquals(
         "custom(`a,b`, tuple(1, 2), 'x=y,z')",
         settings.get(TableConstants.SETTINGS_PREFIX + "nested"));
+  }
+
+  @Test
+  void testParseSettingsFindsTopLevelClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplacingMergeTree(`SETTINGS version`) ORDER BY id SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplicatedMergeTree('path SETTINGS ignored') ORDER BY id "
+                + "SETTINGS index_granularity = 4096");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testParseSettingsRejectsMalformedMetadataBeforeClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] malformedEngineFull = {
+      "MergeTree(broken SETTINGS index_granularity = 8192",
+      "MergeTree('broken SETTINGS index_granularity = 8192",
+      "MergeTree ORDER BY 'oops SETTINGS index_granularity = 1",
+      "MergeTree() ORDER BY id) SETTINGS index_granularity = 8192"
+    };
+
+    for (String engineFull : malformedEngineFull) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> ops.parseSettingsFromEngineFull(engineFull));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
   }
 
   @Test

@@ -117,8 +117,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
-  private static final Pattern SETTINGS_PATTERN =
-      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -1541,15 +1539,50 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     settings.put(TableConstants.SETTINGS_PREFIX + key, value);
   }
 
+  private static int findTopLevelKeyword(String value, String keyword) {
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(value, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (isKeywordAt(value, i, keyword)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isKeywordAt(String value, int index, String keyword) {
+    int keywordEnd = index + keyword.length();
+    return keywordEnd <= value.length()
+        && value.regionMatches(true, index, keyword, 0, keyword.length())
+        && (index == 0 || !isIdentifierCharacter(value.charAt(index - 1)))
+        && (keywordEnd == value.length() || !isIdentifierCharacter(value.charAt(keywordEnd)));
+  }
+
+  private static boolean isIdentifierCharacter(char value) {
+    return Character.isLetterOrDigit(value) || value == '_';
+  }
+
   @VisibleForTesting
   Map<String, String> parseSettingsFromEngineFull(String engineFull) {
     if (StringUtils.isBlank(engineFull)) {
       return Collections.emptyMap();
     }
 
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(engineFull);
-    if (settingsMatcher.find()) {
-      return parseSettingsClause(settingsMatcher.group(1));
+    // engine_full is formatted from ClickHouse's ASTStorage, where SETTINGS is the final storage
+    // clause. Locate it at top level and parse the remainder so keywords in engine parameters and
+    // quoted values are not treated as clause boundaries.
+    int settingsStart = findTopLevelKeyword(engineFull, "SETTINGS");
+    if (settingsStart >= 0) {
+      return parseSettingsClause(engineFull.substring(settingsStart + "SETTINGS".length()).trim());
     }
     return Collections.emptyMap();
   }
