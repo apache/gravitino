@@ -41,12 +41,15 @@ public enum SparkCatalogKind {
   LAKEHOUSE_PAIMON,
   /** AWS Glue catalogs, provider {@code glue}. */
   GLUE,
-  /** Every {@code jdbc-*} catalog except PostgreSQL, which has its own kind. */
+  /** Every {@code jdbc-*} catalog except Doris and PostgreSQL, which have their own kinds. */
   JDBC,
+  /** Apache Doris catalogs, provider {@code jdbc-doris}. */
+  JDBC_DORIS,
   /** PostgreSQL catalogs, provider {@code jdbc-postgresql}. */
   JDBC_POSTGRESQL;
 
   private static final String JDBC_PROVIDER_PREFIX = "jdbc";
+  private static final String DORIS_PROVIDER = "jdbc-doris";
   private static final String POSTGRESQL_PROVIDER_PREFIX = "jdbc-postgresql";
 
   private static final Map<String, SparkCatalogKind> KINDS_BY_PROVIDER =
@@ -73,8 +76,11 @@ public enum SparkCatalogKind {
   public static SparkCatalogKind fromProvider(String provider) {
     Objects.requireNonNull(provider, "Catalog provider must not be null");
     String normalized = provider.toLowerCase(Locale.ROOT);
-    // All JDBC backends share one Spark catalog, apart from PostgreSQL, whose type and property
-    // conversions differ.
+    if (normalized.equals(DORIS_PROVIDER)) {
+      return JDBC_DORIS;
+    }
+    // All remaining JDBC backends share one Spark catalog, apart from PostgreSQL, whose type and
+    // property conversions differ.
     if (normalized.startsWith(JDBC_PROVIDER_PREFIX)) {
       return normalized.startsWith(POSTGRESQL_PROVIDER_PREFIX) ? JDBC_POSTGRESQL : JDBC;
     }

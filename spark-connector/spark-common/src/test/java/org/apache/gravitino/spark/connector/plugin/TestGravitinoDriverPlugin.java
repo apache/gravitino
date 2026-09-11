@@ -57,6 +57,7 @@ public class TestGravitinoDriverPlugin {
   private static final String PAIMON_CATALOG = "org.example.PaimonCatalog";
   private static final String GLUE_CATALOG = "org.example.GlueCatalog";
   private static final String JDBC_CATALOG = "org.example.JdbcCatalog";
+  private static final String DORIS_CATALOG = "org.example.DorisCatalog";
   private static final String POSTGRESQL_CATALOG = "org.example.PostgreSqlCatalog";
 
   @Test
@@ -138,26 +139,26 @@ public class TestGravitinoDriverPlugin {
   /** The catalog every provider resolves to comes from the bindings, not from a fixed table. */
   @Test
   void testEveryProviderResolvesToTheClassBoundForItsKind() {
-    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withPaimon());
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withOptionalCatalogs());
 
     assertEquals(HIVE_CATALOG, classFor(plugin, "hive"));
     assertEquals(ICEBERG_CATALOG, classFor(plugin, "lakehouse-iceberg"));
     assertEquals(PAIMON_CATALOG, classFor(plugin, "lakehouse-paimon"));
     assertEquals(GLUE_CATALOG, classFor(plugin, "glue"));
     assertEquals(POSTGRESQL_CATALOG, classFor(plugin, "jdbc-postgresql"));
-    // Every other JDBC backend shares one catalog.
+    // Doris and PostgreSQL have dedicated kinds; every other JDBC backend shares one catalog.
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-mysql"));
-    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-doris"));
+    assertEquals(DORIS_CATALOG, classFor(plugin, "jdbc-doris"));
   }
 
   @Test
   void testAKindThisBuildBoundNoCatalogForResolvesToNothing() {
     GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
 
-    // Paimon is the one kind a build may legitimately omit, so it is the only kind that can reach
-    // catalogClassName with nothing behind it. Providers that map to no kind at all are
-    // TestSparkCatalogKind's subject.
+    // Paimon and governed Doris are optional because their external connectors are unavailable on
+    // some supported Spark and Scala versions.
     Assertions.assertNull(plugin.catalogClassName(SparkCatalogKind.LAKEHOUSE_PAIMON));
+    Assertions.assertNull(plugin.catalogClassName(SparkCatalogKind.JDBC_DORIS));
   }
 
   @Test
@@ -299,6 +300,13 @@ public class TestGravitinoDriverPlugin {
     return requiredCatalogs().catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG).build();
   }
 
+  private static SparkBindings withOptionalCatalogs() {
+    return requiredCatalogs()
+        .catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG)
+        .catalog(SparkCatalogKind.JDBC_DORIS, DORIS_CATALOG)
+        .build();
+  }
+
   private static SparkBindings.Builder requiredCatalogs() {
     return SparkBindings.builder()
         .authorizationExtension(AUTHZ_EXTENSION)
@@ -381,6 +389,61 @@ public class TestGravitinoDriverPlugin {
                     "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of()));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+  }
+
+  @Test
+  void testDorisUsesGenericJdbcWithoutOptIn() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+    plugin.registerOptInExtensions(sparkConf);
+
+    plugin.registerGravitinoCatalogs(
+        sparkConf, ImmutableMap.of("doris", catalogWithProvider("jdbc-doris")));
+
+    assertEquals(JDBC_CATALOG, sparkConf.get("spark.sql.catalog.doris"));
+  }
+
+  @Test
+  void testDorisOptInRequiresASpecializedBinding() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, "true");
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+    plugin.registerOptInExtensions(sparkConf);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            plugin.registerGravitinoCatalogs(
+                sparkConf, ImmutableMap.of("doris", catalogWithProvider("jdbc-doris"))));
+  }
+
+  @Test
+  void testDorisSparkPatchVersionGate() {
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.0"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.2"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.3"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.9"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.10"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.3-SNAPSHOT"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.6.0"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("invalid"));
+  }
+
+  @Test
+  void testMissingDorisDependencyFailsPreflight() {
+    ClassLoader missingDependencyLoader =
+        new ClassLoader(getClass().getClassLoader()) {
+          @Override
+          protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if ("org.apache.doris.spark.catalog.DorisTableCatalog".equals(name)) {
+              throw new ClassNotFoundException(name);
+            }
+            return super.loadClass(name, resolve);
+          }
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoDriverPlugin.validateDorisDependency(missingDependencyLoader));
   }
 
   private static SparkConf tokenAuthConf() {

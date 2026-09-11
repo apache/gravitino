@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.spark.connector.plugin;
 
+import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import scala.util.Properties$;
 
 /**
  * Tests that this module's bindings are complete. Constructing the driver plugin runs {@code
@@ -32,5 +34,17 @@ public class TestGravitinoSparkPlugin {
   @Test
   void testTheBindingsThisModuleDeclaresAreComplete() {
     Assertions.assertNotNull(new GravitinoSparkPlugin().driverPlugin());
+  }
+
+  @Test
+  void testDorisBindingMatchesTheScalaBinaryVersion() {
+    GravitinoDriverPlugin plugin =
+        (GravitinoDriverPlugin) new GravitinoSparkPlugin().driverPlugin();
+    String expected =
+        Properties$.MODULE$.versionNumberString().startsWith("2.12")
+            ? GravitinoSparkPlugin.DORIS_CATALOG
+            : null;
+
+    Assertions.assertEquals(expected, plugin.catalogClassName(SparkCatalogKind.JDBC_DORIS));
   }
 }
