@@ -393,7 +393,7 @@ public class TestGravitinoDriverPlugin {
     Catalog catalog = mock(Catalog.class);
     when(catalog.provider()).thenReturn("hive");
 
-    new GravitinoDriverPlugin()
+    new GravitinoDriverPlugin(withoutPaimon())
         .registerGravitinoCatalogs(sparkConf, Collections.singletonMap("existing", catalog));
 
     assertEquals("example.UserCatalog", sparkConf.get("spark.sql.catalog.existing"));
