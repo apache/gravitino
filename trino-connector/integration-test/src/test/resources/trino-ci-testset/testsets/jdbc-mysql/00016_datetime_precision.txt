@@ -1,0 +1,54 @@
+"CREATE TABLE gt_mysql.gt_mysql_test_all_type.demo_datetime_precision (
+   id integer NOT NULL,
+   time_col_3 time(3),
+   time_col_6 time(6),
+   datetime_col_3 timestamp(3),
+   datetime_col_6 timestamp(6),
+   timestamp_col_3 timestamp(3) with time zone,
+   timestamp_col_6 timestamp(6) with time zone
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['id']
+)"
+
+"1","14:30:00.123","14:30:00.123456","2025-07-04 14:30:00.123","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123 UTC","2025-07-04 14:30:00.123456 UTC"
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_all_type.demo_datetime_precision_v2 (
+   id integer NOT NULL,
+   time_col time(3),
+   time_col_6 time(6),
+   datetime_col timestamp(3),
+   datetime_col_6 timestamp(6),
+   datetime_col_9 timestamp(6),
+   timestamp_col timestamp(3) with time zone,
+   timestamp_col_6 timestamp(6) with time zone WITH (default = 'CURRENT_TIMESTAMP')
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['id']
+)"
+
+INSERT: 2 rows
+
+"1","14:30:00.123","14:30:00.123456","2025-07-04 14:30:00.123","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123 UTC","2025-07-04 14:30:00.123456 UTC"
+"2","23:59:59.999","23:59:59.999999","2025-12-31 23:59:59.999","2025-12-31 23:59:59.999999","2025-12-31 23:59:59.999999","2025-12-31 23:59:59.999 UTC","2025-12-31 23:59:59.999999 UTC"
+
+CREATE TABLE: 2 rows
+
+"1","14:30:00.123","14:30:00.123456","2025-07-04 14:30:00.123","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123456","2025-07-04 14:30:00.123 UTC","2025-07-04 14:30:00.123456 UTC"
+"2","23:59:59.999","23:59:59.999999","2025-12-31 23:59:59.999","2025-12-31 23:59:59.999999","2025-12-31 23:59:59.999999","2025-12-31 23:59:59.999 UTC","2025-12-31 23:59:59.999999 UTC"
+
+DROP TABLE
+
+CREATE TABLE: 1 row
+
+"14:30:00.123457","2025-07-04 14:30:00.123457","2025-07-04 14:30:00.123457 UTC"
+
+DROP TABLE
+
+DROP TABLE

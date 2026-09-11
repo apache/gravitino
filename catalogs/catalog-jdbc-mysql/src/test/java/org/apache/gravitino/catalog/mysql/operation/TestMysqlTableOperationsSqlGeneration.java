@@ -24,7 +24,9 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -104,6 +106,67 @@ public class TestMysqlTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testCurrentTimestampDefaultValueKeepsColumnPrecision() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+
+    JdbcColumn datetime =
+        JdbcColumn.builder()
+            .withName("datetime_col")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .withDefaultValue(Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+            .build();
+    JdbcColumn datetime0 =
+        JdbcColumn.builder()
+            .withName("datetime_col_0")
+            .withType(Types.TimestampType.withoutTimeZone(0))
+            .withDefaultValue(Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+            .build();
+    JdbcColumn datetime6 =
+        JdbcColumn.builder()
+            .withName("datetime_col_6")
+            .withType(Types.TimestampType.withoutTimeZone(6))
+            .withDefaultValue(Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+            .build();
+    JdbcColumn timestamp3 =
+        JdbcColumn.builder()
+            .withName("timestamp_col_3")
+            .withType(Types.TimestampType.withTimeZone(3))
+            .withDefaultValue(Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+            .build();
+    JdbcColumn upperCase =
+        JdbcColumn.builder()
+            .withName("upper_case_col")
+            .withType(Types.TimestampType.withoutTimeZone(6))
+            .withDefaultValue(FunctionExpression.of("CURRENT_TIMESTAMP"))
+            .build();
+
+    String sql =
+        ops.createTableSql(
+            "test_table", new JdbcColumn[] {datetime, datetime0, datetime6, timestamp3, upperCase});
+    Assertions.assertTrue(
+        sql.contains("`datetime_col` datetime NULL DEFAULT CURRENT_TIMESTAMP "), sql);
+    Assertions.assertTrue(
+        sql.contains("`datetime_col_0` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP "), sql);
+    Assertions.assertTrue(
+        sql.contains("`datetime_col_6` datetime(6) NULL DEFAULT CURRENT_TIMESTAMP(6) "), sql);
+    Assertions.assertTrue(
+        sql.contains("`timestamp_col_3` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3) "), sql);
+    Assertions.assertTrue(
+        sql.contains("`upper_case_col` datetime(6) NULL DEFAULT CURRENT_TIMESTAMP(6) "), sql);
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"added_col"},
+                Types.TimestampType.withoutTimeZone(6),
+                Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP));
+    Assertions.assertTrue(
+        alterSql.contains("ADD COLUMN `added_col` datetime(6) DEFAULT CURRENT_TIMESTAMP(6) "),
+        alterSql);
   }
 
   @Test
