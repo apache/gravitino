@@ -21,10 +21,16 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -131,6 +137,42 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(3)
+  public void testTestExistingCatalogConnection() throws Exception {
+    GravitinoMetalake adminMetalake = client.loadMetalake(METALAKE);
+    CatalogChange proposedChange = CatalogChange.updateComment("proposed comment");
+    assertThrows(
+        "Can not access metadata {" + catalog1 + "}.",
+        ForbiddenException.class,
+        () -> normalUserClient.loadMetalake(METALAKE).testConnection(catalog1));
+
+    // USE_CATALOG allows testing the stored configuration, but not proposed changes.
+    String role = "testConnectionRole";
+    adminMetalake.createRole(
+        role,
+        new HashMap<>(),
+        ImmutableList.of(
+            SecurableObjects.ofCatalog(
+                catalog1, ImmutableList.<Privilege>of(Privileges.UseCatalog.allow()))));
+    adminMetalake.grantRolesToUser(ImmutableList.of(role), NORMAL_USER);
+    try {
+      GravitinoMetalake normalUserMetalake = normalUserClient.loadMetalake(METALAKE);
+      normalUserMetalake.testConnection(catalog1);
+      assertThrows(
+          "Can not access metadata {" + catalog1 + "}.",
+          ForbiddenException.class,
+          () -> normalUserMetalake.testConnection(catalog1, proposedChange));
+    } finally {
+      adminMetalake.revokeRolesFromUser(ImmutableList.of(role), NORMAL_USER);
+      adminMetalake.deleteRole(role);
+    }
+
+    // The owner can test both the stored configuration and proposed changes.
+    adminMetalake.testConnection(catalog1);
+    adminMetalake.testConnection(catalog1, proposedChange);
+  }
+
+  @Test
+  @Order(4)
   public void testDeleteCatalog() {
     String[] catalogs = client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(2, catalogs.length);
@@ -151,7 +193,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
-  @Order(4)
+  @Order(5)
   public void testListCatalogsWithNonExistentMetalake() throws Exception {
     // Test that listCatalogs with @AuthorizationExpression returns 403 Forbidden
     // when the metalake doesn't exist, instead of 404 response
