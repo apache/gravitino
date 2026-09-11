@@ -49,6 +49,10 @@ public class FakeTableLocationProvider implements TableLocationProvider {
 
   private static final AtomicInteger CLOSED = new AtomicInteger();
 
+  // Selection has to construct every registered provider to ask it its name, so counting
+  // constructions is how a test observes whether a lookup scanned or answered from the index.
+  private static final AtomicInteger CONSTRUCTED = new AtomicInteger();
+
   private static volatile boolean failOnUnprovision;
 
   private static volatile boolean failOnInitialize;
@@ -60,6 +64,11 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   private Map<String, String> catalogProperties;
 
   private boolean closed;
+
+  /** Public and no-argument, as the SPI requires; it acquires nothing. */
+  public FakeTableLocationProvider() {
+    CONSTRUCTED.incrementAndGet();
+  }
 
   /**
    * Returns the contexts this provider was asked to provision, in the order the calls came in, so
@@ -122,6 +131,16 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   }
 
   /**
+   * Returns how many instances have been constructed since the last {@link #reset()}, so that a
+   * test can tell a lookup that scanned the classpath from one answered out of the cached index.
+   *
+   * @return the number of constructions
+   */
+  public static int constructedCount() {
+    return CONSTRUCTED.get();
+  }
+
+  /**
    * Makes every subsequent provision call return the given location instead of the composed one, so
    * that a test can drive the catalog with a location a real provider should never return.
    *
@@ -140,6 +159,7 @@ public class FakeTableLocationProvider implements TableLocationProvider {
     UNPROVISIONED.clear();
     RELEASED.clear();
     CLOSED.set(0);
+    CONSTRUCTED.set(0);
     failOnUnprovision = false;
     failOnInitialize = false;
   }

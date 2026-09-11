@@ -150,11 +150,16 @@ public class TableLocationProviderFactory {
    * Instantiates every registered provider once to learn its name, and remembers the resulting
    * name-to-class mapping.
    *
-   * <p>A candidate that cannot be instantiated, or that cannot report its name, is logged and
-   * skipped rather than allowed to fail the scan: one broken third-party jar on the classpath must
-   * not stop every catalog from starting, including the ones on the built-in provider. A services
-   * file that is itself malformed still fails the scan; that error is raised while the loader is
-   * being iterated, before any candidate is reached.
+   * <p>A candidate whose constructor or {@link TableLocationProvider#name()} throws is logged and
+   * skipped rather than allowed to fail the scan, so a provider that is merely broken at runtime
+   * does not stop catalogs that named a different one from starting.
+   *
+   * <p>That does not cover every broken jar. A services file naming a class that cannot be loaded
+   * at all fails the whole scan with a {@link ServiceConfigurationError}, raised while the loader
+   * is being iterated and before any candidate is reached, which is out of reach of the handling
+   * here. Catching it per candidate would mean driving the loader's iterator by hand and risking a
+   * loop that never terminates, which is the worse trade for a case an operator can see in the
+   * failure it produces.
    *
    * <p>A name claimed by more than one provider is recorded rather than thrown here, and fails only
    * the catalogs that actually ask for that name. Throwing during the scan would let two unrelated

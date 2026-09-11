@@ -60,9 +60,10 @@ import java.util.Map;
  *   <li>{@link #name()} must be unique across the classpath, and must not be {@value
  *       DefaultTableLocationProvider#NAME}, which is reserved by {@link
  *       DefaultTableLocationProvider}. If two providers share a name, every catalog selecting that
- *       name fails to initialize. A provider that cannot be instantiated at all is logged and
- *       skipped rather than failing the lookup, so one broken jar does not stop every catalog from
- *       starting.
+ *       name fails to initialize. A provider whose constructor or {@link #name()} throws is logged
+ *       and skipped rather than failing the lookup, so a provider that is broken at runtime does
+ *       not stop catalogs that named a different one from starting. A services file naming a class
+ *       that cannot be loaded at all still fails the lookup.
  * </ul>
  *
  * <p><b>Known limitations.</b> Four of them, and they all point the same way: a provider that

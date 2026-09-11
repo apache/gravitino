@@ -824,4 +824,49 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertEquals(opaque, created.properties().get(Table.PROPERTY_LOCATION));
   }
+
+  @Test
+  public void testANonCanonicalExternalValueIsReadTheSameWayTheFormatsReadIt() {
+    // `external` is stored as the string the caller sent, and the property metadata decodes it
+    // with Boolean::valueOf, so a value like "yes" is accepted and means false. Both table formats
+    // read it with Boolean.parseBoolean or an equalsIgnoreCase("true"), so they see false too and
+    // treat the table as managed -- deleting its data on drop. If this context disagreed and
+    // reported true, the catalog would skip handing the location back for a table whose data was
+    // just deleted: the data lost and the allocation leaked at once.
+    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "s", "t");
+    Schema schema = Mockito.mock(Schema.class);
+
+    for (String notTrue : Arrays.asList("yes", "on", "y", "t", "1")) {
+      Assertions.assertFalse(
+          TableLocationContext.builder()
+              .withTableIdentifier(ident)
+              .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, notTrue))
+              .withSchema(schema)
+              .build()
+              .isExternal(),
+          notTrue + " must not be read as external, because the table formats do not read it so");
+    }
+
+    Assertions.assertTrue(
+        TableLocationContext.builder()
+            .withTableIdentifier(ident)
+            .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, "TrUe"))
+            .withSchema(schema)
+            .build()
+            .isExternal());
+  }
+
+  @Test
+  public void testManagedTableWithoutLocationConsultsProvider() {
+    NameIdentifier schemaIdent = createSchema();
+
+    createTableThroughCatalog(opsWithFakeProvider, schemaIdent, "managed_table", ImmutableMap.of());
+
+    // The fourth cell of the external x supplied-location matrix: no location and not external is
+    // the ordinary case the provider exists for.
+    List<TableLocationContext> provisioned = FakeTableLocationProvider.provisioned();
+    Assertions.assertEquals(1, provisioned.size());
+    Assertions.assertEquals("managed_table", provisioned.get(0).tableIdentifier().name());
+    Assertions.assertFalse(provisioned.get(0).isExternal());
+  }
 }

@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.rel.Table;
@@ -106,16 +105,20 @@ public class TableLocationContext {
    * Returns whether the table this context is about is an external table, that is, one whose data
    * the catalog does not own and only points at.
    *
-   * <p>This is the {@code external} entry of {@link #tableProperties()}, read as a boolean, and is
-   * false when the entry is absent, null or not parseable. It is offered as an accessor because it
-   * changes what a provider should do: the catalog does not ask a provider to unprovision the
-   * location of an external table, and a provider asked to provision one is being asked for a path
-   * for data that may already exist elsewhere.
+   * <p>This is the {@code external} entry of {@link #tableProperties()}, read with {@link
+   * Boolean#parseBoolean(String)}, so only {@code "true"} ignoring case is true and anything else,
+   * absent or null included, is false. That is deliberately the same reading the table formats and
+   * the property metadata use: a provider that saw {@code external} differently from the format
+   * that owns the data would skip reclaiming a location the format had just deleted the data under,
+   * or reclaim one it had left alone. It is offered as an accessor because it changes what a
+   * provider should do: the catalog does not ask a provider to unprovision the location of an
+   * external table, and a provider asked to provision one is being asked for a path for data that
+   * may already exist elsewhere.
    *
    * @return true if the table is marked external
    */
   public boolean isExternal() {
-    return BooleanUtils.toBoolean(tableProperties.get(Table.PROPERTY_EXTERNAL));
+    return Boolean.parseBoolean(tableProperties.get(Table.PROPERTY_EXTERNAL));
   }
 
   /**
