@@ -116,6 +116,43 @@ public class TestCatalogAuthorizationExpression {
   }
 
   @Test
+  public void testTestExistingConnection() throws NoSuchMethodException, OgnlException {
+    Method method =
+        CatalogOperations.class.getMethod(
+            "testExistingConnection", String.class, String.class, CatalogUpdatesRequest.class);
+    AuthorizationExpression authorizationExpressionAnnotation =
+        method.getAnnotation(AuthorizationExpression.class);
+    String expression = authorizationExpressionAnnotation.expression();
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(expression);
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::USE_CATALOG", "CATALOG::DENY_USE_CATALOG")));
+  }
+
+  @Test
+  public void testTestExistingConnectionWithChanges() throws OgnlException {
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants
+                .TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION);
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+  }
+
+  @Test
   public void testDropCatalog() throws NoSuchMethodException, OgnlException {
     Method method =
         CatalogOperations.class.getMethod("dropCatalog", String.class, String.class, boolean.class);

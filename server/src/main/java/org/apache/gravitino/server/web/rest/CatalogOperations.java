@@ -55,6 +55,7 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.secret.SecretBindingDTO;
 import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -63,6 +64,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,7 +232,7 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      expression = AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.CATALOG)
   @ResponseMetered(name = "test-existing-connection", absolute = true)
   public Response testExistingConnection(
@@ -248,6 +250,9 @@ public class CatalogOperations {
             if (request == null) {
               catalogDispatcher.testConnection(ident);
             } else {
+              if (request.getUpdates() != null && !request.getUpdates().isEmpty()) {
+                checkTestConnectionWithChangesAuthorization(ident);
+              }
               request.validate();
               CatalogChange[] changes =
                   request.getUpdates().stream()
@@ -426,6 +431,17 @@ public class CatalogOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.DROP, catalogName, metalakeName, e);
+    }
+  }
+
+  private void checkTestConnectionWithChangesAuthorization(NameIdentifier ident) {
+    String expression =
+        AuthorizationExpressionConstants
+            .TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION;
+    if (!MetadataAuthzHelper.checkAccess(ident, Entity.EntityType.CATALOG, expression)) {
+      throw new ForbiddenException(
+          "User '%s' is not authorized to perform operation '%s' on metadata '%s' with expression '%s'",
+          PrincipalUtils.getCurrentUserName(), "testExistingConnection", ident, expression);
     }
   }
 }

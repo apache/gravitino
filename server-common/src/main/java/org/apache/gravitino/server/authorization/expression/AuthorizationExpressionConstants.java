@@ -20,6 +20,15 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_CATALOG_AUTHORIZATION_EXPRESSION =
       "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
+  /**
+   * Authorizes testing an existing catalog connection with proposed changes. The caller chooses the
+   * configuration the server connects to, so this matches the authorization for altering the
+   * catalog. Testing with the stored configuration uses {@link
+   * #LOAD_CATALOG_AUTHORIZATION_EXPRESSION} instead.
+   */
+  public static final String TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG)";
+
   public static final String LOAD_SCHEMA_AUTHORIZATION_EXPRESSION =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
