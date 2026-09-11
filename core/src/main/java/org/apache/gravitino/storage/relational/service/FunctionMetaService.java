@@ -274,10 +274,39 @@ public class FunctionMetaService {
           updateFunctionPO(oldFunctionPO, newEntity, newSchemaId, newCatalogId, newMetalakeId);
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Same lock strategy as updateTable — prevents cascade-delete race.
             if (isSchemaChanged) {
+              Long sourceSchemaId = oldFunctionPO.schemaId();
+              Long destSchemaId = newSchemaId;
+              // Lock the smaller schemaId first to avoid deadlocks
+              if (sourceSchemaId.compareTo(destSchemaId) <= 0) {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldFunctionEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldFunctionPO.catalogId(),
+                        oldFunctionPO.metalakeId());
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), destSchemaId, newCatalogId, newMetalakeId);
+              } else {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), destSchemaId, newCatalogId, newMetalakeId);
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldFunctionEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldFunctionPO.catalogId(),
+                        oldFunctionPO.metalakeId());
+              }
+            } else {
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
-                      newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId);
+                      newEntity.nameIdentifier(),
+                      oldFunctionPO.schemaId(),
+                      oldFunctionPO.catalogId(),
+                      oldFunctionPO.metalakeId());
             }
           },
           () -> {

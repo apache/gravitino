@@ -218,14 +218,45 @@ public class TableMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            // Only an update that moves the table to another schema needs a lock here. The new
-            // parent must stay alive until the move commits; locking the old parent would not
-            // protect the table's new location.
+            // Always hold the parent schema row until the transaction ends, so the
+            // table cannot be updated below a schema that is being dropped.
+            // For cross-schema moves, lock both source and destination schemas.
             if (isSchemaChanged) {
+              Long sourceSchemaId = oldTablePO.getSchemaId();
+              Long destSchemaId = newSchemaId;
+              // Lock the smaller schemaId first to avoid deadlocks
+              if (sourceSchemaId.compareTo(destSchemaId) <= 0) {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldTableEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldTablePO.getCatalogId(),
+                        oldTablePO.getMetalakeId());
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newTableEntity.nameIdentifier(),
+                        destSchemaId,
+                        oldTablePO.getCatalogId(),
+                        oldTablePO.getMetalakeId());
+              } else {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newTableEntity.nameIdentifier(),
+                        destSchemaId,
+                        oldTablePO.getCatalogId(),
+                        oldTablePO.getMetalakeId());
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldTableEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldTablePO.getCatalogId(),
+                        oldTablePO.getMetalakeId());
+              }
+            } else {
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
                       newTableEntity.nameIdentifier(),
-                      newSchemaId,
+                      oldTablePO.getSchemaId(),
                       oldTablePO.getCatalogId(),
                       oldTablePO.getMetalakeId());
             }

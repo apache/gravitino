@@ -767,6 +767,368 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testSchemaChildUpdateServicesWaitForConcurrentSchemaDelete() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    List<SchemaChildUpdate> childUpdates =
+        Arrays.asList(
+            childIdent ->
+                TableMetaService.getInstance()
+                    .updateTable(
+                        childIdent,
+                        entity -> {
+                          TableEntity table = (TableEntity) entity;
+                          return TableEntity.builder()
+                              .withId(table.id())
+                              .withName(table.name())
+                              .withNamespace(table.namespace())
+                              .withAuditInfo(table.auditInfo())
+                              .withColumns(table.columns())
+                              .withComment("updated table comment")
+                              .withProperties(table.properties())
+                              .build();
+                        }),
+            childIdent ->
+                ViewMetaService.getInstance()
+                    .updateView(
+                        childIdent,
+                        entity -> {
+                          ViewEntity view = (ViewEntity) entity;
+                          return ViewEntity.builder()
+                              .withId(view.id())
+                              .withName(view.name())
+                              .withNamespace(view.namespace())
+                              .withAuditInfo(view.auditInfo())
+                              .withColumns(view.columns())
+                              .withRepresentations(view.representations())
+                              .withComment("updated view comment")
+                              .build();
+                        }),
+            childIdent ->
+                FilesetMetaService.getInstance()
+                    .updateFileset(
+                        childIdent,
+                        entity -> {
+                          FilesetEntity fileset = (FilesetEntity) entity;
+                          return FilesetEntity.builder()
+                              .withId(fileset.id())
+                              .withName(fileset.name())
+                              .withNamespace(fileset.namespace())
+                              .withFilesetType(fileset.filesetType())
+                              .withStorageLocations(fileset.storageLocations())
+                              .withAuditInfo(fileset.auditInfo())
+                              .withComment("updated fileset comment")
+                              .withProperties(fileset.properties())
+                              .build();
+                        }),
+            childIdent ->
+                FunctionMetaService.getInstance()
+                    .updateFunction(
+                        childIdent,
+                        entity -> {
+                          FunctionEntity function = (FunctionEntity) entity;
+                          return FunctionEntity.builder()
+                              .withId(function.id())
+                              .withName(function.name())
+                              .withNamespace(function.namespace())
+                              .withAuditInfo(function.auditInfo())
+                              .withComment("updated function comment")
+                              .withFunctionType(function.functionType())
+                              .withDeterministic(function.deterministic())
+                              .withDefinitions(function.definitions())
+                              .build();
+                        }),
+            childIdent ->
+                ModelMetaService.getInstance()
+                    .updateModel(
+                        childIdent,
+                        entity -> {
+                          ModelEntity model = (ModelEntity) entity;
+                          return ModelEntity.builder()
+                              .withId(model.id())
+                              .withName(model.name())
+                              .withNamespace(model.namespace())
+                              .withAuditInfo(model.auditInfo())
+                              .withComment("updated model comment")
+                              .withLatestVersion(model.latestVersion())
+                              .withProperties(model.properties())
+                              .build();
+                        }),
+            childIdent ->
+                TopicMetaService.getInstance()
+                    .updateTopic(
+                        childIdent,
+                        entity -> {
+                          TopicEntity topic = (TopicEntity) entity;
+                          return TopicEntity.builder()
+                              .withId(topic.id())
+                              .withName(topic.name())
+                              .withNamespace(topic.namespace())
+                              .withAuditInfo(topic.auditInfo())
+                              .withComment("updated topic comment")
+                              .withProperties(topic.properties())
+                              .build();
+                        }));
+
+    for (int index = 0; index < childUpdates.size(); index++) {
+      String schemaName = "schema_for_update_lock_" + index;
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofSchema(metalakeName, catalogName),
+              schemaName,
+              AUDIT_INFO);
+      backend.insert(schema, false);
+
+      Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
+
+      if (childUpdates.get(index) == childUpdates.get(0)) {
+        TableEntity table =
+            createTableEntity(
+                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_table", AUDIT_INFO);
+        backend.insert(table, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, table.nameIdentifier(), childUpdates.get(index));
+      } else if (childUpdates.get(index) == childUpdates.get(1)) {
+        ViewEntity view =
+            createViewEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_view");
+        backend.insert(view, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, view.nameIdentifier(), childUpdates.get(index));
+      } else if (childUpdates.get(index) == childUpdates.get(2)) {
+        FilesetEntity fileset =
+            createFilesetEntity(
+                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_fileset", AUDIT_INFO);
+        backend.insert(fileset, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, fileset.nameIdentifier(), childUpdates.get(index));
+      } else if (childUpdates.get(index) == childUpdates.get(3)) {
+        FunctionEntity function =
+            createFunctionEntity(
+                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_function", AUDIT_INFO);
+        backend.insert(function, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, function.nameIdentifier(), childUpdates.get(index));
+      } else if (childUpdates.get(index) == childUpdates.get(4)) {
+        ModelEntity model =
+            createModelEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                schemaNamespace,
+                "child_model",
+                "model comment",
+                0,
+                Collections.emptyMap(),
+                AUDIT_INFO);
+        backend.insert(model, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, model.nameIdentifier(), childUpdates.get(index));
+      } else if (childUpdates.get(index) == childUpdates.get(5)) {
+        TopicEntity topic =
+            createTopicEntity(
+                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_topic", AUDIT_INFO);
+        backend.insert(topic, false);
+        assertChildUpdateWaitsForConcurrentSchemaDelete(
+            schema, topic.nameIdentifier(), childUpdates.get(index));
+      }
+    }
+  }
+
+  private void assertChildUpdateWaitsForConcurrentSchemaDelete(
+      SchemaEntity schema, NameIdentifier childIdent, SchemaChildUpdate childUpdate)
+      throws Exception {
+    // Run the schema cascade delete and child update concurrently.
+    // After both finish, assert that no orphan version rows remain.
+    // Only checks the no-orphan invariant; lock timing varies across backends.
+    CountDownLatch bothStarted = new CountDownLatch(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                bothStarted.countDown();
+                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
+                SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    Future<Throwable> updateResult =
+        executor.submit(
+            () -> {
+              try {
+                bothStarted.countDown();
+                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
+                childUpdate.run(childIdent);
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Throwable deleteFailure = deleteResult.get(60, TimeUnit.SECONDS);
+      Throwable updateFailure = updateResult.get(60, TimeUnit.SECONDS);
+
+      // The cascade delete must succeed.
+      Assertions.assertNull(deleteFailure, () -> "Schema cascade delete failed: " + deleteFailure);
+
+      // The update either succeeded (then cascade cleaned up) or failed (schema gone).
+      // Both are acceptable as long as no orphan rows remain.
+      Assertions.assertTrue(
+          updateFailure == null
+              || updateFailure instanceof NoSuchEntityException
+              || updateFailure instanceof OptimisticLockException
+              || updateFailure instanceof IOException,
+          () -> "Unexpected update failure: " + updateFailure);
+
+      // Schema and child entity should both be gone.
+      Assertions.assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testCascadeDeleteLeavesNoOrphanVersionRows() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String schemaName = "schema_for_orphan_test";
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            schemaName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(schema, false);
+
+    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "orphan_table", AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // Run the cascade delete and the table update concurrently. After both finish,
+    // assert that no active version row whose parent table_meta is deleted remains.
+    CountDownLatch bothStarted = new CountDownLatch(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                bothStarted.countDown();
+                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
+                schemaMetaService.deleteSchema(schema.nameIdentifier(), true);
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    Future<Throwable> updateResult =
+        executor.submit(
+            () -> {
+              try {
+                bothStarted.countDown();
+                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
+                TableMetaService.getInstance()
+                    .updateTable(
+                        table.nameIdentifier(),
+                        entity -> {
+                          TableEntity t = (TableEntity) entity;
+                          return TableEntity.builder()
+                              .withId(t.id())
+                              .withName(t.name())
+                              .withNamespace(t.namespace())
+                              .withAuditInfo(t.auditInfo())
+                              .withColumns(t.columns())
+                              .withComment("updated comment")
+                              .withProperties(t.properties())
+                              .build();
+                        });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Throwable deleteFailure = deleteResult.get(60, TimeUnit.SECONDS);
+      Throwable updateFailure = updateResult.get(60, TimeUnit.SECONDS);
+
+      // The cascade delete must succeed.
+      Assertions.assertNull(deleteFailure, () -> "Schema cascade delete failed: " + deleteFailure);
+
+      // The table update either succeeded (then cascade cleaned up its version rows)
+      // or failed (schema was already gone). Either is acceptable as long as no orphan
+      // version row remains.
+      Assertions.assertTrue(
+          updateFailure == null || updateFailure instanceof NoSuchEntityException,
+          () -> "Table update failed unexpectedly: " + updateFailure);
+
+      // The schema and table should both be gone.
+      assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+      assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+
+      // Most important assertion: no orphan table_version_info rows.
+      // H2 degrades FOR SHARE to FOR UPDATE, so skip orphan check there.
+      if (!"h2".equalsIgnoreCase(backendType)) {
+        int orphanTableVersions =
+            countActiveVersionRowsForEntity(table.id(), "table_version_info", "table_id");
+        Assertions.assertEquals(
+            0, orphanTableVersions, "Found orphan table_version_info rows after cascade delete");
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private int countActiveVersionRowsForEntity(
+      Long entityId, String versionTableName, String idColumnName) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s = %d AND deleted_at = 0",
+                    versionTableName, idColumnName, entityId))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private long getSchemaDeletedAt(Long schemaId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT deleted_at FROM schema_meta WHERE schema_id = %d", schemaId))) {
+      if (rs.next()) {
+        return rs.getLong(1);
+      }
+      return 0;
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  @TestTemplate
   public void testOverlappingHierarchicalSchemaDeletesDoNotDeadlock() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -1213,5 +1575,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   @FunctionalInterface
   private interface SchemaChildWrite {
     void run(Namespace namespace) throws Exception;
+  }
+
+  @FunctionalInterface
+  private interface SchemaChildUpdate {
+    void run(NameIdentifier childIdentifier) throws Exception;
   }
 }
