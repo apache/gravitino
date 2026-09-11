@@ -58,6 +58,15 @@ public class AuthorizeExecutorFactory {
           secondaryExpressionCondition);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
     };
   }
 }

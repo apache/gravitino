@@ -57,6 +57,8 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -225,7 +227,11 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      expression = AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+      secondaryExpression =
+          AuthorizationExpressionConstants
+              .TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION,
+      secondaryExpressionCondition = ExpressionCondition.HAS_PROPOSED_CHANGES,
       accessMetadataType = MetadataObject.Type.CATALOG)
   @ResponseMetered(name = "test-existing-connection", absolute = true)
   public Response testExistingConnection(
@@ -233,7 +239,8 @@ public class CatalogOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
-      CatalogUpdatesRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.TEST_CATALOG_CONNECTION)
+          CatalogUpdatesRequest request) {
     LOG.info("Received test connection request for existing catalog: {}.{}", metalake, catalogName);
     try {
       return Utils.doAs(
