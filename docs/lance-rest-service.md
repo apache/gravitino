@@ -391,6 +391,44 @@ catalog defaults and table overrides. These are shared configured credentials, n
 credentials restricted to the caller's table privileges. Access to data files depends on the
 permissions of those credentials. Per-user, scoped credential vending is not implemented.
 
+### Authorization differences between deployment modes
+
+The two modes enforce authorization at different places, so the same request can be authorized
+differently depending on how Lance REST is deployed.
+
+In auxiliary mode, each Lance REST endpoint is checked once, before any metadata call, against an
+expression written for that endpoint's Lance semantics (the tables above). In standalone mode,
+Lance REST performs no authorization of its own: every underlying Gravitino REST call that an
+endpoint makes is authorized by the Gravitino server, using the rules of that underlying call and
+the backend identity described above. A Lance endpoint that maps to several Gravitino calls is
+therefore checked several times, and a Lance endpoint whose semantics differ from the Gravitino
+call it maps to follows the Gravitino rule.
+
+| Aspect                    | Auxiliary                                                | Standalone                                                                 |
+| ------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Where authorization runs  | Lance REST, once per endpoint, before any metadata call  | Gravitino server, once per underlying REST call                            |
+| Rules applied             | Lance endpoint expressions listed in Required privileges | Gravitino rules for `loadTable`, `createSchema`, `alterCatalog`, and so on |
+| Checks per Lance endpoint | One                                                      | One per underlying call, including existence checks made before a mutation |
+| Listing filters           | Lance REST filters before pagination                     | Gravitino's own listing filters                                            |
+
+Known differences today:
+
+- **`TableExists` on an existing table.** Auxiliary mode authorizes the probe with `PROBE_TABLE_LIKE`
+  or `CREATE_TABLE`. Standalone mode implements the probe as a Gravitino `loadTable`, whose
+  existence-check allowance only applies when the table is absent. A caller holding `CREATE_TABLE`
+  but not `SELECT_TABLE` therefore receives `200` in auxiliary mode and `403` in standalone mode
+  for the same existing table.
+- **Mutations preceded by a read.** `CreateNamespace` loads the target before creating it, so in
+  standalone mode the backend identity needs read access to the parent in addition to the create
+  privilege. Auxiliary mode evaluates a single create expression and does not require the read.
+- **Overwrite and drop.** Auxiliary mode requires ownership as listed above. Standalone mode
+  requires whatever the underlying Gravitino `alter` or `drop` call requires, which may differ.
+
+These differences are a property of the current architecture rather than a configuration choice.
+Closing them is tracked in [#13089](https://github.com/apache/gravitino/issues/13089).
+Until then, deployments that need identical authorization decisions on both paths should run
+Lance REST in auxiliary mode.
+
 ## Examples
 
 The following examples demonstrate how to interact with Lance REST service using different programming languages and tools.
