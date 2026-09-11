@@ -215,16 +215,13 @@ Access the service at `http://localhost:9101`.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
-## Health Checks
+## Out-of-memory Detection
 
-The Lance REST service exposes `/lance/health/live`, `/lance/health/ready`, and
-`/lance/health` on its own port. Root aliases `/health/live`, `/health/ready`, `/health`,
-and `/health.html` are also available. Readiness checks whether the namespace wrapper
-is initialized.
-
-After an observed `OutOfMemoryError`, all these endpoints return HTTP 503 with a
-`jvm` failure until restart, even if the wrapper remains initialized. See
-[health and readiness](health-and-readiness.md) for response details and detection scope.
+The Lance REST service records observed `OutOfMemoryError`s. When embedded in the
+Gravitino server with the default auxiliary classloader, it shares the JVM health
+marker, so an observed OOM makes the Gravitino and Iceberg REST health endpoints
+return HTTP 503 until restart. Lance REST does not expose dedicated health endpoints
+in version 1.3. See [health and readiness](health-and-readiness.md) for detection scope.
 
 ## Usage Guidelines
 

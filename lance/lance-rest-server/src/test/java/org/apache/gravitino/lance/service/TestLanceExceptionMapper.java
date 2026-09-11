@@ -25,6 +25,7 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -32,9 +33,45 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.model.ErrorResponse;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Tests for {@link LanceExceptionMapper}. */
 public class TestLanceExceptionMapper extends JerseyTest {
+
+  /** Verifies direct and wrapped OOM are recorded by the Lance error mapper. */
+  @Test
+  public void testMappedOutOfMemoryRecordsFailure() {
+    for (Throwable failure :
+        new Throwable[] {
+          new OutOfMemoryError("Metaspace"),
+          new IllegalStateException(new OutOfMemoryError("Java heap space"))
+        }) {
+      ServerHealth health = new ServerHealth();
+      try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+        shared.when(ServerHealth::getInstance).thenReturn(health);
+        try (Response response = LanceExceptionMapper.toRESTResponse("test", failure)) {
+          Assertions.assertEquals(500, response.getStatus());
+        }
+      }
+      Assertions.assertTrue(health.hasOutOfMemoryError());
+    }
+  }
+
+  /** Verifies ordinary mapped failures do not mark the JVM unhealthy. */
+  @Test
+  public void testOrdinaryMappedFailureDoesNotRecordOutOfMemory() {
+    ServerHealth health = new ServerHealth();
+    try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+      shared.when(ServerHealth::getInstance).thenReturn(health);
+      try (Response response =
+          LanceExceptionMapper.toRESTResponse(
+              "test", new IllegalStateException("ordinary failure"))) {
+        Assertions.assertEquals(500, response.getStatus());
+      }
+    }
+    Assertions.assertFalse(health.hasOutOfMemoryError());
+  }
 
   /** A resource that raises an error outside the operation-level exception handlers. */
   @Path("error")
