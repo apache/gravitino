@@ -123,6 +123,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /** Matches ClickHouse wide integer type names (Int128/256, UInt128/256, and future variants). */
   private static final Pattern WIDE_INTEGER_PATTERN = Pattern.compile("^U?INT\\d+$");
 
+  private static final Pattern TABLE_SETTING_NAME_PATTERN =
+      Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+  private static final Pattern NUMERIC_SETTING_LITERAL_PATTERN =
+      Pattern.compile("^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$");
+
   private static final String QUERY_INDEXES_SQL =
       """
       SELECT NULL AS TABLE_CAT,
@@ -700,6 +705,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
+    validateTableSettingChanges(changes);
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       String sql = generateAlterTableSql(databaseName, tableName, changes);
@@ -1045,20 +1051,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
+    List<TableChange.RemoveProperty> removeProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+
+    collectAndValidateTableSettingChanges(changes, setProperties, removeProperties);
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.UpdateComment) {
         updateComment = (TableChange.UpdateComment) change;
 
-      } else if (change instanceof TableChange.SetProperty setProperty) {
-        // The set attribute needs to be added at the end.
-        setProperties.add(setProperty);
-
-      } else if (change instanceof TableChange.RemoveProperty) {
-        // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
-        throw new UnsupportedOperationException(
-            "Remove property for ClickHouse is not supported yet");
+      } else if (change instanceof TableChange.SetProperty
+          || change instanceof TableChange.RemoveProperty) {
+        // Table setting changes were fully validated before any table metadata was loaded. They are
+        // rendered together after the other change branches, which are mutually exclusive with
+        // settings changes.
+        continue;
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1140,8 +1147,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       alterSql.add(" MODIFY COMMENT '%s'".formatted(escapeSingleQuotes(newComment)));
     }
 
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateAlterTableProperties(setProperties));
+    if (!setProperties.isEmpty() || !removeProperties.isEmpty()) {
+      alterSql.add(generateAlterTableProperties(setProperties, removeProperties));
     }
 
     // Remove all empty SQL statements
@@ -1173,7 +1180,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "ALTER TABLE %s \n%s;"
               .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
     }
-    LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    if (!setProperties.isEmpty() || !removeProperties.isEmpty()) {
+      LOG.info(
+          "Generated alter table settings for {}.{} with keys {}",
+          databaseName,
+          tableName,
+          tableSettingNames(setProperties, removeProperties));
+    } else {
+      LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    }
     return result;
   }
 
@@ -1292,13 +1307,142 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
-  private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
-    if (CollectionUtils.isNotEmpty(setProperties)) {
-      throw new UnsupportedOperationException(
-          "Alter table properties in ClickHouse is not supported");
+  private static void collectAndValidateTableSettingChanges(
+      TableChange[] changes,
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty setProperty) {
+        tableSettingName(setProperty.getProperty());
+        validateTableSettingLiteral(setProperty.getValue());
+        setProperties.add(setProperty);
+      } else if (change instanceof TableChange.RemoveProperty removeProperty) {
+        tableSettingName(removeProperty.getProperty());
+        removeProperties.add(removeProperty);
+      }
     }
 
+    int settingChangeCount = setProperties.size() + removeProperties.size();
+    if (settingChangeCount == 0) {
+      return;
+    }
+
+    if (settingChangeCount != changes.length) {
+      throw new UnsupportedOperationException(
+          "ClickHouse table setting changes cannot be mixed with other table changes");
+    }
+    if (!setProperties.isEmpty() && !removeProperties.isEmpty()) {
+      throw new UnsupportedOperationException(
+          "ClickHouse MODIFY SETTING and RESET SETTING cannot be combined in one request");
+    }
+
+    validateNoDuplicateTableSettings(
+        setProperties.stream()
+            .map(change -> tableSettingName(change.getProperty()))
+            .collect(Collectors.toList()));
+    validateNoDuplicateTableSettings(
+        removeProperties.stream()
+            .map(change -> tableSettingName(change.getProperty()))
+            .collect(Collectors.toList()));
+
+    setProperties.sort(Comparator.comparing(change -> tableSettingName(change.getProperty())));
+    removeProperties.sort(Comparator.comparing(change -> tableSettingName(change.getProperty())));
+  }
+
+  private static void validateTableSettingChanges(TableChange[] changes) {
+    collectAndValidateTableSettingChanges(changes, new ArrayList<>(), new ArrayList<>());
+  }
+
+  private static void validateNoDuplicateTableSettings(List<String> settingNames) {
+    Set<String> uniqueNames = new HashSet<>();
+    for (String settingName : settingNames) {
+      Preconditions.checkArgument(
+          uniqueNames.add(settingName), "Duplicate ClickHouse table setting: %s", settingName);
+    }
+  }
+
+  private static String tableSettingName(String property) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(property), "ClickHouse table setting property is required");
+    if (!property.startsWith(TableConstants.SETTINGS_PREFIX)) {
+      throw new UnsupportedOperationException(
+          "Only ClickHouse table properties with the 'settings.' prefix can be altered");
+    }
+
+    String settingName = property.substring(TableConstants.SETTINGS_PREFIX.length());
+    Preconditions.checkArgument(
+        TABLE_SETTING_NAME_PATTERN.matcher(settingName).matches(),
+        "Invalid ClickHouse table setting name: %s",
+        settingName);
+    return settingName;
+  }
+
+  private static void validateTableSettingLiteral(String value) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value), "ClickHouse table setting value is required");
+    String literal = value.trim();
+    boolean valid =
+        NUMERIC_SETTING_LITERAL_PATTERN.matcher(literal).matches()
+            || "true".equalsIgnoreCase(literal)
+            || "false".equalsIgnoreCase(literal)
+            || isValidQuotedSettingLiteral(literal);
+    Preconditions.checkArgument(valid, "Invalid ClickHouse table setting literal");
+  }
+
+  private static boolean isValidQuotedSettingLiteral(String literal) {
+    if (literal.length() < 2
+        || literal.charAt(0) != '\''
+        || literal.charAt(literal.length() - 1) != '\'') {
+      return false;
+    }
+
+    for (int i = 1; i < literal.length() - 1; i++) {
+      char current = literal.charAt(i);
+      if (current == '\\') {
+        if (i + 1 >= literal.length() - 1) {
+          return false;
+        }
+        i++;
+      } else if (current == '\'') {
+        if (i + 1 >= literal.length() - 1 || literal.charAt(i + 1) != '\'') {
+          return false;
+        }
+        i++;
+      }
+    }
+    return true;
+  }
+
+  private static String generateAlterTableProperties(
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    if (!setProperties.isEmpty()) {
+      return setProperties.stream()
+          .map(
+              change ->
+                  "%s = %s"
+                      .formatted(tableSettingName(change.getProperty()), change.getValue().trim()))
+          .collect(Collectors.joining(", ", "MODIFY SETTING ", ""));
+    }
+    if (!removeProperties.isEmpty()) {
+      return removeProperties.stream()
+          .map(change -> tableSettingName(change.getProperty()))
+          .collect(Collectors.joining(", ", "RESET SETTING ", ""));
+    }
     return "";
+  }
+
+  private static List<String> tableSettingNames(
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    if (!setProperties.isEmpty()) {
+      return setProperties.stream()
+          .map(change -> tableSettingName(change.getProperty()))
+          .collect(Collectors.toList());
+    }
+    return removeProperties.stream()
+        .map(change -> tableSettingName(change.getProperty()))
+        .collect(Collectors.toList());
   }
 
   private String updateColumnCommentFieldDefinition(
