@@ -1357,8 +1357,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     String[][] fields = ops.parseIndexFields("tuple(`c2`, `c3`)");
     Assertions.assertArrayEquals(new String[][] {{"c2"}, {"c3"}}, fields);
 
-    String[][] bloomFields = ops.parseIndexFields("bloom_filter(`c4`)");
-    Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.parseIndexFields("bloom_filter(`c4`)"));
   }
 
   @Test

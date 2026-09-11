@@ -762,7 +762,7 @@ public class TestClickHouseTableOperationsUnit {
     Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
     Mockito.when(secondaryRs.getString("type_full"))
         .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
-    Mockito.when(secondaryRs.getString("expr")).thenReturn("cityHash64(col_1) % 16", "col_2");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("lower(col_1)", "col_2");
     Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
 
     Connection connection = Mockito.mock(Connection.class);
