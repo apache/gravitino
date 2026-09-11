@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.filter;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -947,7 +948,13 @@ public class TestGravitinoInterceptionService {
 
     assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     verify(invocation, never()).proceed();
-    verify(eventBus).dispatchEvent(ArgumentMatchers.any(AuthorizationDenialFailureEvent.class));
+    // The denial event reports the owner expression the executor evaluated, not the default one.
+    ArgumentCaptor<AuthorizationDenialFailureEvent> captor =
+        ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
+    verify(eventBus).dispatchEvent(captor.capture());
+    assertEquals(
+        TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION,
+        captor.getValue().expression());
   }
 
   @Test
