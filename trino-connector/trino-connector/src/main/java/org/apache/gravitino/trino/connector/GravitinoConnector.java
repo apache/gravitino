@@ -242,6 +242,12 @@ public class GravitinoConnector implements Connector {
                 GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
                 GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
     String token = session.getIdentity().getExtraCredentials().get(credentialKey);
+    // Password-authenticated sessions have no OAuth token. Reuse the configured service
+    // identity in that case; failures with a supplied token must still propagate.
+    if (GravitinoAuthProvider.parseAuthType(authType) == GravitinoAuthProvider.AuthType.OAUTH2
+        && StringUtils.isBlank(token)) {
+      return connectorMetadata;
+    }
     String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(
