@@ -57,6 +57,9 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -226,6 +229,8 @@ public class JobManager implements JobOperationDispatcher {
             throw new JobTemplateAlreadyExistsException(
                 "Job template with name %s under metalake %s already exists",
                 jobTemplateEntity.name(), metalake);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
           }
@@ -267,44 +272,50 @@ public class JobManager implements JobOperationDispatcher {
       return false;
     }
 
-    boolean hasActiveJobs =
-        jobs.stream()
-            .anyMatch(
-                job ->
-                    job.status() != JobHandle.Status.CANCELLED
-                        && job.status() != JobHandle.Status.SUCCEEDED
-                        && job.status() != JobHandle.Status.FAILED);
+    boolean hasActiveJobs = jobs.stream().anyMatch(job -> !isFinishedStatus(job.status()));
     if (hasActiveJobs) {
       throw new InUseException(
           "Job template %s under metalake %s has active jobs associated with it",
           jobTemplateName, metalake);
     }
 
-    // Delete all the job staging directories associated with the job template.
-    String jobTemplateStagingPath =
-        stagingDir.getAbsolutePath() + File.separator + metalake + File.separator + jobTemplateName;
-    File jobTemplateStagingDir = new File(jobTemplateStagingPath);
-    if (jobTemplateStagingDir.exists()) {
+    // Delete the job template entity as well as all the jobs associated with it.
+    boolean deleted =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
+            LockType.WRITE,
+            () -> {
+              try {
+                return entityStore.delete(
+                    NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
+                    Entity.EntityType.JOB_TEMPLATE);
+              } catch (NonEmptyEntityException e) {
+                throw new InUseException(
+                    "Job template %s under metalake %s has active jobs associated with it",
+                    jobTemplateName, metalake);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+    if (!deleted) {
+      return false;
+    }
+
+    // Only remove directories belonging to the observed jobs. A same-name template can be
+    // recreated after the metadata transaction commits, so its parent directory is not ours to
+    // delete.
+    for (JobEntity job : jobs) {
+      String jobStagingPath =
+          stagingDir.getAbsolutePath()
+              + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
       try {
-        FileUtils.deleteDirectory(jobTemplateStagingDir);
+        FileUtils.deleteDirectory(new File(jobStagingPath));
       } catch (IOException e) {
-        LOG.error("Failed to delete job template staging directory: {}", jobTemplateStagingPath, e);
+        LOG.error("Failed to delete job staging directory: {}", jobStagingPath, e);
       }
     }
 
-    // Delete the job template entity as well as all the jobs associated with it.
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
-        LockType.WRITE,
-        () -> {
-          try {
-            return entityStore.delete(
-                NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
-                Entity.EntityType.JOB_TEMPLATE);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    return true;
   }
 
   @Override
@@ -335,9 +346,7 @@ public class JobManager implements JobOperationDispatcher {
                     updateJobTemplateEntity(jobTemplateIdent, jobTemplateEntity, changes));
           } catch (NoSuchEntityException e) {
             throw new NoSuchJobTemplateException(
-                "Job template with name %s under metalake %s does not exist, this could be due to"
-                    + " the job template not existing or updated concurrently. For the latter case"
-                    + " please retry the operation.",
+                "Job template with name %s under metalake %s does not exist",
                 jobTemplateName, metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -490,6 +499,20 @@ public class JobManager implements JobOperationDispatcher {
 
     try {
       entityStore.put(jobEntity, false /* overwrite */);
+    } catch (NoSuchEntityException e) {
+      LOG.error(
+          "Job {} was submitted as execution {} but could not be registered because its template "
+              + "{} or metalake {} no longer exists",
+          jobEntity.name(),
+          jobExecutionId,
+          jobTemplateName,
+          metalake,
+          e);
+      throw new NoSuchJobTemplateException(
+          e,
+          "Job template with name %s under metalake %s does not exist",
+          jobTemplateName,
+          metalake);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }
@@ -669,6 +692,14 @@ public class JobManager implements JobOperationDispatcher {
                                 e);
                           }
                         });
+              } catch (OptimisticLockException e) {
+                // A later poll re-reads both executor state and metadata. Never stop the scheduled
+                // task or replay external submission/cancellation because a metadata CAS lost.
+                LOG.info(
+                    "Job {} under metalake {} changed concurrently; deferring status update",
+                    job.name(),
+                    metalake);
+                return;
               } catch (NoSuchEntityException e) {
                 // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
                 // in the gap between the listJobs() snapshot above and this update. Skip it rather
@@ -767,11 +798,7 @@ public class JobManager implements JobOperationDispatcher {
     for (String metalake : metalakes) {
       List<JobEntity> finishedJobs =
           listJobs(metalake, Optional.empty()).stream()
-              .filter(
-                  job ->
-                      job.status() == JobHandle.Status.CANCELLED
-                          || job.status() == JobHandle.Status.SUCCEEDED
-                          || job.status() == JobHandle.Status.FAILED)
+              .filter(job -> isFinishedStatus(job.status()))
               .filter(
                   job ->
                       job.finishedAt() > 0
@@ -793,6 +820,13 @@ public class JobManager implements JobOperationDispatcher {
                 FileUtils.deleteDirectory(jobStagingDir);
                 LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
               }
+            } catch (OptimisticLockException e) {
+              // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
+              // job and checks retention eligibility again; this batch can process other jobs.
+              LOG.info(
+                  "Job {} under metalake {} changed concurrently; deferring cleanup",
+                  job.name(),
+                  metalake);
             } catch (IOException e) {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }
