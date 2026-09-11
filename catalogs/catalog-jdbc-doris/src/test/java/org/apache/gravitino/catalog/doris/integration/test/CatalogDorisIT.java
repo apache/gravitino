@@ -32,6 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -675,6 +680,106 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testAddColumnPreservesDefaultValue() throws SQLException {
+    String defaultedColumnName = "defaulted_col";
+    String nullableDefaultColumnName = "nullable_default_col";
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("test_add_column_preserves_default"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        table_comment,
+        createTableProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null,
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {defaultedColumnName},
+            Types.VarCharType.of(255),
+            "defaulted column",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255))));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn =
+                  findColumn(tableCatalog.loadTable(tableIdentifier), defaultedColumnName);
+              Assertions.assertEquals(Types.VarCharType.of(255), addedColumn.dataType());
+              Assertions.assertFalse(addedColumn.nullable());
+              Assertions.assertEquals("defaulted column", addedColumn.comment());
+              Assertions.assertEquals(
+                  Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)),
+                  addedColumn.defaultValue());
+            });
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {nullableDefaultColumnName},
+            Types.IntegerType.get(),
+            "nullable default column",
+            TableChange.ColumnPosition.defaultPos(),
+            true,
+            false,
+            Literals.integerLiteral(9)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn =
+                  findColumn(tableCatalog.loadTable(tableIdentifier), nullableDefaultColumnName);
+              Assertions.assertEquals(Types.IntegerType.get(), addedColumn.dataType());
+              Assertions.assertTrue(addedColumn.nullable());
+              Assertions.assertEquals("nullable default column", addedColumn.comment());
+              Assertions.assertEquals(Literals.integerLiteral(9), addedColumn.defaultValue());
+            });
+
+    String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tableIdentifier.name());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (`%s`, `%s`, `%s`, `%s`) "
+                  + "VALUES (101, 'data-1', 'data-2', '2024-01-01')",
+              qualifiedTableName,
+              DORIS_COL_NAME1,
+              DORIS_COL_NAME2,
+              DORIS_COL_NAME3,
+              DORIS_COL_NAME4));
+
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT `%s`, `%s` FROM %s WHERE `%s` = 101",
+                  defaultedColumnName,
+                  nullableDefaultColumnName,
+                  qualifiedTableName,
+                  DORIS_COL_NAME1))) {
+        Assertions.assertTrue(resultSet.next());
+        Assertions.assertEquals("owner's \"value\"\\path", resultSet.getString(1));
+        Assertions.assertEquals(9, resultSet.getInt(2));
+        Assertions.assertFalse(resultSet.wasNull());
+        Assertions.assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   void testDorisIndex() {
     String tableName = GravitinoITUtils.genRandomName("test_add_index");
 
@@ -1308,5 +1413,12 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(2, partitions.size());
     assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
     assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  private Column findColumn(Table table, String columnName) {
+    return Arrays.stream(table.columns())
+        .filter(column -> column.name().equals(columnName))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Column not found: " + columnName));
   }
 }

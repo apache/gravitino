@@ -30,6 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -95,6 +100,7 @@ public class CatalogDoris3xIT extends BaseIT {
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  private String jdbcUrl;
 
   @BeforeAll
   public void startup() throws IOException {
@@ -125,7 +131,7 @@ public class CatalogDoris3xIT extends BaseIT {
 
   private void createCatalog() {
     DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_3_0);
-    String jdbcUrl =
+    jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
             dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
@@ -218,6 +224,97 @@ public class CatalogDoris3xIT extends BaseIT {
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testAddColumnPreservesDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_add_column_preserves_default"));
+    String defaultedColumnName = "defaulted_col";
+    String nullableDefaultColumnName = "nullable_default_col";
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {defaultedColumnName},
+            Types.VarCharType.of(255),
+            "defaulted column",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255))));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), defaultedColumnName);
+              assertEquals(Types.VarCharType.of(255), addedColumn.dataType());
+              assertFalse(addedColumn.nullable());
+              assertEquals("defaulted column", addedColumn.comment());
+              assertEquals(
+                  Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)),
+                  addedColumn.defaultValue());
+            });
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {nullableDefaultColumnName},
+            Types.IntegerType.get(),
+            "nullable default column",
+            TableChange.ColumnPosition.defaultPos(),
+            true,
+            false,
+            Literals.integerLiteral(9)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), nullableDefaultColumnName);
+              assertEquals(Types.IntegerType.get(), addedColumn.dataType());
+              assertTrue(addedColumn.nullable());
+              assertEquals("nullable default column", addedColumn.comment());
+              assertEquals(Literals.integerLiteral(9), addedColumn.defaultValue());
+            });
+
+    String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tid.name());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (`%s`, `%s`) VALUES (101, 'data')",
+              qualifiedTableName, colName1, colName2));
+
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT `%s`, `%s` FROM %s WHERE `%s` = 101",
+                  defaultedColumnName, nullableDefaultColumnName, qualifiedTableName, colName1))) {
+        assertTrue(resultSet.next());
+        assertEquals("owner's \"value\"\\path", resultSet.getString(1));
+        assertEquals(9, resultSet.getInt(2));
+        assertFalse(resultSet.wasNull());
+        assertFalse(resultSet.next());
+      }
+    }
   }
 
   @Test
