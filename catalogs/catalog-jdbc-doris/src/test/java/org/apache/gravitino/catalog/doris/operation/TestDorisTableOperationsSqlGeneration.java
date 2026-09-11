@@ -50,6 +50,9 @@ import org.mockito.Mockito;
 public class TestDorisTableOperationsSqlGeneration {
 
   private static class TestableDorisTableOperations extends DorisTableOperations {
+    private JdbcTable tableForAlter =
+        JdbcTable.builder().withName("test_table").withIndexes(Indexes.EMPTY_INDEXES).build();
+
     public TestableDorisTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new DorisTypeConverter();
@@ -101,10 +104,14 @@ public class TestDorisTableOperationsSqlGeneration {
       return generateAlterTableSql("database", tableName, changes);
     }
 
+    void setTableForAlter(JdbcTable table) {
+      this.tableForAlter = table;
+    }
+
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return tableForAlter;
     }
 
     public String createTableSqlWithIndexes(
@@ -563,6 +570,114 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testDeleteIndexDefinitionReturnsEmptyFragmentForMissingIndex() {
+    JdbcTable table = tableWithIndexes("idx_existing");
+
+    TableChange.DeleteIndex deleteIndex =
+        (TableChange.DeleteIndex) TableChange.deleteIndex("idx_missing", true);
+    Assertions.assertEquals("", DorisTableOperations.deleteIndexDefinition(table, deleteIndex));
+
+    TableChange.DeleteIndex strictDeleteIndex =
+        (TableChange.DeleteIndex) TableChange.deleteIndex("idx_missing", false);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DorisTableOperations.deleteIndexDefinition(table, strictDeleteIndex));
+    Assertions.assertEquals("Index does not exist", exception.getMessage());
+  }
+
+  @Test
+  public void testNoOpDeleteIsFilteredFromAlterSql() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setTableForAlter(tableWithIndexes());
+
+    Assertions.assertEquals(
+        "", ops.alterTableSql("test_table", TableChange.deleteIndex("idx_missing", true)));
+
+    TableChange[] unrelatedChanges =
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get()),
+          TableChange.updateColumnComment(new String[] {"col1"}, "updated comment"),
+          TableChange.setProperty(REPLICATION_FACTOR, "1"),
+          TableChange.addIndex(Index.IndexType.INVERTED, "idx_new", new String[][] {{"col1"}})
+        };
+    String[] unrelatedFragments =
+        new String[] {
+          "ADD COLUMN `col2`",
+          "MODIFY COLUMN `col1` COMMENT 'updated comment'",
+          "set (",
+          "ADD INDEX `idx_new`"
+        };
+    for (int i = 0; i < unrelatedChanges.length; i++) {
+      TableChange unrelatedChange = unrelatedChanges[i];
+      String noOpFirstSql =
+          ops.alterTableSql(
+              "test_table", TableChange.deleteIndex("idx_missing", true), unrelatedChange);
+      String noOpLastSql =
+          ops.alterTableSql(
+              "test_table", unrelatedChange, TableChange.deleteIndex("idx_missing", true));
+
+      Assertions.assertFalse(noOpFirstSql.contains("DROP INDEX `idx_missing`"), noOpFirstSql);
+      Assertions.assertFalse(noOpLastSql.contains("DROP INDEX `idx_missing`"), noOpLastSql);
+      Assertions.assertTrue(noOpFirstSql.contains(unrelatedFragments[i]), noOpFirstSql);
+      Assertions.assertTrue(noOpLastSql.contains(unrelatedFragments[i]), noOpLastSql);
+    }
+  }
+
+  @Test
+  public void testIndexChangeConflictsFailFastBeforeJdbc() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    ops.setDataSource(dataSource);
+
+    TableChange[][] duplicateDeleteChanges =
+        new TableChange[][] {
+          {TableChange.deleteIndex("idx", true), TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", true), TableChange.deleteIndex("idx", false)},
+          {TableChange.deleteIndex("idx", false), TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", false), TableChange.deleteIndex("idx", false)}
+        };
+    ops.setTableForAlter(tableWithIndexes("idx"));
+    for (TableChange[] changes : duplicateDeleteChanges) {
+      assertIndexChangeConflict(
+          ops,
+          connection,
+          "Index 'idx' cannot be deleted more than once in the same request",
+          changes);
+    }
+
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.INVERTED, "idx", new String[][] {{"col1"}});
+    TableChange[][] addDeleteChanges =
+        new TableChange[][] {
+          {addIndex, TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", true), addIndex},
+          {addIndex, TableChange.deleteIndex("idx", false)},
+          {TableChange.deleteIndex("idx", false), addIndex}
+        };
+    JdbcTable[] addDeleteTables =
+        new JdbcTable[] {
+          tableWithIndexes(), tableWithIndexes(), tableWithIndexes("idx"), tableWithIndexes("idx")
+        };
+    for (int i = 0; i < addDeleteChanges.length; i++) {
+      ops.setTableForAlter(addDeleteTables[i]);
+      assertIndexChangeConflict(
+          ops,
+          connection,
+          "Index 'idx' cannot be added and deleted in the same request",
+          addDeleteChanges[i]);
+    }
+
+    ops.setTableForAlter(tableWithIndexes());
+    ops.alterTable("database", "test_table", TableChange.deleteIndex("idx_missing", true));
+    Mockito.verify(connection, Mockito.never()).createStatement();
+    Mockito.verify(connection, Mockito.never()).prepareStatement(Mockito.anyString());
+  }
+
+  @Test
   public void testIsVersionAtLeast() {
     // Exact match
     Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("2.1.0", 2, 1, 0));
@@ -622,6 +737,30 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "Properties 'replication_num' and 'replication_allocation' cannot be set at the same time",
         exception.getMessage());
+  }
+
+  private static void assertIndexChangeConflict(
+      TestableDorisTableOperations ops,
+      Connection connection,
+      String expectedMessage,
+      TableChange[] changes)
+      throws Exception {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.alterTable("database", "test_table", changes));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
+    Mockito.verify(connection, Mockito.never()).createStatement();
+    Mockito.verify(connection, Mockito.never()).prepareStatement(Mockito.anyString());
+  }
+
+  private static JdbcTable tableWithIndexes(String... indexNames) {
+    Index[] indexes = new Index[indexNames.length];
+    for (int i = 0; i < indexNames.length; i++) {
+      indexes[i] = Indexes.of(Index.IndexType.INVERTED, indexNames[i], new String[][] {{"col1"}});
+    }
+    return JdbcTable.builder().withName("test_table").withIndexes(indexes).build();
   }
 
   private static void assertInvalidAddIndex(String[][] fields, String expectedMessage) {
