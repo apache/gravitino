@@ -1077,14 +1077,12 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
       assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
 
-      // Most important assertion: no orphan table_version_info rows.
-      // H2 degrades FOR SHARE to FOR UPDATE, so skip orphan check there.
-      if (!"h2".equalsIgnoreCase(backendType)) {
-        int orphanTableVersions =
-            countActiveVersionRowsForEntity(table.id(), "table_version_info", "table_id");
-        Assertions.assertEquals(
-            0, orphanTableVersions, "Found orphan table_version_info rows after cascade delete");
-      }
+      // Most important assertion: no orphan table_version_info rows. The cascade delete
+      // must soft-delete version rows alongside the parent table_meta rows.
+      int orphanTableVersions =
+          countActiveVersionRowsForEntity(table.id(), "table_version_info", "table_id");
+      Assertions.assertEquals(
+          0, orphanTableVersions, "Found orphan table_version_info rows after cascade delete");
     } finally {
       executor.shutdownNow();
     }

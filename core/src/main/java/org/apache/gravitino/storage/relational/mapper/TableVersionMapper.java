@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -41,6 +42,11 @@ public interface TableVersionMapper {
       method = "softDeleteTableVersionByTableIdAndVersion")
   void softDeleteTableVersionByTableIdAndVersion(
       @Param("tableId") Long tableId, @Param("version") Long version);
+
+  @UpdateProvider(
+      type = TableVersionSQLProviderFactory.class,
+      method = "softDeleteTableVersionsBySchemaIds")
+  Integer softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @DeleteProvider(
       type = TableVersionSQLProviderFactory.class,
