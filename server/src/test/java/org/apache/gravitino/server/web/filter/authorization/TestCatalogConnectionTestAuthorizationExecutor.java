@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web.filter.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Method;
@@ -73,6 +74,35 @@ public class TestCatalogConnectionTestAuthorizationExecutor {
         createExecutor(proposedChanges(), ExpressionCondition.NEVER);
 
     assertEquals(PRIMARY_EXPRESSION, executor.expression);
+  }
+
+  @Test
+  public void testUsesPrimaryExpressionForNullChanges() throws Exception {
+    CatalogConnectionTestAuthorizationExecutor executor =
+        createExecutor(new CatalogUpdatesRequest(), ExpressionCondition.HAS_PROPOSED_CHANGES);
+
+    assertEquals(PRIMARY_EXPRESSION, executor.expression);
+  }
+
+  @Test
+  public void testFactoryCreatesExecutorForTestCatalogConnection() throws Exception {
+    Method method = TestOperations.class.getMethod("testConnection", CatalogUpdatesRequest.class);
+    AuthorizationExecutor executor =
+        AuthorizeExecutorFactory.create(
+            PRIMARY_EXPRESSION,
+            AuthorizationRequest.RequestType.TEST_CATALOG_CONNECTION,
+            Collections.emptyMap(),
+            Collections.emptyMap(),
+            Optional.empty(),
+            method.getParameters(),
+            new Object[] {proposedChanges()},
+            SECONDARY_EXPRESSION,
+            ExpressionCondition.HAS_PROPOSED_CHANGES,
+            "");
+
+    assertTrue(executor instanceof CatalogConnectionTestAuthorizationExecutor);
+    assertEquals(
+        SECONDARY_EXPRESSION, ((CatalogConnectionTestAuthorizationExecutor) executor).expression);
   }
 
   private static CatalogUpdatesRequest proposedChanges() {
