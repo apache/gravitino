@@ -544,6 +544,7 @@ on the URI scheme:
 | `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)                                  | No       |
 | `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)                                  | No       |
 | `gravitino.iceberg-rest.s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false                                   | No       |
+| `gravitino.iceberg-rest.s3-proxy-endpoint`    | The proxy endpoint for S3 requests, e.g. `http://proxy-host:8080`.                                                                                                                                                  | (none)                                  | No       |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
@@ -840,6 +841,7 @@ For cloud or remote storage, configure the corresponding [storage](#storage) set
 | `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                       | `gravitino.iceberg-rest.s3-endpoint`                       |
 | `GRAVITINO_ICEBERG_REST_S3_REGION`                         | `gravitino.iceberg-rest.s3-region`                         |
 | `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`              | `gravitino.iceberg-rest.s3-path-style-access`              |
+| `GRAVITINO_ICEBERG_REST_S3_PROXY_ENDPOINT`                 | `gravitino.iceberg-rest.s3-proxy-endpoint`                 |
 | `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                       | `gravitino.iceberg-rest.s3-role-arn`                       |
 | `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                    | `gravitino.iceberg-rest.s3-external-id`                    |
 | `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`         | `gravitino.iceberg-rest.s3-token-service-endpoint`         |

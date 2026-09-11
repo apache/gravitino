@@ -38,6 +38,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -98,6 +99,12 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
+            stringOptionalPropertyEntry(
+                S3Properties.GRAVITINO_S3_PROXY_ENDPOINT,
+                "The proxy endpoint for S3 requests",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "
