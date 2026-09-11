@@ -51,6 +51,13 @@ public class ClickHouseConstants {
 
     /** Parameters for supported parameterized MergeTree engines, without outer parentheses. */
     public static final String ENGINE_PARAMETERS = "engine_parameters";
+
+    /**
+     * Read-only property that exposes ClickHouse's canonical native partition expression as
+     * returned by system.tables.partition_key. It carries expressions that cannot be mapped to a
+     * structured Transform (identity, year, month, or day).
+     */
+    public static final String PARTITION_KEY = "partition-key";
   }
 
   public static final class IndexConstants {

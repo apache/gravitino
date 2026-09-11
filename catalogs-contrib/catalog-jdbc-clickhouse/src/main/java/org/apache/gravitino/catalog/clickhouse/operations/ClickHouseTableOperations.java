@@ -42,7 +42,6 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -92,7 +91,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
@@ -112,9 +110,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
               ENGINE.SUMMINGMERGETREE,
               ENGINE.COLLAPSINGMERGETREE,
               ENGINE.VERSIONEDCOLLAPSINGMERGETREE));
-  private static final Pattern PARTITION_BY_PATTERN =
-      Pattern.compile(
-          "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern SETTINGS_PATTERN =
       Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
@@ -878,12 +873,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
-      ShowCreateTableMetadata showCreateMetadata = parseShowCreateTable(connection, tableName);
-      Transform[] partitioning = showCreateMetadata.partitioning;
-      if (ArrayUtils.isEmpty(partitioning)) {
-        partitioning = getTablePartitioning(connection, databaseName, tableName);
-      }
-      jdbcTableBuilder.withPartitioning(partitioning);
+      String partitionKey = getPartitionKey(connection, databaseName, tableName);
+      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -895,12 +886,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       // mistaken for table SETTINGS. These values take precedence
       // over any settings.* keys that might exist in system.tables (though getTableProperties()
       // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
+      Map<String, String> merged = new HashMap<>(tableProperties);
       if (!systemTableMetadata.settings().isEmpty()) {
-        Map<String, String> merged = new HashMap<>(tableProperties);
         merged.putAll(systemTableMetadata.settings());
-        tableProperties = Collections.unmodifiableMap(merged);
       }
-      jdbcTableBuilder.withProperties(tableProperties);
+      // Expose ClickHouse's canonical native partition expression. Unpartitioned tables expose an
+      // empty string so that the property key is always present.
+      merged.put(TableConstants.PARTITION_KEY, StringUtils.defaultString(partitionKey));
+      jdbcTableBuilder.withProperties(Collections.unmodifiableMap(merged));
 
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
 
@@ -950,6 +943,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
+    return parsePartitioning(getPartitionKey(connection, databaseName, tableName));
+  }
+
+  @VisibleForTesting
+  String getPartitionKey(Connection connection, String databaseName, String tableName)
+      throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
             "SELECT partition_key FROM system.tables WHERE database = ? AND name = ?")) {
@@ -957,22 +956,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       statement.setString(2, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         if (resultSet.next()) {
-          String partitionKey = resultSet.getString("partition_key");
-          try {
-            return parsePartitioning(partitionKey);
-          } catch (IllegalArgumentException | UnsupportedOperationException e) {
-            LOG.warn(
-                "Skip unsupported partition expression {} for {}.{}",
-                partitionKey,
-                databaseName,
-                tableName);
-            return Transforms.EMPTY_TRANSFORM;
-          }
+          return resultSet.getString("partition_key");
         }
       }
     }
 
-    return Transforms.EMPTY_TRANSFORM;
+    return null;
   }
 
   @Override
@@ -1478,20 +1467,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
-  private ShowCreateTableMetadata parseCreateStatement(String createSql) {
-    ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
-    if (StringUtils.isBlank(createSql)) {
-      return metadata;
-    }
-
-    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
-    if (partitionMatcher.find()) {
-      metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
-    }
-
-    return metadata;
-  }
-
   // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
   // Keys are prefixed with "settings." to match the write path convention in
   // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
@@ -1522,24 +1497,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return parseSettingsClause(settingsMatcher.group(1));
     }
     return Collections.emptyMap();
-  }
-
-  private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
-      throws SQLException {
-    String createSql = parseShowCreateTableSql(connection, tableName);
-    return parseCreateStatement(createSql);
-  }
-
-  private String parseShowCreateTableSql(Connection connection, String tableName)
-      throws SQLException {
-    String sql = "SHOW CREATE TABLE " + quoteIdentifier(tableName);
-    try (Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(sql)) {
-      if (resultSet.next()) {
-        return resultSet.getString(1);
-      }
-      throw new SQLException("SHOW CREATE TABLE returned no rows for " + tableName);
-    }
   }
 
   private String unquote(String value) {
@@ -1657,10 +1614,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Map<String, String> settings() {
       return settings;
     }
-  }
-
-  private static final class ShowCreateTableMetadata {
-    private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
   }
 
   private static final class TablePropertiesWithClusterMetadata {
