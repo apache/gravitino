@@ -221,15 +221,20 @@ complete record of the locations it handed out.
 
 Two constraints follow from `ServiceLoader` discovery:
 
-- The implementation needs a public no-argument constructor that is cheap and does not throw. Every
-  provider on the classpath is instantiated before the one named by the catalog property is selected,
-  so a heavy constructor slows catalog initialization for everyone, including catalogs using the
-  built-in provider, and one that throws costs that provider the ability to be selected at all. Put
-  clients, connection pools and other expensive setup in `initialize`.
+- The implementation needs a public no-argument constructor that is cheap and does not throw.
+  Selecting a provider means asking each candidate its name, and `name()` is an instance method, so
+  every provider on the classpath is constructed once before the named one is selected. That scan
+  happens once per class loader and its result is remembered, so a heavy constructor costs the first
+  catalog to start rather than every catalog, but it still costs that one -- including when the
+  provider it is slowing down is not the one being selected. A constructor that throws costs that
+  provider the ability to be selected at all. Put clients, connection pools and other expensive
+  setup in `initialize`, which runs only on the selected provider.
 - `name()` must be unique across the classpath and must not be `default`, which is reserved by the
   built-in provider. If two providers share a name, every catalog selecting that name fails to
-  initialize. A provider that cannot be instantiated at all is logged and skipped rather than
-  failing the lookup, so one broken jar does not stop every catalog from starting.
+  initialize. A candidate whose constructor or `name()` throws is logged and skipped, so one
+  misbehaving provider does not stop a catalog that named a different one. A services file naming a
+  class that cannot be loaded at all is not survivable in the same way: it fails the scan before any
+  candidate is reached.
 
 #### Key Property: `location`
 

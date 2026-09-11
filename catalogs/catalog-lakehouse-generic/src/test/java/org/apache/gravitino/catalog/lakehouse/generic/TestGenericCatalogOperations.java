@@ -823,6 +823,20 @@ public class TestGenericCatalogOperations {
             opsWithFakeProvider, schemaIdent, "verbatim_location", ImmutableMap.of());
 
     Assertions.assertEquals(opaque, created.properties().get(Table.PROPERTY_LOCATION));
+
+    // A trailing slash is left alone for the same reason. The catalog does append one when it
+    // compares the location it handed out with the one the created table reports, so that a
+    // provider is not told its location was declined over a slash; that normalization belongs to
+    // the comparison and must not reach the stored property.
+    String directory = "testing://bucket/9f1c2e04-6b3a-4a17-bd6e-1c0a5f2d8e77/";
+    FakeTableLocationProvider.provisionLocation(directory);
+
+    Table createdInDirectory =
+        createTableThroughCatalog(
+            opsWithFakeProvider, schemaIdent, "verbatim_directory", ImmutableMap.of());
+
+    Assertions.assertEquals(
+        directory, createdInDirectory.properties().get(Table.PROPERTY_LOCATION));
   }
 
   @Test
