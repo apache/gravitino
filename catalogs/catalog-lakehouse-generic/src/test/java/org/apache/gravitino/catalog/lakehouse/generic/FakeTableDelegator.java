@@ -19,12 +19,21 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**
@@ -37,6 +46,26 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
 
   /** The table format handled by this delegator. */
   public static final String TABLE_FORMAT = "testing";
+
+  // Set by a test to make createTable behave like a format that declines the location it was
+  // given: Lance's EXIST_OK mode returns the table that already exists, at the location that table
+  // already had. Static because the catalog builds its own table operations through ServiceLoader.
+  private static volatile String locationToUseInstead;
+
+  /**
+   * Makes every subsequent creation store the given location instead of the one the catalog
+   * provisioned, the way a format returning an already existing table does.
+   *
+   * @param location the location the created table will report, null to create normally
+   */
+  public static void useLocationInstead(String location) {
+    locationToUseInstead = location;
+  }
+
+  /** Stops overriding the location of created tables. */
+  public static void reset() {
+    locationToUseInstead = null;
+  }
 
   @Override
   public String tableFormat() {
@@ -65,6 +94,34 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
       @Override
       protected IdGenerator idGenerator() {
         return idGenerator;
+      }
+
+      @Override
+      public Table createTable(
+          NameIdentifier ident,
+          Column[] columns,
+          String comment,
+          Map<String, String> properties,
+          Transform[] partitions,
+          Distribution distribution,
+          SortOrder[] sortOrders,
+          Index[] indexes) {
+        String override = locationToUseInstead;
+        Map<String, String> storedProperties = properties;
+        if (override != null) {
+          storedProperties = Maps.newHashMap(properties);
+          storedProperties.put(Table.PROPERTY_LOCATION, override);
+        }
+
+        return super.createTable(
+            ident,
+            columns,
+            comment,
+            storedProperties,
+            partitions,
+            distribution,
+            sortOrders,
+            indexes);
       }
     };
   }

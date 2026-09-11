@@ -34,12 +34,16 @@ import org.apache.gravitino.rel.Table;
  * levels:
  *
  * <ol>
- *   <li>the table's own {@code location} property, used as-is;
+ *   <li>the table's own {@code location} property, with a trailing slash added;
  *   <li>the schema's {@code location} property, with the table name appended;
  *   <li>the catalog's {@code location} property, with the schema and table names appended.
  * </ol>
  *
  * If none of them is set, provisioning fails with an {@link IllegalArgumentException}.
+ *
+ * <p>The first level is unreachable through the catalog, which keeps a caller-supplied location
+ * without consulting any provider. It is kept so that the three levels still read as one rule, and
+ * so that calling this provider directly behaves as it always has.
  */
 public class DefaultTableLocationProvider implements TableLocationProvider {
 
@@ -48,7 +52,7 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
 
   private static final String SLASH = "/";
 
-  private Optional<String> catalogLocation = Optional.empty();
+  private volatile Optional<String> catalogLocation = Optional.empty();
 
   @Override
   public String name() {
@@ -57,8 +61,7 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
 
   @Override
   public void initialize(Map<String, String> catalogProperties) {
-    String location =
-        catalogProperties == null ? null : catalogProperties.get(Catalog.PROPERTY_LOCATION);
+    String location = catalogProperties.get(Catalog.PROPERTY_LOCATION);
     this.catalogLocation =
         StringUtils.isNotBlank(location)
             ? Optional.of(location).map(DefaultTableLocationProvider::ensureTrailingSlash)
@@ -95,7 +98,7 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
     }
 
     return ensureTrailingSlash(catalogLocation.get())
-        + tableIdent.namespace().level(2)
+        + schema.name()
         + SLASH
         + tableIdent.name()
         + SLASH;
@@ -111,7 +114,29 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
   @Override
   public void unprovisionTableLocation(TableLocationContext context) {}
 
-  private static String ensureTrailingSlash(String path) {
+  /**
+   * Does nothing, for the same reason as {@link #unprovisionTableLocation(TableLocationContext)}: a
+   * composed location was never allocated anywhere, so a location the table did not use costs
+   * nothing and there is nothing to release. Written out rather than inherited so that the two
+   * callbacks are visibly deliberate here, not overlooked.
+   *
+   * @param context the table that was created, unused
+   */
+  @Override
+  public void releaseUnusedLocation(TableLocationContext context) {}
+
+  /**
+   * Appends a trailing slash to the given path unless it already ends with one.
+   *
+   * <p>Package-private rather than private so that {@link GenericCatalogOperations} can apply the
+   * very same normalization to a caller-supplied location, which bypasses this provider, and when
+   * comparing a provisioned location against the one the created table reports. Sharing the method
+   * is what keeps those and this provider from drifting apart.
+   *
+   * @param path the path to normalize
+   * @return the path, ending with a slash
+   */
+  static String ensureTrailingSlash(String path) {
     return path.endsWith(SLASH) ? path : path + SLASH;
   }
 }

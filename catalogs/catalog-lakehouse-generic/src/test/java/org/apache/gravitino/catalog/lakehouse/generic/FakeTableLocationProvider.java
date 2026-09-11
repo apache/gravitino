@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A {@link TableLocationProvider} registered only in the test classpath, used to verify that a
@@ -36,15 +37,39 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   public static final String LOCATION_PREFIX = "testing://bucket/";
 
   // The provider instance used by a catalog is created by the ServiceLoader and not reachable from
-  // the test, so the unprovision calls are recorded statically.
+  // the test, so the provision and unprovision calls are recorded statically.
+  private static final List<TableLocationContext> PROVISIONED =
+      Collections.synchronizedList(Lists.newArrayList());
+
   private static final List<TableLocationContext> UNPROVISIONED =
       Collections.synchronizedList(Lists.newArrayList());
 
+  private static final List<TableLocationContext> RELEASED =
+      Collections.synchronizedList(Lists.newArrayList());
+
+  private static final AtomicInteger CLOSED = new AtomicInteger();
+
   private static volatile boolean failOnUnprovision;
+
+  private static volatile boolean failOnInitialize;
+
+  private static volatile boolean overrideLocation;
+
+  private static volatile String locationOverride;
 
   private Map<String, String> catalogProperties;
 
   private boolean closed;
+
+  /**
+   * Returns the contexts this provider was asked to provision, in the order the calls came in, so
+   * that a test can assert the provider was or was not consulted for a given table.
+   *
+   * @return the recorded provision contexts
+   */
+  public static List<TableLocationContext> provisioned() {
+    return Lists.newArrayList(PROVISIONED);
+  }
 
   /**
    * Returns the contexts this provider was asked to unprovision, in the order the calls came in.
@@ -53,6 +78,17 @@ public class FakeTableLocationProvider implements TableLocationProvider {
    */
   public static List<TableLocationContext> unprovisioned() {
     return Lists.newArrayList(UNPROVISIONED);
+  }
+
+  /**
+   * Returns the contexts this provider was asked to release as unused, in the order the calls came
+   * in. Kept apart from {@link #unprovisioned()} so that a test can tell the drop callback from the
+   * creation-path one, which a provider reclaiming by table identity has to tell apart too.
+   *
+   * @return the recorded release contexts
+   */
+  public static List<TableLocationContext> released() {
+    return Lists.newArrayList(RELEASED);
   }
 
   /**
@@ -65,10 +101,47 @@ public class FakeTableLocationProvider implements TableLocationProvider {
     failOnUnprovision = fail;
   }
 
-  /** Clears the recorded unprovision calls and stops unprovisioning from failing. */
+  /**
+   * Makes every subsequent initialization fail, to verify that a provider failing halfway through
+   * {@link #initialize(Map)} is still closed.
+   *
+   * @param fail whether initialization should throw
+   */
+  public static void failOnInitialize(boolean fail) {
+    failOnInitialize = fail;
+  }
+
+  /**
+   * Returns how many instances of this provider have been closed since the last {@link #reset()},
+   * so that a test can observe an instance it never gets a reference to.
+   *
+   * @return the number of recorded close calls
+   */
+  public static int closedCount() {
+    return CLOSED.get();
+  }
+
+  /**
+   * Makes every subsequent provision call return the given location instead of the composed one, so
+   * that a test can drive the catalog with a location a real provider should never return.
+   *
+   * @param location the location to return, null included
+   */
+  public static void provisionLocation(String location) {
+    overrideLocation = true;
+    locationOverride = location;
+  }
+
+  /** Clears the recorded calls and stops initialization and unprovisioning from failing. */
   public static void reset() {
+    overrideLocation = false;
+    locationOverride = null;
+    PROVISIONED.clear();
     UNPROVISIONED.clear();
+    RELEASED.clear();
+    CLOSED.set(0);
     failOnUnprovision = false;
+    failOnInitialize = false;
   }
 
   @Override
@@ -79,11 +152,17 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   @Override
   public void initialize(Map<String, String> catalogProperties) {
     this.catalogProperties = catalogProperties;
+    if (failOnInitialize) {
+      throw new IllegalStateException("The path allocation service is unreachable");
+    }
   }
 
   @Override
   public String provisionTableLocation(TableLocationContext context) {
-    return LOCATION_PREFIX + context.tableIdentifier().name() + "/";
+    PROVISIONED.add(context);
+    return overrideLocation
+        ? locationOverride
+        : LOCATION_PREFIX + context.tableIdentifier().name() + "/";
   }
 
   @Override
@@ -95,8 +174,14 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   }
 
   @Override
+  public void releaseUnusedLocation(TableLocationContext context) {
+    RELEASED.add(context);
+  }
+
+  @Override
   public void close() {
     this.closed = true;
+    CLOSED.incrementAndGet();
   }
 
   /**

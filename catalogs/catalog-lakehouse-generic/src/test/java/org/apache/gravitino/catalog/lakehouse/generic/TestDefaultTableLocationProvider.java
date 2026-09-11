@@ -134,6 +134,9 @@ public class TestDefaultTableLocationProvider {
 
   private static Schema mockSchema(Map<String, String> properties) {
     Schema schema = Mockito.mock(Schema.class);
+    // The context is always built from the schema the table is being created in, so the schema
+    // name matches the second level of the table identifier by construction.
+    Mockito.when(schema.name()).thenReturn(TABLE_IDENT.namespace().level(2));
     Mockito.when(schema.properties()).thenReturn(properties);
     return schema;
   }

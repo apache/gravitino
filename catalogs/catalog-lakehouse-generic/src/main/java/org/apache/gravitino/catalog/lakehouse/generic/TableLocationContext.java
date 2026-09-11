@@ -20,19 +20,24 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.rel.Table;
 
 /**
- * The context passed to a {@link TableLocationProvider}, both when the location of a table that is
- * being created has to be provisioned and when the location of a table that has been dropped has to
- * be unprovisioned.
+ * The context passed to a {@link TableLocationProvider} on each of its three callbacks: when a
+ * table is being created and its location has to be provisioned, when a location that was
+ * provisioned turns out not to be the one the table ended up at and has to be released, and when a
+ * table has been dropped and its location has to be unprovisioned.
  *
- * <p>The same type is used for both operations so that a new input becomes an additional accessor
- * rather than a signature change: providers written against an older version keep compiling and
- * running. For that reason implementations should not rely on the constructor signature and should
- * build instances through {@link #builder()}.
+ * <p>The same type is used for all three so that a new input becomes an additional accessor rather
+ * than a signature change: providers written against an older version keep compiling and running.
+ * For that reason implementations should not rely on the constructor signature and should build
+ * instances through {@link #builder()}.
  */
 public class TableLocationContext {
 
@@ -60,11 +65,27 @@ public class TableLocationContext {
   }
 
   /**
-   * Returns the properties of the table this context is about. On provisioning, these are the
-   * properties of the creation request, before the location is filled in. On unprovisioning, these
-   * are the stored properties of the table being dropped, read right before it was removed, so they
-   * carry the {@code location} that was provisioned for it under {@link
-   * org.apache.gravitino.rel.Table#PROPERTY_LOCATION}.
+   * Returns the properties of the table this context is about. Which properties those are, and in
+   * particular whether the {@code location} entry ({@link
+   * org.apache.gravitino.rel.Table#PROPERTY_LOCATION}) is filled in, depends on the callback being
+   * served:
+   *
+   * <ul>
+   *   <li>{@link TableLocationProvider#provisionTableLocation(TableLocationContext)} gets the
+   *       properties of the creation request. There is no location worth reading here: the provider
+   *       is consulted only when the request did not carry a non-blank one, so the entry is either
+   *       absent or blank.
+   *   <li>{@link TableLocationProvider#releaseUnusedLocation(TableLocationContext)} gets the
+   *       properties the table was created with, so the location entry is filled in, and it holds
+   *       exactly the provisioned location that is to be released.
+   *   <li>{@link TableLocationProvider#unprovisionTableLocation(TableLocationContext)} gets the
+   *       stored properties of the table being dropped, read right before it was removed, so the
+   *       location entry holds the location that was provisioned for it.
+   * </ul>
+   *
+   * <p>Values are carried through as they were given, null ones included: the catalog accepts a
+   * property whose value is null, and this context is not the layer that starts to reject it. Read
+   * a property with {@code get} rather than assuming that a key which is present has a value.
    *
    * @return the table properties, never null but possibly empty
    */
@@ -79,6 +100,22 @@ public class TableLocationContext {
    */
   public Schema schema() {
     return schema;
+  }
+
+  /**
+   * Returns whether the table this context is about is an external table, that is, one whose data
+   * the catalog does not own and only points at.
+   *
+   * <p>This is the {@code external} entry of {@link #tableProperties()}, read as a boolean, and is
+   * false when the entry is absent, null or not parseable. It is offered as an accessor because it
+   * changes what a provider should do: the catalog does not ask a provider to unprovision the
+   * location of an external table, and a provider asked to provision one is being asked for a path
+   * for data that may already exist elsewhere.
+   *
+   * @return true if the table is marked external
+   */
+  public boolean isExternal() {
+    return BooleanUtils.toBoolean(tableProperties.get(Table.PROPERTY_EXTERNAL));
   }
 
   /**
@@ -113,15 +150,20 @@ public class TableLocationContext {
     }
 
     /**
-     * Sets the properties of the table this context is about. A null value is treated as an empty
-     * map.
+     * Sets the properties of the table this context is about. A null map is treated as an empty
+     * one; a null value under a key is kept as it is.
      *
      * @param tableProperties the table properties
      * @return this builder
      */
     public Builder withTableProperties(Map<String, String> tableProperties) {
+      // A defensive copy that tolerates null values, which ImmutableMap.copyOf would reject. The
+      // catalog itself accepts a property whose value is null, and building this context must not
+      // be what turns such a request into a failure.
       this.tableProperties =
-          tableProperties == null ? ImmutableMap.of() : ImmutableMap.copyOf(tableProperties);
+          tableProperties == null
+              ? ImmutableMap.of()
+              : Collections.unmodifiableMap(Maps.newHashMap(tableProperties));
       return this;
     }
 
