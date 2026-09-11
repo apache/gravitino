@@ -493,7 +493,7 @@ public class Configs {
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
-              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds. "
                   + "Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_1_0_0)
           .longConf()

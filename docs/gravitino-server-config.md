@@ -301,7 +301,10 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
 Two eviction limits apply at once. Time to live always applies: an entry older than
-`expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
+`expireTimeInMs` expires and is cleaned up asynchronously. The clock starts when the entry is
+written and is not reset by reads, so in a multi-node deployment `expireTimeInMs` is also the upper
+bound on how long a node can serve a stale entry if a cross-node invalidation is ever missed (see
+[Change Log Propagation](#change-log-propagation)). Alongside it, the cache bounds its size
 either by count or by weight. With `enableWeigher` disabled, Caffeine's W-TinyLFU policy evicts the
 least-used entries once `maxEntries` is reached. With `enableWeigher` enabled, each entity type
 carries a weight, larger for entities higher in the hierarchy, and eviction targets a total weight
