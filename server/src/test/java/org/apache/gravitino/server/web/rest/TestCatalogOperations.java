@@ -27,11 +27,9 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,8 +75,6 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -87,7 +83,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestCatalogOperations extends BaseOperationsTest {
@@ -496,55 +491,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, internalError.getCode());
     Assertions.assertEquals("unexpected failure", internalError.getMessage());
     Assertions.assertNull(internalError.getStack());
-  }
-
-  @Test
-  public void testExistingCatalogConnectionWithChangesRequiresOwner() throws Exception {
-    // Call the resource directly because a static mock is only visible on the current thread.
-    CatalogDispatcher dispatcher = mock(CatalogDispatcher.class);
-    CatalogOperations operations = new CatalogOperations(dispatcher);
-    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
-    CatalogUpdatesRequest proposedChanges =
-        new CatalogUpdatesRequest(
-            ImmutableList.of(new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "value")));
-
-    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
-        mockStatic(MetadataAuthzHelper.class)) {
-      metadataAuthzHelper
-          .when(
-              () ->
-                  MetadataAuthzHelper.checkAccess(
-                      any(),
-                      any(),
-                      eq(
-                          AuthorizationExpressionConstants
-                              .TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION)))
-          .thenReturn(false);
-
-      Response forbiddenResponse =
-          operations.testExistingConnection("metalake1", "catalog1", proposedChanges);
-      Assertions.assertEquals(
-          Response.Status.FORBIDDEN.getStatusCode(), forbiddenResponse.getStatus());
-      ErrorResponse forbidden = (ErrorResponse) forbiddenResponse.getEntity();
-      Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, forbidden.getCode());
-      Assertions.assertTrue(forbidden.getMessage().contains("testExistingConnection"));
-      verify(dispatcher, never())
-          .testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
-
-      // Testing the stored configuration, including an empty change list, needs no owner check.
-      Response storedResponse = operations.testExistingConnection("metalake1", "catalog1", null);
-      Assertions.assertEquals(Response.Status.OK.getStatusCode(), storedResponse.getStatus());
-      Assertions.assertEquals(0, ((BaseResponse) storedResponse.getEntity()).getCode());
-      verify(dispatcher).testConnection(NameIdentifier.of("metalake1", "catalog1"));
-
-      Response emptyChangesResponse =
-          operations.testExistingConnection(
-              "metalake1", "catalog1", new CatalogUpdatesRequest(Collections.emptyList()));
-      Assertions.assertEquals(Response.Status.OK.getStatusCode(), emptyChangesResponse.getStatus());
-      Assertions.assertEquals(0, ((BaseResponse) emptyChangesResponse.getEntity()).getCode());
-
-      metadataAuthzHelper.verify(() -> MetadataAuthzHelper.checkAccess(any(), any(), any()));
-    }
   }
 
   @Test

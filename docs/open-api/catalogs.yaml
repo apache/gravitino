@@ -229,6 +229,14 @@ paths:
                     message: Catalog my_metalake.my_catalog is not in use
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: >-
+            Forbidden - The caller cannot load the catalog, or tests proposed changes without
+            owning the metalake or the catalog
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

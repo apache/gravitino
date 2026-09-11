@@ -16,6 +16,7 @@
  */
 package org.apache.gravitino.server.web.rest.authorization;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,6 +27,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.junit.jupiter.api.Test;
@@ -138,11 +140,18 @@ public class TestCatalogAuthorizationExpression {
   }
 
   @Test
-  public void testTestExistingConnectionWithChanges() throws OgnlException {
+  public void testTestExistingConnectionWithChanges() throws NoSuchMethodException, OgnlException {
+    Method method =
+        CatalogOperations.class.getMethod(
+            "testExistingConnection", String.class, String.class, CatalogUpdatesRequest.class);
+    AuthorizationExpression authorizationExpressionAnnotation =
+        method.getAnnotation(AuthorizationExpression.class);
+    assertEquals(
+        ExpressionCondition.HAS_PROPOSED_CHANGES,
+        authorizationExpressionAnnotation.secondaryExpressionCondition());
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants
-                .TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION);
+            authorizationExpressionAnnotation.secondaryExpression());
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));

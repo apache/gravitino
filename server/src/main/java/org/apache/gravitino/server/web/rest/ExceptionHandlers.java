@@ -179,8 +179,7 @@ public class ExceptionHandlers {
    * Handles an existing catalog connection test failure without exposing its stack trace.
    *
    * @param e the connection test failure
-   * @return an HTTP 200 response containing the application error, or an HTTP 403 response if the
-   *     caller is not authorized to run the test
+   * @return an HTTP 200 response containing the application error
    */
   public static Response handleExistingCatalogTestConnectionException(Exception e) {
     return handleTestConnectionException(e, false);
@@ -227,10 +226,6 @@ public class ExceptionHandlers {
 
     } else if (e instanceof NotInUseException) {
       response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
-
-    } else if (e instanceof ForbiddenException) {
-      // An authorization denial is not a connection test result, so it keeps its HTTP 403 status.
-      return Utils.forbidden(e.getMessage(), throwable);
 
     } else {
       return Utils.internalError(e.getMessage(), throwable);
