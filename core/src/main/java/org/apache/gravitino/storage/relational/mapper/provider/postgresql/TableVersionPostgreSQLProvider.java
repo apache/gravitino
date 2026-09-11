@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TableVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
@@ -64,6 +67,23 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + " SET deleted_at = round(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ")) AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override
