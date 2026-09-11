@@ -215,6 +215,14 @@ Access the service at `http://localhost:9101`.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
+## Out-of-memory Detection
+
+The Lance REST service records observed `OutOfMemoryError`s. When embedded in the
+Gravitino server with the default auxiliary classloader, it shares the JVM health
+marker, so an observed OOM makes the Gravitino and Iceberg REST health endpoints
+return HTTP 503 until restart. Lance REST does not expose dedicated health endpoints
+in version 1.3. See [health and readiness](health-and-readiness.md) for detection scope.
+
 ## Usage Guidelines
 
 When using Lance REST service with Gravitino backend, keep the following considerations in mind:

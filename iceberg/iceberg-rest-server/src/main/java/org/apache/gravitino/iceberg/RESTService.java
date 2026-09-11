@@ -61,6 +61,7 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
 import org.glassfish.hk2.api.InterceptionService;
@@ -105,6 +106,7 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
+    config.register(new OutOfMemoryErrorListener());
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);

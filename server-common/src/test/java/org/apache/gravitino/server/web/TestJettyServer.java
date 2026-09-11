@@ -20,16 +20,20 @@ package org.apache.gravitino.server.web;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.IOException;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.rest.RESTUtils;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestJettyServer {
 
@@ -94,5 +98,20 @@ public class TestJettyServer {
   @Test
   public void testStartWithoutInitialise() throws InterruptedException {
     assertThrows(RuntimeException.class, () -> jettyServer.start());
+  }
+  /** Jetty worker failures update health before logging the uncaught error. */
+  @Test
+  public void testUncaughtOutOfMemoryUpdatesHealth() throws IOException {
+    ServerHealth health = new ServerHealth();
+    Config config = new Config(false) {};
+    jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    Thread worker = ((QueuedThreadPool) jettyServer.getThreadPool()).newThread(() -> {});
+    try (MockedStatic<ServerHealth> state = mockStatic(ServerHealth.class)) {
+      state.when(ServerHealth::getInstance).thenReturn(health);
+      worker
+          .getUncaughtExceptionHandler()
+          .uncaughtException(worker, new OutOfMemoryError("Metaspace"));
+      assertTrue(health.hasOutOfMemoryError());
+    }
   }
 }
