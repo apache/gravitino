@@ -85,7 +85,7 @@ public class TestLanceRESTCatalogProvider {
     server.createContext(
         "/lance/v1/namespace/$/list",
         exchange -> {
-          assertTrue(exchange.getRequestURI().getQuery().contains("delimiter=%23"));
+          assertTrue(exchange.getRequestURI().getRawQuery().contains("delimiter=%23"));
           respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
         });
     server.start();
