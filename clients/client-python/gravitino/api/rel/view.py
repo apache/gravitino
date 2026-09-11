@@ -22,6 +22,7 @@ from gravitino.api.auditable import Auditable
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -79,3 +80,8 @@ class View(Auditable):
             SupportsTags: The tag operations supported by the view.
         """
         raise UnsupportedOperationException("View does not support tag operations.")
+
+    def support_secrets(self) -> SupportsSecrets:
+        raise UnsupportedOperationException(
+            "View does not support secret property operations."
+        )

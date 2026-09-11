@@ -21,17 +21,46 @@ package org.apache.gravitino.lance.service.rest;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.function.Supplier;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestLanceHealthOperations {
 
+  /** Verifies the documented status casing with the service's actual JSON mapper. */
+  @Test
+  public void testSerializedHealthStatus() throws Exception {
+    ServerHealth health = new ServerHealth();
+    LanceHealthOperations operations = new LanceHealthOperations(health);
+    ObjectMapper mapper = new JsonNullableMapperProvider().getContext(HealthResponse.class);
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals("up", json.path("status").asText());
+      Assertions.assertEquals("up", json.path("checks").get(0).path("status").asText());
+    }
+    health.recordFailure(new OutOfMemoryError("Metaspace"));
+    try (Response response = operations.live()) {
+      JsonNode json = mapper.readTree(mapper.writeValueAsString(response.getEntity()));
+      Assertions.assertEquals(503, response.getStatus());
+      Assertions.assertEquals("down", json.path("status").asText());
+      Assertions.assertEquals("down", json.path("checks").get(0).path("status").asText());
+      Assertions.assertEquals("jvm", json.path("checks").get(0).path("name").asText());
+    }
+  }
+
   private static LanceHealthOperations operationsWithWrapper(NamespaceWrapper wrapper) {
-    return new LanceHealthOperations() {
+    return new LanceHealthOperations(new ServerHealth()) {
       @Override
       NamespaceWrapper getNamespaceWrapper() {
         return wrapper;
@@ -92,5 +121,84 @@ public class TestLanceHealthOperations {
     boolean hasNamespaceCheck =
         body.getChecks().stream().anyMatch(c -> "namespaceWrapper".equals(c.getName()));
     Assertions.assertTrue(hasNamespaceCheck);
+  }
+
+  /** Verifies mapped direct and wrapped OOM disable all health probes. */
+  @Test
+  public void testMappedOutOfMemoryMakesAllProbesUnhealthy() {
+    for (Throwable failure :
+        new Throwable[] {
+          new OutOfMemoryError("Metaspace"),
+          new IllegalStateException(new OutOfMemoryError("Java heap space"))
+        }) {
+      ServerHealth health = new ServerHealth();
+      LanceHealthOperations ops =
+          new LanceHealthOperations(health) {
+            @Override
+            NamespaceWrapper getNamespaceWrapper() {
+              Assertions.fail("Readiness must skip initialization checks after OOM");
+              return null;
+            }
+          };
+      try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+        shared.when(ServerHealth::getInstance).thenReturn(health);
+        try (Response response = LanceExceptionMapper.toRESTResponse("test", failure)) {
+          Assertions.assertEquals(500, response.getStatus());
+        }
+      }
+      for (Supplier<Response> probe :
+          List.<Supplier<Response>>of(ops::live, ops::ready, ops::health)) {
+        try (Response response = probe.get()) {
+          Assertions.assertEquals(503, response.getStatus());
+          HealthResponse body = (HealthResponse) response.getEntity();
+          Assertions.assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
+          Assertions.assertEquals(1, body.getChecks().size());
+          Assertions.assertEquals("jvm", body.getChecks().get(0).getName());
+          Assertions.assertEquals(
+              "OutOfMemoryError; restart required",
+              body.getChecks().get(0).getDetails().get("reason"));
+        }
+      }
+      Assertions.assertTrue(health.hasOutOfMemoryError());
+    }
+  }
+
+  /** Verifies an ordinary mapped failure leaves liveness healthy. */
+  @Test
+  public void testOrdinaryMappedFailureDoesNotPoisonLiveness() {
+    ServerHealth health = new ServerHealth();
+    Throwable failure = new IllegalStateException("ordinary failure");
+    try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+      shared.when(ServerHealth::getInstance).thenReturn(health);
+      try (Response response = LanceExceptionMapper.toRESTResponse("test", failure)) {
+        Assertions.assertEquals(500, response.getStatus());
+      }
+    }
+    try (Response response = new LanceHealthOperations(health).live()) {
+      Assertions.assertEquals(200, response.getStatus());
+    }
+  }
+
+  /** Verifies OOM recorded during initialization checks overrides their successful result. */
+  @Test
+  public void testOutOfMemoryObservedDuringReadinessOverridesSuccess() {
+    for (boolean aggregate : new boolean[] {false, true}) {
+      ServerHealth health = new ServerHealth();
+      NamespaceWrapper dependency = mock(NamespaceWrapper.class);
+      when(dependency.isInitialized()).thenReturn(true);
+      LanceHealthOperations ops =
+          new LanceHealthOperations(health) {
+            @Override
+            NamespaceWrapper getNamespaceWrapper() {
+              health.recordFailure(new OutOfMemoryError("Metaspace"));
+              return dependency;
+            }
+          };
+      try (Response response = aggregate ? ops.health() : ops.ready()) {
+        Assertions.assertEquals(503, response.getStatus());
+        HealthResponse body = (HealthResponse) response.getEntity();
+        Assertions.assertEquals("jvm", body.getChecks().get(0).getName());
+      }
+    }
   }
 }

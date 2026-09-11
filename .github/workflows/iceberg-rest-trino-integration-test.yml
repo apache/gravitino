@@ -46,55 +46,11 @@ jobs:
   IcebergRestTrinoIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     strategy:
       matrix:
         architecture: [linux/amd64]
         java-version: [ 17 ]
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v4
-
-      # Installs the primary JDK plus JDK 24 and registers JDK 24 with the Gradle
-      # toolchain, which the trino-iceberg-rest module requires.
-      - uses: ./.github/actions/setup-java-toolchains
-        with:
-          java-version: ${{ matrix.java-version }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        run: |
-          ./gradlew compileDistribution -PskipWeb=true -x test
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Install dependencies
-        run: |
-          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-
-      - name: Iceberg REST Trino Integration Test
-        id: integrationTest
-        run: |
-          ./gradlew :iceberg:iceberg-rest-trino-it:test -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v7
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: iceberg-rest-trino-it-reports-${{ matrix.java-version }}
-          path: |
-            build/reports
-            iceberg/iceberg-rest-trino-it/build/reports
-            distribution/package/logs/*.out
-            distribution/package/logs/*.log
+    uses: ./.github/workflows/iceberg-rest-trino-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}

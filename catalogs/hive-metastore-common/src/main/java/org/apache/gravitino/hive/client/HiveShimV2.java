@@ -22,6 +22,7 @@ import static org.apache.gravitino.hive.client.Util.updateConfigurationFromPrope
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import org.apache.gravitino.hive.HivePartition;
@@ -31,9 +32,11 @@ import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 
 class HiveShimV2 extends HiveShim {
 
@@ -148,10 +151,22 @@ class HiveShimV2 extends HiveShim {
 
   @Override
   public void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate) {
     try {
       var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
-      client.alter_table(databaseName, tableName, tb);
+      if (skipStatsUpdate) {
+        // Instruct the metastore not to recompute statistics for this alter, so it does not access
+        // the table's storage location. Hive 2.x has no catalog-aware alter, so the database name
+        // is used directly.
+        client.alter_table_with_environmentContext(
+            databaseName, tableName, tb, doNotUpdateStatsContext());
+      } else {
+        client.alter_table(databaseName, tableName, tb);
+      }
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
@@ -293,5 +308,16 @@ class HiveShimV2 extends HiveShim {
   @Override
   public void close() throws Exception {
     client.close();
+  }
+
+  /**
+   * Builds an {@link EnvironmentContext} that tells the metastore not to recompute table statistics
+   * during an alter, avoiding an access to the table's storage location.
+   *
+   * @return An environment context with {@code DO_NOT_UPDATE_STATS} set to {@code true}.
+   */
+  protected EnvironmentContext doNotUpdateStatsContext() {
+    return new EnvironmentContext(
+        Collections.singletonMap(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE));
   }
 }

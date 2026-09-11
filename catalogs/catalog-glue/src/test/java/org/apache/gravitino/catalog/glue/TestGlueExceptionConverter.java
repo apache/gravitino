@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +31,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
@@ -43,6 +46,43 @@ public class TestGlueExceptionConverter {
           + "glue:CreateDatabase on resource: "
           + "arn:aws:glue:us-east-2:123456789012:database/drop_me3 "
           + "because no identity-based policy allows the glue:CreateDatabase action";
+
+  @Test
+  public void testIsCredentialFailureMatchesChainExhaustedMessage() {
+    SdkClientException e =
+        SdkClientException.create(
+            "Unable to load credentials from any of the providers in the chain "
+                + "AwsCredentialsProviderChain(...)");
+
+    assertTrue(GlueExceptionConverter.isCredentialFailure(e));
+  }
+
+  @Test
+  public void testIsCredentialFailureRejectsUnrelatedMessage() {
+    SdkClientException e = SdkClientException.create("connection refused");
+
+    assertFalse(GlueExceptionConverter.isCredentialFailure(e));
+  }
+
+  @Test
+  public void testIsCredentialFailureRejectsNullMessage() {
+    SdkClientException e = SdkClientException.builder().message(null).build();
+
+    assertFalse(GlueExceptionConverter.isCredentialFailure(e));
+  }
+
+  @Test
+  public void testToCredentialExceptionIncludesContextAndPropertyNames() {
+    SdkClientException cause =
+        SdkClientException.create("Unable to load credentials from any of the providers");
+
+    RuntimeException ex = GlueExceptionConverter.toCredentialException(cause, "table mydb.mytbl");
+
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains("table mydb.mytbl"));
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+  }
 
   @Test
   public void testSchemaAccessDeniedKeepsAwsMessage() {
