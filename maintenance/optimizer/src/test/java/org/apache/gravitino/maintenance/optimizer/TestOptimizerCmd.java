@@ -24,6 +24,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
@@ -157,6 +158,23 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testSubmitStrategyJobsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForSubmitStrategy(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "db.table",
+            "--strategy-name",
+            StrategyProviderForCmdTest.STRATEGY_NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+  }
+
+  @Test
   void testSubmitStrategyJobsDryRunDoesNotSubmit() throws Exception {
     Path confPath = createOptimizerConfForSubmitStrategy();
     String[] output =
@@ -249,6 +267,38 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testListTableMetricsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMetricsProvider(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+  }
+
+  @Test
+  void testListTableMetricsRejectsTwoLevelIdentifierWithoutDefaultCatalog() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(
+        output[1].contains(
+            "configure gravitino.optimizer.gravitinoDefaultCatalog when using schema.table"),
+        "stderr=" + output[1] + ", stdout=" + output[0]);
+  }
+
+  @Test
   void testListTableMetricsWithPartitionPathImplemented() throws Exception {
     Path confPath = createOptimizerConfForMetricsProvider();
     String[] output =
@@ -289,6 +339,22 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testListJobMetricsDoesNotApplyDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMetricsProvider(), "catalog");
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "db.job1",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=db.job1"));
+    Assertions.assertFalse(output[0].contains("identifier=catalog.db.job1"));
+  }
+
+  @Test
   void testMonitorMetricsImplemented() throws Exception {
     Path confPath = createOptimizerConfForMonitor();
     String[] output =
@@ -308,6 +374,25 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=JOB"));
     Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
     Assertions.assertTrue(output[0].contains("identifier=test.db.job2"));
+  }
+
+  @Test
+  void testMonitorMetricsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMonitor(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "monitor-metrics",
+            "--identifiers",
+            "db.table",
+            "--action-time",
+            "100",
+            "--range-seconds",
+            "10",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
   }
 
   @Test
@@ -640,6 +725,15 @@ class TestOptimizerCmd {
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path addDefaultCatalog(Path confPath, String catalogName) throws Exception {
+    Files.writeString(
+        confPath,
+        "gravitino.optimizer.gravitinoDefaultCatalog = " + catalogName + System.lineSeparator(),
+        StandardCharsets.UTF_8,
+        StandardOpenOption.APPEND);
     return confPath;
   }
 
