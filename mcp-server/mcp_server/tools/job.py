@@ -249,3 +249,108 @@ def load_job_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().cancel_job(job_id)
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"job"})
+    async def register_job_template(
+        ctx: Context,
+        job_template: dict,
+    ) -> None:
+        """
+        Register a new job template within the metalake.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            job_template (dict): A dictionary describing the job template. It must
+                include a "jobType" ("shell" or "spark"), a "name", an "executable"
+                and other type-specific fields.
+
+        Example input for a shell job template:
+            {
+              "jobType": "shell",
+              "name": "shell_test",
+              "comment": "a shell job template",
+              "executable": "/path/to/script.sh",
+              "arguments": ["arg1", "arg2"],
+              "environments": {"ENV1": "value1"},
+              "customFields": {},
+              "scripts": []
+            }
+
+        Example input for a spark job template:
+            {
+              "jobType": "spark",
+              "name": "spark_test",
+              "comment": "a spark job template",
+              "executable": "/path/to/app.jar",
+              "arguments": [],
+              "environments": {},
+              "customFields": {},
+              "className": "org.example.Main",
+              "jars": [],
+              "files": [],
+              "archives": [],
+              "configs": {}
+            }
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If the registration fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().register_job_template(
+            job_template
+        )
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"job"})
+    async def delete_job_template(
+        ctx: Context,
+        name: str,
+    ) -> str:
+        """
+        Delete a job template by its name.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            name (str): The name of the job template to delete.
+
+        Returns:
+            str: A JSON string indicating whether the job template was deleted (true/false).
+
+        Raises:
+            Exception: If the deletion fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().delete_job_template(name)
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"job"})
+    async def alter_job_template(
+        ctx: Context,
+        name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing job template by its name.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            name (str): The name of the job template to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "new_template"},
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "updateTemplate", "newTemplate": {...}}
+                ]
+
+        Returns:
+            str: A JSON string containing the altered job template.
+
+        Raises:
+            Exception: If the alteration fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().alter_job_template(name, updates)
