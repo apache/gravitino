@@ -412,6 +412,12 @@ public class BaseIT {
 
       setupJdbcDrivers();
 
+      JettyServerConfig configuredJetty =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      // The readiness check below only asks whether an HTTP server answers, so a Gravitino left
+      // behind by an earlier run would pass it and the suite would run against that process.
+      ITUtils.checkServerPortIsFree(configuredJetty.getHost(), configuredJetty.getHttpPort());
+
       GravitinoITUtils.startGravitinoServer();
 
       JettyServerConfig jettyServerConfig =
