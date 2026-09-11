@@ -60,8 +60,8 @@ gravitino.client.basic.password=YourSecureGravitinoPassword
 | Property                          | Description                                                     | Default value | Required                   |
 |-----------------------------------|-----------------------------------------------------------------|---------------|----------------------------|
 | `gravitino.client.authType`       | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Basic)      |
-| `gravitino.client.basic.username` | Local user store username                                           | (none)        | Yes if authType is `basic` |
-| `gravitino.client.basic.password` | Local user store password                                           | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.username` | Local user store username                                       | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.password` | Local user store password                                       | (none)        | Yes if authType is `basic` |
 
 ### OAuth2 Authentication
 
@@ -154,7 +154,7 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 
 ## Session Credential Forwarding
 
-Setting `gravitino.client.session.forwardUser=true` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user` or service identity. It is supported with `authType=simple` and `authType=oauth2`.
+Setting `gravitino.client.session.forwardUser=true` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user` or service identity. It is supported with `authType=simple` and `authType=oauth2`. For OAuth2 sessions without a forwarded token, the connector reuses the shared service metadata instead.
 
 **Configuration (`authType=simple`):**
 
@@ -184,7 +184,7 @@ gravitino.client.oauth2.scope=gravitino
 gravitino.client.session.forwardUser=true
 ```
 
-With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly instead of the shared client-credentials identity. This requires the Trino coordinator to populate the session's extra-credentials with the caller's access token under the key `token`; the connector reads it from there, and `buildForSession` fails with a clear error if it's missing.
+With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly when the Trino coordinator populates the session's extra-credentials with the caller's access token under the key `token` (or the configured `gravitino.client.session.userTokenCredentialKey`). If that credential is absent, empty, or whitespace-only, the connector reuses the shared service metadata. This allows password-authenticated sessions, including internal catalog-management JDBC sessions, to access Gravitino metadata using the configured service identity and its permissions. Errors encountered while using a supplied token still propagate; they do not trigger this fallback. Downstream catalog authentication, including IRC authentication, is configured separately and is not changed by this metadata fallback.
 
 Whether the coordinator can populate this extra-credential depends on the Trino distribution:
 
@@ -215,11 +215,11 @@ which the connector does not re-route), the connector does not set `iceberg.rest
 
 **Configuration properties:**
 
-| Property                                                     | Description                                                                                    | Default value   | Required   | Since version   |
-|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------|------------|-----------------|
-| `gravitino.client.session.forwardUser`                       | When `true` with `authType=simple` or `authType=oauth2`, forwards the Trino session user/token to Gravitino per-query   | `false`         | No         | 1.3.0           |
-| `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                       | `500`           | No         | 1.3.0           |
-| `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                              | `3600`          | No         | 1.3.0           |
+| Property                                                  | Description                                                                                                                                                                            | Default value | Required | Since version |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.client.session.forwardUser`                    | When `true` with `authType=simple` or `authType=oauth2`, forwards the Trino session user/token to Gravitino per-query; OAuth2 sessions without a token use the shared service metadata | `false`       | No       | 1.3.0         |
+| `gravitino.client.session.cache.maxSize`                  | Maximum number of per-user sessions to keep in the cache                                                                                                                               | `500`         | No       | 1.3.0         |
+| `gravitino.client.session.cache.expireAfterAccessSeconds` | Seconds before an idle per-user session is evicted from the cache                                                                                                                      | `3600`        | No       | 1.3.0         |
 
 ### Example: OAuth2 Per-User Token Forwarding
 
@@ -244,8 +244,8 @@ populate the session's extra-credentials with the caller's access token under th
 - **Open-source Trino**: there is currently no equivalent coordinator setting. Track
   [trinodb/trino discussion #24403](https://github.com/trinodb/trino/discussions/24403) and
   [issue #27917](https://github.com/trinodb/trino/issues/27917) for this feature request. Until
-  it lands upstream, this connector's `authType=oauth2` forwardUser path requires a Trino
-  distribution that provides this extra-credential itself.
+  it lands upstream, forwarding OAuth2 user tokens requires a Trino distribution that
+  provides this extra-credential itself. Sessions without it use the shared service metadata.
 
 **2. Gravitino server: enable OAuth2** (in `conf/gravitino.conf`):
 
@@ -273,8 +273,9 @@ gravitino.client.session.forwardUser=true
 ```
 
 The `gravitino.client.oauth2.*` properties configure the shared service identity used for catalog
-discovery; the per-user forwarded token (from step 1) is what each query actually authenticates
-with once `forwardUser=true`.
+discovery and for metadata access by sessions without a forwarded token. With
+`forwardUser=true`, sessions carrying a token from step 1 authenticate metadata requests with
+that token instead.
 
 **4. Create the metalake and catalog.** Create the metalake `my_metalake` first (via the
 Gravitino REST API, SDK, or CLI — see
@@ -304,9 +305,10 @@ call gravitino.system.create_catalog(
 );
 ```
 
-This call itself runs with the connector's own shared service identity, not any forwarded user
-token — `forwardUser` only affects `SELECT`/`SHOW`-style queries against the catalog afterward,
-not catalog registration itself. `create_catalog` both creates the catalog in Gravitino and loads
+The procedure uses the connector's shared service client to create the catalog in Gravitino.
+Catalog registration can also invoke the connector's metadata entry point; an internal
+password-authenticated JDBC session without a forwarded token uses the shared service metadata
+there. `create_catalog` both creates the catalog in Gravitino and loads
 it into Trino as its own top-level catalog — not as a schema nested under a single `gravitino`
 catalog. If the two `trino.bypass.iceberg.rest-catalog.*` properties above are omitted, the REST
 catalog keeps its own default security setting, independent of
