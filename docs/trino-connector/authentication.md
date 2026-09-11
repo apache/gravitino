@@ -60,8 +60,8 @@ gravitino.client.basic.password=YourSecureGravitinoPassword
 | Property                          | Description                                                     | Default value | Required                   |
 |-----------------------------------|-----------------------------------------------------------------|---------------|----------------------------|
 | `gravitino.client.authType`       | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Basic)      |
-| `gravitino.client.basic.username` | Local user store username                                           | (none)        | Yes if authType is `basic` |
-| `gravitino.client.basic.password` | Local user store password                                           | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.username` | Local user store username                                       | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.password` | Local user store password                                       | (none)        | Yes if authType is `basic` |
 
 ### OAuth2 Authentication
 
@@ -215,11 +215,11 @@ which the connector does not re-route), the connector does not set `iceberg.rest
 
 **Configuration properties:**
 
-| Property                                                     | Description                                                                                    | Default value   | Required   | Since version   |
-|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------|------------|-----------------|
-| `gravitino.client.session.forwardUser`                       | When `true` with `authType=simple` or `authType=oauth2`, forwards the Trino session user/token to Gravitino per-query; OAuth2 sessions without a token use the shared service metadata   | `false`         | No         | 1.3.0           |
-| `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                       | `500`           | No         | 1.3.0           |
-| `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                              | `3600`          | No         | 1.3.0           |
+| Property                                                  | Description                                                                                                                                                                            | Default value | Required | Since version |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.client.session.forwardUser`                    | When `true` with `authType=simple` or `authType=oauth2`, forwards the Trino session user/token to Gravitino per-query; OAuth2 sessions without a token use the shared service metadata | `false`       | No       | 1.3.0         |
+| `gravitino.client.session.cache.maxSize`                  | Maximum number of per-user sessions to keep in the cache                                                                                                                               | `500`         | No       | 1.3.0         |
+| `gravitino.client.session.cache.expireAfterAccessSeconds` | Seconds before an idle per-user session is evicted from the cache                                                                                                                      | `3600`        | No       | 1.3.0         |
 
 ### Example: OAuth2 Per-User Token Forwarding
 
