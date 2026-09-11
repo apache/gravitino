@@ -111,10 +111,18 @@ Four keys are reserved: `iceberg.rest-catalog.uri`, `.warehouse`, `.prefix` and
 `gravitino.iceberg.rest-catalog.` or a catalog's `trino.bypass.` has no effect — the connector logs
 when it ignores one.
 
-When `gravitino.client.session.forwardUser=true`, the connector also sets
-`iceberg.rest-catalog.session=USER` so that each query carries the end user's identity to the IRC,
-keeping per-user credential vending and per-user authorization intact. Set
-`gravitino.iceberg.rest-catalog.session` explicitly to override it. See
+The connector sets `iceberg.rest-catalog.session=USER` automatically when both hold:
+
+- `gravitino.client.session.forwardUser=true`
+- the IRC authenticates with OAuth2, through any one of:
+  - `gravitino.client.authType=oauth2`
+  - `gravitino.iceberg.rest-catalog.security=OAUTH2`
+  - `trino.bypass.iceberg.rest-catalog.security=OAUTH2`, on a catalog with its own REST backend
+
+Each query then carries the end user's identity to the IRC, keeping per-user credential vending and
+per-user authorization intact. Otherwise the session mode is deliberately left off: the forwarded
+token cannot be exchanged, so it would carry no identity to the IRC. Set
+`gravitino.iceberg.rest-catalog.session` explicitly to override either way. See
 [Authentication](./authentication.md) for the full setup.
 
 ### Limitations

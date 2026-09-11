@@ -22,12 +22,29 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Reports errors on the request path as server errors without deciding process lifetime. */
 public class ErrorExceptionMapper implements ExceptionMapper<Error> {
   private static final Logger LOG = LoggerFactory.getLogger(ErrorExceptionMapper.class);
+
+  private final ServerHealth health;
+
+  /** Creates a mapper using the shared server health state. */
+  public ErrorExceptionMapper() {
+    this(ServerHealth.getInstance());
+  }
+
+  /**
+   * Creates a mapper using the supplied health state.
+   *
+   * @param health the state to update before constructing an error response
+   */
+  public ErrorExceptionMapper(ServerHealth health) {
+    this.health = health;
+  }
 
   /**
    * Returns a server error response retaining the original error type and complete stack trace.
@@ -37,6 +54,7 @@ public class ErrorExceptionMapper implements ExceptionMapper<Error> {
    */
   @Override
   public Response toResponse(Error error) {
+    health.recordFailure(error);
     String message = "Server error while processing request: " + error;
     LOG.error(message, error);
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)

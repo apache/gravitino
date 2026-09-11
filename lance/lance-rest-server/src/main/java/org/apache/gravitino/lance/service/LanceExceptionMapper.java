@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.lance.namespace.errors.ConcurrentModificationException;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
@@ -49,6 +50,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
   public static Response toRESTResponse(String instance, Throwable ex) {
+    ServerHealth.getInstance().recordFailure(ex);
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex

@@ -60,6 +60,7 @@ import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
@@ -188,6 +189,7 @@ public class GravitinoServer extends ResourceConfig {
           }
         });
     register(JsonProcessingExceptionMapper.class);
+    register(new OutOfMemoryErrorListener());
     register(ErrorExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
