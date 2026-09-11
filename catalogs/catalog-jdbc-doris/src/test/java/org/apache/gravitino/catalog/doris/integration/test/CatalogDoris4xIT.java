@@ -31,6 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -97,6 +101,7 @@ public class CatalogDoris4xIT extends BaseIT {
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  private String jdbcUrl;
 
   @BeforeAll
   public void startup() throws IOException {
@@ -127,7 +132,7 @@ public class CatalogDoris4xIT extends BaseIT {
 
   private void createCatalog() {
     DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_4_0);
-    String jdbcUrl =
+    jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
             dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
@@ -181,6 +186,86 @@ public class CatalogDoris4xIT extends BaseIT {
     assertEquals(1, t.index().length);
     assertEquals(Index.IndexType.INVERTED, t.index()[0].type());
     assertEquals("idx_data", t.index()[0].name());
+  }
+
+  @Test
+  void testInvertedIndexPropertiesRoundTrip() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    Map<String, String> requestedProperties = Map.of("parser", "english", "support_phrase", "true");
+
+    NameIdentifier createId = NameIdentifier.of(schemaName, "t_inverted_properties_create");
+    Index[] createIndexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.INVERTED,
+              "idx_create",
+              new String[][] {{colName2}},
+              requestedProperties)
+        };
+    tc.createTable(
+        createId,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        createIndexes);
+
+    Table created = tc.loadTable(createId);
+    Index createdIndex = findIndex(created, "idx_create");
+    assertContainsProperties(createdIndex, requestedProperties);
+
+    NameIdentifier recreateId = NameIdentifier.of(schemaName, "t_inverted_properties_recreate");
+    tc.createTable(
+        recreateId,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        created.index());
+    assertEquals(
+        createdIndex.properties(), findIndex(tc.loadTable(recreateId), "idx_create").properties());
+
+    NameIdentifier alterId = NameIdentifier.of(schemaName, "t_inverted_properties_alter");
+    tc.createTable(
+        alterId,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        Indexes.EMPTY_INDEXES);
+    tc.alterTable(
+        alterId,
+        TableChange.addIndex(
+            Index.IndexType.INVERTED,
+            "idx_alter",
+            new String[][] {{colName2}},
+            requestedProperties));
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertContainsProperties(
+                    findIndex(tc.loadTable(alterId), "idx_alter"), requestedProperties));
+
+    NameIdentifier nativeId = NameIdentifier.of(schemaName, "t_inverted_properties_native");
+    executeSql(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "`%s` BIGINT NOT NULL, "
+                + "`%s` VARCHAR(100), "
+                + "INDEX `idx_native` (`%s`) USING INVERTED "
+                + "PROPERTIES(\"parser\"=\"english\", \"support_phrase\"=\"true\")"
+                + ") DISTRIBUTED BY HASH(`%s`) BUCKETS 1 "
+                + "PROPERTIES(\"replication_num\"=\"1\")",
+            schemaName, nativeId.name(), colName1, colName2, colName2, colName1));
+    assertContainsProperties(findIndex(tc.loadTable(nativeId), "idx_native"), requestedProperties);
   }
 
   @Test
@@ -572,6 +657,27 @@ public class CatalogDoris4xIT extends BaseIT {
                 assertTrue(
                     tc.loadTable(tid).properties().containsKey(LIGHT_SCHEMA_CHANGE),
                     "light_schema_change=true should appear after ALTER TABLE SET"));
+  }
+
+  private void executeSql(String sql) throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+    }
+  }
+
+  private Index findIndex(Table table, String indexName) {
+    return Arrays.stream(table.index())
+        .filter(index -> index.name().equals(indexName))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Index not found: " + indexName));
+  }
+
+  private void assertContainsProperties(Index index, Map<String, String> expectedProperties) {
+    expectedProperties.forEach(
+        (key, value) -> assertEquals(value, index.properties().get(key), "Property: " + key));
   }
 
   private Column findColumn(Table table, String columnName) {
