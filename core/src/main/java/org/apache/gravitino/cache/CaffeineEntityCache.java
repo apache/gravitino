@@ -335,7 +335,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     if (cacheConfig.get(Configs.CACHE_EXPIRATION_TIME) > 0) {
-      builder.expireAfterAccess(
+      // Expire after write, not after access. The TTL is the safety net for a cross-node
+      // invalidation that never arrives (a lost entity_change_log row, a stalled poller). With an
+      // access-based TTL a stale entry that keeps being read would never expire, so a single missed
+      // invalidation would become permanent on exactly the hottest keys. A write-based TTL bounds
+      // that staleness to expireTimeInMs.
+      builder.expireAfterWrite(
           cacheConfig.get(Configs.CACHE_EXPIRATION_TIME), TimeUnit.MILLISECONDS);
     }
 
