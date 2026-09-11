@@ -338,6 +338,13 @@ public class TestDorisTableOperationsSqlGeneration {
         DorisTableOperations.mapDorisIndexType("BLOOMFILTER", "idx_name"));
     Assertions.assertEquals(
         Index.IndexType.VECTOR, DorisTableOperations.mapDorisIndexType("ANN", "idx_name"));
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> DorisTableOperations.mapDorisIndexType("NGRAM_BF", "idx_ngram"));
+    Assertions.assertEquals(
+        "Doris index 'idx_ngram' uses unsupported native index type 'NGRAM_BF'",
+        exception.getMessage());
     // Unknown type should fall back to INVERTED
     Assertions.assertEquals(
         Index.IndexType.INVERTED,
