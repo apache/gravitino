@@ -447,6 +447,9 @@ public class TestIcebergViewAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::SELECT_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
 
     // DENY_SELECT_VIEW blocks
     assertFalse(

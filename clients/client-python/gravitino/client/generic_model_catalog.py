@@ -252,7 +252,7 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
         model_version_info_list_resp.validate()
 
         return [
-            GenericModelVersion(version)
+            GenericModelVersion(version, self.rest_client, model_full_ident)
             for version in model_version_info_list_resp.versions()
         ]
 
@@ -283,7 +283,9 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
         )
         model_version_resp.validate()
 
-        return GenericModelVersion(model_version_resp.model_version())
+        return GenericModelVersion(
+            model_version_resp.model_version(), self.rest_client, model_full_ident
+        )
 
     def get_model_version_by_alias(
         self, model_ident: NameIdentifier, alias: str
@@ -314,7 +316,9 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
         )
         model_version_resp.validate()
 
-        return GenericModelVersion(model_version_resp.model_version())
+        return GenericModelVersion(
+            model_version_resp.model_version(), self.rest_client, model_full_ident
+        )
 
     def alter_model(self, model_ident: NameIdentifier, *changes: ModelChange) -> Model:
         """Alter the schema by applying the changes.
@@ -383,7 +387,9 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
             resp.body, infer_missing=True
         )
         model_version_response.validate()
-        return GenericModelVersion(model_version_response.model_version())
+        return GenericModelVersion(
+            model_version_response.model_version(), self.rest_client, model_full_ident
+        )
 
     def alter_model_version_by_alias(
         self, model_ident: NameIdentifier, alias: str, *changes: ModelVersionChange
@@ -423,7 +429,9 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
             resp.body, infer_missing=True
         )
         model_version_response.validate()
-        return GenericModelVersion(model_version_response.model_version())
+        return GenericModelVersion(
+            model_version_response.model_version(), self.rest_client, model_full_ident
+        )
 
     def link_model_version(
         self,

@@ -17,16 +17,6 @@
 -- under the License.
 --
 
-ALTER TABLE `user_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`,
-    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `external_id`;
-
-ALTER TABLE `group_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`;
-
-CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
-
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
@@ -44,6 +34,37 @@ ALTER TABLE `idp_user_meta`
 
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+
+-- add audit_info as nullable first for MySQL 5.7 compatibility (TEXT cannot have defaults)
+ALTER TABLE `idp_user_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user audit info' AFTER `enabled`;
+
+UPDATE `idp_user_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_user_meta`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user audit info' AFTER `enabled`;
+
+ALTER TABLE `idp_group_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp group audit info' AFTER `group_comment`;
+
+UPDATE `idp_group_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_group_meta`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp group audit info' AFTER `group_comment`;
+
+ALTER TABLE `idp_user_group_rel`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user group relation audit info' AFTER `group_id`;
+
+UPDATE `idp_user_group_rel`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_user_group_rel`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user group relation audit info' AFTER `group_id`;
 
 CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);

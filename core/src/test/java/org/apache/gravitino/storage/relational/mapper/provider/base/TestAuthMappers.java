@@ -444,7 +444,6 @@ public class TestAuthMappers {
             .withUserId(userId)
             .withUserName(userName)
             .withMetalakeId(metalakeId)
-            .withEnabled(true)
             .withAuditInfo(auditInfo.toString())
             .withCurrentVersion(1L)
             .withLastVersion(0L)

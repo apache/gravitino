@@ -185,6 +185,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
+              ( entityType == 'MODEL_VERSION' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s))
               """
             .formatted(
@@ -202,6 +203,7 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+                LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION));
   }
 
@@ -292,6 +294,12 @@ public class AuthorizationExpressionConverter {
             "ANY_USE_MODEL",
             "((ANY(USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)) && "
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_SECRET",
+            "((ANY(USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+                + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE,"
+                + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))");
     expression =
         expression.replaceAll(
             "ANY_LINK_MODEL_VERSION",

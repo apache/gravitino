@@ -350,7 +350,10 @@ public class GravitinoConfig {
    * @return the metalake name for used
    */
   public String getMetalake() {
-    return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
+    // Trimmed so a stray leading/trailing space in the catalog properties file does not make this
+    // value silently stop matching the canonical metalake name the load loop records states
+    // under, e.g. in the catalog_status/load_status system tables' per-metalake filtering.
+    return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue).trim();
   }
 
   /**

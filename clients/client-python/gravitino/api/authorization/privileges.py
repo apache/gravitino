@@ -192,6 +192,12 @@ class Privilege(ABC):
         MODIFY_FUNCTION = (0, 1 << 32)
         """The privilege to alter a function's metadata."""
 
+        VIEW_SECRET_PROVIDERS = (0, 1 << 36)
+        """The privilege to list configured secrets providers."""
+
+        USE_SECRET = (0, 1 << 37)
+        """The privilege to retrieve plaintext secrets and vend credentials."""
+
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1586,6 +1592,58 @@ class ModifyFunction(GenericPrivilege):
         return obj_type in Privileges.FUNCTION_SUPPORTED_TYPES
 
 
+class ViewSecretProviders(GenericPrivilege):
+    """The privilege to list configured secrets providers."""
+
+    _ALLOW_INSTANCE: Optional["ViewSecretProviders"] = None
+    _DENY_INSTANCE: Optional["ViewSecretProviders"] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        if ViewSecretProviders._ALLOW_INSTANCE is None:
+            ViewSecretProviders._ALLOW_INSTANCE = ViewSecretProviders(
+                Privilege.Condition.ALLOW, Privilege.Name.VIEW_SECRET_PROVIDERS
+            )
+        return ViewSecretProviders._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        if ViewSecretProviders._DENY_INSTANCE is None:
+            ViewSecretProviders._DENY_INSTANCE = ViewSecretProviders(
+                Privilege.Condition.DENY, Privilege.Name.VIEW_SECRET_PROVIDERS
+            )
+        return ViewSecretProviders._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type == MetadataObject.Type.METALAKE
+
+
+class UseSecret(GenericPrivilege):
+    """The privilege to retrieve plaintext secrets and vend credentials."""
+
+    _ALLOW_INSTANCE: Optional["UseSecret"] = None
+    _DENY_INSTANCE: Optional["UseSecret"] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        if UseSecret._ALLOW_INSTANCE is None:
+            UseSecret._ALLOW_INSTANCE = UseSecret(
+                Privilege.Condition.ALLOW, Privilege.Name.USE_SECRET
+            )
+        return UseSecret._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        if UseSecret._DENY_INSTANCE is None:
+            UseSecret._DENY_INSTANCE = UseSecret(
+                Privilege.Condition.DENY, Privilege.Name.USE_SECRET
+            )
+        return UseSecret._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.SECRET_SUPPORTED_TYPES
+
+
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
@@ -1612,6 +1670,7 @@ class Privileges:
         Privilege.Name.APPLY_TAG: ApplyTag,
         Privilege.Name.CREATE_POLICY: CreatePolicy,
         Privilege.Name.APPLY_POLICY: ApplyPolicy,
+        Privilege.Name.VIEW_SECRET_PROVIDERS: ViewSecretProviders,
         Privilege.Name.REGISTER_JOB_TEMPLATE: RegisterJobTemplate,
         Privilege.Name.USE_JOB_TEMPLATE: UseJobTemplate,
         Privilege.Name.RUN_JOB: RunJob,
@@ -1620,6 +1679,7 @@ class Privileges:
         Privilege.Name.REGISTER_FUNCTION: RegisterFunction,
         Privilege.Name.EXECUTE_FUNCTION: ExecuteFunction,
         Privilege.Name.MODIFY_FUNCTION: ModifyFunction,
+        Privilege.Name.USE_SECRET: UseSecret,
     }
 
     TABLE_SUPPORTED_TYPES = {
@@ -1657,6 +1717,17 @@ class Privileges:
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,
         MetadataObject.Type.FUNCTION,
+    }
+    SECRET_SUPPORTED_TYPES = {
+        MetadataObject.Type.METALAKE,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+        MetadataObject.Type.VIEW,
+        MetadataObject.Type.TOPIC,
+        MetadataObject.Type.FILESET,
+        MetadataObject.Type.MODEL,
+        MetadataObject.Type.MODEL_VERSION,
     }
     MANAGE_GRANTS_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,

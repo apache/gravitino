@@ -1,0 +1,12 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"1","sam","sam"
+"2","jerry","jerry"
+
+DROP TABLE
+
+DROP SCHEMA

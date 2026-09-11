@@ -46,4 +46,17 @@ public interface LanceMetadataFilter {
   default List<String> filterSchemas(String catalogName, List<String> schemaNames) {
     return schemaNames;
   }
+
+  /**
+   * Filters the tables listed under a schema.
+   *
+   * @param catalogName the catalog holding the schema.
+   * @param schemaName the schema holding the tables.
+   * @param tableNames the table names to filter.
+   * @return the table names the current caller may see.
+   */
+  default List<String> filterTables(
+      String catalogName, String schemaName, List<String> tableNames) {
+    return tableNames;
+  }
 }

@@ -70,7 +70,7 @@ public abstract class TableEvent extends Event {
 
   /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return customInfo;
   }
 }

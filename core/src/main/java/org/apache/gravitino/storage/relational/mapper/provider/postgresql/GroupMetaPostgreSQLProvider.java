@@ -53,14 +53,14 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name, metalake_id, external_id,"
+        + " (group_id, group_name, metalake_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
         + " #{groupMeta.metalakeId},"
-        + " #{groupMeta.externalId},"
+        + ""
         + " #{groupMeta.auditInfo},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
@@ -69,7 +69,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " ON CONFLICT(group_id) DO UPDATE SET"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
-        + " external_id = #{groupMeta.externalId},"
+        + ""
         + " audit_info = #{groupMeta.auditInfo},"
         // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
         + " current_version = "
@@ -85,7 +85,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -116,7 +116,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -155,7 +155,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
     return "<script>"
         + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
-        + " gt.external_id as externalId,"
+        + ""
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"

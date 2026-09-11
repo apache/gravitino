@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -88,6 +89,11 @@ public class MetadataAuthzHelper {
    */
   private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
+
+  private static final Set<Entity.EntityType> METADATA_OBJECT_ENTITY_TYPES =
+      Arrays.stream(MetadataObject.Type.values())
+          .map(type -> Entity.EntityType.valueOf(type.name()))
+          .collect(Collectors.toUnmodifiableSet());
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
@@ -376,6 +382,12 @@ public class MetadataAuthzHelper {
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
     if (enableAuthorization() && nameIdentifiers.length > 0) {
+      if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
+        Arrays.stream(nameIdentifiers)
+            .forEach(
+                identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
+      }
+
       String principalName = PrincipalUtils.getCurrentPrincipal().getName();
       if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
         // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
@@ -551,7 +563,7 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
     if (!GravitinoEnv.getInstance().cacheEnabled()
-        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || GravitinoEnv.getInstance().internalAccessControlDispatcher() == null
         || nameIdentifiers.length == 0) {
       return;
     }
@@ -570,7 +582,7 @@ public class MetadataAuthzHelper {
           "All identifiers must have the same schema");
 
       if (!GravitinoEnv.getInstance()
-          .schemaDispatcher()
+          .internalSchemaDispatcher()
           .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
         return;
       }

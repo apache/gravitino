@@ -33,7 +33,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.model.Model;
@@ -45,11 +48,11 @@ import org.mockito.ArgumentCaptor;
 
 public class TestModelHookDispatcher {
 
-  private ModelHookDispatcher hookDispatcher;
+  private ModelDispatcher hookDispatcher;
   private ModelDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
-  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  private BaseCatalog<?> mockCatalog;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
@@ -60,24 +63,26 @@ public class TestModelHookDispatcher {
     mockDispatcher = mock(ModelDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
-    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
-    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    mockCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Read the catalogManager field directly via reflection because the public accessor
     // Preconditions-checks for non-null, which would fail when GravitinoEnv has not been
     // initialized for this test class.
     savedCatalogManager =
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    hookDispatcher = new ModelHookDispatcher(mockDispatcher);
+    hookDispatcher =
+        new ModelNormalizeDispatcher(new ModelHookDispatcher(mockDispatcher), mockCatalogManager);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
   }
 
@@ -103,7 +108,7 @@ public class TestModelHookDispatcher {
 
   @Test
   public void testRegisterModelSetsOwnerWithNormalizedIdentifier() throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident =
         NameIdentifier.of("test_metalake", "test_catalog", "TEST_SCHEMA", "MY_MODEL");

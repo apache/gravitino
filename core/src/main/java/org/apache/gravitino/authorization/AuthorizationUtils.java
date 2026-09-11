@@ -23,7 +23,9 @@ import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -40,7 +42,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -64,15 +65,7 @@ public class AuthorizationUtils {
   private static final String FILESET_SCHEMA_LOCATION = "location";
   private static final String HIVE_LOCATION = "location";
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
-  static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
-      "User with external id %s does not exist in the metalake %s";
-  static final String USER_WITH_ID_DOES_NOT_EXIST_MSG =
-      "User with id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
-  static final String GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
-      "Group with external id %s does not exist in the metalake %s";
-  static final String GROUP_WITH_ID_DOES_NOT_EXIST_MSG =
-      "Group with id %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   /**
@@ -156,74 +149,6 @@ public class AuthorizationUtils {
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
-  /**
-   * Creates a synthetic {@link NameIdentifier} used only as a {@link
-   * org.apache.gravitino.lock.TreeLockUtils} lock path for user operations keyed by external id.
-   *
-   * @param metalake the metalake name
-   * @param externalId the external id of the user
-   * @return a synthetic name identifier for tree locking only
-   */
-  public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
-    return NameIdentifier.of(
-        metalake,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.USER_EXTERNAL_ID_SCHEMA_NAME,
-        externalId);
-  }
-
-  /**
-   * Creates a synthetic {@link NameIdentifier} used only as a tree-lock path for user operations
-   * keyed by Gravitino-assigned id.
-   *
-   * @param metalake the metalake name
-   * @param userId the Gravitino-assigned user id
-   * @return a synthetic name identifier for tree locking only
-   */
-  public static NameIdentifier ofUserId(String metalake, long userId) {
-    return NameIdentifier.of(
-        metalake,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.USER_ID_SCHEMA_NAME,
-        String.valueOf(userId));
-  }
-
-  /**
-   * Creates a synthetic {@link NameIdentifier} used only as a tree-lock path for group operations
-   * keyed by Gravitino-assigned id.
-   *
-   * @param metalake the metalake name
-   * @param groupId the Gravitino-assigned group id
-   * @return a synthetic name identifier for tree locking only
-   */
-  public static NameIdentifier ofGroupId(String metalake, long groupId) {
-    return NameIdentifier.of(
-        metalake,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.GROUP_ID_SCHEMA_NAME,
-        String.valueOf(groupId));
-  }
-
-  /**
-   * Creates a synthetic {@link NameIdentifier} used only as a {@link
-   * org.apache.gravitino.lock.TreeLockUtils} lock path for group operations keyed by external id.
-   *
-   * <p>This is <strong>not</strong> the entity's storage identifier. Group entities are stored and
-   * retrieved by Gravitino group name via {@link #ofGroup(String, String)}. At lock time the group
-   * name may be unknown, so external-id operations need a dedicated lock path.
-   *
-   * @param metalake the metalake name
-   * @param externalId the external id of the group
-   * @return a synthetic name identifier for tree locking only
-   */
-  public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
-    return NameIdentifier.of(
-        metalake,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME,
-        externalId);
-  }
-
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
@@ -236,72 +161,14 @@ public class AuthorizationUtils {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
   }
 
-  public static Namespace ofUserExternalIdNamespace(String metalake) {
-    return Namespace.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_EXTERNAL_ID_SCHEMA_NAME);
-  }
-
-  public static Namespace ofUserIdNamespace(String metalake) {
-    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_ID_SCHEMA_NAME);
-  }
-
-  public static Namespace ofGroupExternalIdNamespace(String metalake) {
-    return Namespace.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME);
-  }
-
-  public static Namespace ofGroupIdNamespace(String metalake) {
-    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_ID_SCHEMA_NAME);
-  }
-
   public static void checkUser(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "User identifier must not be null");
     checkUserNamespace(ident.namespace());
   }
 
-  /**
-   * Validates that the name identifier refers to a user external id in a metalake.
-   *
-   * @param ident the external id name identifier to validate
-   */
-  public static void checkUserExternalId(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "External id identifier must not be null");
-    checkUserExternalIdNamespace(ident.namespace());
-  }
-
-  /**
-   * Validates that the name identifier refers to a user id in a metalake.
-   *
-   * @param ident the user id name identifier to validate
-   */
-  public static void checkUserId(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "User id identifier must not be null");
-    checkUserIdNamespace(ident.namespace());
-  }
-
   public static void checkGroup(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Group identifier must not be null");
     checkGroupNamespace(ident.namespace());
-  }
-
-  /**
-   * Validates that the name identifier refers to a group external id in a metalake.
-   *
-   * @param ident the external id name identifier to validate
-   */
-  public static void checkGroupExternalId(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "External id identifier must not be null");
-    checkGroupExternalIdNamespace(ident.namespace());
-  }
-
-  /**
-   * Validates that the name identifier refers to a group id in a metalake.
-   *
-   * @param ident the group id name identifier to validate
-   */
-  public static void checkGroupId(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "Group id identifier must not be null");
-    checkGroupIdNamespace(ident.namespace());
   }
 
   public static void checkRole(NameIdentifier ident) {
@@ -313,34 +180,6 @@ public class AuthorizationUtils {
     Namespace.check(
         namespace != null && namespace.length() == 3,
         "User namespace must have 3 levels, the input namespace is %s",
-        namespace);
-  }
-
-  public static void checkUserExternalIdNamespace(Namespace namespace) {
-    Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "User external id namespace must have 3 levels, the input namespace is %s",
-        namespace);
-  }
-
-  public static void checkUserIdNamespace(Namespace namespace) {
-    Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "User id namespace must have 3 levels, the input namespace is %s",
-        namespace);
-  }
-
-  public static void checkGroupExternalIdNamespace(Namespace namespace) {
-    Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "Group external id namespace must have 3 levels, the input namespace is %s",
-        namespace);
-  }
-
-  public static void checkGroupIdNamespace(Namespace namespace) {
-    Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "Group id namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 
@@ -370,20 +209,16 @@ public class AuthorizationUtils {
     for (SecurableObject securableObject : securableObjects) {
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
         NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-        // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
-        // call authorization plugin method.
         for (NameIdentifier catalog : catalogs) {
-          callAuthorizationPluginImpl(consumer, catalogManager.loadCatalog(catalog));
+          callAuthorizationPluginImpl(consumer, catalogManager, catalog);
         }
 
       } else if (needApplyAuthorization(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
-        Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-        if (!catalogsAlreadySet.contains(catalog.name())) {
-          catalogsAlreadySet.add(catalog.name());
-          callAuthorizationPluginImpl(consumer, catalog);
+        if (catalogsAlreadySet.add(catalogIdent.name())) {
+          callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
         }
       }
     }
@@ -391,9 +226,11 @@ public class AuthorizationUtils {
 
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
-    List<Catalog> loadedCatalogs = loadMetadataObjectCatalog(metalake, metadataObject);
-    for (Catalog catalog : loadedCatalogs) {
-      callAuthorizationPluginImpl(consumer, catalog);
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    List<NameIdentifier> catalogIdents =
+        getMetadataObjectCatalogs(catalogManager, metalake, metadataObject);
+    for (NameIdentifier catalogIdent : catalogIdents) {
+      callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
     }
   }
 
@@ -492,7 +329,8 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, List<String> locations) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
+      notifyEntityNameIdMappingChange(ident, type);
       MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       String metalake =
           type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
@@ -507,18 +345,22 @@ public class AuthorizationUtils {
     }
   }
 
-  public static void removeCatalogPrivileges(Catalog catalog, List<String> locations) {
-    // If we enable authorization, we should remove the privileges about the entity in the
-    // authorization plugin.
-    MetadataObject metadataObject =
-        MetadataObjects.of(null, catalog.name(), MetadataObject.Type.CATALOG);
-    MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject, locations);
-
+  /**
+   * Removes catalog privileges using the live catalog's name while its operation lease is held.
+   *
+   * @param catalogIdent the identifier used to load the catalog
+   * @param locations the catalog storage locations
+   */
+  public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
     callAuthorizationPluginImpl(
-        authorizationPlugin -> {
-          authorizationPlugin.onMetadataUpdated(removeObject);
+        (authorizationPlugin, catalogName) -> {
+          MetadataObject metadataObject =
+              MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+          authorizationPlugin.onMetadataUpdated(
+              MetadataObjectChange.remove(metadataObject, locations));
         },
-        catalog);
+        GravitinoEnv.getInstance().catalogManager(),
+        catalogIdent);
   }
 
   public static void authorizationPluginRenamePrivileges(
@@ -530,7 +372,7 @@ public class AuthorizationUtils {
       NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObject newMetadataObject =
@@ -552,8 +394,16 @@ public class AuthorizationUtils {
     }
   }
 
-  private static void notifyEntityNameIdMappingChange(
-      NameIdentifier ident, Entity.EntityType type) {
+  /**
+   * Notifies the built-in authorizer that an entity name may now resolve to a different ID.
+   *
+   * <p>This does not push a metadata change to the catalog authorization plugin. Use it when only
+   * Gravitino's local authorization caches support the entity type.
+   *
+   * @param ident the entity identifier whose mapping changed
+   * @param type the entity type
+   */
+  public static void notifyEntityNameIdMappingChange(NameIdentifier ident, Entity.EntityType type) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer == null) {
       return;
@@ -603,35 +453,28 @@ public class AuthorizationUtils {
   }
 
   private static void callAuthorizationPluginImpl(
-      BiConsumer<AuthorizationPlugin, String> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin(), catalog.name());
-      }
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
-              catalog.type()));
-    }
+      BiConsumer<AuthorizationPlugin, String> consumer,
+      CatalogManager catalogManager,
+      NameIdentifier catalogIdent) {
+    catalogManager.doWithCatalog(
+        catalogIdent,
+        catalog -> {
+          AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+          if (authorizationPlugin != null) {
+            consumer.accept(authorizationPlugin, catalog.name());
+          }
+          return null;
+        });
   }
 
   private static void callAuthorizationPluginImpl(
-      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin());
-      }
-    } else {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s is not a BaseCatalog, we don't support authorization plugin for it",
-              catalog.type()));
-    }
+      Consumer<AuthorizationPlugin> consumer,
+      CatalogManager catalogManager,
+      NameIdentifier catalogIdent) {
+    callAuthorizationPluginImpl(
+        (authorizationPlugin, catalogName) -> consumer.accept(authorizationPlugin),
+        catalogManager,
+        catalogIdent);
   }
 
   private static void checkCatalogType(
@@ -645,26 +488,19 @@ public class AuthorizationUtils {
     }
   }
 
-  private static List<Catalog> loadMetadataObjectCatalog(
-      String metalake, MetadataObject metadataObject) {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    List<Catalog> loadedCatalogs = Lists.newArrayList();
+  private static List<NameIdentifier> getMetadataObjectCatalogs(
+      CatalogManager catalogManager, String metalake, MetadataObject metadataObject) {
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
-      NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-      // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
-      // call authorization plugin method.
-      for (NameIdentifier catalog : catalogs) {
-        loadedCatalogs.add(catalogManager.loadCatalog(catalog));
-      }
-    } else if (needApplyAuthorization(metadataObject.type())) {
-      NameIdentifier catalogIdent =
-          NameIdentifierUtil.getCatalogIdentifier(
-              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-      loadedCatalogs.add(catalog);
+      return Arrays.asList(catalogManager.listCatalogs(Namespace.of(metalake)));
     }
 
-    return loadedCatalogs;
+    if (needApplyAuthorization(metadataObject.type())) {
+      return Collections.singletonList(
+          NameIdentifierUtil.getCatalogIdentifier(
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject)));
+    }
+
+    return Collections.emptyList();
   }
 
   // The Hive default schema location is Hive warehouse directory
@@ -690,7 +526,7 @@ public class AuthorizationUtils {
     List<String> locations = new ArrayList<>();
 
     // If we don't enable authorization, the location should return empty collection.
-    if (GravitinoEnv.getInstance().accessControlDispatcher() == null) {
+    if (GravitinoEnv.getInstance().internalAccessControlDispatcher() == null) {
       return locations;
     }
 

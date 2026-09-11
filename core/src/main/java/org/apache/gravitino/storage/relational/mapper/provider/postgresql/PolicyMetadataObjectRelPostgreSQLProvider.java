@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjec
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -30,6 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetadataObjectRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
@@ -39,18 +41,12 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
   private static final String DELETED_AT_NOW_EXPRESSION = " " + DatabaseTimeSQL.POSTGRESQL;
 
   @Override
-  public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      String metalakeName, String policyName) {
+  public String softDeletePolicyMetadataObjectRelsByPolicyId(Long policyId) {
     return "UPDATE "
         + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at ="
+        + " SET deleted_at ="
         + DELETED_AT_NOW_EXPRESSION
-        + " WHERE te.policy_id IN (SELECT tm.policy_id FROM "
-        + PolicyMetaMapper.POLICY_META_TABLE_NAME
-        + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.policy_name = #{policyName} AND tm.deleted_at = 0) AND te.deleted_at = 0";
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
   @Override
@@ -103,9 +99,16 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + " LEFT JOIN "
         + ModelMetaMapper.TABLE_NAME
         + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
+        + " LEFT JOIN "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt ON pe_alias.metadata_object_id = vt.view_id AND pe_alias.metadata_object_type = 'VIEW'"
+        + " LEFT JOIN "
+        + FunctionMetaMapper.TABLE_NAME
+        + " ft2 ON pe_alias.metadata_object_id = ft2.function_id AND pe_alias.metadata_object_type = 'FUNCTION'"
         + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
         + "   ct.catalog_id = #{catalogId} OR st.catalog_id = #{catalogId} OR tt.catalog_id = #{catalogId}"
         + "   OR tat.catalog_id = #{catalogId} OR ft.catalog_id = #{catalogId} OR mt.catalog_id = #{catalogId}"
+        + "   OR vt.catalog_id = #{catalogId} OR ft2.catalog_id = #{catalogId}"
         + " )";
   }
 
@@ -135,6 +138,12 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + " LEFT JOIN "
         + ModelMetaMapper.TABLE_NAME
         + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
+        + " LEFT JOIN "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt ON pe_alias.metadata_object_id = vt.view_id AND pe_alias.metadata_object_type = 'VIEW'"
+        + " LEFT JOIN "
+        + FunctionMetaMapper.TABLE_NAME
+        + " ft2 ON pe_alias.metadata_object_id = ft2.function_id AND pe_alias.metadata_object_type = 'FUNCTION'"
         + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
         + "   st.schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
@@ -153,6 +162,14 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + "#{schemaId}"
         + "</foreach>"
         + "   OR mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR ft2.schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
