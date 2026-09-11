@@ -45,6 +45,33 @@ The connector provides read access and write access to data and metadata stored 
 - [DROP SCHEMA](https://trino.io/docs/current/sql/drop-schema.html)
 - [COMMENT](https://trino.io/docs/current/sql/comment.html)
 
+### View Management
+
+- [CREATE VIEW](https://trino.io/docs/current/sql/create-view.html)
+- [CREATE OR REPLACE VIEW](https://trino.io/docs/current/sql/create-view.html)
+- [SHOW CREATE VIEW](https://trino.io/docs/current/sql/show-create-view.html)
+- [DROP VIEW](https://trino.io/docs/current/sql/drop-view.html)
+- [ALTER VIEW ... RENAME TO](https://trino.io/docs/current/sql/alter-view.html)
+
+View management is only supported for catalogs backed by Hive or Iceberg; other catalogs
+(e.g. Glue, JDBC, Memory) do not support view operations. A view stored by Gravitino may carry SQL
+representations for multiple engines (Hive, Spark, Flink, Trino); the Trino connector only reads and
+writes the Trino dialect representation. A view that has no Trino SQL representation is silently
+invisible to Trino (it does not appear in `SHOW TABLES`/`information_schema` and cannot be loaded),
+rather than causing an error. View owner is not supported; views are always shown with `SECURITY
+INVOKER` (Gravitino does not track an owner, so `SECURITY DEFINER` cannot be represented).
+
+Some catalogs (e.g. Iceberg) can store a view with a default schema but no default catalog. In
+single-metalake mode this is resolved against the current Trino catalog. In multi-metalake mode it
+cannot be resolved reliably, so loading such a view fails with an error instead of silently
+resolving to a possibly incorrect catalog.
+
+For Hive-backed catalogs, Trino dialect views are stored using Trino's own native "Presto View"
+Hive Metastore format, so views are interoperable with a native Trino (or Presto) Hive connector
+pointed at the same Hive Metastore: a view created directly through a native Trino Hive connector
+is visible and queryable through Gravitino, and a view created through Gravitino is visible and
+queryable through a native Trino Hive connector.
+
 ### Transactions
 
 - [START TRANSACTION](https://trino.io/docs/current/sql/start-transaction.html)

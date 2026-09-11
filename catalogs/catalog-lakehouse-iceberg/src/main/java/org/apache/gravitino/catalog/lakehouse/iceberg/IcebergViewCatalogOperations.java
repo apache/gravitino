@@ -231,6 +231,11 @@ class IcebergViewCatalogOperations {
           NameIdentifier.of(ArrayUtils.add(ident.namespace().levels(), rename.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
       throw new NoSuchViewException(e, "Iceberg view %s does not exist", ident);
+    } catch (AlreadyExistsException e) {
+      throw new ViewAlreadyExistsException(
+          e,
+          "View %s already exists in Iceberg catalog",
+          NameIdentifier.of(ident.namespace(), rename.getNewName()));
     }
   }
 
