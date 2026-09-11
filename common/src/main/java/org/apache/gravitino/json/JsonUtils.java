@@ -857,51 +857,58 @@ public class JsonUtils {
       return primitiveType;
     }
 
-    Matcher fixed = FIXED.matcher(lowerTypeString);
-    if (fixed.matches()) {
-      return Types.FixedType.of(Integer.parseInt(fixed.group(1)));
-    }
+    try {
+      Matcher fixed = FIXED.matcher(lowerTypeString);
+      if (fixed.matches()) {
+        return Types.FixedType.of(Integer.parseInt(fixed.group(1)));
+      }
 
-    Matcher fixedChar = FIXEDCHAR.matcher(lowerTypeString);
-    if (fixedChar.matches()) {
-      return Types.FixedCharType.of(Integer.parseInt(fixedChar.group(1)));
-    }
+      Matcher fixedChar = FIXEDCHAR.matcher(lowerTypeString);
+      if (fixedChar.matches()) {
+        return Types.FixedCharType.of(Integer.parseInt(fixedChar.group(1)));
+      }
 
-    Matcher varchar = VARCHAR.matcher(lowerTypeString);
-    if (varchar.matches()) {
-      return Types.VarCharType.of(Integer.parseInt(varchar.group(1)));
-    }
+      Matcher varchar = VARCHAR.matcher(lowerTypeString);
+      if (varchar.matches()) {
+        return Types.VarCharType.of(Integer.parseInt(varchar.group(1)));
+      }
 
-    Matcher decimal = DECIMAL.matcher(lowerTypeString);
-    if (decimal.matches()) {
-      return Types.DecimalType.of(
-          Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
-    }
+      Matcher decimal = DECIMAL.matcher(lowerTypeString);
+      if (decimal.matches()) {
+        return Types.DecimalType.of(
+            Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
+      }
 
-    // Match against the original string, not the lowercased one, so the CRS keeps its case.
-    Matcher geometry = GEOMETRY.matcher(orignalTypeString);
-    if (geometry.matches()) {
-      return Types.GeometryType.of(geometry.group(1));
-    }
+      // Match against the original string, not the lowercased one, so the CRS keeps its case.
+      Matcher geometry = GEOMETRY.matcher(orignalTypeString);
+      if (geometry.matches()) {
+        return Types.GeometryType.of(geometry.group(1));
+      }
 
-    Matcher geography = GEOGRAPHY.matcher(orignalTypeString);
-    if (geography.matches()) {
-      return Types.GeographyType.of(geography.group(1), geography.group(2));
-    }
+      Matcher geography = GEOGRAPHY.matcher(orignalTypeString);
+      if (geography.matches()) {
+        return Types.GeographyType.of(geography.group(1), geography.group(2));
+      }
 
-    Matcher time = TIME.matcher(lowerTypeString);
-    if (time.matches()) {
-      return Types.TimeType.of(Integer.parseInt(time.group(1)));
-    }
+      Matcher time = TIME.matcher(lowerTypeString);
+      if (time.matches()) {
+        return Types.TimeType.of(Integer.parseInt(time.group(1)));
+      }
 
-    Matcher timestampTz = TIMESTAMP_TZ.matcher(lowerTypeString);
-    if (timestampTz.matches()) {
-      return Types.TimestampType.withTimeZone(Integer.parseInt(timestampTz.group(1)));
-    }
+      Matcher timestampTz = TIMESTAMP_TZ.matcher(lowerTypeString);
+      if (timestampTz.matches()) {
+        return Types.TimestampType.withTimeZone(Integer.parseInt(timestampTz.group(1)));
+      }
 
-    Matcher timestamp = TIMESTAMP.matcher(lowerTypeString);
-    if (timestamp.matches()) {
-      return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
+      Matcher timestamp = TIMESTAMP.matcher(lowerTypeString);
+      if (timestamp.matches()) {
+        return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
+      }
+    } catch (NumberFormatException e) {
+      // A parametric size/precision whose digits overflow int is not a supported type;
+      // fall through to UnparsedType instead of throwing, matching how other
+      // unrecognized type strings are handled below.
+      return Types.UnparsedType.of(orignalTypeString);
     }
 
     return Types.UnparsedType.of(orignalTypeString);

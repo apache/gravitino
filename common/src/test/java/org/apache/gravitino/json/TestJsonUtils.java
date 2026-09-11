@@ -643,6 +643,28 @@ public class TestJsonUtils {
     Assertions.assertNull(e.getCause());
   }
 
+  @Test
+  public void testDeserializeParametricTypeWithOverflowingSize() throws JsonProcessingException {
+    // Regression: a parametric size/precision whose digits overflow int used to raise an
+    // uncaught NumberFormatException from Integer.parseInt in fromPrimitiveTypeString,
+    // aborting deserialization. It should fall back to UnparsedType like any other
+    // unrecognized type string.
+    String[] typeStrings = {
+      "fixed(2147483648)",
+      "char(9999999999)",
+      "varchar(9999999999)",
+      "decimal(9999999999,0)",
+      "time(9999999999)",
+      "timestamp(9999999999)",
+      "timestamp_tz(9999999999)",
+    };
+    for (String typeString : typeStrings) {
+      String json = objectMapper.writeValueAsString(typeString);
+      Type type = objectMapper.readValue(json, Type.class);
+      assertEquals(Types.UnparsedType.of(typeString), type);
+    }
+  }
+
   private static void assertRejected(String json, String expectedMessagePart) {
     IllegalArgumentException e =
         Assertions.assertThrows(
