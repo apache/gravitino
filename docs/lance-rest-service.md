@@ -303,6 +303,8 @@ The auxiliary fallback applies only after authentication accepts an anonymous re
 not recover a rejected authentication attempt. Authenticated callers keep their own privileges,
 active roles, ownership and audit identity; they do not inherit the service user's privileges.
 The fallback service user itself needs the privileges required by the requested operation.
+Setting `gravitino.lance-rest.gravitino-simple.user-name` explicitly is optional in auxiliary mode;
+configure it only to override the default anonymous fallback identity, `lance-rest-server`.
 
 With `simple` authentication, a Basic header supplies a user name without validating a password,
 and a request without credentials is accepted as anonymous. Some malformed Basic credentials
@@ -326,7 +328,6 @@ gravitino.authorization.enable = true
 gravitino.authorization.serviceAdmins = adminUser
 # Development example: simple accepts the supplied user name without password validation.
 gravitino.authenticators = simple
-gravitino.lance-rest.gravitino-simple.user-name = lance-rest-server
 ```
 
 Create the metalake, add users, and grant roles through the Gravitino API as described in
