@@ -1,0 +1,118 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Run the complete CI entry point from branch pushes in the contributor's repository.
+name: Fork CI
+
+on:
+  push:
+    branches: ['**']
+
+concurrency:
+  group: fork-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  backend:
+    uses: ./.github/workflows/backend-integration-test.yml
+
+  spark:
+    uses: ./.github/workflows/spark-integration-test.yml
+
+  flink:
+    uses: ./.github/workflows/flink-integration-test.yml
+
+  trino:
+    uses: ./.github/workflows/trino-integration-test.yml
+
+  iceberg_rest_trino:
+    uses: ./.github/workflows/iceberg-rest-trino-integration-test.yml
+
+  python:
+    uses: ./.github/workflows/python-integration-test.yml
+
+  frontend:
+    uses: ./.github/workflows/frontend-integration-test.yml
+
+  access_control:
+    uses: ./.github/workflows/access-control-integration-test.yml
+
+  idp_basic:
+    uses: ./.github/workflows/idp-basic-test.yml
+
+  mcp:
+    uses: ./.github/workflows/mcp-integration-test.yml
+
+  maintenance:
+    uses: ./.github/workflows/maintenance-integration-test.yml
+
+  web_ui:
+    uses: ./.github/workflows/web-ui-tests.yml
+
+  charts:
+    uses: ./.github/workflows/chart-test.yaml
+
+  contrib_catalog:
+    uses: ./.github/workflows/contrib-catalog-test.yml
+
+  asf_allowlist:
+    uses: ./.github/workflows/asf-allowlist-check.yml
+
+  required_ci:
+    name: Required CI
+    if: always()
+    needs:
+      - build
+      - backend
+      - spark
+      - flink
+      - trino
+      - iceberg_rest_trino
+      - python
+      - frontend
+      - access_control
+      - idp_basic
+      - mcp
+      - maintenance
+      - web_ui
+      - charts
+      - contrib_catalog
+      - asf_allowlist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required CI suites
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "Required CI suite results:"
+          jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "${RESULTS}"
+          failures="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success" and .value.result != "skipped")
+              | "\(.key)=\(.value.result)"
+            ' <<< "${RESULTS}"
+          )"
+          if [ -n "${failures}" ]; then
+            echo "::error::One or more required CI suites did not succeed."
+            echo "${failures}"
+            exit 1
+          fi

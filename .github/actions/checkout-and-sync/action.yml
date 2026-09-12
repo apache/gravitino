@@ -1,0 +1,111 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Checkout and sync
+description: Check out the upstream base branch and merge the contributor branch for fork CI.
+
+outputs:
+  base-ref:
+    description: Upstream branch used as the comparison base.
+    value: ${{ steps.base.outputs.base_ref }}
+  base-sha:
+    description: Upstream commit checked out before merging contributor changes.
+    value: ${{ steps.upstream.outputs.base_sha }}
+  head-sha:
+    description: Commit tested after contributor changes are merged.
+    value: ${{ steps.head.outputs.head_sha }}
+  synced:
+    description: Whether contributor changes were merged onto the upstream base.
+    value: ${{ steps.base.outputs.should_sync }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve pull request base branch
+      id: base
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HEAD_OWNER: ${{ github.repository_owner }}
+        HEAD_BRANCH: ${{ github.ref_name }}
+        HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        if [[ "${GITHUB_REPOSITORY}" == "apache/gravitino" && \
+          ("${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/heads/branch-*) ]]; then
+          echo "base_ref=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        response="$(curl --fail-with-body --silent --show-error \
+          --header "Accept: application/vnd.github+json" \
+          --header "Authorization: Bearer ${GH_TOKEN}" \
+          --header "X-GitHub-Api-Version: 2022-11-28" \
+          --get \
+          --data-urlencode "state=open" \
+          --data-urlencode "head=${HEAD_OWNER}:${HEAD_BRANCH}" \
+          --data-urlencode "per_page=10" \
+          "https://api.github.com/repos/apache/gravitino/pulls")"
+
+        base_ref="$(jq -r \
+          --arg head_sha "${HEAD_SHA}" \
+          '[.[] | select(.head.sha == $head_sha) | .base.ref]
+           | if length == 1 then .[0] else "main" end' \
+          <<< "${response}")"
+
+        echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+        echo "should_sync=true" >> "${GITHUB_OUTPUT}"
+
+    - name: Checkout upstream base branch
+      if: steps.base.outputs.should_sync == 'true'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        repository: apache/gravitino
+        ref: ${{ steps.base.outputs.base_ref }}
+
+    - name: Resolve upstream base commit
+      id: upstream
+      shell: bash
+      run: echo "base_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+    - name: Merge contributor branch
+      if: steps.base.outputs.should_sync == 'true'
+      shell: bash
+      env:
+        HEAD_REPOSITORY: ${{ github.repository }}
+        HEAD_BRANCH: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+
+        git fetch "https://github.com/${HEAD_REPOSITORY}.git" \
+          "+refs/heads/${HEAD_BRANCH}:refs/remotes/contributor/${HEAD_BRANCH}"
+        git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          merge --no-commit --no-ff "refs/remotes/contributor/${HEAD_BRANCH}"
+        git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          commit --allow-empty -m 'Merge contributor branch for CI'
+
+    - name: Resolve tested commit
+      id: head
+      shell: bash
+      run: echo "head_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
