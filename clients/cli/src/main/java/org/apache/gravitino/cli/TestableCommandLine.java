@@ -62,6 +62,7 @@ import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListEntityTags;
 import org.apache.gravitino.cli.commands.ListFilesetProperties;
 import org.apache.gravitino.cli.commands.ListFilesets;
+import org.apache.gravitino.cli.commands.ListFunctions;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
@@ -2229,5 +2230,17 @@ public class TestableCommandLine {
   protected ListTables newListTables(
       CommandContext context, String metalake, String catalog, String schema) {
     return new ListTables(context, metalake, catalog, schema);
+  }
+
+  /**
+   * Get a new instance of the command to list the functions in a schema.
+   *
+   * @param context The Command context.
+   * @param metalake The name of the metalake instance.
+   * @param name The full name of the entity.
+   * @return The instance of the command.
+   */
+  protected ListFunctions newListFunctions(CommandContext context, String metalake, FullName name) {
+    return new ListFunctions(context, metalake, name);
   }
 }

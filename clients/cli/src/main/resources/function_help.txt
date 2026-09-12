@@ -1,0 +1,8 @@
+gcli function [list]
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
+Example commands
+
+List functions
+gcli function list --name catalog.schema
