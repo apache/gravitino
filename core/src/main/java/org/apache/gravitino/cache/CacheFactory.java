@@ -29,7 +29,9 @@ public final class CacheFactory {
   // Register EntityCache's short name to its full qualified class name in the map. So that user
   // doesn't need to specify the full qualified class name when creating an EntityCache instance.
   public static final ImmutableMap<String, String> ENTITY_CACHES =
-      ImmutableMap.of("caffeine", CaffeineEntityCache.class.getCanonicalName());
+      ImmutableMap.of(
+          "caffeine", CaffeineEntityCache.class.getCanonicalName(),
+          "redis", RedisEntityCache.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
   private CacheFactory() {}

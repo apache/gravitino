@@ -300,6 +300,40 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.enableStats`    | Whether to log hit count, miss count, and load failures every five minutes at INFO. | `false`            |
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
+##### Shared cache with Redis
+
+By default each server keeps its own Caffeine cache, so a write on one server does not clear the
+copies held by the others until the change log reaches them. Setting
+`gravitino.cache.implementation` to `redis` keeps one copy of every cached entity in Redis instead,
+shared by every server: a write on any server clears the shared copy once, and every other server
+observes the change immediately. Reads then cost a network round trip, so keep the default on a
+single server.
+
+The Redis cache is a shared cache, not a strongly consistent pair with the metadata database. The
+cache is only touched after the database has committed, and an invalidation deletes the entry
+rather than updating it, so a Redis failure degrades to a cache miss and never to a stale hit. The
+one remaining window is a server that dies between its database commit and the invalidation that
+follows it; the entry then stays readable until `gravitino.cache.expireTimeInMs` passes. Operations
+that cannot tolerate that must read the database directly.
+
+| Configuration Item                  | Description                                                                                                                                                                                     | Default Value                          |
+|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| `gravitino.cache.redis.address`     | Comma-separated `host:port` list. Required when the implementation is `redis`. A standalone Redis takes exactly one address; a Redis Cluster takes one or more seed nodes and `cluster = true`. | (none)                                 |
+| `gravitino.cache.redis.cluster`     | Whether the address points at a Redis Cluster.                                                                                                                                                  | `false`                                |
+| `gravitino.cache.redis.namespace`   | Prefix of every key the cache writes, so several Gravitino clusters can share one Redis. Must not contain `{` or `}`.                                                                          | `gravitino`                            |
+| `gravitino.cache.redis.fenceTtlMs`  | Lifetime of the version fence kept for an invalidated key. Must exceed `gravitino.cache.expireTimeInMs`; `0` means twice that value.                                                             | `0`                                    |
+| `gravitino.cache.redis.serializer`  | Serialization format for cached entities. Only `kryo` is supported.                                                                                                                             | `kryo`                                 |
+| `gravitino.cache.redis.timeoutMs`   | Connection and command timeout in milliseconds. A read or write that exceeds it is treated as a miss.                                                                                           | `1000`                                 |
+| `gravitino.cache.redis.username`    | Optional Redis ACL user name.                                                                                                                                                                   | (none)                                 |
+| `gravitino.cache.redis.password`    | Optional Redis password.                                                                                                                                                                        | (none)                                 |
+
+`gravitino.cache.expireTimeInMs` is the value TTL for Redis as well; `maxEntries` and
+`enableWeigher` apply only to the Caffeine cache, since Redis is sized by the operator. All keys of
+one metalake share a Redis Cluster hash slot, so a metalake's entries live on one cluster node. A
+server that cannot reach Redis at startup fails to start rather than running uncached; a failed
+invalidation at runtime is reported as an error on the write, because a silently dropped
+invalidation would leave a stale entry readable by every server.
+
 Two eviction limits apply at once. Time to live always applies: an entry older than
 `expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
 either by count or by weight. With `enableWeigher` disabled, Caffeine's W-TinyLFU policy evicts the
