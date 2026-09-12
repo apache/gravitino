@@ -18,21 +18,111 @@
  */
 package org.apache.gravitino.lance;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.lance.common.config.LanceConfig;
+import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.JettyServerTestUtils;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.eclipse.jetty.servlet.ServletHandler;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 public class TestLanceRESTService {
+
+  private Config previousConfig;
+  private MetricsSystem previousMetricsSystem;
+  private EventBus previousEventBus;
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (previousConfig != null) {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+    }
+    if (previousMetricsSystem != null) {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "metricsSystem", previousMetricsSystem, true);
+    }
+    if (previousEventBus != null) {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "eventBus", previousEventBus, true);
+    }
+  }
+
+  private void injectGravitinoEnv(boolean authorizationEnabled) throws Exception {
+    previousConfig = (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    previousMetricsSystem =
+        (MetricsSystem) FieldUtils.readField(GravitinoEnv.getInstance(), "metricsSystem", true);
+    previousEventBus =
+        (EventBus) FieldUtils.readField(GravitinoEnv.getInstance(), "eventBus", true);
+
+    Config mockConfig = mock(Config.class);
+    when(mockConfig.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(authorizationEnabled);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "metricsSystem", new MetricsSystem(), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "eventBus", new EventBus(Collections.emptyList()), true);
+  }
+
+  private boolean hasServiceIdentityFilter(LanceRESTService service) throws Exception {
+    JettyServer server = (JettyServer) FieldUtils.readField(service, "server", true);
+    ServletHandler servletHandler =
+        JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
+    Set<String> filterPathSpecs =
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, LanceServiceIdentityFilter.class);
+    return !filterPathSpecs.isEmpty();
+  }
+
+  /** See GH-13093. The filter must not be registered when authorization is enabled. */
+  @Test
+  public void testServiceIdentityFilterNotRegisteredWhenAuthorizationEnabled() throws Exception {
+    injectGravitinoEnv(true);
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(LanceConfig.CONFIG_NAMESPACE_BACKEND, LanceConfig.GRAVITINO_NAMESPACE_BACKEND);
+    LanceRESTService service = new LanceRESTService();
+    try {
+      service.serviceInit(properties, true);
+      assertFalse(
+          hasServiceIdentityFilter(service),
+          "LanceServiceIdentityFilter must not be registered when authorization is enabled");
+    } finally {
+      service.serviceStop();
+    }
+  }
+
+  /** Filter is installed for backward compat when authorization is disabled. */
+  @Test
+  public void testServiceIdentityFilterRegisteredWhenAuthorizationDisabled() throws Exception {
+    injectGravitinoEnv(false);
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(LanceConfig.CONFIG_NAMESPACE_BACKEND, LanceConfig.GRAVITINO_NAMESPACE_BACKEND);
+    LanceRESTService service = new LanceRESTService();
+    try {
+      service.serviceInit(properties, true);
+      assertTrue(
+          hasServiceIdentityFilter(service),
+          "LanceServiceIdentityFilter must be registered when authorization is disabled");
+    } finally {
+      service.serviceStop();
+    }
+  }
 
   /**
    * LanceRESTService.serviceInit() previously registered /metrics and /prometheus/metrics (added by
