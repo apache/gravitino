@@ -144,7 +144,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
             eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
         LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
-    if (auxMode) {
+    // Skip the identity filter when authorization is enabled so anonymous requests are
+    // rejected by the authorization interceptor instead of running as the service user.
+    if (auxMode && !authorizationEnabled) {
       server.addFilter(
           new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
           LANCE_SPEC);
