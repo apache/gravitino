@@ -36,7 +36,9 @@ import java.io.StringWriter;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -471,23 +473,61 @@ public class TestAuthenticationFilter {
   }
 
   @Test
-  public void testDownstreamFailureIsNotLoggedByFilter() throws Exception {
-    Authenticator authenticator = mock(Authenticator.class);
-    when(authenticator.supportsToken(any())).thenReturn(true);
-    when(authenticator.isDataFromToken()).thenReturn(true);
-    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
-    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+  public void testDownstreamCheckedFailureIsLoggedOnce() throws Exception {
+    ServletException failure = new ServletException("downstream failure");
     FilterChain failingChain =
         (req, resp) -> {
-          throw new ServletException("downstream failure");
+          throw failure;
         };
     HttpServletResponse mockResponse = responseWithWriter();
 
     List<LogEvent> errors =
         captureErrorLogs(
-            () -> filter.doFilter(requestWithAuthorizationHeader(), mockResponse, failingChain));
+            () ->
+                acceptingFilter()
+                    .doFilter(requestWithAuthorizationHeader(), mockResponse, failingChain));
 
     verify(mockResponse).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    // PrincipalUtils.doAs logs checked failures, so the filter must not log them again.
+    Assertions.assertEquals(1, errors.size());
+    Assertions.assertEquals(PrincipalUtils.class.getName(), errors.get(0).getLoggerName());
+  }
+
+  @Test
+  public void testDownstreamUncheckedFailureIsLoggedOnce() throws Exception {
+    IllegalStateException failure = new IllegalStateException("downstream bug");
+    FilterChain failingChain =
+        (req, resp) -> {
+          throw failure;
+        };
+    HttpServletResponse mockResponse = responseWithWriter();
+
+    List<LogEvent> errors =
+        captureErrorLogs(
+            () ->
+                acceptingFilter()
+                    .doFilter(requestWithAuthorizationHeader(), mockResponse, failingChain));
+
+    verify(mockResponse).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertEquals(1, errors.size());
+    Assertions.assertSame(failure, errors.get(0).getThrown());
+  }
+
+  @Test
+  public void testDownstreamForbiddenIsNotLogged() throws Exception {
+    FilterChain forbiddingChain =
+        (req, resp) -> {
+          throw new ForbiddenException("Access denied");
+        };
+    HttpServletResponse mockResponse = responseWithWriter();
+
+    List<LogEvent> errors =
+        captureErrorLogs(
+            () ->
+                acceptingFilter()
+                    .doFilter(requestWithAuthorizationHeader(), mockResponse, forbiddingChain));
+
+    verify(mockResponse).setStatus(HttpServletResponse.SC_FORBIDDEN);
     Assertions.assertTrue(errors.isEmpty());
   }
 
@@ -543,6 +583,14 @@ public class TestAuthenticationFilter {
     Assertions.assertTrue(errors.isEmpty());
   }
 
+  private static AuthenticationFilter acceptingFilter() {
+    Authenticator authenticator = mock(Authenticator.class);
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+    return new AuthenticationFilter(Lists.newArrayList(authenticator));
+  }
+
   private static HttpServletRequest requestWithAuthorizationHeader() {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
@@ -560,13 +608,20 @@ public class TestAuthenticationFilter {
     void run() throws Exception;
   }
 
-  /** Runs the invocation and returns the ERROR events logged by {@link AuthenticationFilter}. */
+  /**
+   * Runs the invocation and returns the ERROR events logged by {@link AuthenticationFilter} and
+   * {@link PrincipalUtils}, the two places a failure on the authentication path can be logged.
+   */
   private static List<LogEvent> captureErrorLogs(FilterInvocation invocation) throws Exception {
-    String loggerName = AuthenticationFilter.class.getName();
+    List<String> loggerNames =
+        Arrays.asList(AuthenticationFilter.class.getName(), PrincipalUtils.class.getName());
     LoggerContext loggerContext =
         (LoggerContext) LogManager.getContext(AuthenticationFilter.class.getClassLoader(), false);
     AbstractConfiguration configuration = (AbstractConfiguration) loggerContext.getConfiguration();
-    LoggerConfig previousLoggerConfig = configuration.getLoggers().get(loggerName);
+    Map<String, LoggerConfig> previousLoggerConfigs = new HashMap<>();
+    for (String loggerName : loggerNames) {
+      previousLoggerConfigs.put(loggerName, configuration.getLoggers().get(loggerName));
+    }
     List<LogEvent> events = new CopyOnWriteArrayList<>();
     AbstractAppender appender =
         new AbstractAppender(
@@ -579,15 +634,20 @@ public class TestAuthenticationFilter {
     try {
       appender.start();
       configuration.addAppender(appender);
-      LoggerConfig loggerConfig = new LoggerConfig(loggerName, Level.ERROR, false);
-      loggerConfig.addAppender(appender, Level.ERROR, null);
-      configuration.addLogger(loggerName, loggerConfig);
+      for (String loggerName : loggerNames) {
+        LoggerConfig loggerConfig = new LoggerConfig(loggerName, Level.ERROR, false);
+        loggerConfig.addAppender(appender, Level.ERROR, null);
+        configuration.addLogger(loggerName, loggerConfig);
+      }
       loggerContext.updateLoggers();
       invocation.run();
     } finally {
-      configuration.removeLogger(loggerName);
-      if (previousLoggerConfig != null) {
-        configuration.addLogger(loggerName, previousLoggerConfig);
+      for (String loggerName : loggerNames) {
+        configuration.removeLogger(loggerName);
+        LoggerConfig previousLoggerConfig = previousLoggerConfigs.get(loggerName);
+        if (previousLoggerConfig != null) {
+          configuration.addLogger(loggerName, previousLoggerConfig);
+        }
       }
       configuration.removeAppender(appender.getName());
       appender.stop();

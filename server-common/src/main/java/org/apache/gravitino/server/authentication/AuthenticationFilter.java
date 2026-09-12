@@ -105,25 +105,21 @@ public class AuthenticationFilter implements Filter {
     }
     HttpServletRequest req = (HttpServletRequest) request;
     HttpServletResponse resp = (HttpServletResponse) response;
-
-    Principal principal;
     try {
-      principal = authenticate(req);
+      Principal principal = authenticate(req);
+      runAsPrincipal(principal, req, resp, chain);
     } catch (UnauthorizedException ue) {
       sendUnauthorizedResponse(resp, ue);
-      return;
     } catch (IllegalActiveRolesException | ForbiddenException clientError) {
       sendAuthErrorResponse(resp, clientError);
-      return;
     } catch (RuntimeException unexpected) {
       // The response may omit the stack trace, so keep the cause in the server log.
-      LOG.error(
-          "Unexpected error while authenticating request to {}", req.getRequestURI(), unexpected);
+      LOG.error("Unexpected error while processing request to {}", req.getRequestURI(), unexpected);
       sendAuthErrorResponse(resp, unexpected);
-      return;
+    } catch (Exception checked) {
+      // Only the downstream chain throws checked exceptions, and PrincipalUtils.doAs logs them.
+      sendAuthErrorResponse(resp, checked);
     }
-
-    runAsPrincipal(principal, req, resp, chain);
   }
 
   /**
@@ -234,28 +230,21 @@ public class AuthenticationFilter implements Filter {
     return principal;
   }
 
-  private void runAsPrincipal(
+  private static void runAsPrincipal(
       Principal principal,
       HttpServletRequest request,
       HttpServletResponse response,
       FilterChain chain)
-      throws IOException {
+      throws Exception {
     // Publish the finalized principal (already carrying any narrowed roles) so downstream
     // re-binds from the attribute (e.g. Utils.doAs) see the same identity and roles.
     request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
-    try {
-      PrincipalUtils.doAs(
-          principal,
-          () -> {
-            chain.doFilter(request, response);
-            return null;
-          });
-    } catch (UnauthorizedException ue) {
-      sendUnauthorizedResponse(response, ue);
-    } catch (Exception e) {
-      // PrincipalUtils.doAs already logs checked failures from the downstream chain.
-      sendAuthErrorResponse(response, e);
-    }
+    PrincipalUtils.doAs(
+        principal,
+        () -> {
+          chain.doFilter(request, response);
+          return null;
+        });
   }
 
   private void sendUnauthorizedResponse(HttpServletResponse response, UnauthorizedException ue)
