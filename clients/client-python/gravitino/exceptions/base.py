@@ -217,6 +217,10 @@ class NoSuchTableException(NotFoundException):
     """An exception thrown when a table with specified name is not existed."""
 
 
+class NoSuchViewException(NotFoundException):
+    """An exception thrown when a view with specified name is not found."""
+
+
 class NoSuchPartitionException(NotFoundException):
     """An exception thrown when a partition with specified name is not existed."""
 
@@ -227,6 +231,10 @@ class PartitionAlreadyExistsException(AlreadyExistsException):
 
 class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
+
+
+class ViewAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a view already exists."""
 
 
 class NoSuchFunctionException(NotFoundException):
@@ -259,10 +267,23 @@ class NoSuchMetadataObjectException(NotFoundException):
 
 class RoleAlreadyExistsException(AlreadyExistsException):
     """Exception thrown when a role with specified name already exists."""
-class NoSuchViewException(Exception):
-    """Exception raised when a view does not exist."""
-    pass
-class NoSuchViewException(Exception):
-    """Exception raised when a view does not exist."""
-    pass
 
+
+class NoSuchUserException(NotFoundException):
+    """An exception thrown when a user is not found."""
+
+
+class UserAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a user already exists."""
+
+
+class NoSuchGroupException(NotFoundException):
+    """An exception thrown when a group is not found."""
+
+
+class GroupAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a group already exists."""
+
+
+class NoSuchViewException(NotFoundException):
+    """An exception thrown when a view is not found."""
