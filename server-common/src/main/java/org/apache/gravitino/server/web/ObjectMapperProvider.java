@@ -51,7 +51,7 @@ public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
    * traces.
    */
   public ObjectMapperProvider() {
-    this(JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue());
+    this.objectMapper = objectMapper();
   }
 
   /**

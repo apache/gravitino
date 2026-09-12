@@ -99,7 +99,7 @@ public class VersioningFilter implements Filter {
 
   /** Creates a versioning filter with the backward-compatible error response behavior. */
   public VersioningFilter() {
-    this(JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue());
+    this.objectMapper = ObjectMapperProvider.objectMapper();
   }
 
   /**
