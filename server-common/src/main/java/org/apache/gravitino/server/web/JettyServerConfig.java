@@ -112,6 +112,10 @@ public final class JettyServerConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
+  /**
+   * Whether HTTP error responses include server-side stack traces. Defaults to {@code true} for
+   * compatibility with clients that read the {@code stack} field.
+   */
   public static final ConfigEntry<Boolean> INCLUDE_ERROR_STACK_TRACE =
       new ConfigBuilder("includeErrorStackTrace")
           .doc(
