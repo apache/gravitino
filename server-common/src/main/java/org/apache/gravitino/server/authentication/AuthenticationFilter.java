@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.HealthCheckPathMatcher;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,8 @@ import org.slf4j.LoggerFactory;
 public class AuthenticationFilter implements Filter {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticationFilter.class);
+
+  private final ServerHealth health = ServerHealth.getInstance();
 
   private final List<Authenticator> filterAuthenticators;
 
@@ -109,14 +112,18 @@ public class AuthenticationFilter implements Filter {
       Principal principal = authenticate(req);
       runAsPrincipal(principal, req, resp, chain);
     } catch (UnauthorizedException ue) {
+      health.recordFailure(ue);
       sendUnauthorizedResponse(resp, ue);
     } catch (IllegalActiveRolesException | ForbiddenException clientError) {
+      health.recordFailure(clientError);
       sendAuthErrorResponse(resp, clientError);
     } catch (RuntimeException unexpected) {
+      health.recordFailure(unexpected);
       // The response may omit the stack trace, so keep the cause in the server log.
       LOG.error("Unexpected error while processing request to {}", req.getRequestURI(), unexpected);
       sendAuthErrorResponse(resp, unexpected);
     } catch (Exception checked) {
+      health.recordFailure(checked);
       // Only the downstream chain throws checked exceptions, and PrincipalUtils.doAs logs them.
       sendAuthErrorResponse(resp, checked);
     }

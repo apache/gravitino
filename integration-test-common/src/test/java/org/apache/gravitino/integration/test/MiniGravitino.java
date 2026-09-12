@@ -198,10 +198,12 @@ public class MiniGravitino {
         executor.submit(
             () -> {
               try {
-                GravitinoServer.main(
-                    new String[] {
-                      ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
-                    });
+                context
+                    .serverLauncher()
+                    .launch(
+                        new String[] {
+                          ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
+                        });
               } catch (Exception e) {
                 LOG.error("Exception in startup MiniGravitino Server ", e);
                 throw new RuntimeException(e);

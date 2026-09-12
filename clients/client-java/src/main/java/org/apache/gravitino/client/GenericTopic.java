@@ -33,18 +33,21 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic topic. */
-class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolicies {
+class GenericTopic
+    implements Topic, SupportsTags, SupportsRoles, SupportsPolicies, SupportsSecrets {
 
   private final TopicDTO topicDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericTopic(TopicDTO topicDTO, RESTClient restClient, Namespace topicNs) {
     this.topicDTO = topicDTO;
@@ -57,6 +60,8 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
         new MetadataObjectRoleOperations(topicNs.level(0), topicObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(topicNs.level(0), topicObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(topicNs.level(0), topicObject, restClient);
   }
 
   @Override
@@ -92,6 +97,16 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

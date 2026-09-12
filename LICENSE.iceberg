@@ -249,6 +249,8 @@
    Apache Hadoop
    Apache Hive
    Apache HTrace
+   Google HTTP Client
+   Google HTTP Client GSON
    Apache HttpComponents Client
    Apache HttpClient
    Apache HttpCore
@@ -313,6 +315,8 @@
    Apache Avro
    Apache Yetus - Audience Annotations
    ASM
+   Google auth Credentials
+   Google auth HTTP
    Javolution
    JLine
    JSch

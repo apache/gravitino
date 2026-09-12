@@ -71,6 +71,19 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.VIEW);
 
+  /** Types that may carry secret properties or support credential vending. */
+  private static final Set<MetadataObject.Type> SECRET_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.MODEL_VERSION);
+
   private static final Set<MetadataObject.Type> FUNCTION_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
@@ -198,6 +211,8 @@ public class Privileges {
         // Secrets
       case VIEW_SECRET_PROVIDERS:
         return ViewSecretProviders.allow();
+      case USE_SECRET:
+        return UseSecret.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -330,6 +345,8 @@ public class Privileges {
         // Secrets
       case VIEW_SECRET_PROVIDERS:
         return ViewSecretProviders.deny();
+      case USE_SECRET:
+        return UseSecret.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1393,6 +1410,42 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /**
+   * The privilege to retrieve plaintext secrets and vend credentials for a metadata object.
+   *
+   * <p>Applies to both {@code getSecrets} and {@code getCredentials}. Callers that are not the
+   * metalake owner and lack this privilege receive an empty result rather than a forbidden error,
+   * once they can already access the metadata object.
+   */
+  public static final class UseSecret extends GenericPrivilege<UseSecret> {
+
+    private static final UseSecret ALLOW_INSTANCE = new UseSecret(Condition.ALLOW, Name.USE_SECRET);
+    private static final UseSecret DENY_INSTANCE = new UseSecret(Condition.DENY, Name.USE_SECRET);
+
+    private UseSecret(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseSecret allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseSecret deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
     }
   }
 

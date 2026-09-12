@@ -172,7 +172,11 @@ paths:
         regular catalog operations, but does not guarantee that every object-level or mutating
         operation will succeed. Fileset catalogs test all catalog-level `location` and `location-*`
         targets. Model and Generic catalogs do not support connection testing. Expected test
-        failures are returned as application error codes in an HTTP 200 response.
+        failures are returned as application error codes in an HTTP 200 response. When
+        authorization is enabled, testing with the stored configuration requires the same access
+        as loading the catalog, and testing with proposed changes requires owning the metalake or
+        the catalog, the same as altering it. Callers without that access receive an HTTP 403
+        response.
       operationId: testExistingCatalogConnection
       requestBody:
         required: false
@@ -232,6 +236,14 @@ paths:
                     message: Catalog my_metalake.my_catalog is not in use
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: >-
+            Forbidden - The caller cannot load the catalog, or tests proposed changes without
+            owning the metalake or the catalog
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

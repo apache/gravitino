@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.integration.test.util;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -42,5 +44,33 @@ public class TestITUtils {
   public void testIsCiEnvironmentFalse() {
     Assertions.assertFalse(ITUtils.isCiEnvironment(Map.of()));
     Assertions.assertFalse(ITUtils.isCiEnvironment(Map.of("CI", "false")));
+  }
+
+  @Test
+  void testCheckServerPortIsFreeAcceptsAnUnusedPort() throws IOException {
+    int port;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      port = socket.getLocalPort();
+    }
+
+    Assertions.assertDoesNotThrow(() -> ITUtils.checkServerPortIsFree("localhost", port));
+  }
+
+  @Test
+  void testCheckServerPortIsFreeRejectsAPortSomethingElseHolds() throws IOException {
+    // A server left behind by an earlier run keeps answering on this port. Starting a suite against
+    // it runs the tests against a stranger's configuration, so refuse before the launch rather than
+    // after a readiness probe the leftover satisfies.
+    try (ServerSocket socket = new ServerSocket(0)) {
+      int port = socket.getLocalPort();
+
+      IllegalStateException e =
+          Assertions.assertThrows(
+              IllegalStateException.class, () -> ITUtils.checkServerPortIsFree("localhost", port));
+
+      Assertions.assertTrue(
+          e.getMessage().contains(String.valueOf(port)),
+          "the message has to name the port so the cause is actionable: " + e.getMessage());
+    }
   }
 }
