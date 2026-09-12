@@ -1173,6 +1173,27 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertNotEquals(metalake1, new Object());
   }
 
+  @Test
+  public void testNoSuchMetalakeOnFirstOperation() throws JsonProcessingException {
+    // NoSuchMetalakeException surfaces on first operation, not at build().
+    String missingMetalake = "nonexistent-metalake";
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(
+        Method.GET, "/api/metalakes/" + missingMetalake, null, errorResp, HttpStatus.SC_NOT_FOUND);
+
+    try (GravitinoClient client =
+        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
+            .withMetalake(missingMetalake)
+            .withVersionCheckDisabled()
+            .build()) {
+      // build() succeeded — exception must surface on first operation
+      Throwable ex =
+          Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.listCatalogs());
+      Assertions.assertTrue(ex.getMessage().contains("metalake not found"));
+    }
+  }
+
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)
       throws JsonProcessingException {
     return createMetalake(client, metalakeName, false);
