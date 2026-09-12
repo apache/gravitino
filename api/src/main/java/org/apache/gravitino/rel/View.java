@@ -25,8 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Unstable;
-import org.apache.gravitino.secret.SupportsSecrets;
-import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a logical view in a {@link Namespace}. A view is a named query whose
@@ -124,21 +122,5 @@ public interface View extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
-  }
-
-  /**
-   * @return The {@link SupportsTags} if the view supports tag operations.
-   * @throws UnsupportedOperationException If the view does not support tag operations.
-   */
-  default SupportsTags supportsTags() {
-    throw new UnsupportedOperationException("View does not support tag operations.");
-  }
-
-  /**
-   * @return the {@link SupportsSecrets} if the view supports secret property operations.
-   * @throws UnsupportedOperationException if the view does not support secret property operations.
-   */
-  default SupportsSecrets supportsSecrets() {
-    throw new UnsupportedOperationException("View does not support secret property operations.");
   }
 }
