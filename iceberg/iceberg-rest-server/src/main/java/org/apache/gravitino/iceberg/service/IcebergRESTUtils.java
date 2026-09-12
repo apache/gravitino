@@ -49,6 +49,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -91,6 +92,11 @@ public class IcebergRESTUtils {
           "client.refresh-credentials-endpoint",
           "gcs.oauth2.refresh-credentials-endpoint",
           "adls.refresh-credentials-endpoint");
+
+  // Set once at service startup. Iceberg REST classes are not shared with the main server's
+  // classloader, so this does not collide with other services in the same JVM.
+  private static volatile boolean includeErrorStackTrace =
+      JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -425,14 +431,26 @@ public class IcebergRESTUtils {
     return Response.status(Status.NOT_FOUND).build();
   }
 
+  /**
+   * Sets whether error responses built by {@link #errorResponse(Throwable, int)} include the
+   * exception's stack trace. Called once when the service starts.
+   *
+   * @param include whether to include stack traces
+   */
+  public static void setIncludeErrorStackTrace(boolean include) {
+    includeErrorStackTrace = include;
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
-    ErrorResponse errorResponse =
+    ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage())
-            .withStackTrace(ex)
-            .build();
+            .withMessage(ex.getMessage());
+    if (includeErrorStackTrace) {
+      builder.withStackTrace(ex);
+    }
+    ErrorResponse errorResponse = builder.build();
     return Response.status(httpStatus)
         .entity(errorResponse)
         .type(MediaType.APPLICATION_JSON)

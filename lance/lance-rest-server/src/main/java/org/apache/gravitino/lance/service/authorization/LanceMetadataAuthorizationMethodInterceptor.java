@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.lance.service.authorization;
 
-import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
@@ -190,7 +188,7 @@ public class LanceMetadataAuthorizationMethodInterceptor
     if (throwable instanceof ForbiddenException) {
       exception =
           new PermissionDeniedException(
-              throwable.getMessage(), getStackTrace(throwable), namespaceId);
+              throwable.getMessage(), LanceExceptionMapper.errorDetail(throwable), namespaceId);
     } else if (throwable instanceof Exception) {
       exception = (Exception) throwable;
     } else {

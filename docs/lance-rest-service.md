@@ -129,6 +129,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include server-side stack traces in `detail`. Set this to `false` in new deployments | true | No |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
@@ -182,6 +183,7 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
 | `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
 | `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true | No |
 
 :::tip
 In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,
