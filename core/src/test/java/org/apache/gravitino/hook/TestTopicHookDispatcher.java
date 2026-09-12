@@ -24,11 +24,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestTopicHookDispatcher extends TestOperationDispatcher {
@@ -73,6 +76,23 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+  }
+
+  @Test
+  public void testDropTopicDoesNotRemovePrivilegesWhenTopicDoesNotExist() {
+    TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+    TopicHookDispatcher hook = new TopicHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "topic");
+    Mockito.when(dispatcher.dropTopic(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertFalse(hook.dropTopic(ident));
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TOPIC, null),
+          Mockito.never());
+    }
   }
 
   @Test
