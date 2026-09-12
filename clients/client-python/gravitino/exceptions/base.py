@@ -275,6 +275,3 @@ class NoSuchGroupException(NotFoundException):
 
 class GroupAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a group already exists."""
-
-class NoSuchViewException(NotFoundException):
-    """An exception thrown when a view is not found."""
