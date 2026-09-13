@@ -36,6 +36,7 @@ import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -81,6 +82,14 @@ import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.AbstractConfiguration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.glassfish.hk2.api.Descriptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -719,55 +728,84 @@ public class TestGravitinoInterceptionService {
   /**
    * When {@code checkCurrentUser} throws {@link ForbiddenException} (user is not a metalake
    * member), the interceptor must dispatch an {@link AuthorizationDenialFailureEvent} and set
-   * {@code operationFailureFired}.
+   * {@code operationFailureFired}, while logging the original exception for server-side diagnosis.
    */
   @Test
-  public void testForbiddenExceptionDispatchesEventAndSetsFlag() throws Throwable {
-    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
-            mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
-        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+  public void testForbiddenExceptionDispatchesEventSetsFlagAndLogsThrowable() throws Throwable {
+    String loggerName =
+        GravitinoInterceptionService.class.getName() + "$MetadataAuthorizationMethodInterceptor";
+    LoggerContext loggerContext =
+        (LoggerContext)
+            LogManager.getContext(GravitinoInterceptionService.class.getClassLoader(), false);
+    AbstractConfiguration configuration = (AbstractConfiguration) loggerContext.getConfiguration();
+    LoggerConfig previousLoggerConfig = configuration.getLoggers().get(loggerName);
+    CaptureAppender captureAppender = new CaptureAppender("authorizationCapture");
+    ForbiddenException forbiddenException = new ForbiddenException("User outsider is not a member");
+    try {
+      captureAppender.start();
+      configuration.addAppender(captureAppender);
+      LoggerConfig loggerConfig = new LoggerConfig(loggerName, Level.WARN, false);
+      loggerConfig.addAppender(captureAppender, Level.WARN, null);
+      configuration.addLogger(loggerName, loggerConfig);
+      loggerContext.updateLoggers();
 
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("outsider"));
-      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("outsider");
+      try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+          MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+              mockStatic(GravitinoAuthorizerProvider.class);
+          MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+          MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
 
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+        principalUtilsMocked
+            .when(PrincipalUtils::getCurrentPrincipal)
+            .thenReturn(new UserPrincipal("outsider"));
+        principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("outsider");
 
-      authUtilsMocked
-          .when(
-              () ->
-                  AuthorizationUtils.checkCurrentUser(
-                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
-          .thenThrow(new ForbiddenException("User outsider is not a member"));
+        GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+        authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+        when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
 
-      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
-      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
-      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+        authUtilsMocked
+            .when(
+                () ->
+                    AuthorizationUtils.checkCurrentUser(
+                        ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+            .thenThrow(forbiddenException);
 
-      GravitinoInterceptionService service = new GravitinoInterceptionService();
-      Method testMethod = TestOperations.class.getMethods()[0];
-      MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
+        GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+        EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+        envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+        when(mockEnv.eventBus()).thenReturn(mockEventBus);
 
-      MethodInvocation invocation = mock(MethodInvocation.class);
-      when(invocation.getMethod()).thenReturn(testMethod);
-      when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+        GravitinoInterceptionService service = new GravitinoInterceptionService();
+        Method testMethod = TestOperations.class.getMethods()[0];
+        MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
 
-      Assertions.assertFalse(RequestContext.isOperationFailureFired());
-      Response response = (Response) interceptor.invoke(invocation);
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getMethod()).thenReturn(testMethod);
+        when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
 
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      ArgumentCaptor<AuthorizationDenialFailureEvent> captor =
-          ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
-      verify(mockEventBus).dispatchEvent(captor.capture());
-      AuthorizationDenialFailureEvent event = captor.getValue();
-      assertEquals("outsider", event.user());
-      Assertions.assertTrue(RequestContext.isOperationFailureFired());
+        Assertions.assertFalse(RequestContext.isOperationFailureFired());
+        Response response = (Response) interceptor.invoke(invocation);
+
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+        ArgumentCaptor<AuthorizationDenialFailureEvent> captor =
+            ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
+        verify(mockEventBus).dispatchEvent(captor.capture());
+        AuthorizationDenialFailureEvent event = captor.getValue();
+        assertEquals("outsider", event.user());
+        Assertions.assertTrue(RequestContext.isOperationFailureFired());
+        Assertions.assertTrue(
+            captureAppender.getEvents().stream()
+                .anyMatch(logEvent -> logEvent.getThrown() == forbiddenException));
+      }
+    } finally {
+      configuration.removeLogger(loggerName);
+      if (previousLoggerConfig != null) {
+        configuration.addLogger(loggerName, previousLoggerConfig);
+      }
+      configuration.removeAppender(captureAppender.getName());
+      captureAppender.stop();
+      loggerContext.updateLoggers();
     }
   }
 
@@ -1227,5 +1265,22 @@ public class TestGravitinoInterceptionService {
 
     @Override
     public void close() throws IOException {}
+  }
+
+  private static class CaptureAppender extends AbstractAppender {
+    private final List<LogEvent> events = new CopyOnWriteArrayList<>();
+
+    CaptureAppender(String name) {
+      super(name, null, PatternLayout.createDefaultLayout(), true, null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      events.add(event.toImmutable());
+    }
+
+    List<LogEvent> getEvents() {
+      return events;
+    }
   }
 }

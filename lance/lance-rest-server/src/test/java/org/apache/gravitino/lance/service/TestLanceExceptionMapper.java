@@ -31,6 +31,7 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.model.ErrorResponse;
 
 /** Tests for {@link LanceExceptionMapper}. */
@@ -85,6 +86,35 @@ public class TestLanceExceptionMapper extends JerseyTest {
           entity.getDetail().contains("java.lang.AssertionError: assertion failure"));
       Assertions.assertTrue(
           entity.getDetail().contains("Caused by: java.lang.IllegalStateException: root cause"));
+    }
+  }
+
+  /** Verifies that the error detail omits the stack trace when disabled. */
+  @Test
+  public void testErrorDetailFollowsSetting() {
+    IllegalStateException failure = new IllegalStateException("failure");
+    try {
+      Assertions.assertTrue(
+          LanceExceptionMapper.errorDetail(failure)
+              .contains("java.lang.IllegalStateException: failure"));
+
+      LanceExceptionMapper.setIncludeErrorStackTrace(false);
+      Assertions.assertEquals("", LanceExceptionMapper.errorDetail(failure));
+      Response response = LanceExceptionMapper.toRESTResponse("", failure);
+      Assertions.assertEquals(
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("failure", entity.getError());
+      Assertions.assertEquals("", entity.getDetail());
+
+      // Lance exceptions that already carry a detail keep it; only generated stacks are omitted.
+      Response nativeResponse =
+          LanceExceptionMapper.toRESTResponse(
+              "instance", new InvalidInputException("bad input", "native detail", "instance"));
+      Assertions.assertEquals(
+          "native detail", ((ErrorResponse) nativeResponse.getEntity()).getDetail());
+    } finally {
+      LanceExceptionMapper.setIncludeErrorStackTrace(true);
     }
   }
 }

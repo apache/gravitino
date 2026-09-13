@@ -130,9 +130,16 @@ paths:
                     description: The message of the exception
                   stack:
                     type: array
+                    deprecated: true
+                    description: >-
+                      Deprecated diagnostic stack trace. Operators should disable it with
+                      gravitino.server.webserver.includeErrorStackTrace=false because it can
+                      expose internal implementation details. It remains enabled by default only
+                      to avoid breaking legacy clients that expect this field. See
+                      [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling)
+                      and [CWE-209](https://cwe.mitre.org/data/definitions/209.html).
                     items:
                       type: string
-                      description: The stack trace of the exception
               examples:
                 TestConnectionSuccess:
                   value: {
