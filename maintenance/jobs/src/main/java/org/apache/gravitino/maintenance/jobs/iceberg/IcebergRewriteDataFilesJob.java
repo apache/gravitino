@@ -124,6 +124,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       System.exit(1);
     }
 
+    IcebergJobUtils.validateTableIdentifier(tableIdentifier);
+
     // Optional arguments
     String strategy = argMap.get("strategy");
     String sortOrder = argMap.get("sort-order");

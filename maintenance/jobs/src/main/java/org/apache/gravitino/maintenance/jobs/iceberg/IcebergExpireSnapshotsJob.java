@@ -112,6 +112,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
       System.exit(1);
     }
 
+    IcebergJobUtils.validateTableIdentifier(tableIdentifier);
+
     // Optional arguments
     String olderThan = argMap.get("older-than");
     String retainLast = argMap.get("retain-last");
@@ -127,6 +129,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
       printUsage();
       System.exit(1);
     }
+
+    IcebergJobUtils.validateTimestamp(olderThan);
 
     // Build Spark session with custom configs if provided
     SparkSession.Builder sparkBuilder =
