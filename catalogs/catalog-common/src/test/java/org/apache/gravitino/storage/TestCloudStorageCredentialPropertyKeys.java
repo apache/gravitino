@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Test;
 
 public class TestCloudStorageCredentialPropertyKeys {
@@ -57,5 +59,24 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_REGION));
+  }
+
+  @Test
+  void testAllModuleStaticCredentialKeysAreCovered() {
+    // Before the fix, the filter let these static credentials defined in this same module pass
+    // straight through into GVFS client configuration.
+    Map<String, String> input =
+        Map.of(
+            AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "aad-secret",
+            GlueConstants.AWS_ACCESS_KEY_ID, "ak",
+            GlueConstants.AWS_SECRET_ACCESS_KEY, "sk",
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak",
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk",
+            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, "dlf-token");
+
+    Map<String, String> filtered =
+        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+
+    assertTrue(filtered.isEmpty(), "static credentials must all be filtered, got: " + filtered);
   }
 }
