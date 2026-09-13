@@ -31,7 +31,10 @@ import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.Security;
+import java.util.IdentityHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Test;
 
 class TestClassLoaderResourceCleanerUtils {
@@ -324,5 +327,54 @@ class TestClassLoaderResourceCleanerUtils {
     assertFalse(
         ClassLoaderResourceCleanerUtils.isOwnedByClassLoader(
             String.class, ClassLoader.getSystemClassLoader()));
+  }
+
+  @Test
+  void testClearShutdownHooksHoldsApplicationShutdownHooksMonitor() throws Exception {
+    Class<?> shutdownHooksClass = Class.forName("java.lang.ApplicationShutdownHooks");
+    ClassLoader targetLoader = new URLClassLoader(new URL[0], null);
+    Thread hookThread = new Thread(() -> {}, "cleaner-monitor-test-hook");
+    hookThread.setContextClassLoader(targetLoader);
+    Runtime.getRuntime().addShutdownHook(hookThread);
+    try {
+      CountDownLatch monitorHeld = new CountDownLatch(1);
+      Thread monitorHolder =
+          new Thread(
+              () -> {
+                synchronized (shutdownHooksClass) {
+                  monitorHeld.countDown();
+                  try {
+                    Thread.sleep(600);
+                  } catch (InterruptedException ignored) {
+                  }
+                }
+              },
+              "cleaner-monitor-holder");
+      monitorHolder.start();
+      assertTrue(monitorHeld.await(5, TimeUnit.SECONDS));
+
+      long start = System.nanoTime();
+      ClassLoaderResourceCleanerUtils.clearShutdownHooks(targetLoader);
+      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+      monitorHolder.join();
+
+      // Before the fix, the hooks map was mutated without the ApplicationShutdownHooks monitor,
+      // so this completed immediately even while another thread held the monitor.
+      assertTrue(
+          elapsedMs >= 250,
+          "clearShutdownHooks must block on the ApplicationShutdownHooks monitor, completed in "
+              + elapsedMs
+              + "ms");
+
+      IdentityHashMap<Thread, Thread> hooks =
+          (IdentityHashMap<Thread, Thread>)
+              FieldUtils.readStaticField(shutdownHooksClass, "hooks", true);
+      assertFalse(hooks.containsKey(hookThread));
+    } finally {
+      try {
+        Runtime.getRuntime().removeShutdownHook(hookThread);
+      } catch (Exception ignored) {
+      }
+    }
   }
 }

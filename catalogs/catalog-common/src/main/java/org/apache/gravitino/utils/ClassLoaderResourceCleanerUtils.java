@@ -301,20 +301,26 @@ public class ClassLoaderResourceCleanerUtils {
    * <p>All shutdown hooks are run with the system class loader, so we need to manually clear the
    * shutdown hooks registered by the target class loader.
    *
+   * <p>The map is JVM-global and {@code ApplicationShutdownHooks.add/remove} synchronize on the
+   * {@code ApplicationShutdownHooks} class monitor, so the mutation must hold that monitor too.
+   *
    * @param targetClassLoader the classloader where the shutdown hooks are registered.
    */
-  private static void clearShutdownHooks(ClassLoader targetClassLoader) throws Exception {
+  @VisibleForTesting
+  static void clearShutdownHooks(ClassLoader targetClassLoader) throws Exception {
     Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
     IdentityHashMap<Thread, Thread> hooks =
         (IdentityHashMap<Thread, Thread>) FieldUtils.readStaticField(shutdownHooks, "hooks", true);
 
-    hooks
-        .entrySet()
-        .removeIf(
-            entry -> {
-              Thread thread = entry.getKey();
-              return thread.getContextClassLoader() == targetClassLoader;
-            });
+    synchronized (shutdownHooks) {
+      hooks
+          .entrySet()
+          .removeIf(
+              entry -> {
+                Thread thread = entry.getKey();
+                return thread.getContextClassLoader() == targetClassLoader;
+              });
+    }
   }
 
   /**
