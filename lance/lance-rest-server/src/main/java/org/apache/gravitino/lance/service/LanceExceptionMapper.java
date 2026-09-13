@@ -48,8 +48,8 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
-  // Set once at service startup. Lance REST classes are not shared with the main server's
-  // classloader, so this does not collide with other services in the same JVM.
+  // Set once at service startup. Only Lance REST reads this flag, and its classes are packaged
+  // outside the main server's classpath, so each service loads its own copy.
   private static volatile boolean includeErrorStackTrace =
       JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
 
