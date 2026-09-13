@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.rel.expressions.distributions;
 
-import java.util.Arrays;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 
@@ -47,19 +46,10 @@ public interface Distribution extends Expression {
     return expressions();
   }
 
-  /**
-   * Indicates whether some other object is "equal to" this one.
-   *
-   * @param distribution The reference distribution object with which to compare.
-   * @return returns true if this object is the same as the obj argument; false otherwise.
-   */
-  default boolean equals(Distribution distribution) {
-    if (distribution == null) {
-      return false;
-    }
-
-    return strategy().equals(distribution.strategy())
-        && number() == distribution.number()
-        && Arrays.equals(expressions(), distribution.expressions());
-  }
+  // Note: this interface intentionally does NOT define a `boolean equals(Distribution)` overload.
+  // Such an overload never overrides Object.equals, so it is invisible to HashSet/HashMap and any
+  // code comparing through Object references, which makes structural equality silently
+  // dispatch-dependent. Implementations must override equals(Object)/hashCode() themselves
+  // (DistributionImpl and DistributionDTO do). Use Distributions.isNone to test for the NONE
+  // distribution across representations.
 }

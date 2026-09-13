@@ -333,7 +333,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SortOrder[] sortOrders) {
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
+        Distributions.isNone(distribution), "ClickHouse does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
 

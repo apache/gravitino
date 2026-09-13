@@ -452,8 +452,8 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   private void compareDistributions(Distribution expected, Distribution actual) {
-    boolean expectedEmpty = expected == null || Distributions.NONE.equals(expected);
-    boolean actualEmpty = actual == null || Distributions.NONE.equals(actual);
+    boolean expectedEmpty = expected == null || Distributions.isNone(expected);
+    boolean actualEmpty = actual == null || Distributions.isNone(actual);
     Assertions.assertEquals(expectedEmpty, actualEmpty);
     if (expectedEmpty) {
       return;
