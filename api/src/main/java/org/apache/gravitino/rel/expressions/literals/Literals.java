@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.expressions.literals;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Type;
@@ -288,6 +289,15 @@ public class Literals {
       if (value == null || literal.value == null) {
         return Objects.equals(value, literal.value);
       }
+      // Arrays need structural comparison: Objects.equals is reference equality for arrays and
+      // the toString() fallback below renders identity hashes, so equal-content binary and array
+      // literals would never compare equal.
+      if (value instanceof byte[] && literal.value instanceof byte[]) {
+        return Arrays.equals((byte[]) value, (byte[]) literal.value);
+      }
+      if (value instanceof Object[] && literal.value instanceof Object[]) {
+        return Arrays.deepEquals((Object[]) value, (Object[]) literal.value);
+      }
       // Now, it's safe to compare using toString() since neither value is null
       return Objects.equals(value, literal.value)
           || value.toString().equals(literal.value.toString());
@@ -295,6 +305,12 @@ public class Literals {
 
     @Override
     public int hashCode() {
+      if (value instanceof byte[]) {
+        return Objects.hash(dataType, Arrays.hashCode((byte[]) value));
+      }
+      if (value instanceof Object[]) {
+        return Objects.hash(dataType, Arrays.deepHashCode((Object[]) value));
+      }
       return Objects.hash(dataType, value != null ? value.toString() : null);
     }
 

@@ -39,6 +39,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
@@ -115,5 +118,22 @@ public class TestLiteral {
     literal = decimalLiteral(Decimal.of("0.00"));
     Assertions.assertEquals(Decimal.of(new BigDecimal("0.00")), literal.value());
     Assertions.assertEquals(Types.DecimalType.of(2, 2), literal.dataType());
+  }
+
+  @Test
+  public void testBinaryLiteralsWithEqualContentAreEqual() {
+    Literal<?> first = Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get());
+    Literal<?> second = Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get());
+
+    // Before the fix, LiteralImpl.equals fell back to value.toString(), so structurally identical
+    // binary literals were never equal (Objects.equals on arrays is reference equality and the
+    // toString fallback renders identity hashes).
+    Assertions.assertEquals(first, second);
+    Assertions.assertEquals(first.hashCode(), second.hashCode());
+    Assertions.assertNotEquals(first, Literals.of(new byte[] {1, 2}, Types.BinaryType.get()));
+
+    Set<Literal<?>> literals = new HashSet<>(Collections.singletonList(first));
+    Assertions.assertTrue(
+        literals.contains(Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get())));
   }
 }
