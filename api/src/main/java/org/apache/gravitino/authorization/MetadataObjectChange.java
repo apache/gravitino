@@ -180,28 +180,28 @@ public interface MetadataObjectChange {
 
     /**
      * Compares this RemoveMetadataObject instance with another object for equality. The comparison
-     * is based on the old metadata entity.
+     * is based on the metadata entity and the locations.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object represents the same rename metadata entity; false otherwise.
+     * @return true if the given object represents the same remove metadata entity; false otherwise.
      */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
-      RenameMetadataObject that = (RenameMetadataObject) o;
-      return metadataObject.equals(that.metadataObject);
+      RemoveMetadataObject that = (RemoveMetadataObject) o;
+      return metadataObject.equals(that.metadataObject) && locations.equals(that.locations);
     }
 
     /**
      * Generates a hash code for this RemoveMetadataObject instance. The hash code is based on the
-     * old metadata entity.
+     * metadata entity and the locations.
      *
-     * @return A hash code value for this update metadata entity operation.
+     * @return A hash code value for this remove metadata entity operation.
      */
     @Override
     public int hashCode() {
-      return Objects.hash(metadataObject);
+      return Objects.hash(metadataObject, locations);
     }
 
     /**
