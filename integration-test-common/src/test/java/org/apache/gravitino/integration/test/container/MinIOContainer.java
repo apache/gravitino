@@ -41,7 +41,8 @@ import org.testcontainers.containers.Network;
 public class MinIOContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(MinIOContainer.class);
 
-  public static final String DEFAULT_IMAGE = "minio/minio:RELEASE.2025-09-07T16-13-09Z";
+  // MinIO no longer publishes this image on Docker Hub; quay.io carries the same release.
+  public static final String DEFAULT_IMAGE = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
   public static final String HOST_NAME = "gravitino-ci-minio";
   public static final int PORT = 9000;
   public static final String ACCESS_KEY = "minioadmin";
