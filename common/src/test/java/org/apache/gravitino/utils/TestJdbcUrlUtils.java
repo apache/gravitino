@@ -31,14 +31,15 @@ import org.junit.jupiter.api.parallel.Resources;
 public class TestJdbcUrlUtils {
 
   @Test
-  public void whenMalformedUrlGiven_ShouldThrowGravitinoRuntimeException() {
-    GravitinoRuntimeException gre =
-        Assertions.assertThrows(
-            GravitinoRuntimeException.class,
-            () ->
-                JdbcUrlUtils.validateJdbcConfig(
-                    "testDriver", "malformed%ZZurl", Collections.singletonMap("test", "test")));
-    Assertions.assertEquals("Unable to decode JDBC URL", gre.getMessage());
+  public void whenMalformedUrlGiven_ShouldFallBackToLastDecodedForm() {
+    // A percent escape that URLDecoder cannot decode (e.g. a literal '%' in a password) no
+    // longer rejects the whole URL: JDBC URLs are not required to be percent-encoded. The
+    // validation still scans the last successfully decoded form, so unsafe parameters remain
+    // detectable (see unsafeParameterBehindEncodingIsStillDetectedWithLiteralPercent).
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver", "malformed%ZZurl", Collections.singletonMap("test", "test")));
   }
 
   @Test
@@ -60,6 +61,61 @@ public class TestJdbcUrlUtils {
                 "testDriver",
                 "jdbc:mysql://localhost:0000/test",
                 Collections.singletonMap("test", "test")));
+  }
+
+  @Test
+  public void testValidateJdbcConfigWithLiteralPercentInUrl() {
+    // A literal '%' (e.g. a password like "100%") is legal in a JDBC URL; before the fix the
+    // decoder threw "Unable to decode JDBC URL" for it.
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?password=100%",
+                Collections.emptyMap()));
+
+    // A once-encoded '%25' decodes to a literal '%', which must not be rejected either.
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:postgresql://localhost:5432/test?password=pa%25ss",
+                Collections.emptyMap()));
+  }
+
+  @Test
+  public void unsafeParameterBehindEncodingWithFragmentPoisonIsStillDetected() {
+    // MySQL Connector/J decodes query tokens independently and ignores the URL fragment, so a
+    // malformed escape in the fragment must not stop the scan from revealing an encoded unsafe
+    // parameter name in the query.
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?%61utoDeserialize=true#%zz",
+                Collections.emptyMap()));
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?%71ueryInterceptors=x#frag%25",
+                Collections.emptyMap()));
+  }
+
+  @Test
+  public void unsafeParameterBehindEncodingIsStillDetectedWithLiteralPercent() {
+    // The decoded fallback must not weaken detection: an unsafe parameter that remains readable
+    // after the last successful decode is still rejected even when the URL also carries a
+    // literal '%'.
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?password=100%&autoDeserialize=true",
+                Collections.emptyMap()));
   }
 
   @Test
