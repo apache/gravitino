@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,9 +45,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tests for {@link FileFetcher}.
  *
- * <p>The hdfs happy path is exercised reflectively against Hadoop and is covered by the catalog
- * Kerberos integration tests; the common module has no Hadoop on its test classpath, so here we
- * only assert that an hdfs uri without a Hadoop configuration is rejected.
+ * <p>The hdfs happy path is exercised reflectively against minimal Hadoop test stubs (see {@code
+ * org.apache.hadoop} under this test source set), which pin that the filesystem is resolved from
+ * the fetched uri rather than fs.defaultFS; the catalog Kerberos integration tests cover the path
+ * against real Hadoop. Here we also assert that an hdfs uri without a Hadoop configuration is
+ * rejected.
  */
 public class TestFileFetcher {
 
@@ -276,6 +281,21 @@ public class TestFileFetcher {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> FileFetcher.get().fetchFileFromUri("hdfs://namenode/keytab", destFile, 10, null));
+  }
+
+  @Test
+  public void testHdfsFetchResolvesFileSystemFromUriNotDefaultFs() throws Exception {
+    File destFile = new File(tempDir, "dest_hdfs_uri");
+    Configuration hadoopConf = new Configuration();
+    FileSystem.uriOverloadUsed.set(null);
+
+    // Before the fix, the fetcher resolved the filesystem via FileSystem.get(Configuration),
+    // which keys off fs.defaultFS and ignores the fetched uri's authority; the stub's
+    // default-FS overload throws the "Wrong FS" error real Hadoop produces in that case.
+    FileFetcher.get().fetchFileFromUri("hdfs://namenode:8020/dir/keytab", destFile, 10, hadoopConf);
+
+    Assertions.assertEquals(
+        new URI("hdfs://namenode:8020/dir/keytab"), FileSystem.uriOverloadUsed.get());
   }
 
   @Test
