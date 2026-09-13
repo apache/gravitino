@@ -155,8 +155,13 @@ public class Indexes {
         IndexType indexType, String name, String[][] fieldNames, Map<String, String> properties) {
       this.indexType = indexType;
       this.name = name;
-      this.fieldNames = fieldNames;
-      this.properties = properties == null ? ImmutableMap.of() : properties;
+      // Deep-copy the caller's arrays and snapshot the map so later external mutations of the
+      // caller's inputs cannot change the built index.
+      this.fieldNames =
+          fieldNames == null
+              ? null
+              : Arrays.stream(fieldNames).map(String[]::clone).toArray(String[][]::new);
+      this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     }
 
     /**
@@ -176,11 +181,13 @@ public class Indexes {
     }
 
     /**
-     * @return The field names under the table contained in the index
+     * @return A defensive copy of the field names under the table contained in the index
      */
     @Override
     public String[][] fieldNames() {
-      return fieldNames;
+      return fieldNames == null
+          ? null
+          : Arrays.stream(fieldNames).map(String[]::clone).toArray(String[][]::new);
     }
 
     /**
