@@ -474,4 +474,94 @@ public class TestIcebergExpireSnapshotsJob {
       assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
     }
   }
+
+  @Test
+  public void testParseCustomSparkConfigsRejectsReservedKey() {
+    try {
+      IcebergJobUtils.parseCustomSparkConfigs("{\"spark.sql.extensions\":\"x\"}");
+      fail("Expected IllegalArgumentException for reserved key");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Cannot override reserved Spark config key"));
+      assertTrue(e.getMessage().contains("spark.sql.extensions"));
+    }
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsRejectsCatalogPrefix() {
+    try {
+      IcebergJobUtils.parseCustomSparkConfigs("{\"spark.sql.catalog.my_catalog\":\"x\"}");
+      fail("Expected IllegalArgumentException for catalog prefix");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Cannot override reserved Spark config key"));
+      assertTrue(e.getMessage().contains("spark.sql.catalog.my_catalog"));
+    }
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsRejectsSparkMaster() {
+    try {
+      IcebergJobUtils.parseCustomSparkConfigs("{\"spark.master\":\"local[2]\"}");
+      fail("Expected IllegalArgumentException for spark.master");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Cannot override reserved Spark config key"));
+      assertTrue(e.getMessage().contains("spark.master"));
+    }
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsAllowsNonReservedKeys() {
+    String json = "{\"spark.executor.memory\":\"4g\",\"spark.sql.shuffle.partitions\":\"200\"}";
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(json);
+    assertEquals(2, configs.size());
+    assertEquals("4g", configs.get("spark.executor.memory"));
+    assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
+  }
+
+  @Test
+  public void testValidateTableIdentifierValid() {
+    IcebergJobUtils.validateTableIdentifier("db.table");
+  }
+
+  @Test
+  public void testValidateTableIdentifierInvalidNoDot() {
+    try {
+      IcebergJobUtils.validateTableIdentifier("dbtable");
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid table identifier"));
+      assertTrue(e.getMessage().contains("dbtable"));
+    }
+  }
+
+  @Test
+  public void testValidateTableIdentifierInvalidEmptySegment() {
+    try {
+      IcebergJobUtils.validateTableIdentifier("db.");
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid table identifier"));
+    }
+  }
+
+  @Test
+  public void testValidateTimestampValid() {
+    IcebergJobUtils.validateTimestamp("2024-01-01 00:00:00");
+  }
+
+  @Test
+  public void testValidateTimestampInvalid() {
+    try {
+      IcebergJobUtils.validateTimestamp("not-a-date");
+      fail("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid timestamp"));
+      assertTrue(e.getMessage().contains("not-a-date"));
+    }
+  }
+
+  @Test
+  public void testValidateTimestampNull() {
+    IcebergJobUtils.validateTimestamp(null);
+    IcebergJobUtils.validateTimestamp("");
+  }
 }
