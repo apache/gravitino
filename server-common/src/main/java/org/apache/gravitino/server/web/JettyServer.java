@@ -538,14 +538,18 @@ public class JettyServer {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(createAuthenticationFilter(), pathSpec);
+    addFilter(createAuthenticationFilter(serverConfig.isIncludeErrorStackTrace()), pathSpec);
   }
 
   /**
    * Creates the authentication filter for this server. Subclasses can override this to provide a
    * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
+   *
+   * @param includeErrorStackTrace whether the filter's error responses may include server-side
+   *     stack traces; implementations must not include them when this is {@code false}
+   * @return the authentication filter
    */
-  protected Filter createAuthenticationFilter() {
-    return new AuthenticationFilter(serverConfig.isIncludeErrorStackTrace());
+  protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
+    return new AuthenticationFilter(includeErrorStackTrace);
   }
 }

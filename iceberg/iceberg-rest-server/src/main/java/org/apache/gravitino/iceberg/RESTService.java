@@ -96,7 +96,10 @@ public class RESTService implements GravitinoAuxiliaryService {
     server =
         new JettyServer() {
           @Override
-          protected javax.servlet.Filter createAuthenticationFilter() {
+          protected javax.servlet.Filter createAuthenticationFilter(
+              boolean includeErrorStackTrace) {
+            // Iceberg authentication errors never carry a stack trace (see
+            // TestIcebergAuthenticationFilter), so either setting is honored.
             return new IcebergAuthenticationFilter();
           }
         };

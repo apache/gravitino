@@ -29,7 +29,9 @@ import org.apache.gravitino.server.web.JettyServer;
 class LanceJettyServer extends JettyServer {
 
   @Override
-  protected Filter createAuthenticationFilter() {
+  protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
+    // Lance authentication errors always send an empty detail (see
+    // TestLanceAuthenticationFilter), so either setting is honored.
     return new LanceAuthenticationFilter();
   }
 }
