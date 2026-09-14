@@ -573,7 +573,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     builder.withClientConfig(clientProperties);
     String authType = config.getGravitinoAuthType();
-    if (AuthProperties.isSimple(authType)) {
+    if (LanceConfig.CALLER_AUTH_TYPE.equalsIgnoreCase(authType)) {
+      builder.withCustomTokenAuth(new LanceCallerTokenProvider());
+    } else if (AuthProperties.isSimple(authType)) {
       builder.withSimpleAuth(config.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME));
     } else if (AuthProperties.isOAuth2(authType)) {
       DefaultOAuth2TokenProvider tokenProvider =
@@ -589,10 +591,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     } else {
       throw new UnsupportedOperationException(
           String.format(
-              "Unsupported value for %sgravitino-%s: %s. Supported values are %s and %s.",
+              "Unsupported value for %sgravitino-%s: %s. Supported values are %s, %s and %s.",
               LanceConfig.LANCE_CONFIG_PREFIX,
               LanceConfig.CONFIG_AUTH_TYPE,
               authType,
+              LanceConfig.CALLER_AUTH_TYPE,
               AuthProperties.SIMPLE_AUTH_TYPE,
               AuthProperties.OAUTH2_AUTH_TYPE));
     }

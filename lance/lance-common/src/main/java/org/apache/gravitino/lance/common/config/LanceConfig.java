@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.OverwriteDefaultConfig;
-import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -35,6 +34,9 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String CONFIG_METALAKE = "metalake";
   public static final String CONFIG_URI = "uri";
   public static final String CONFIG_AUTH_TYPE = "auth-type";
+  /** Forwards the authenticated caller to the remote Gravitino server. */
+  public static final String CALLER_AUTH_TYPE = "caller";
+
   public static final String DEFAULT_SIMPLE_USERNAME = "lance-rest-server";
 
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTP_PORT = 9101;
@@ -67,10 +69,11 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-" + CONFIG_AUTH_TYPE)
           .doc(
               "The auth type used when the Lance REST service communicates with the Gravitino "
-                  + "server. Supported values are `simple` and `oauth2`.")
+                  + "server. Use `caller` to forward request credentials, or `simple` / `oauth2` "
+                  + "to use configured service credentials.")
           .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
-          .createWithDefault(AuthProperties.SIMPLE_AUTH_TYPE);
+          .createWithDefault(CALLER_AUTH_TYPE);
 
   public static final ConfigEntry<String> GRAVITINO_SIMPLE_USERNAME =
       new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-simple.user-name")

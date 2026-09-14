@@ -24,6 +24,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -85,6 +87,21 @@ public class TestLanceExceptionMapper extends JerseyTest {
           entity.getDetail().contains("java.lang.AssertionError: assertion failure"));
       Assertions.assertTrue(
           entity.getDetail().contains("Caused by: java.lang.IllegalStateException: root cause"));
+    }
+  }
+
+  /** Verifies that remote authentication and authorization errors retain their status codes. */
+  @Test
+  public void testRemoteAuthenticationAndAuthorizationErrorsKeepTheirStatus() {
+    assertStatus(401, new UnauthorizedException("Missing caller credentials"));
+    assertStatus(403, new ForbiddenException("Caller lacks permission"));
+  }
+
+  private void assertStatus(int status, Exception failure) {
+    try (Response response = LanceExceptionMapper.toRESTResponse("catalog", failure)) {
+      Assertions.assertEquals(status, response.getStatus());
+      Assertions.assertEquals(
+          failure.getMessage(), ((ErrorResponse) response.getEntity()).getError());
     }
   }
 }

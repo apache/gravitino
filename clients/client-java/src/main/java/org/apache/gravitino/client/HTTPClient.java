@@ -400,6 +400,7 @@ public class HTTPClient implements RESTClient {
       addRequestHeaders(request, headers, ContentType.APPLICATION_JSON.getMimeType());
     }
     if (authDataProvider != null) {
+      authDataProvider.getRequestHeaders().forEach(request::setHeader);
       request.setHeader(
           AuthConstants.HTTP_HEADER_AUTHORIZATION,
           new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
