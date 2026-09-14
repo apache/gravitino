@@ -44,4 +44,12 @@ public class TestSparkJdbcTypeConverter {
     Assertions.assertEquals(
         DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.VarCharType.of(10)));
   }
+
+  @Test
+  void testConvertExternalTypeToSparkString() {
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("numeric")));
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("json")));
+  }
 }

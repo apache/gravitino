@@ -79,7 +79,11 @@ public abstract class HiveShim {
   public abstract HiveTable getTable(String catalogName, String databaseName, String tableName);
 
   public abstract void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate);
 
   public abstract void dropTable(
       String catalogName,

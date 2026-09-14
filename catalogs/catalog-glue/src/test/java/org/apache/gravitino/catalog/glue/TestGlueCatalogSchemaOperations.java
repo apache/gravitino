@@ -125,6 +125,31 @@ class TestGlueCatalogSchemaOperations {
     assertEquals(0, result.length);
   }
 
+  @Test
+  void testListSchemasMapsCredentialFailureToActionableMessage() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    SdkClientException cause =
+        SdkClientException.create("Unable to load credentials from any of the providers");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    RuntimeException ex = assertThrows(RuntimeException.class, () -> ops.listSchemas(ns));
+
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains("aws-access-key-id"));
+    assertTrue(ex.getMessage().contains("aws-secret-access-key"));
+  }
+
+  @Test
+  void testListSchemasRethrowsNonCredentialSdkClientException() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    SdkClientException cause = SdkClientException.create("connection refused");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    SdkClientException ex = assertThrows(SdkClientException.class, () -> ops.listSchemas(ns));
+
+    assertEquals(cause, ex);
+  }
+
   // -------------------------------------------------------------------------
   // createSchema
   // -------------------------------------------------------------------------
