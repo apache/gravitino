@@ -250,6 +250,15 @@ paths:
               examples:
                 JobTemplateAlreadyExistsException:
                   $ref: "#/components/examples/NoSuchJobTemplateException"
+        "400":
+          description: Bad Request - The job cannot be launched by the job executor, for example, a required job executor configuration is missing
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobRunIllegalArgumentException:
+                  $ref: "#/components/examples/JobRunIllegalArgumentException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -988,6 +997,17 @@ components:
         "message": "Failed to operate job template(s) [my_job] operation [UPDATE], reason [IllegalArgumentException]",
         "stack": [
           "java.lang.IllegalArgumentException: Invalid argument xxx",
+          "..."
+        ]
+      }
+
+    JobRunIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate job(s) operation [RUN] under object [my_test_metalake], reason [gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must be set for Spark jobs]",
+        "stack": [
+          "java.lang.IllegalArgumentException: gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must be set for Spark jobs",
           "..."
         ]
       }

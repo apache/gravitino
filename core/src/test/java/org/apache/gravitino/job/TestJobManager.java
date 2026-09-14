@@ -520,6 +520,38 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobPropagatesJobExecutorRejection() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity shellJobTemplate =
+        newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+
+    IllegalArgumentException rejection =
+        new IllegalArgumentException(
+            "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
+                + " be set for Spark jobs");
+    doThrow(rejection).when(jobExecutor).submitJob(any());
+
+    // The rejection must reach the caller as is, so the REST layer reports the original reason
+    // with a 400 instead of wrapping it into a generic 500 error.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+    Assertions.assertSame(rejection, e);
+
+    // No job entity is registered and the staging directory of the rejected job is removed.
+    verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
+    File templateStagingDir =
+        new File(testStagingDir, metalake + File.separator + shellJobTemplate.name());
+    String[] jobStagingDirs = templateStagingDir.list();
+    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+  }
+
+  @Test
   public void testRunJobSucceedsWhenStagingDirectoryAlreadyExists() throws Exception {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
