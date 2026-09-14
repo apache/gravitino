@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -204,6 +205,30 @@ public class TestSparkProcessBuilder {
     } finally {
       FileUtils.deleteDirectory(validSparkHome);
       FileUtils.deleteDirectory(invalidSparkHome);
+    }
+  }
+
+  @Test
+  public void testResolveSparkSubmitWithRelativeSparkHome() throws IOException {
+    // Created under the current working directory, so it is referenced by a relative path.
+    File relativeSparkHome =
+        Files.createTempDirectory(Paths.get(""), "gravitino-test-relative-spark-home").toFile();
+    try {
+      Assertions.assertFalse(relativeSparkHome.isAbsolute());
+      File sparkSubmit = new File(relativeSparkHome, "bin/spark-submit");
+      FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\n", "UTF-8");
+      Assertions.assertTrue(sparkSubmit.setExecutable(true));
+
+      // The Spark process runs in the job staging directory, so the resolved path must be
+      // absolute rather than relative to the server working directory.
+      String resolved =
+          SparkProcessBuilder.resolveSparkSubmit(
+              ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, relativeSparkHome.getPath()),
+              null);
+      Assertions.assertTrue(new File(resolved).isAbsolute());
+      Assertions.assertEquals(sparkSubmit.getAbsolutePath(), resolved);
+    } finally {
+      FileUtils.deleteDirectory(relativeSparkHome);
     }
   }
 

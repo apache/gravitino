@@ -76,14 +76,15 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
         "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
             + " be set for Spark jobs");
 
-    String sparkSubmit = sparkHome + "/bin/spark-submit";
-    File sparkSubmitFile = new File(sparkSubmit);
+    // Resolve to an absolute path: the Spark process runs in the job staging directory, so a
+    // relative path validated against the server working directory would not be found there.
+    File sparkSubmitFile = new File(sparkHome, "bin/spark-submit").getAbsoluteFile();
     // canExecute() alone is also true for a searchable directory, so require a regular file.
     Preconditions.checkArgument(
         sparkSubmitFile.isFile() && sparkSubmitFile.canExecute(),
         "spark-submit is not found or not executable: %s",
-        sparkSubmit);
-    return sparkSubmit;
+        sparkSubmitFile);
+    return sparkSubmitFile.getPath();
   }
 
   @VisibleForTesting
