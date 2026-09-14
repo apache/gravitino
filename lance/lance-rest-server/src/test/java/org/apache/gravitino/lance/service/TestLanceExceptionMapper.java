@@ -24,6 +24,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -31,6 +33,7 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.model.ErrorResponse;
 
 /** Tests for {@link LanceExceptionMapper}. */
@@ -79,12 +82,57 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(
           Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
       ErrorResponse entity = response.readEntity(ErrorResponse.class);
-      Assertions.assertEquals("assertion failure", entity.getError());
+      Assertions.assertEquals("Internal server error", entity.getError());
       Assertions.assertEquals("", entity.getInstance());
-      Assertions.assertTrue(
-          entity.getDetail().contains("java.lang.AssertionError: assertion failure"));
-      Assertions.assertTrue(
-          entity.getDetail().contains("Caused by: java.lang.IllegalStateException: root cause"));
+      Assertions.assertEquals("", entity.getDetail());
+    }
+  }
+
+  /** Verifies backend authorization failures use the Lance forbidden response. */
+  @Test
+  public void testBackendForbidden() {
+    assertAuthenticationError(new ForbiddenException("Access denied"), 403);
+  }
+
+  /** Verifies backend authentication failures use the Lance unauthenticated response. */
+  @Test
+  public void testBackendUnauthorized() {
+    assertAuthenticationError(new UnauthorizedException("Invalid credentials"), 401);
+  }
+
+  /** Verifies unexpected exceptions do not expose internal details in the response. */
+  @Test
+  public void testInternalFailureDoesNotExposeException() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "catalog.schema.table", new RuntimeException("private-backend-detail"))) {
+      Assertions.assertEquals(500, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("Internal server error", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  /** Verifies intentional protocol validation details remain available to callers. */
+  @Test
+  public void testProtocolValidationDetailsArePreserved() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "table",
+            new InvalidInputException("Invalid field", "field must be positive", "table"))) {
+      Assertions.assertEquals(400, response.getStatus());
+      Assertions.assertEquals(
+          "field must be positive", ((ErrorResponse) response.getEntity()).getDetail());
+    }
+  }
+
+  private void assertAuthenticationError(Exception exception, int status) {
+    try (Response response = LanceExceptionMapper.toRESTResponse("catalog", exception)) {
+      Assertions.assertEquals(status, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(exception.getMessage(), error.getError());
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertEquals("catalog", error.getInstance());
     }
   }
 }
