@@ -19,20 +19,11 @@ When Gravitino catalogs contain registered functions, the Trino connector:
 2. Filters to include only functions with `RuntimeType.TRINO` and `Language.SQL`.
 3. Maps each function implementation to a Trino `LanguageFunction` with a signature token derived from the function name and parameter types.
 
-Only functions with language `SQL` and runtime `TRINO` are visible to and callable from Trino.
-Functions registered for other languages or runtimes (for example a Python or Java implementation
-with runtime `SPARK`) are managed in Gravitino but are **not** exposed through this connector: they
-do not appear in `SHOW FUNCTIONS`, and invoking one fails with a Trino
-`Function "<catalog>.<schema>.<name>" not registered` error. The function still exists in
-Gravitino; the connector simply filters it out. The Gravitino UI function detail view shows, per
-implementation, whether it is exposed through the Trino connector.
+Only functions with language `SQL` and runtime `TRINO` are visible to and callable from Trino. Functions registered for other languages or runtimes (for example a Python or Java implementation with runtime `SPARK`) are managed in Gravitino but are **not** exposed through this connector: they do not appear in `SHOW FUNCTIONS`, and invoking one fails with a Trino `Function "<catalog>.<schema>.<name>" not registered` error. The function still exists in Gravitino; the connector simply filters it out. The Gravitino UI function detail view shows, per implementation, whether it is exposed through the Trino connector.
 
 ### SQL body format
 
-The `sql` field of a `SQL`/`TRINO` implementation is the function body. The connector assembles a
-complete [Trino SQL routine](https://trino.io/docs/current/routines/function.html) specification
-(`FUNCTION <name>(<params>) RETURNS <type> [NOT] DETERMINISTIC ...`) from the function name,
-parameters, return type and deterministic flag before handing it to Trino. The body may be:
+The `sql` field of a `SQL`/`TRINO` implementation is the function body. The connector assembles a complete [Trino SQL routine](https://trino.io/docs/current/routines/function.html) specification (`FUNCTION <name>(<params>) RETURNS <type> [NOT] DETERMINISTIC ...`) from the function name, parameters, return type and deterministic flag before handing it to Trino. The body may be:
 
 - A bare expression, e.g. `x + 1`. The connector wraps it as `RETURN x + 1`.
 - A control statement, e.g. `RETURN x + 1` or `BEGIN ... END`.
