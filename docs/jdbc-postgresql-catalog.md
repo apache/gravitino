@@ -122,8 +122,10 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 An unconstrained `Numeric` column, that is one declared without precision and scale, accepts values of up to
 131072 digits before and 16383 digits after the decimal point, and its precision and scale vary per row.
 Gravitino `Decimal` caps precision at 38 and is fixed per column, so such a column is mapped to the External
-Type `numeric` instead. A `Numeric(p, s)` column is mapped to `Decimal(p, s)` and a `Numeric(p)` column to
-`Decimal(p, 0)` as usual.
+Type `numeric` instead. A `Numeric(p, s)` column maps to `Decimal(p, s)` when `p` is at most 38
+and `s` is between 0 and `p`. Other constrained declarations, such as `numeric(39,0)`,
+`numeric(2,-3)`, and `numeric(3,5)`, map to External Types preserving their precision and scale.
+A `Numeric(p)` column follows the same rules with scale 0.
 
 PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
 mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and
