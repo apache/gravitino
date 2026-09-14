@@ -19,137 +19,108 @@
 
 # Container image advisories
 
-Existing dependency monitoring did not cover container images. The
-[Container Image Advisories workflow](../../.github/workflows/container-image-advisories.yml)
-adds repository-wide discovery and advisory vulnerability reports. It runs weekly
-on the upstream default branch and on manual dispatch, with no PR or push check.
-Vulnerabilities, missing coverage, unavailable images and scanner failures produce
-warnings only. None is a merge or build gate.
+Keep release and test images maintained with ordinary package scans and reviewable
+updates—not a zero-CVE gate or an exhaustive discovery system.
 
-## What is inventoried
+## Scope and cadence
 
-The collector reads tracked source files; it does not execute Gradle, Java, shell
-commands or Helm templates. Each run retains a deduplicated inventory with the
-declared reference, source file/line, normalized registry reference and unresolved
-declarations. Docker Hub shorthand aliases are deduplicated and untagged images
-are recorded as `latest`. These are scan targets, not rewritten source pins.
+The [maintained list](container-scan-images.json) includes published Gravitino
+images, CI/compatibility fixtures, chart dependencies and test tooling. Each entry
+records its purpose and source. Update it alongside release and fixture changes.
+It is scan configuration, not the authoritative fixture pin; Dependabot does not
+synchronize it. Preserve intentionally old compatibility versions where needed.
 
-| Declaration | Discovery coverage | Version-update coverage |
-| --- | --- | --- |
-| Dockerfiles/Containerfiles | Literal `FROM` and external `COPY --from` references, with global `ARG` defaults; excludes stage aliases and `scratch` | Dependabot Docker directories for `FROM`; external copy sources may need manual updates |
-| Compose files | Service `image` values, including nested literal environment defaults; local `build` services recorded separately | Dependabot Compose; its handling of interpolation and prerelease suffixes is limited |
-| GitHub Actions / Kubernetes | Literal service images, job containers and `docker://` actions | No additional automatic update coverage claimed for CI services/container actions |
-| Java/Testcontainers and Gradle | Image constants, literal constructor/`withImage`/`DockerImageName.parse` arguments, image enums and declared CI image environment defaults | Manual source updates; Gradle Dependabot does not update these literals |
-| Helm | Explicit repository/registry/tag/digest defaults and literal template image lines | Dependabot Docker scans chart default directories; computed tags/templates may need manual updates |
-| Shell tooling | Literal `docker run`/`pull` targets with recognized options | Manual source updates |
+The [workflow](../../.github/workflows/container-image-advisories.yml) runs monthly
+on the upstream default branch (first day, 07:23 UTC), manually, and after
+successful publication through [Publish Docker Image](../../.github/workflows/docker-image.yml).
+Manual input selects one image; blank input scans the list. Prefer a digest for
+exact-artifact checks. The publication hook scans the published tag in a separate
+read-only job without rebuilding or receiving publication secrets.
 
-The initial upstream inventory contained 41 unique registry references across
-nine Dockerfiles, five Compose files, the CI MySQL service, shared fixtures,
-maintenance tests, Gradle CI defaults, three Helm charts and two Docker helper
-scripts. Families include the Gravitino/CI/playground images; Ubuntu, Debian,
-Temurin and Python bases; MySQL, PostgreSQL, Doris, ClickHouse, OceanBase and
-StarRocks; Kafka, ZooKeeper, Hive/Trino/Ranger; MinIO, Moto, LocalStack, uv and curl.
-The generated artifact is authoritative for each run, not this historical count.
-RustFS is automatically included when its Compose manifest is present; this
-workflow does not depend on that migration.
+The hook applies only to revisions containing these workflows, not every external
+release process. It resolves the tag at scan time and records its digest, not an
+attestation that the tag still identifies the exact build just published.
+Monthly cadence is a maintenance tradeoff, not a mandated security standard.
+Run an extra scan for urgent advisories.
 
-The initial inventory also recorded 17 unresolved declarations: runtime image
-overrides, computed Helm templates and the local Ranger build image. Defaults
-are inventoried independently from those overrides. A caller can select other
-images at runtime, and a locally published snapshot is not necessarily the current
-registry snapshot. Dynamically concatenated refs, image references supplied only
-through private configuration, implicit Testcontainers helper images such as
-Ryuk, downloaded/generated Dockerfiles and local build outputs are not covered.
-Transitive chart defaults are not expanded. Documentation examples, Helm assertion
-fixtures, symlinks and the scanner's own
-matrix expression are excluded. The collector is deliberately not a complete
-Java/Kotlin/shell interpreter; new reference forms need discovery tests.
+There are no PR/push scan triggers, merge gates, automatic tickets, SARIF uploads
+or dependency-graph submissions. Findings and failures are warnings only.
+Existing integration tests still validate actual image updates.
 
-## Version updates
+## Evidence and limits
 
-[Dependabot](../../.github/dependabot.yml) checks Dockerfile/chart directories and
-recursively discovers Compose manifests weekly. It proposes ordinary reviewable
-PRs and does not auto-merge. The recursive Compose configuration also discovers
-new fixture manifests without a duplicate unused image list.
+Syft inventories each Linux amd64 registry image without running it. Grype matches
+the saved package inventory against its vulnerability database. The report keeps
+the resolved manifest digest, package types, all severities and unfixed findings.
+Per-image SBOMs, raw vulnerability JSON and summaries are retained for 30 days.
+Pinned actions use four-way parallelism, bounded timeouts and contents-read access.
 
-GitHub's Docker updater [preserves tag suffixes](https://github.com/dependabot/dependabot-core/blob/main/docker/README.md#supported-tag-schemas).
-Do not assume that it proposes every release-candidate update or the transition
-to a stable tag. Review upstream releases/advisories for image families whose
-versions need manual updates. Version availability never fails this monitoring
-workflow. Existing tests still validate any actual image update through their
-normal changed-path triggers; this workflow adds no required check.
+This is ordinary metadata-based scanning, not exploit testing or bespoke binary
+analysis. Missing metadata, opaque/static dependencies, other architectures,
+runtime downloads and overrides are not fully covered. RustFS rc.6 has no
+discovered Rust crates in the initial SBOM: OS-only findings do not establish
+embedded Rust dependency coverage. Zero matches do not prove an image is safe.
 
-## Scan evidence and limitations
+We do not parse arbitrary Java, Gradle, shell or generated manifests to promise
+whole-repository discovery. Reviewers must maintain the explicit list when images
+change. Scan final published products, not only their bases. Unpublished snapshots
+and local builds need a published reference or a separate build-specific check.
 
-Syft inventories each registry reference's Linux amd64 image without running it.
-Grype scans that retained SBOM, so a mutable tag cannot change between inventory
-and vulnerability matching. The per-image summary records the resolved manifest
-digest; source references that already include a digest retain it. The immutable
-action hashes are on the [ASF allowlist](https://github.com/apache/infrastructure-actions/blob/main/actions.yml)
-and select fixed scanner versions. GitHub Actions Dependabot can propose action
-updates. Scanner and registry access use no repository secrets.
+Failed downloads, empty inventories, missing platforms and invalid reports are
+warning states, never clean results. Platform outages or cancellation can interrupt
+a run. Check expected runs and artifacts; silence is not success. Scheduling starts
+only after default-branch placement. Verify the first hosted scan after merge.
 
-Inventory, SBOM, raw findings and summaries are retained for 30 days. All severities
-and unfixed findings remain visible. Failed downloads, timeouts, invalid reports,
-empty inventories and missing platform images are warning states, never evidence
-of a clean scan. Individual jobs continue independently, with four scans running
-at a time. Job/step failures are nonblocking; runner cancellation or a platform
-outage can still interrupt a run. Check that an expected weekly run produced its
-inventory and per-image artifacts rather than treating silence as success.
-If discovery exceeds GitHub's 256-job matrix limit, it retains the full inventory
-and warns that scans must be split; it does not silently scan only part of it.
+## Version updates and response
 
-Scanners depend on available package metadata and advisory databases. Opaque,
-statically linked dependencies, unsupported package types, local build changes,
-runtime downloads and other architectures may be absent. For example, the
-initial RustFS rc.6 amd64 check discovered Alpine packages but zero Rust packages.
-Usable `Cargo.lock`, [cargo-auditable metadata](https://oss.anchore.com/docs/capabilities/rust/)
-or a verified upstream SBOM is needed to establish embedded Rust coverage. A
-nonempty language inventory still does not prove that every dependency was found.
+[Dependabot](../../.github/dependabot.yml) checks supported Docker/chart directories
+and recursive Compose manifests weekly, with up to five open PRs per added
+ecosystem and no auto-merge. Existing language/action updates are unchanged.
+Java/Gradle image strings, computed Helm values and the scan list need manual
+maintenance. Prerelease suffixes can limit updates; release-candidate-to-stable
+transitions must not be assumed automatic. Verify the first hosted update check.
 
-## Maintainer response and optional tickets
+Version updates and vulnerability reporting are separate: Syft/Grype reports do
+not create Dependabot alerts or GitHub issues.
 
-Review [workflow summaries and artifacts](https://github.com/apache/gravitino/actions/workflows/container-image-advisories.yml)
-and upstream security advisories. Configure notifications or periodically inspect
-the workflow; these files do not change repository notification settings. Since
-findings are warnings, failure-only notifications are insufficient. Confirm the
-first scheduled run and Dependabot check after merge.
+Prioritize applicable findings in shipped products, especially exposed code,
+known exploitation and available fixes. Then maintain CI/test fixtures while
+preserving old-version compatibility coverage. A database-recorded package fix is
+not proof of a compatible replacement image. Check vendor guidance, test and rescan
+updates, and record a reason and revisit condition for deferrals. Avoid one issue
+per match and blanket suppressions.
 
-Triage public findings in an existing update PR or tracking issue: record the
-image reference and resolved digest, package/advisory IDs, applicability, available
-fixes and run link. Reuse the thread for repeat findings. For an urgent applicable
-finding, coordinate a focused update and its normal tests with maintainers via
-`dev@gravitino.apache.org`. If deferring, record rationale, owner and revisit date.
-New or nonpublic vulnerabilities follow [SECURITY.md](../../SECURITY.md).
-
-Automatic ticket filing is possible, but is **not enabled or implemented here**.
-A future explicit opt-in could maintain one rolling issue per normalized image
-repository, grouping its affected declared tags/digests. A stable hidden marker
-would locate the existing issue, and a digest/advisory fingerprint would suppress
-unchanged updates. Only trusted default-branch scheduled runs would write issues;
-new or changed findings would update that issue, and a successful complete scan
-could record resolution. Failed/incomplete scans must not close findings.
-This would require separately enabling `issues: write` and choosing triage owners
-and notification policy. The current workflow has only `contents: read`, no
-ticket-filing switch, and makes no issue, comment or repository-setting writes.
+Use [the follow-up issue](https://github.com/apache/gravitino/issues/13157) for public
+findings and focused updates. Nonpublic vulnerabilities follow
+[SECURITY.md](../../SECURITY.md). The workflow does not configure notifications;
+failure-only notifications miss warning-only findings.
 
 ## Local verification
 
 ```bash
-python3 -m venv /tmp/container-image-venv
-/tmp/container-image-venv/bin/pip install -r dev/ci/requirements-container-images.txt
-/tmp/container-image-venv/bin/python -m unittest discover -s dev/ci -p test_container_images.py -v
-/tmp/container-image-venv/bin/python dev/ci/container_images.py inventory --root . --output /tmp/container-inventory
+python3 -m unittest discover -s dev/ci -p test_container_image_report.py -v
 actionlint .github/workflows/container-image-advisories.yml
+actionlint -shellcheck="" .github/workflows/docker-image.yml
 ```
 
-To scan one discovered reference with the scanner versions selected by the action
-commits, then produce the same advisory summary:
+To generate the same evidence for one image:
 
 ```bash
-mkdir -p /tmp/container-report
-image=docker.io/library/ubuntu:22.04
-syft scan "registry:$image" --platform linux/amd64 -o syft-json=/tmp/container-report/sbom.json
-grype sbom:/tmp/container-report/sbom.json -o json --file /tmp/container-report/vulnerabilities.json
-python3 dev/ci/container_images.py report --image "$image" --directory /tmp/container-report
+report_dir=$(mktemp -d)
+image_ref=docker.io/apache/gravitino:1.3.0
+syft scan "registry:$image_ref" --platform linux/amd64 -o "syft-json=$report_dir/sbom.json"
+grype "sbom:$report_dir/sbom.json" -o json --file "$report_dir/vulnerabilities.json"
+python3 dev/ci/container_image_report.py --image "$image_ref" --directory "$report_dir"
 ```
+
+If a scanner fails, pass the actual `--sbom-outcome` and `--scan-outcome`
+to the reporter. Missing evidence must never be treated as clean.
+
+## Rationale
+
+[NIST SSDF](https://csrc.nist.gov/projects/ssdf) supports risk-based practices;
+[NIST SP 800-190](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf)
+recommends image vulnerability management. Neither mandates this monthly cadence.
+[Grype architecture](https://oss.anchore.com/docs/architecture/grype/) and
+[result interpretation](https://oss.anchore.com/docs/guides/vulnerability/interpreting-results/)
+explain package matching and its limits.
