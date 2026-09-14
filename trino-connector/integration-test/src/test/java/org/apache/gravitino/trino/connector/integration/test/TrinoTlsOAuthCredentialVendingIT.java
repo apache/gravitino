@@ -37,16 +37,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -60,10 +65,10 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -73,6 +78,7 @@ import org.testcontainers.containers.Container;
  * Gravitino and Iceberg REST requests, and Iceberg REST S3 credential vending.
  */
 @Tag("gravitino-docker-test")
+@EnabledIfSystemProperty(named = ITUtils.TEST_MODE, matches = ITUtils.DEPLOY_TEST_MODE)
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
@@ -100,8 +106,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    Assumptions.assumeFalse(ITUtils.isEmbedded(), "This test requires the deploy distribution");
-
     containerSuite.startLocalStackContainer();
     localStack = containerSuite.getLocalStackContainer();
     createBucket();
@@ -112,7 +116,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     configureGravitino();
     copyIcebergAwsBundle();
 
-    OAuthMockDataProvider.getInstance().setTokenData(mintToken().getBytes(StandardCharsets.UTF_8));
+    OAuthMockDataProvider.getInstance()
+        .setTokenData(mintToken("admin").getBytes(StandardCharsets.UTF_8));
     super.startIntegrationTest();
 
     createCatalog();
@@ -163,6 +168,27 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     assertFalse(objects.getStdout().isBlank(), "No Iceberg objects were written to S3");
 
     trinoContainer.executeUpdateSQL("DROP TABLE " + table);
+    trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
+  }
+
+  @Test
+  public void testForwardedUserTokenIsUsedForGravitinoRequests() throws Exception {
+    assertTrue(trinoContainer.checkSyncCatalogFromGravitino(10, catalogName));
+
+    // The session carries a user token in extra-credentials, so with
+    // gravitino.client.session.forwardUser=true the connector must call Gravitino as that user
+    // instead of the configured service identity.
+    String forwardedUser = "alice";
+    String schema = "forwarded";
+    try (Connection connection = openJdbcConnection(forwardedUser, mintToken(forwardedUser));
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("CREATE SCHEMA " + catalogName + "." + schema);
+    }
+
+    Schema created =
+        client.loadMetalake(metalakeName).loadCatalog(catalogName).asSchemas().loadSchema(schema);
+    assertEquals(forwardedUser, created.auditInfo().creator());
+
     trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
   }
 
@@ -336,6 +362,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
             + CLIENT_CREDENTIAL
             + "\n"
             + "gravitino.client.oauth2.scope=test\n"
+            + "gravitino.client.session.forwardUser=true\n"
             + "gravitino.iceberg.rest-uri="
             + containerIcebergRestUri()
             + "\n"
@@ -471,10 +498,27 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         .replace("0.0.0.0", "host.docker.internal");
   }
 
+  private Connection openJdbcConnection(String user, String userToken) throws Exception {
+    Properties properties = new Properties();
+    properties.setProperty("user", user);
+    properties.setProperty("extraCredentials", "token:" + userToken);
+    properties.setProperty("SSL", "true");
+    properties.setProperty("SSLVerification", "FULL");
+    properties.setProperty(
+        "SSLTrustStorePath", trinoConfigDirectory.resolve("tls/truststore.p12").toString());
+    properties.setProperty("SSLTrustStorePassword", STORE_PASSWORD);
+    properties.setProperty("SSLTrustStoreType", "PKCS12");
+    String url =
+        String.format(
+            "jdbc:trino://127.0.0.1:%d",
+            trinoContainer.getMappedPort(TrinoContainer.TRINO_HTTPS_PORT));
+    return DriverManager.getConnection(url, properties);
+  }
+
   @SuppressWarnings("JavaUtilDate")
-  private String mintToken() {
+  private String mintToken(String subject) {
     return Jwts.builder()
-        .setSubject("admin")
+        .setSubject(subject)
         .setAudience(AUDIENCE)
         .setExpiration(new Date(System.currentTimeMillis() + 3_600_000))
         .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
