@@ -20,9 +20,9 @@ package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Audit;
@@ -65,10 +65,29 @@ public class MetalakeDTO implements Metalake {
    */
   protected MetalakeDTO(
       String name, String comment, Map<String, String> properties, AuditDTO audit) {
+    this(name, comment, properties, audit, null);
+  }
+
+  /**
+   * Creates a new instance of MetalakeDTO.
+   *
+   * @param name The name of the Metalake DTO.
+   * @param comment The comment of the Metalake DTO.
+   * @param properties The properties of the Metalake DTO.
+   * @param audit The audit information of the Metalake DTO.
+   * @param owner The owner of the Metalake DTO.
+   */
+  protected MetalakeDTO(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      AuditDTO audit,
+      @Nullable OwnerDTO owner) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
     this.audit = audit;
+    this.owner = owner;
   }
 
   /**
@@ -202,9 +221,7 @@ public class MetalakeDTO implements Metalake {
     public MetalakeDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      MetalakeDTO dto = new MetalakeDTO(name, comment, properties, audit);
-      dto.owner = owner;
-      return dto;
+      return new MetalakeDTO(name, comment, properties, audit, owner);
     }
   }
 
@@ -217,10 +234,29 @@ public class MetalakeDTO implements Metalake {
       return false;
     }
     MetalakeDTO that = (MetalakeDTO) o;
-    return Objects.equal(name, that.name)
-        && Objects.equal(comment, that.comment)
+    return Objects.equals(name, that.name)
+        && Objects.equals(comment, that.comment)
         && propertyEqual(properties, that.properties)
-        && Objects.equal(audit, that.audit);
+        && Objects.equals(audit, that.audit)
+        && ownerEqual(owner, that.owner);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        name,
+        comment,
+        audit,
+        properties,
+        owner == null ? null : owner.name(),
+        owner == null ? null : owner.type());
+  }
+
+  /**
+   * @return the builder for creating a new instance of MetalakeDTO.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 
   private boolean propertyEqual(Map<String, String> p1, Map<String, String> p2) {
@@ -236,18 +272,18 @@ public class MetalakeDTO implements Metalake {
       return true;
     }
 
-    return java.util.Objects.equals(p1, p2);
+    return Objects.equals(p1, p2);
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(name, comment, audit, properties);
-  }
+  private boolean ownerEqual(@Nullable OwnerDTO owner1, @Nullable OwnerDTO owner2) {
+    if (owner1 == owner2) {
+      return true;
+    }
 
-  /**
-   * @return the builder for creating a new instance of MetalakeDTO.
-   */
-  public static Builder builder() {
-    return new Builder();
+    if (owner1 == null || owner2 == null) {
+      return false;
+    }
+
+    return Objects.equals(owner1.name(), owner2.name()) && owner1.type() == owner2.type();
   }
 }

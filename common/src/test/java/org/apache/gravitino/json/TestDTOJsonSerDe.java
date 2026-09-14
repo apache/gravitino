@@ -192,6 +192,15 @@ public class TestDTOJsonSerDe {
       Assertions.assertEquals("owner", restored.owner().name());
       Assertions.assertEquals(type, restored.owner().type());
       Assertions.assertEquals(dto, restored);
+      Assertions.assertEquals(dto.hashCode(), restored.hashCode());
+
+      MetalakeDTO differentOwner =
+          MetalakeDTO.builder()
+              .withName("lake")
+              .withAudit(audit)
+              .withOwner(OwnerDTO.builder().withName("another-owner").withType(type).build())
+              .build();
+      Assertions.assertNotEquals(dto, differentOwner);
     }
     String legacy =
         "{\"name\":\"lake\",\"audit\":{\"creator\":\"admin\",\"createTime\":\"1970-01-01T00:00:00Z\"}}";

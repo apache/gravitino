@@ -85,6 +85,7 @@ class DTOConverters {
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
         .withAudit((AuditDTO) metalake.auditInfo())
+        .withOwner(metalake.owner())
         .withRestClient(client)
         .build();
   }

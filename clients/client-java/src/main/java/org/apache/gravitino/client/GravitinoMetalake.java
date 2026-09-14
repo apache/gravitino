@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -48,6 +49,7 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
@@ -171,8 +173,9 @@ public class GravitinoMetalake extends MetalakeDTO
       String comment,
       Map<String, String> properties,
       AuditDTO auditDTO,
+      @Nullable OwnerDTO owner,
       RESTClient restClient) {
-    super(name, comment, properties, auditDTO);
+    super(name, comment, properties, auditDTO, owner);
     this.restClient = restClient;
     MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
@@ -1766,7 +1769,7 @@ public class GravitinoMetalake extends MetalakeDTO
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new GravitinoMetalake(name, comment, properties, audit, restClient);
+      return new GravitinoMetalake(name, comment, properties, audit, owner, restClient);
     }
   }
 
