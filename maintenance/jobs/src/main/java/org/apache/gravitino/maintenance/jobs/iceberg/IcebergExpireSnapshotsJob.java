@@ -133,7 +133,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     // Build Spark session with custom configs if provided
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Expire Snapshots");
-    IcebergJobUtils.applyIcebergRestAuth(sparkBuilder, catalogName);
+    IcebergJobUtils.applyIcebergRestAuth(sparkBuilder, catalogName, null);
 
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
