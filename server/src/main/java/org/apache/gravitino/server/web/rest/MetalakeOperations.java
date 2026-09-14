@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -38,11 +39,16 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -94,8 +100,31 @@ public class MetalakeOperations {
                 MetadataAuthzHelper.filterMetalakes(
                     metalakes,
                     AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
+            OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
             MetalakeDTO[] metalakeDTOs =
-                Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
+                Arrays.stream(metalakes)
+                    .map(
+                        metalake -> {
+                          @Nullable
+                          OwnerDTO owner =
+                              ownerDispatcher == null
+                                  ? null
+                                  : ownerDispatcher
+                                      .getOwner(
+                                          metalake.name(),
+                                          MetadataObjects.of(
+                                              null, metalake.name(), MetadataObject.Type.METALAKE))
+                                      .map(DTOConverters::toDTO)
+                                      .orElse(null);
+                          return MetalakeDTO.builder()
+                              .withName(metalake.name())
+                              .withComment(metalake.comment())
+                              .withProperties(metalake.properties())
+                              .withAudit(DTOConverters.toDTO(metalake.auditInfo()))
+                              .withOwner(owner)
+                              .build();
+                        })
+                    .toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
             LOG.info("List {} metalakes in Gravitino", metalakeDTOs.length);
             return response;

@@ -337,6 +337,24 @@ components:
           type: string
           description: A comment about the Metalake
           nullable: true
+        owner:
+          type: object
+          nullable: true
+          description: >-
+            The user or group owning the metalake, populated when listing metalakes.
+            Null when authorization is disabled, no owner is assigned, or ownership
+            was not loaded by the operation.
+          required:
+            - name
+            - type
+          properties:
+            name:
+              type: string
+              description: The owner name.
+            type:
+              type: string
+              enum: [user, group]
+              description: Whether the owner is a user or a group.
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         properties:

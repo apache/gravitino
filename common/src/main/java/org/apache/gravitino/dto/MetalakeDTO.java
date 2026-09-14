@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -26,6 +27,7 @@ import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 
 /** Represents a Metalake Data Transfer Object (DTO) that implements the Metalake interface. */
 @ToString
@@ -44,6 +46,11 @@ public class MetalakeDTO implements Metalake {
 
   @JsonProperty("audit")
   private AuditDTO audit;
+
+  @Nullable
+  @JsonProperty("owner")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
+  private OwnerDTO owner;
 
   /** Default constructor for Jackson deserialization. */
   protected MetalakeDTO() {}
@@ -97,6 +104,16 @@ public class MetalakeDTO implements Metalake {
   }
 
   /**
+   * Returns the owner included in a metalake list response.
+   *
+   * @return The owner, or null when ownership is unavailable or was not loaded.
+   */
+  @Nullable
+  public OwnerDTO owner() {
+    return owner;
+  }
+
+  /**
    * A builder class for constructing instances of MetalakeDTO.
    *
    * @param <S> The type of the builder subclass.
@@ -114,6 +131,9 @@ public class MetalakeDTO implements Metalake {
 
     /** The audit information of the Metalake DTO. */
     protected AuditDTO audit;
+
+    /** The optional owner of the Metalake DTO. */
+    @Nullable protected OwnerDTO owner;
 
     /** Default constructor. */
     protected Builder() {}
@@ -163,6 +183,17 @@ public class MetalakeDTO implements Metalake {
     }
 
     /**
+     * Sets the owner of the Metalake DTO.
+     *
+     * @param owner The owner, or null if ownership is unavailable.
+     * @return The builder instance.
+     */
+    public S withOwner(@Nullable OwnerDTO owner) {
+      this.owner = owner;
+      return (S) this;
+    }
+
+    /**
      * Builds an instance of MetalakeDTO using the builder's properties.
      *
      * @return An instance of MetalakeDTO.
@@ -171,7 +202,9 @@ public class MetalakeDTO implements Metalake {
     public MetalakeDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new MetalakeDTO(name, comment, properties, audit);
+      MetalakeDTO dto = new MetalakeDTO(name, comment, properties, audit);
+      dto.owner = owner;
+      return dto;
     }
   }
 

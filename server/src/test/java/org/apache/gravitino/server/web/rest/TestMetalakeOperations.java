@@ -33,11 +33,14 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -48,8 +51,13 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.MetalakeChange;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -67,11 +75,13 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
+import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
@@ -115,6 +125,7 @@ public class TestMetalakeOperations extends BaseOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(MetalakeOperations.class);
+    resourceConfig.register(ObjectMapperProvider.class).register(JacksonFeature.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -184,6 +195,82 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(2, metalakes.length);
     Assertions.assertEquals(metalakeName, metalakes[0].name());
     Assertions.assertEquals(metalakeName, metalakes[1].name());
+  }
+
+  @Test
+  public void testListMetalakesOwnerJson() throws Exception {
+    OwnerDispatcher previous = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", owners, true);
+    try {
+      BaseMetalake[] metalakes = new BaseMetalake[3];
+      for (int i = 0; i < metalakes.length; i++) {
+        metalakes[i] =
+            BaseMetalake.builder()
+                .withName("lake" + i)
+                .withId((long) i + 1)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("admin").withCreateTime(Instant.EPOCH).build())
+                .withVersion(SchemaVersion.V_0_1)
+                .build();
+      }
+      when(metalakeManager.listMetalakes()).thenReturn(metalakes);
+      when(owners.getOwner(
+              "lake0", MetadataObjects.of(null, "lake0", MetadataObject.Type.METALAKE)))
+          .thenReturn(
+              Optional.of(OwnerDTO.builder().withName("alice").withType(Owner.Type.USER).build()));
+      when(owners.getOwner(
+              "lake1", MetadataObjects.of(null, "lake1", MetadataObject.Type.METALAKE)))
+          .thenReturn(
+              Optional.of(
+                  OwnerDTO.builder().withName("admins").withType(Owner.Type.GROUP).build()));
+      when(owners.getOwner(
+              "lake2", MetadataObjects.of(null, "lake2", MetadataObject.Type.METALAKE)))
+          .thenReturn(Optional.empty());
+      try (Response response = target("/metalakes").request().get()) {
+        Assertions.assertEquals(200, response.getStatus());
+        String json = response.readEntity(String.class);
+        JsonNode root = new ObjectMapper().readTree(json);
+        Assertions.assertEquals(0, root.get("code").asInt());
+        JsonNode entries = root.get("metalakes");
+        Assertions.assertEquals(3, entries.size());
+        Assertions.assertEquals("lake0", entries.get(0).get("name").asText());
+        Assertions.assertEquals("alice", entries.get(0).get("owner").get("name").asText());
+        Assertions.assertEquals("user", entries.get(0).get("owner").get("type").asText());
+        Assertions.assertEquals("admins", entries.get(1).get("owner").get("name").asText());
+        Assertions.assertEquals("group", entries.get(1).get("owner").get("type").asText());
+        Assertions.assertTrue(entries.get(2).has("owner"));
+        Assertions.assertTrue(entries.get(2).get("owner").isNull());
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", previous, true);
+    }
+  }
+
+  @Test
+  public void testListMetalakesWithoutAuthorizationOwnerJson() throws Exception {
+    OwnerDispatcher previous = GravitinoEnv.getInstance().ownerDispatcher();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    try {
+      BaseMetalake metalake =
+          BaseMetalake.builder()
+              .withName("lake")
+              .withId(1L)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("admin").withCreateTime(Instant.EPOCH).build())
+              .withVersion(SchemaVersion.V_0_1)
+              .build();
+      when(metalakeManager.listMetalakes()).thenReturn(new BaseMetalake[] {metalake});
+      try (Response response = target("/metalakes").request().get()) {
+        Assertions.assertEquals(200, response.getStatus());
+        JsonNode entry =
+            new ObjectMapper().readTree(response.readEntity(String.class)).get("metalakes").get(0);
+        Assertions.assertTrue(entry.has("owner"));
+        Assertions.assertTrue(entry.get("owner").isNull());
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", previous, true);
+    }
   }
 
   @Test

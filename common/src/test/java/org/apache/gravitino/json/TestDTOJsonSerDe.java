@@ -25,9 +25,11 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.expressions.FieldReferenceDTO;
@@ -58,7 +60,8 @@ public class TestDTOJsonSerDe {
   private final String auditJson =
       "{\"creator\":%s,\"createTime\":%s,\"lastModifier\":%s,\"lastModifiedTime\":%s}";
 
-  private final String metalakeJson = "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
+  private final String metalakeJson =
+      "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s,\"owner\":null}";
 
   private final String columnJson =
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
@@ -172,6 +175,27 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(expectedJson1, serJson1);
     MetalakeDTO desermetalake1 = JsonUtils.objectMapper().readValue(serJson1, MetalakeDTO.class);
     Assertions.assertEquals(metalake1, desermetalake1);
+  }
+
+  @Test
+  public void testMetalakeOwnerSerDe() throws Exception {
+    AuditDTO audit = AuditDTO.builder().withCreator("admin").withCreateTime(Instant.EPOCH).build();
+    for (Owner.Type type : Owner.Type.values()) {
+      MetalakeDTO dto =
+          MetalakeDTO.builder()
+              .withName("lake")
+              .withAudit(audit)
+              .withOwner(OwnerDTO.builder().withName("owner").withType(type).build())
+              .build();
+      String json = JsonUtils.objectMapper().writeValueAsString(dto);
+      MetalakeDTO restored = JsonUtils.objectMapper().readValue(json, MetalakeDTO.class);
+      Assertions.assertEquals("owner", restored.owner().name());
+      Assertions.assertEquals(type, restored.owner().type());
+      Assertions.assertEquals(dto, restored);
+    }
+    String legacy =
+        "{\"name\":\"lake\",\"audit\":{\"creator\":\"admin\",\"createTime\":\"1970-01-01T00:00:00Z\"}}";
+    Assertions.assertNull(JsonUtils.objectMapper().readValue(legacy, MetalakeDTO.class).owner());
   }
 
   @Test
