@@ -52,6 +52,11 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
   // already had. Static because the catalog builds its own table operations through ServiceLoader.
   private static volatile String locationToUseInstead;
 
+  // Set by a test to reproduce the shape of LanceTableOperations#dropTable: the entity is removed
+  // first and the data deleted second, and a failure of the second step arrives after the table
+  // has already ceased to exist.
+  private static volatile boolean failAfterRemovingMetadata;
+
   /**
    * Makes every subsequent creation store the given location instead of the one the catalog
    * provisioned, the way a format returning an already existing table does.
@@ -62,9 +67,20 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
     locationToUseInstead = location;
   }
 
-  /** Stops overriding the location of created tables. */
+  /**
+   * Makes every subsequent drop remove the table metadata and then throw, the way a format that
+   * deletes the data as a second, non-atomic step fails.
+   *
+   * @param fail whether dropping should throw after the metadata is gone
+   */
+  public static void failAfterRemovingMetadata(boolean fail) {
+    failAfterRemovingMetadata = fail;
+  }
+
+  /** Stops overriding the location of created tables and failing drops. */
   public static void reset() {
     locationToUseInstead = null;
+    failAfterRemovingMetadata = false;
   }
 
   @Override
@@ -94,6 +110,15 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
       @Override
       protected IdGenerator idGenerator() {
         return idGenerator;
+      }
+
+      @Override
+      public boolean dropTable(NameIdentifier ident) {
+        boolean dropped = super.dropTable(ident);
+        if (failAfterRemovingMetadata) {
+          throw new RuntimeException("Failed to delete the data of table " + ident);
+        }
+        return dropped;
       }
 
       @Override

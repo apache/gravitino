@@ -18,10 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.lang.ref.WeakReference;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,7 +28,6 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -40,30 +36,17 @@ import org.slf4j.LoggerFactory;
 /**
  * A factory that discovers {@link TableLocationProvider}s through {@link ServiceLoader}.
  *
- * <p>Discovery is done once per class loader and remembered, because it is the expensive half:
- * selecting by name requires every registered provider to be instantiated so that {@link
- * TableLocationProvider#name()} can be called on it, and {@code name()} is an instance method, so
- * there is no way to learn the names without doing that at least once. What the cache removes is
- * repeating it for every catalog; it cannot remove the first pass. Creating a catalog after the
- * first then instantiates only the provider it selected.
- *
- * <p>The remembered index holds classes, and a class keeps its class loader alive, so the entries
- * are weak on both sides: the map is keyed weakly by class loader and holds each class through a
- * {@link WeakReference}. A strong value would pin the loader of a dropped catalog through the very
- * map meant to speed the next one up, which is the leak {@code [#12986]} removed elsewhere. A
- * collected entry simply causes the next lookup to scan again.
+ * <p>Selecting by name costs one instantiation of every registered provider, because {@link
+ * TableLocationProvider#name()} is an instance method and there is no way to learn the names
+ * without one. That is why the interface requires a constructor that acquires nothing: everything
+ * worth closing belongs in {@link TableLocationProvider#initialize(Map)}, which only the selected
+ * provider ever reaches. The scan is repeated per catalog rather than remembered, matching {@code
+ * LakehouseTableDelegatorFactory} in this module, and catalog creation is rare enough that the
+ * trivial constructions it costs do not justify a cache keyed by class loader.
  */
 public class TableLocationProviderFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableLocationProviderFactory.class);
-
-  /**
-   * Provider classes by lower-cased name, per class loader. Weak on both sides; see the class
-   * javadoc. Guarded by synchronization on the map itself rather than by a concurrent map, because
-   * {@link WeakHashMap} is not thread-safe and the map is touched once per catalog creation.
-   */
-  private static final Map<ClassLoader, Index> INDEXES =
-      Collections.synchronizedMap(new WeakHashMap<>());
 
   private TableLocationProviderFactory() {}
 
@@ -71,11 +54,9 @@ public class TableLocationProviderFactory {
    * Creates and initializes the {@link TableLocationProvider} registered under the given name.
    *
    * <p>A new instance is returned on every call, so the caller owns its lifecycle and is
-   * responsible for closing it. Only the selected provider is instantiated once the class loader
-   * has been scanned; the instances made during that first scan are discarded without {@link
-   * TableLocationProvider#close()} being called on them, which is safe only because the interface
-   * requires a constructor that acquires nothing. Everything worth closing is acquired in {@link
-   * TableLocationProvider#initialize(Map)}, which only the selected provider ever reaches.
+   * responsible for closing it. The instances made while scanning for the name are discarded
+   * without {@link TableLocationProvider#close()} being called on them, which is safe only because
+   * the interface requires a constructor that acquires nothing.
    *
    * @param name the provider name to look up, matched case-insensitively against {@link
    *     TableLocationProvider#name()}
@@ -95,15 +76,8 @@ public class TableLocationProviderFactory {
             .orElse(TableLocationProvider.class.getClassLoader());
     String key = name.toLowerCase(Locale.ROOT);
 
-    Index index = index(cl);
+    Index index = scan(cl);
     Class<? extends TableLocationProvider> type = index.get(key);
-    if (type == null) {
-      // Either never seen, or the entry was collected along with its class loader. Scanning again
-      // is the correct answer to both, and tells a caller asking for a provider added since the
-      // last scan about it.
-      index = rescan(cl);
-      type = index.get(key);
-    }
 
     Preconditions.checkArgument(
         !index.isDuplicated(key),
@@ -133,21 +107,7 @@ public class TableLocationProviderFactory {
   }
 
   /**
-   * Forgets everything discovered so far, so that the next lookup scans again. For tests, which
-   * register providers through class loaders they build themselves.
-   */
-  @VisibleForTesting
-  static void invalidateCache() {
-    INDEXES.clear();
-  }
-
-  private static Index index(ClassLoader cl) {
-    Index index = INDEXES.get(cl);
-    return index == null ? rescan(cl) : index;
-  }
-
-  /**
-   * Instantiates every registered provider once to learn its name, and remembers the resulting
+   * Instantiates every registered provider once to learn its name, and returns the resulting
    * name-to-class mapping.
    *
    * <p>A candidate whose constructor or {@link TableLocationProvider#name()} throws is logged and
@@ -168,8 +128,8 @@ public class TableLocationProviderFactory {
    * @param cl the class loader to scan
    * @return the index for that class loader
    */
-  private static Index rescan(ClassLoader cl) {
-    Map<String, WeakReference<Class<? extends TableLocationProvider>>> byName = new HashMap<>();
+  private static Index scan(ClassLoader cl) {
+    Map<String, Class<? extends TableLocationProvider>> byName = new HashMap<>();
     Set<String> duplicated = new HashSet<>();
 
     List<ServiceLoader.Provider<TableLocationProvider>> candidates =
@@ -202,23 +162,20 @@ public class TableLocationProviderFactory {
       }
 
       String key = name.toLowerCase(Locale.ROOT);
-      WeakReference<Class<? extends TableLocationProvider>> previous =
-          byName.put(key, new WeakReference<>(type));
-      if (previous != null && previous.get() != type) {
+      Class<? extends TableLocationProvider> previous = byName.put(key, type);
+      if (previous != null && previous != type) {
         duplicated.add(key);
         LOG.warn(
             "TableLocationProvider name '{}' is claimed by more than one implementation, including "
                 + "{} and {}. Catalogs selecting that name will fail to initialize.",
             name,
-            previous.get() == null ? "an unloaded class" : previous.get().getName(),
+            previous.getName(),
             type.getName());
       }
     }
 
-    Index index = new Index(byName, duplicated);
-    INDEXES.put(cl, index);
     LOG.info("Discovered TableLocationProviders: {}", byName.keySet());
-    return index;
+    return new Index(byName, duplicated);
   }
 
   private static TableLocationProvider instantiate(Class<? extends TableLocationProvider> type) {
@@ -248,23 +205,21 @@ public class TableLocationProviderFactory {
     }
   }
 
-  /** The providers discovered under one class loader, held weakly. */
+  /** The providers discovered under one class loader. */
   private static final class Index {
 
-    private final Map<String, WeakReference<Class<? extends TableLocationProvider>>> byName;
+    private final Map<String, Class<? extends TableLocationProvider>> byName;
 
     private final Set<String> duplicated;
 
     private Index(
-        Map<String, WeakReference<Class<? extends TableLocationProvider>>> byName,
-        Set<String> duplicated) {
+        Map<String, Class<? extends TableLocationProvider>> byName, Set<String> duplicated) {
       this.byName = byName;
       this.duplicated = duplicated;
     }
 
     private Class<? extends TableLocationProvider> get(String key) {
-      WeakReference<Class<? extends TableLocationProvider>> ref = byName.get(key);
-      return ref == null ? null : ref.get();
+      return byName.get(key);
     }
 
     private boolean isDuplicated(String key) {

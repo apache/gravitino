@@ -23,21 +23,12 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestTableLocationProviderFactory {
 
   private static final Map<String, String> CATALOG_PROPERTIES =
       ImmutableMap.of("location", "/tmp/catalog");
-
-  @BeforeEach
-  void forgetDiscoveredProviders() {
-    // The index is remembered per class loader and every test here shares one, so without this
-    // only the first test would exercise a real ServiceLoader scan and the rest would be reading
-    // back what it found.
-    TableLocationProviderFactory.invalidateCache();
-  }
 
   @Test
   void testCreateDefaultProvider() throws IOException {
@@ -138,39 +129,21 @@ public class TestTableLocationProviderFactory {
   }
 
   @Test
-  void testTheIndexIsReusedRatherThanRescanned() throws IOException {
+  void testEveryLookupScansRatherThanAnsweringFromACache() {
     FakeTableLocationProvider.reset();
 
-    try (TableLocationProvider ignored = create(DefaultTableLocationProvider.NAME)) {
-      // The first lookup has to construct every registered provider, including this one, because
-      // name() is an instance method and there is no other way to learn what a candidate answers
-      // to.
-      Assertions.assertTrue(FakeTableLocationProvider.constructedCount() >= 1);
-    }
-    int afterFirstScan = FakeTableLocationProvider.constructedCount();
+    TableLocationProviderFactory.create(DefaultTableLocationProvider.NAME, CATALOG_PROPERTIES);
+    int afterFirstLookup = FakeTableLocationProvider.constructedCount();
+    Assertions.assertTrue(afterFirstLookup >= 1, "selection has to construct every candidate");
 
-    try (TableLocationProvider ignored = create(DefaultTableLocationProvider.NAME)) {
-      // The second lookup reads the index, so no candidate other than the selected one is
-      // constructed. That is the whole benefit of the cache, and it is the part worth pinning.
-      Assertions.assertEquals(afterFirstScan, FakeTableLocationProvider.constructedCount());
-    }
-  }
+    TableLocationProviderFactory.create(DefaultTableLocationProvider.NAME, CATALOG_PROPERTIES);
 
-  @Test
-  void testInvalidatingTheIndexForcesARescan() throws IOException {
-    FakeTableLocationProvider.reset();
-
-    try (TableLocationProvider ignored = create(DefaultTableLocationProvider.NAME)) {
-      Assertions.assertTrue(FakeTableLocationProvider.constructedCount() >= 1);
-    }
-    int afterFirstScan = FakeTableLocationProvider.constructedCount();
-
-    TableLocationProviderFactory.invalidateCache();
-    try (TableLocationProvider ignored = create(DefaultTableLocationProvider.NAME)) {
-      // A dropped index is what a collected class loader leaves behind, and the next lookup has to
-      // survive it by scanning again rather than reporting the provider as missing.
-      Assertions.assertTrue(FakeTableLocationProvider.constructedCount() > afterFirstScan);
-    }
+    // Discovery is repeated per catalog rather than remembered. Pinned because it is a deliberate
+    // choice and not an oversight: a provider registered after the first catalog started is found
+    // by the next one, and nothing static outlives the lookup to be invalidated later.
+    Assertions.assertTrue(
+        FakeTableLocationProvider.constructedCount() > afterFirstLookup,
+        "a second lookup should scan again rather than answer from a remembered index");
   }
 
   private static TableLocationProvider create(String name) {

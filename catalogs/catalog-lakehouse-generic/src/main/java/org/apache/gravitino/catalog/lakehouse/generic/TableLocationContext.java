@@ -46,11 +46,17 @@ public class TableLocationContext {
 
   private final Schema schema;
 
+  private final boolean purge;
+
   private TableLocationContext(
-      NameIdentifier tableIdentifier, Map<String, String> tableProperties, Schema schema) {
+      NameIdentifier tableIdentifier,
+      Map<String, String> tableProperties,
+      Schema schema,
+      boolean purge) {
     this.tableIdentifier = tableIdentifier;
     this.tableProperties = tableProperties;
     this.schema = schema;
+    this.purge = purge;
   }
 
   /**
@@ -122,6 +128,23 @@ public class TableLocationContext {
   }
 
   /**
+   * Returns whether the removal this context is about is a purge rather than a drop. False on the
+   * creation-path callbacks, which are not a removal at all.
+   *
+   * <p>The two are not interchangeable, and a provider that treats them alike can be wrong in
+   * either direction. A drop leaves an external table's data where it is, so the catalog does not
+   * ask for its location back. A purge is the explicit request to destroy the data, and a format
+   * may honour it for an external table too -- {@code LanceTableOperations#purgeTable} deletes the
+   * dataset that its {@code dropTable} would have left alone -- so the location is handed back even
+   * when the table is external, because the data it pointed at is gone.
+   *
+   * @return true if the table is being purged rather than dropped
+   */
+  public boolean isPurge() {
+    return purge;
+  }
+
+  /**
    * Creates a builder for {@link TableLocationContext}.
    *
    * @return a new builder
@@ -138,6 +161,8 @@ public class TableLocationContext {
     private Map<String, String> tableProperties = ImmutableMap.of();
 
     private Schema schema;
+
+    private boolean purge;
 
     private Builder() {}
 
@@ -182,6 +207,18 @@ public class TableLocationContext {
     }
 
     /**
+     * Sets whether the removal this context is about is a purge rather than a drop. Defaults to
+     * false, which is also what the creation-path callbacks want.
+     *
+     * @param purge true if the table is being purged
+     * @return this builder
+     */
+    public Builder withPurge(boolean purge) {
+      this.purge = purge;
+      return this;
+    }
+
+    /**
      * Builds the {@link TableLocationContext}.
      *
      * @return the built context
@@ -189,7 +226,7 @@ public class TableLocationContext {
     public TableLocationContext build() {
       Preconditions.checkArgument(tableIdentifier != null, "tableIdentifier must not be null");
       Preconditions.checkArgument(schema != null, "schema must not be null");
-      return new TableLocationContext(tableIdentifier, tableProperties, schema);
+      return new TableLocationContext(tableIdentifier, tableProperties, schema, purge);
     }
   }
 }

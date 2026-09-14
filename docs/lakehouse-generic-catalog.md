@@ -44,12 +44,12 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-| Property                    | Description                                                                                                                                                                                                    | Example                 | Required |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
-| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      |
-| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       |
-| `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created.                               | `default`               | No       |
-| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       |
+| Property                    | Description                                                                                                                                                                                                                                                                                                               | Example                 | Required |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
+| `provider`                  | Catalog provider type                                                                                                                                                                                                                                                                                                     | `lakehouse-generic`     | Yes      |
+| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                                                                                                                              | `s3://bucket/lakehouse` | No       |
+| `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
+| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
 
 #### Pluggable table location provider
 
@@ -79,19 +79,22 @@ itself. A provider doing that should reject an unrecognized value rather than fa
 strategy, and should treat the property as immutable: a table provisioned under one strategy has to be
 unprovisioned under the same one.
 
-A **request that supplies its own `location` never reaches the provider**
--- the supplied value is stored, normalized only with a trailing slash. In this catalog a caller
-supplies a location mostly because the data is already there: an external Delta table, or a Lance
-registration, both of which point at a dataset that exists. Asking a provider for an address in
-those cases would repoint the table at a freshly allocated empty path and orphan the caller's data,
-while leaving behind an allocation that is never written to and never handed back.
+A **request that supplies its own `location` reaches the provider too**, with the supplied value
+visible as the `location` entry of `context.tableProperties()`. What happens to it is the provider's
+decision: return it unchanged to honour it, return something else to place the table elsewhere, or
+throw to refuse the creation. A provider enforcing a placement policy exists precisely for this
+request, and deciding it in the catalog would leave that provider with nothing to enforce.
 
-The catalog cannot tell those requests apart from a caller merely overriding placement, so it keeps
-the supplied location in both cases -- which is also exactly what it did before providers existed.
-A deployment that wants allocation to be mandatory has to reject a caller-supplied `location`
-before it reaches the catalog; a provider cannot enforce it, because it is not called. Everything
-else does reach the provider, including an external table that carries no `location`; the table
-format decides whether that combination is valid at all.
+This is not a behaviour change for a catalog on the built-in provider, which returns a supplied
+location verbatim as its first branch -- the same branch the catalog used to apply on its behalf.
+
+An implementation that allocates storage has to handle the case deliberately. In this catalog a
+caller usually supplies a location because the data is already there: an external Delta table, or a
+Lance registration, both of which point at a dataset that exists. Allocating a fresh path for one of
+those and returning it repoints the table at an empty directory and orphans the caller's data, while
+the creation still reports success. Returning the supplied value unchanged is the safe default.
+Everything else reaches the provider as well, including an external table that carries no
+`location`; the table format decides whether that combination is valid at all.
 
 `provisionTableLocation` runs on the server thread handling the table creation request. The catalog
 applies no timeout, so a provider that calls a remote service must bound every call itself and fail
@@ -132,27 +135,30 @@ drop after the metadata is already gone, which takes no crash and leaves the ser
 normally. A provider reclaiming real storage needs its own reconciliation to catch both, and must
 tolerate being called for a location that is already released.
 
-**External tables are skipped.** The catalog does not own their data — the table formats leave the
-dataset in place on drop — so asking a provider to hand the location back would invite it to delete
-exactly the data the catalog just promised not to touch. A leak is recoverable and a deletion is
-not, so `unprovisionTableLocation` is not called for a table whose `external` property is true.
-`context.isExternal()` reports the same flag on the paths where the provider *is* called.
+**Dropping an external table skips the callback; purging one does not.** On a drop the catalog does
+not own the data — the table formats leave the dataset in place — so asking a provider to hand the
+location back would invite it to delete exactly the data the catalog just promised not to touch. A
+leak is recoverable and a deletion is not, so `unprovisionTableLocation` is not called when a table
+whose `external` property is true is dropped.
 
-The `external` flag is an approximation of the rule this callback wants, which is "hand back only
-what was handed out", and two cases stay asymmetric under it:
+A purge is the opposite request. `LanceTableOperations.purgeTable` deletes the external dataset that
+its `dropTable` leaves alone, so by the time the callback would run the data is gone and the reason
+to skip has gone with it; the location is handed back. `context.isPurge()` tells the two apart and
+`context.isExternal()` reports the flag itself, so a provider that deletes storage of its own can
+make the same distinction.
 
-- An external table created *without* a location does get one provisioned, because both table
-  formats check the location only after the catalog has filled it in. Skipping leaks that
-  allocation.
-- A table that is not external, but whose creation carried its own `location`, was never
-  provisioned, yet is still unprovisioned — so the provider is asked about a path it never issued.
+Even so, `external` is only an approximation of the rule this callback wants, which is "hand back
+only what was handed out". An external table created *without* a location does get one provisioned,
+because both table formats check the location only after the catalog has filled it in, so skipping
+its drop leaks that allocation.
 
 Telling those apart exactly would need the catalog to record, per table, whether it provisioned the
 location, which it does not do today. Both are why a provider reclaiming real storage needs its own
 reconciliation, and why it must tolerate a location it does not recognize.
 
-There is no separate purge flag in the context, because for the tables this catalog manages
-`purgeTable` delegates to `dropTable` and the two paths remove exactly the same things.
+`ManagedTableOperations.purgeTable` delegates to `dropTable`, so for a format that does not override
+it the two paths remove the same things -- but Lance overrides both, and its purge deletes data its
+drop does not. A provider must not assume the two are interchangeable.
 
 ##### Releasing a location the table format did not use
 
@@ -223,12 +229,10 @@ Two constraints follow from `ServiceLoader` discovery:
 
 - The implementation needs a public no-argument constructor that is cheap and does not throw.
   Selecting a provider means asking each candidate its name, and `name()` is an instance method, so
-  every provider on the classpath is constructed once before the named one is selected. That scan
-  happens once per class loader and its result is remembered, so a heavy constructor costs the first
-  catalog to start rather than every catalog, but it still costs that one -- including when the
-  provider it is slowing down is not the one being selected. A constructor that throws costs that
-  provider the ability to be selected at all. Put clients, connection pools and other expensive
-  setup in `initialize`, which runs only on the selected provider.
+  every provider on the classpath is constructed once, per catalog, before the named one is
+  selected -- including when the provider being constructed is not the one selected. A constructor
+  that throws costs that provider the ability to be selected at all. Put clients, connection pools
+  and other expensive setup in `initialize`, which runs only on the selected provider.
 - `name()` must be unique across the classpath and must not be `default`, which is reserved by the
   built-in provider. If two providers share a name, every catalog selecting that name fails to
   initialize. A candidate whose constructor or `name()` throws is logged and skipped, so one
@@ -388,3 +392,19 @@ For additional operations, refer to [Schema Operations documentation](./manage-c
 Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats:
 
 - [Lance Format Support](./lakehouse-generic-lance-table.md)
+
+### Dropping a table that does not exist
+
+Dropping or purging a table this catalog does not have answers `200` with `{"dropped": false}`. It
+previously answered `404 NoSuchTableException`.
+
+This is a wire-level change for clients that treated a repeated `DELETE` as an error: such a request
+now succeeds with `dropped: false`. The new response is what `TableCatalog.dropTable` documents
+("False if the table does not exist") and what the other catalogs already return, so this catalog
+was the one out of step.
+
+:::note
+Introduced together with the [pluggable table location
+provider](#pluggable-table-location-provider), whose drop path reads the table before removing it
+so that the location can be handed back.
+:::

@@ -140,11 +140,18 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     this.catalogProperties =
         conf == null ? Map.of() : Collections.unmodifiableMap(Maps.newHashMap(conf));
 
+    // getOrDefault returns decode(null) rather than the default when the key is present with a
+    // null value, and the decoder of a string property is the identity, so an explicitly null
+    // `table-location-provider` arrives here as null. Falling back to the built-in provider is
+    // the same answer as leaving the property out, which is what a null value means; failing the
+    // whole catalog with "must not be blank" would contradict the null tolerance just above.
     String providerName =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(conf, GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER);
+        StringUtils.defaultIfBlank(
+            (String)
+                propertiesMetadata
+                    .catalogPropertiesMetadata()
+                    .getOrDefault(conf, GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER),
+            DefaultTableLocationProvider.NAME);
     this.tableLocationProvider =
         TableLocationProviderFactory.create(providerName, catalogProperties);
   }
@@ -228,9 +235,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // cached format invalidated. The schema is resolved once for the whole cascade rather than
     // once per table: every table here has the same parent, and the provider may not ask for it at
     // all.
-    Schema cascadedSchema = loadSchema(ident);
-    for (NameIdentifier tableIdent : tableIdents) {
-      dropOrPurgeTable(tableIdent, false /* purge */, cascadedSchema);
+    if (tableIdents.length > 0) {
+      Schema cascadedSchema = loadSchema(ident);
+      for (NameIdentifier tableIdent : tableIdents) {
+        dropOrPurgeTable(tableIdent, false /* purge */, cascadedSchema);
+      }
     }
 
     return schemaOps.dropSchema(ident, cascade);
@@ -280,16 +289,18 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
     ManagedTableOperations tableOps = configureTableOps(tableOpsSupplier.get());
 
-    // The provider is consulted only once the request is known to be one this catalog can serve,
-    // and only when the catalog is the one choosing the location. A provider that allocates real
-    // storage has no compensating callback, so every check that can be made before asking it for a
-    // location is one reservation it does not have to reclaim later.
-    String suppliedLocation = properties.get(Table.PROPERTY_LOCATION);
-    boolean provisioned = StringUtils.isBlank(suppliedLocation);
-    String tableLocation =
-        provisioned
-            ? provisionTableLocation(ident, properties, schema)
-            : DefaultTableLocationProvider.ensureTrailingSlash(suppliedLocation);
+    // The provider is consulted only once the request is known to be one this catalog can serve.
+    // A provider that allocates real storage has no compensating callback, so every check that can
+    // be made before asking it for a location is one reservation it does not have to reclaim.
+    //
+    // It is consulted even when the request carries its own `location`. The catalog used to skip
+    // it there, which read as respect for the caller's choice but left the provider unable to see,
+    // let alone refuse, a path outside the policy it exists to enforce -- the very bypass this SPI
+    // is meant to close. The supplied value is visible as the `location` entry of the context's
+    // table properties, and the built-in provider returns it verbatim as its first branch, so a
+    // catalog on the built-in provider is unaffected. What an allocating provider does with it is
+    // the provider's decision: honour it, rewrite it, or reject the creation.
+    String tableLocation = provisionTableLocation(ident, properties, schema);
 
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
@@ -298,9 +309,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Table createdTable =
         tableOps.createTable(
             ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
-    if (provisioned) {
-      releaseLocationIfUnused(ident, schema, newProperties, tableLocation, createdTable);
-    }
+    releaseLocationIfUnused(ident, schema, newProperties, tableLocation, createdTable);
     // Cache the table format for future use.
     tableFormatCache.put(ident, format);
     return createdTable;
@@ -394,16 +403,46 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             .withTableIdentifier(ident)
             .withTableProperties(tableProperties)
             .withSchema(schema)
+            .withPurge(purge)
             .build();
 
     // The properties just read are handed on rather than left to be read again: resolving the
     // table format is a second store read for the very same entity whenever the format cache is
     // cold, which for a drop it usually is.
     ManagedTableOperations tableOps = tableOps(ident, tableProperties);
-    boolean dropped = purge ? tableOps.purgeTable(ident) : tableOps.dropTable(ident);
-    tableFormatCache.invalidate(ident);
+    boolean dropped;
+    try {
+      dropped = purge ? tableOps.purgeTable(ident) : tableOps.dropTable(ident);
+    } catch (RuntimeException e) {
+      // A format that fails partway through a removal may already have deleted the metadata --
+      // LanceTableOperations removes the entity first and deletes the dataset second, and wraps a
+      // failure of the second step. The table can be gone with its location still allocated, and
+      // the caller sees only the format's exception, so the location is named here or nowhere. It
+      // is not unprovisioned: the format may equally have failed before touching storage, and
+      // handing back a location that still has data under it is the unrecoverable direction, the
+      // same reasoning as limitation (2) on a failed creation.
+      LOG.warn(
+          "Table format failed to {} table {}. If the metadata was already removed, its location "
+              + "'{}' is not handed back to table location provider '{}' and may be leaked.",
+          purge ? "purge" : "drop",
+          ident,
+          context.tableProperties().get(Table.PROPERTY_LOCATION),
+          tableLocationProvider.name(),
+          e);
+      throw e;
+    } finally {
+      // In a finally because a format that threw may still have removed the metadata, and a cache
+      // entry for a table that no longer exists is a stale format for whatever is created next
+      // under the same name.
+      tableFormatCache.invalidate(ident);
+    }
 
-    if (dropped && !context.isExternal()) {
+    // External data is left in place by a drop, so asking for the location back would invite the
+    // provider to delete exactly what the catalog just promised not to touch. A purge is the
+    // opposite request: LanceTableOperations#purgeTable deletes an external dataset that its
+    // dropTable would have left alone, so the location is handed back there even when the table is
+    // external -- the data it pointed at is gone either way.
+    if (dropped && (purge || !context.isExternal())) {
       TableLocationProvider provider = tableLocationProvider;
       try {
         provider.unprovisionTableLocation(context);
@@ -419,8 +458,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       }
     } else if (dropped) {
       LOG.debug(
-          "Table {} is external, so its location '{}' is left alone rather than handed back to "
-              + "table location provider '{}': the catalog does not own that data.",
+          "Table {} is external and was dropped rather than purged, so its location '{}' is left "
+              + "alone rather than handed back to table location provider '{}': the data is still "
+              + "there and the catalog does not own it.",
           ident,
           context.tableProperties().get(Table.PROPERTY_LOCATION),
           tableLocationProvider.name());

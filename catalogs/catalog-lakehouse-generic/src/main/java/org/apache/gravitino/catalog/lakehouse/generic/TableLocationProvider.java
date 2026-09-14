@@ -136,18 +136,23 @@ public interface TableLocationProvider extends Closeable {
    * nothing downstream appends to the location, and storing it unchanged is what lets a provider
    * unprovisioning it later match the string it handed out.
    *
-   * <p>A request that carries its own {@code location} never reaches this method; the supplied
-   * value is stored, normalized only with a trailing slash. In this catalog a caller supplies a
-   * location mostly because the data is already there -- an external Delta table, or a Lance
-   * registration -- and allocating a fresh empty path for one of those would orphan the caller's
-   * data while still reporting success. The catalog cannot tell those requests apart from a caller
-   * merely overriding placement, so it keeps the supplied location in both cases, which is also
-   * what it has always done. A deployment that wants allocation to be mandatory has to reject a
-   * caller-supplied location before it reaches the catalog; a provider cannot enforce it, because
-   * it is not called.
+   * <p><b>A request that carries its own {@code location} reaches this method too</b>, with the
+   * supplied value visible as the {@code location} entry of {@link
+   * TableLocationContext#tableProperties()}. The decision is the provider's: return it unchanged to
+   * honour it, return something else to place the table elsewhere, or throw to refuse the creation.
+   * A provider enforcing a placement policy would have nothing to enforce if the catalog decided
+   * this on its behalf, and a caller-supplied path is exactly the case such a policy exists for.
    *
-   * <p>Everything else reaches this method, including an external table that carries no location.
-   * Whether a table is external can be read from the {@code external} entry of {@link
+   * <p>An implementation that allocates storage has to handle that case deliberately, because in
+   * this catalog a caller usually supplies a location because the data is already there -- an
+   * external Delta table, or a Lance registration. Allocating a fresh empty path for one of those
+   * and returning it repoints the table at an empty directory and orphans the caller's data, while
+   * the creation still reports success. Returning the supplied value unchanged is the safe default
+   * and what the built-in provider does as its first branch, which is why a catalog on the built-in
+   * provider sees no change.
+   *
+   * <p>Everything else reaches this method as well, including an external table that carries no
+   * location. Whether a table is external can be read from the {@code external} entry of {@link
    * TableLocationContext#tableProperties()}.
    *
    * @param context the table being created and the context needed to derive its location
@@ -171,26 +176,26 @@ public interface TableLocationProvider extends Closeable {
    * failure is logged at WARN and the drop still reports success. Dropping a schema with cascade
    * unprovisions the location of every table it contains, one by one.
    *
-   * <p>It is <em>not</em> called for external tables. The catalog does not own their data -- the
-   * table formats leave the dataset in place on drop -- so asking a provider to hand the location
-   * back would invite it to delete exactly the data the catalog just promised not to touch. A leak
-   * is recoverable and a deletion is not, so the callback is skipped. {@link
+   * <p>It is <em>not</em> called when an external table is <b>dropped</b>. The catalog does not own
+   * their data -- the table formats leave the dataset in place on drop -- so asking a provider to
+   * hand the location back would invite it to delete exactly the data the catalog just promised not
+   * to touch. A leak is recoverable and a deletion is not, so the callback is skipped. {@link
    * TableLocationContext#isExternal()} reports the same flag on the paths where it is called.
    *
-   * <p>The external flag is an approximation of the rule this callback actually wants, which is
-   * "hand back only what was handed out", and two cases stay asymmetric under it. An external table
-   * created without a location <em>does</em> get one provisioned -- both table formats check the
-   * location after the catalog has filled it in -- and skipping leaks that one. A table that is not
-   * external but whose creation carried its own location was never provisioned, yet is still
-   * unprovisioned here, so the provider is asked about a path it never issued. Distinguishing them
-   * exactly would need the catalog to record, per table, whether it provisioned the location, which
-   * it does not do today. Both cases are why an implementation reclaiming real storage needs its
-   * own reconciliation, and why this method must tolerate a location it does not recognize.
+   * <p>It <em>is</em> called when an external table is <b>purged</b>. Purge and drop do not remove
+   * the same things: {@code LanceTableOperations#purgeTable} deletes the external dataset that its
+   * {@code dropTable} leaves alone, so by the time this runs the data is gone and the reason to
+   * skip has gone with it. {@link TableLocationContext#isPurge()} tells the two apart, and an
+   * implementation that deletes storage of its own should consult it rather than {@code external}
+   * alone.
    *
-   * <p>There is no purge flag in the context, because for the tables this catalog manages there is
-   * nothing to distinguish: {@code ManagedTableOperations.purgeTable} delegates straight to {@code
-   * dropTable}, so the two paths remove exactly the same things. The signal that matters is {@code
-   * external}, which is already available.
+   * <p>Even so, {@code external} is only an approximation of the rule this callback actually wants,
+   * which is "hand back only what was handed out". An external table created without a location
+   * <em>does</em> get one provisioned -- both table formats check the location after the catalog
+   * has filled it in -- and skipping its drop leaks that one. Distinguishing exactly would need the
+   * catalog to record, per table, whether it provisioned the location, which it does not do today.
+   * That is why an implementation reclaiming real storage needs its own reconciliation, and why
+   * this method must tolerate a location it does not recognize.
    *
    * <p>This method is only ever called for a table that is gone. A location provisioned for a table
    * that then went on to exist somewhere else is handed back through {@link
