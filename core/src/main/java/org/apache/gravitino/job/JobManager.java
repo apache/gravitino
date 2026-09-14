@@ -29,7 +29,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -847,6 +849,7 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
+    validateArtifactFileNames(content, jobConf);
     String executable =
         fetchFileFromUri(
             replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
@@ -1120,5 +1123,35 @@ public class JobManager implements JobOperationDispatcher {
 
   private <T> T updatedValue(T currentValue, Optional<T> newValue) {
     return newValue.orElse(currentValue);
+  }
+
+  private static void validateArtifactFileNames(
+      JobTemplateEntity.TemplateContent content, Map<String, String> jobConf) {
+    List<String> artifacts = new ArrayList<>();
+    artifacts.add(content.executable());
+    if (content.jobType() == JobTemplate.JobType.SHELL) {
+      artifacts.addAll(content.scripts());
+    } else if (content.jobType() == JobTemplate.JobType.SPARK) {
+      artifacts.addAll(content.jars());
+      artifacts.addAll(content.files());
+      artifacts.addAll(content.archives());
+    }
+
+    // Validate before fetching anything: all artifact kinds share the same staging directory.
+    Map<String, URI> sources = new HashMap<>();
+    for (String artifact : artifacts) {
+      URI source = URI.create(replacePlaceholder(artifact, jobConf)).normalize();
+      String fileName = new File(source.getPath()).getName();
+      if (source.getScheme() == null || "file".equalsIgnoreCase(source.getScheme())) {
+        source = new File(source.getPath()).getAbsoluteFile().toURI().normalize();
+      }
+      URI previous = sources.putIfAbsent(fileName, source);
+      Preconditions.checkArgument(
+          previous == null || previous.equals(source),
+          "Job artifacts %s and %s have the same staging filename: %s",
+          previous,
+          source,
+          fileName);
+    }
   }
 }

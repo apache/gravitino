@@ -164,6 +164,91 @@ public class TestJobTemplate {
   }
 
   @Test
+  public void testRejectExecutableScriptFilenameCollision() throws IOException {
+    File firstDir = Files.createTempDirectory(tempDir.toPath(), "first").toFile();
+    File secondDir = Files.createTempDirectory(tempDir.toPath(), "second").toFile();
+    File executable = new File(firstDir, "task.sh");
+    File script = new File(secondDir, "task.sh");
+    Files.writeString(executable.toPath(), "#!/bin/sh\necho FIRST\n");
+    Files.writeString(script.toPath(), "#!/bin/sh\necho SECOND\n");
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("collision")
+            .withExecutable(executable.toURI().toString())
+            .withScripts(Lists.newArrayList(script.toURI().toString()))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir));
+    Assertions.assertTrue(error.getMessage().contains("task.sh"));
+    Assertions.assertEquals(0, tempStagingDir.list().length);
+  }
+
+  @Test
+  public void testRejectSparkArtifactFilenameCollisions() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("spark-collision")
+            .withExecutable("/nonexistent-job-audit.jar")
+            .withClassName("Example")
+            .withJars(Lists.newArrayList("https://example.com/jars/shared.zip"))
+            .withFiles(Lists.newArrayList("https://example.com/files/config.txt"))
+            .withArchives(Lists.newArrayList("https://example.com/archives/shared.zip"))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir));
+    Assertions.assertTrue(error.getMessage().contains("shared.zip"));
+    Assertions.assertEquals(0, tempStagingDir.list().length);
+  }
+
+  @Test
+  public void testRepeatedArtifactUriIsAllowed() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "repeated", ".sh").toFile();
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("repeated")
+            .withExecutable(executable.getAbsolutePath())
+            .withScripts(
+                Lists.newArrayList(executable.toURI().toString(), executable.toURI().toString()))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    ShellJobTemplate runtime =
+        (ShellJobTemplate)
+            JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    Assertions.assertEquals(
+        Lists.newArrayList(runtime.executable(), runtime.executable()), runtime.scripts());
+  }
+
+  @Test
   public void testCreateShellRuntimeJobTemplate() throws IOException {
     File testScript1 = Files.createTempFile(tempDir.toPath(), "testScript1", ".sh").toFile();
     File testScript2 = Files.createTempFile(tempDir.toPath(), "testScript2", ".sh").toFile();
