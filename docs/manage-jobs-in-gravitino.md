@@ -69,8 +69,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ### Register a Spark Template
 
 A Spark template submits an application. Running one with the local executor needs either
-`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, or the job
-fails to launch.
+`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, pointing to a
+Spark installation with an executable `bin/spark-submit`. Otherwise, the run request is rejected with
+an error that names the missing setting, and no job is created.
 
 ```json
 {
