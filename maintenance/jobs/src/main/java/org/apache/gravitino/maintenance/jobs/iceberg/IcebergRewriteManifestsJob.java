@@ -33,7 +33,7 @@ import org.apache.spark.sql.SparkSession;
  * Built-in job for rewriting Iceberg table manifest files.
  *
  * <p>This job leverages Iceberg's RewriteManifestsProcedure to consolidate small manifest files and
- * rewrite manifests with improved partition specs, which improves scan planning performance.
+ * cluster manifest entries within an existing partition spec to improve scan planning.
  */
 public class IcebergRewriteManifestsJob implements BuiltInJob {
 
@@ -66,8 +66,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
    *   <li>--use-caching &lt;boolean&gt; Optional. Whether to cache the table metadata in Spark
    *       while rewriting (default: Iceberg's own default)
-   *   <li>--spec-id &lt;int&gt; Optional. Rewrite manifests to this partition spec ID (default: the
-   *       table's current spec)
+   *   <li>--spec-id &lt;int&gt; Optional. Rewrite manifests belonging to this partition spec ID
+   *       (default: the table's current spec)
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
    *
@@ -183,7 +183,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @param catalogName Iceberg catalog name
    * @param tableIdentifier Fully qualified table name
    * @param useCaching Whether to cache table metadata during the rewrite
-   * @param specId Partition spec ID to rewrite manifests to
+   * @param specId Existing partition spec ID whose manifests to rewrite
    * @return SQL CALL statement
    */
   static String buildProcedureCall(
@@ -263,8 +263,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
             + "Optional Options:\n"
             + "  --use-caching <boolean>   Cache table metadata in Spark while rewriting\n"
             + "                              Must be either 'true' or 'false'\n"
-            + "                              Default: true (Iceberg default)\n"
-            + "  --spec-id <int>           Rewrite manifests to this partition spec ID\n"
+            + "                              Default: installed Iceberg version's default\n"
+            + "  --spec-id <int>           Rewrite manifests belonging to this partition spec ID\n"
             + "                              Must be a non-negative integer\n"
             + "                              Default: the table's current partition spec\n"
             + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
@@ -278,7 +278,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
             + "  # Rewrite without caching table metadata\n"
             + "  --catalog iceberg_prod --table db.sample --use-caching false\n"
             + "\n"
-            + "  # Re-cluster manifests onto partition spec 2 after a spec evolution\n"
+            + "  # Consolidate manifests belonging to existing partition spec 2\n"
             + "  --catalog iceberg_prod --table db.sample --spec-id 2");
   }
 
