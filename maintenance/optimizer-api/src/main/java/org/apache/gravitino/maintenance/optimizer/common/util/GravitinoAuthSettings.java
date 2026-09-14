@@ -248,6 +248,7 @@ public final class GravitinoAuthSettings {
         break;
       case TYPE_OAUTH:
         if (StringUtils.isNotBlank(oauthToken)) {
+          // Static bearer token; not refreshed. Prefer client-credentials for long jobs.
           builder.withHeaders(ImmutableMap.of("Authorization", "Bearer " + oauthToken));
         } else {
           requireValue(oauthServerUri, "oauth server URI is required for oauth authentication");
@@ -300,8 +301,11 @@ public final class GravitinoAuthSettings {
           configs.put(prefix + ICEBERG_REST_OAUTH2_TOKEN, oauthToken);
         } else {
           requireValue(oauthServerUri, "oauth server URI is required for oauth authentication");
+          requireValue(oauthPath, "oauth path is required for oauth authentication");
           requireValue(oauthCredential, "oauth credential is required for oauth authentication");
-          configs.put(prefix + ICEBERG_REST_OAUTH2_SERVER_URI, oauthServerUri);
+          // Iceberg REST expects the full token endpoint in oauth2-server-uri (same as Spark
+          // IcebergRestOAuthConfig.joinUri).
+          configs.put(prefix + ICEBERG_REST_OAUTH2_SERVER_URI, joinUri(oauthServerUri, oauthPath));
           configs.put(prefix + ICEBERG_REST_OAUTH2_CREDENTIAL, oauthCredential);
           if (StringUtils.isNotBlank(oauthScope)) {
             configs.put(prefix + ICEBERG_REST_OAUTH2_SCOPE, oauthScope);
@@ -311,11 +315,11 @@ public final class GravitinoAuthSettings {
       case TYPE_SIMPLE:
         // Gravitino simple auth is a Basic token of user:dummy. Iceberg REST accepts the same
         // username with an unused password when the server authenticators include simple.
-        if (StringUtils.isNotBlank(username)) {
-          configs.put(prefix + ICEBERG_REST_AUTH_TYPE, "basic");
-          configs.put(prefix + ICEBERG_REST_BASIC_USERNAME, username);
-          configs.put(prefix + ICEBERG_REST_BASIC_PASSWORD, "dummy");
-        }
+        String simpleUser = firstNonBlank(username, System.getProperty("user.name"));
+        requireValue(simpleUser, "username is required for simple authentication");
+        configs.put(prefix + ICEBERG_REST_AUTH_TYPE, "basic");
+        configs.put(prefix + ICEBERG_REST_BASIC_USERNAME, simpleUser);
+        configs.put(prefix + ICEBERG_REST_BASIC_PASSWORD, "dummy");
         break;
       case TYPE_NONE:
         break;
@@ -398,5 +402,12 @@ public final class GravitinoAuthSettings {
     if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException(message);
     }
+  }
+
+  /** Joins an OAuth server base URI and token path into a full token endpoint URL. */
+  private static String joinUri(String serverUri, String tokenPath) {
+    return StringUtils.removeEnd(serverUri.trim(), "/")
+        + "/"
+        + StringUtils.removeStart(tokenPath.trim(), "/");
   }
 }
