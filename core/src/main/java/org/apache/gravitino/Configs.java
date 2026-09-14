@@ -586,7 +586,7 @@ public class Configs {
   public static final ConfigEntry<Boolean> CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES =
       new ConfigBuilder("gravitino.catalog.credential.backfillToProperties")
           .doc(
-              "If true, the server exposes hidden catalog credentials (such as jdbc-user and "
+              "If true, the server exposes hidden catalog credentials (such as "
                   + "jdbc-password) in the catalog properties response. Enable only during a "
                   + "rolling upgrade while old connectors that do not support credential vending "
                   + "are still in use. Enabling this is a security risk because credentials "
