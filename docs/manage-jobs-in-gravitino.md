@@ -236,6 +236,13 @@ default configurations:
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
 
+:::caution
+`gravitino.job.stagingDirKeepTimeInMs` also decides when an active job is considered left
+behind. A queued, started or cancelling job whose status has not changed for longer than this time
+is marked as `FAILED`, or as `CANCELLED` if it was being cancelled, no matter which job executor
+runs it. Such a job keeps its terminal status even if it later finishes in the job executor. Set
+this time longer than any job can run, or stay queued, without changing its status.
+:::
 
 #### Configurations for Local Job Executor
 
@@ -248,6 +255,30 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+
+When multiple Gravitino servers share the same metadata store, each server's local job executor
+only tracks the jobs it runs itself:
+
+- A job can only be run and tracked by the server that received the run request. Other servers
+  skip it when pulling job statuses.
+- Cancelling a job on a server that doesn't run it marks the job as `CANCELLING`, and the server
+  running the job cancels it the next time it pulls job statuses. This can take up to
+  `gravitino.job.statusPullIntervalInMs`.
+- If a server exits while running jobs, nobody can track these jobs anymore. When such a job has
+  not been updated for `gravitino.job.stagingDirKeepTimeInMs`, it is marked as `FAILED`, or as
+  `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
+  `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
+  directory.
+
+:::caution
+The local job executor gets a new identity every time the Gravitino server starts, so a restarted
+server doesn't recognize the jobs it ran before the restart. This also applies to a single-server
+deployment. The processes of these jobs are usually gone with the previous server process, but the
+jobs are only marked as `FAILED` once they expire as described above, which can take up to about
+1.1 times `gravitino.job.stagingDirKeepTimeInMs` (about 7.7 days by default), as the cleanup runs
+every tenth of that time. Until then, they are still reported as queued, started or cancelling.
+Cancelling such a job only marks it as `CANCELLING`, which also restarts the expiration.
+:::
 
 ## Future Work
 
