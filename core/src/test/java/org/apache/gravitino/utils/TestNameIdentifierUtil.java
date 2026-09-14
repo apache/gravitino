@@ -166,11 +166,37 @@ public class TestNameIdentifierUtil {
     assertEquals(expectedTagObject, tagObject);
 
     // test model version
-    Throwable e3 =
+    NameIdentifier modelVersion =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
+    MetadataObject modelVersionObject =
+        MetadataObjects.parse("catalog1.schema1.model1.0", MetadataObject.Type.MODEL_VERSION);
+    assertEquals(
+        modelVersionObject,
+        NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+  }
+
+  @Test
+  public void testRejectDottedMetadataObjectName() {
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    IllegalNameIdentifierException tableException =
         assertThrows(
-            IllegalArgumentException.class,
-            () -> NameIdentifierUtil.toMetadataObject(model, Entity.EntityType.MODEL_VERSION));
-    assertTrue(e3.getMessage().contains("Entity type MODEL_VERSION is not supported"));
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(table, Entity.EntityType.TABLE));
+    assertEquals(
+        "The TABLE name 'sales.2024' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        tableException.getMessage());
+
+    NameIdentifier topic =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "orders.created.v1");
+    IllegalNameIdentifierException topicException =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(topic, Entity.EntityType.TOPIC));
+    assertEquals(
+        "The TOPIC name 'orders.created.v1' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        topicException.getMessage());
   }
 
   @Test

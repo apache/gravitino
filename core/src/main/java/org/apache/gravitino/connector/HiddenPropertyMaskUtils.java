@@ -36,12 +36,19 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *   <li><b>Omit</b> keys that are both metadata-{@code reserved} and {@code hidden} (for example
  *       {@code gravitino.identifier}). Users cannot set them and UIs cannot edit them, so a masked
  *       placeholder is useless.
- *   <li><b>Mask</b> other hidden keys (credentials such as {@code jdbc-password}) and
- *       secret-manager URN values with {@link #MASKED_VALUE}, so clients can see that the property
- *       exists.
+ *   <li><b>Mask</b> other hidden keys (credentials such as {@code jdbc-password}), secret-manager
+ *       URN values, and undeclared keys whose names look sensitive (contain {@code secret}, {@code
+ *       password}, {@code token}, {@code credential}, {@code access}, or {@code account},
+ *       case-insensitive) with {@link #MASKED_VALUE}, so clients can see that the property exists
+ *       without reading the plaintext.
  *   <li>Return all other properties as-is, including reserved-but-visible ones (for example {@code
  *       in-use}, {@code numFiles}).
  * </ul>
+ *
+ * <p>Recovery via {@code getSecrets} covers secret-URN values and sensitive-named keys only. A
+ * property that is merely declared {@code hidden} (and whose name does not look sensitive) remains
+ * {@code ******} after merging {@code properties()} with {@code getSecrets()}; that API does not
+ * return it. See {@code org.apache.gravitino.secret.SupportsSecrets}.
  *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code
@@ -102,7 +109,9 @@ public final class HiddenPropertyMaskUtils {
       boolean reserved = metadata.isReservedProperty(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
-      } else if (hidden || SecretPropertyUtils.isSecretProperty(key, value)) {
+      } else if (hidden
+          || SecretPropertyUtils.isSecretProperty(key, value)
+          || SecretPropertyUtils.isSensitivePropertyKey(key)) {
         keysToMask.add(key);
       }
     }

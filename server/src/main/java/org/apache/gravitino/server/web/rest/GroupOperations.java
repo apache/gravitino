@@ -52,6 +52,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -64,7 +65,7 @@ public class GroupOperations {
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
   private static final String LOAD_GROUP_PRIVILEGE =
-      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
+      AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION;
 
   private final AccessControlDispatcher accessControlManager;
   private final OwnerDispatcher ownerDispatcher;
@@ -76,7 +77,7 @@ public class GroupOperations {
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   @GET

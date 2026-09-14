@@ -32,7 +32,10 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.Column;
@@ -55,17 +58,18 @@ public class TestViewHookDispatcher {
   @Test
   public void testCreateViewSetsOwnerWithNormalizedIdentifier() throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
     View createdView = Mockito.mock(View.class);
     Mockito.when(dispatcher.createView(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdView);
-    ViewHookDispatcher hook =
-        new ViewHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+    ViewDispatcher hook =
+        new ViewNormalizeDispatcher(
+            new ViewHookDispatcher(dispatcher, () -> ownerDispatcher), catalogManager);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "SCHEMA_NORM", "MY_VIEW");
 
     try (MockedStatic<PrincipalUtils> principalUtils = Mockito.mockStatic(PrincipalUtils.class)) {
@@ -88,7 +92,7 @@ public class TestViewHookDispatcher {
     View createdView = Mockito.mock(View.class);
     Mockito.when(dispatcher.createView(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdView);
-    ViewHookDispatcher hook = new ViewHookDispatcher(dispatcher, () -> null, catalogManager);
+    ViewHookDispatcher hook = new ViewHookDispatcher(dispatcher, () -> null);
 
     assertSame(
         createdView, createView(hook, NameIdentifier.of(METALAKE, CATALOG, "schema", "view")));
@@ -103,14 +107,13 @@ public class TestViewHookDispatcher {
         .when(ownerDispatcher)
         .setOwner(any(), any(), any(), any());
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
     Mockito.when(dispatcher.createView(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Mockito.mock(View.class));
-    ViewHookDispatcher hook =
-        new ViewHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+    ViewHookDispatcher hook = new ViewHookDispatcher(dispatcher, () -> ownerDispatcher);
 
     RuntimeException thrown =
         assertThrows(
@@ -124,8 +127,7 @@ public class TestViewHookDispatcher {
   @Test
   public void testRenameViewUpdatesAuthorizationMapping() {
     ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
-    ViewHookDispatcher hook =
-        new ViewHookDispatcher(dispatcher, () -> null, Mockito.mock(CatalogManager.class));
+    ViewHookDispatcher hook = new ViewHookDispatcher(dispatcher, () -> null);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "view");
     View alteredView = Mockito.mock(View.class);
     ViewChange setChange = ViewChange.setProperty("key", "value");
@@ -146,7 +148,7 @@ public class TestViewHookDispatcher {
     }
   }
 
-  private View createView(ViewHookDispatcher hook, NameIdentifier ident) {
+  private View createView(ViewDispatcher hook, NameIdentifier ident) {
     Representation[] representations =
         new Representation[] {
           SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()

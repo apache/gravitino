@@ -36,7 +36,9 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.FunctionNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
@@ -60,8 +62,6 @@ public class TestFunctionHookDispatcher {
     Function registeredFunction = Mockito.mock(Function.class);
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
 
-    CatalogManager catalogManager = catalogManagerWith(Capability.DEFAULT);
-
     Mockito.when(
             dispatcher.registerFunction(
                 Mockito.eq(functionIdentifier),
@@ -72,7 +72,7 @@ public class TestFunctionHookDispatcher {
         .thenReturn(registeredFunction);
 
     FunctionHookDispatcher hookDispatcher =
-        new FunctionHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+        new FunctionHookDispatcher(dispatcher, () -> ownerDispatcher);
     Function result =
         hookDispatcher.registerFunction(
             functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
@@ -108,9 +108,7 @@ public class TestFunctionHookDispatcher {
                 Mockito.eq(definitions)))
         .thenReturn(registeredFunction);
 
-    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    FunctionHookDispatcher hookDispatcher =
-        new FunctionHookDispatcher(dispatcher, () -> null, catalogManager);
+    FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher, () -> null);
     Function result =
         hookDispatcher.registerFunction(
             functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
@@ -118,7 +116,6 @@ public class TestFunctionHookDispatcher {
     assertSame(registeredFunction, result);
     Mockito.verify(dispatcher)
         .registerFunction(functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
-    Mockito.verifyNoInteractions(catalogManager);
   }
 
   @Test
@@ -136,9 +133,10 @@ public class TestFunctionHookDispatcher {
                 any(), any(), any(), Mockito.anyBoolean(), any()))
         .thenReturn(mockFunction);
 
-    FunctionHookDispatcher hook =
-        new FunctionHookDispatcher(
-            mockFunctionDispatcher, () -> mockOwnerDispatcher, catalogManager);
+    FunctionDispatcher hook =
+        new FunctionNormalizeDispatcher(
+            new FunctionHookDispatcher(mockFunctionDispatcher, () -> mockOwnerDispatcher),
+            catalogManager);
     NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "SCHEMA_NORM", "MY_FUNC");
     hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions);
 
@@ -156,8 +154,6 @@ public class TestFunctionHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    CatalogManager catalogManager = catalogManagerWith(Capability.DEFAULT);
-
     FunctionDispatcher mockFunctionDispatcher = Mockito.mock(FunctionDispatcher.class);
     Function mockFunction = Mockito.mock(Function.class);
     FunctionDefinition[] definitions = new FunctionDefinition[] {};
@@ -167,8 +163,7 @@ public class TestFunctionHookDispatcher {
         .thenReturn(mockFunction);
 
     FunctionHookDispatcher hook =
-        new FunctionHookDispatcher(
-            mockFunctionDispatcher, () -> mockOwnerDispatcher, catalogManager);
+        new FunctionHookDispatcher(mockFunctionDispatcher, () -> mockOwnerDispatcher);
     NameIdentifier ident =
         NameIdentifier.of("metalake1", "catalog1", "schema_owner_fail", "func_owner_fail");
     RuntimeException thrown =
@@ -186,7 +181,7 @@ public class TestFunctionHookDispatcher {
     NameIdentifier normalizedIdentifier =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
     FunctionDispatcher dispatcher = Mockito.mock(FunctionDispatcher.class);
-    Mockito.when(dispatcher.dropFunction(functionIdentifier))
+    Mockito.when(dispatcher.dropFunction(normalizedIdentifier))
         .thenReturn(true, false)
         .thenThrow(new RuntimeException("Drop failed"));
     CatalogManager catalogManager = catalogManagerWith(new CaseInsensitiveCapability());
@@ -205,8 +200,9 @@ public class TestFunctionHookDispatcher {
 
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
       envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
-      FunctionHookDispatcher hookDispatcher =
-          new FunctionHookDispatcher(dispatcher, () -> null, catalogManager);
+      FunctionDispatcher hookDispatcher =
+          new FunctionNormalizeDispatcher(
+              new FunctionHookDispatcher(dispatcher, () -> null), catalogManager);
 
       assertTrue(hookDispatcher.dropFunction(functionIdentifier));
       assertFalse(hookDispatcher.dropFunction(functionIdentifier));
@@ -221,16 +217,15 @@ public class TestFunctionHookDispatcher {
       // mock represents that integration boundary and must not receive a removal callback.
       Mockito.verifyNoInteractions(catalogAuthorizationPlugin);
       Mockito.verify(catalogManager, Mockito.never()).loadCatalog(any());
-      Mockito.verify(catalogManager, Mockito.times(1)).loadCatalogAndWrap(any());
+      Mockito.verify(catalogManager, Mockito.times(3)).doWithCatalog(any(), any());
     }
   }
 
   private static CatalogManager catalogManagerWith(Capability capability) throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper catalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogWrapper.capabilities()).thenReturn(capability);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     return catalogManager;
   }
 

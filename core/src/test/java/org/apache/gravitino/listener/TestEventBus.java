@@ -29,6 +29,7 @@ import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
@@ -101,6 +102,7 @@ public class TestEventBus {
   @AfterEach
   void clearRequestContext() {
     RequestContext.resetOperationFailureFired();
+    RequestContext.resetOperationSuccessFired();
     RequestContext.clear();
   }
 
@@ -138,6 +140,41 @@ public class TestEventBus {
         RequestContext.isOperationFailureFired(),
         "Flag must NOT be set when dispatching HttpRequestFailureEvent — "
             + "it is the HTTP-layer event and must not suppress itself");
+  }
+
+  // ─── operationSuccessFired flag marking ──────────────────────────────────────
+
+  @Test
+  void testOperationLayerSuccessEventSetsOperationSuccessFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    Event successEvent =
+        new Event("user", NameIdentifier.of("test")) {
+          @Override
+          public OperationStatus operationStatus() {
+            return OperationStatus.SUCCESS;
+          }
+        };
+
+    Assertions.assertFalse(RequestContext.isOperationSuccessFired(), "Flag must start as false");
+    eventBus.dispatchEvent(successEvent);
+    Assertions.assertTrue(
+        RequestContext.isOperationSuccessFired(),
+        "Flag must be set after dispatching an operation-layer success event");
+  }
+
+  @Test
+  void testHttpRequestEventDoesNotSetOperationSuccessFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    HttpRequestEvent httpEvent =
+        new HttpRequestEvent(
+            "alice", "1.2.3.4", "GET", "/api/metalakes", 200, EventSource.GRAVITINO_SERVER);
+
+    eventBus.dispatchEvent(httpEvent);
+
+    Assertions.assertFalse(
+        RequestContext.isOperationSuccessFired(),
+        "Flag must NOT be set when dispatching HttpRequestEvent — "
+            + "it is the HTTP-layer fallback event and must not suppress itself");
   }
 
   static class ThrowingEventListener implements EventListenerPlugin {

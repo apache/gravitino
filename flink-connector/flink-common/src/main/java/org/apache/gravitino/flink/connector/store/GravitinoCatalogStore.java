@@ -20,8 +20,6 @@
 package org.apache.gravitino.flink.connector.store;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,9 +220,6 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   }
 
   private static Map<String, String> propsWithSecrets(Catalog catalog) {
-    Map<String, String> props =
-        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    props.putAll(catalog.supportsSecrets().getSecrets());
-    return props;
+    return PropertyUtils.propertiesWithSecrets(catalog.properties(), catalog::supportsSecrets);
   }
 }

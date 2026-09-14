@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +34,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +53,7 @@ public class TestFunctionOperationDispatcher {
   private EntityStore store;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws Exception {
     catalogManager = mock(CatalogManager.class);
     schemaOps = mock(SchemaOperationDispatcher.class);
     store = mock(EntityStore.class);
@@ -57,10 +61,8 @@ public class TestFunctionOperationDispatcher {
     CatalogManager.CatalogWrapper icebergWrapper = createMockCatalogWrapper("lakehouse-iceberg");
     CatalogManager.CatalogWrapper hiveWrapper = createMockCatalogWrapper("hive");
 
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
-        .thenReturn(icebergWrapper);
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
-        .thenReturn(hiveWrapper);
+    mockCatalogWrapper(NameIdentifier.of(METALAKE, ICEBERG_CATALOG), icebergWrapper);
+    mockCatalogWrapper(NameIdentifier.of(METALAKE, HIVE_CATALOG), hiveWrapper);
 
     dispatcher =
         new FunctionOperationDispatcher(
@@ -118,6 +120,19 @@ public class TestFunctionOperationDispatcher {
 
     CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     when(wrapper.catalog()).thenReturn(catalog);
-    return wrapper;
+    return CatalogTestUtils.mockDetachConnectorResult(wrapper);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void mockCatalogWrapper(
+      NameIdentifier ident, CatalogManager.CatalogWrapper catalogWrapper) throws Exception {
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogManager.CatalogWrapper, Object> operation =
+                  invocation.getArgument(1);
+              return operation.apply(catalogWrapper);
+            })
+        .when(catalogManager)
+        .doWithCatalogWrapper(eq(ident), any());
   }
 }

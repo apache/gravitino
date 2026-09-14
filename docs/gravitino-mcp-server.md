@@ -71,6 +71,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 | Tool name                           | Description                                                                    | Tag          |
 |-------------------------------------|--------------------------------------------------------------------------------|--------------|
+| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`   |
 | `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`    |
 | `create_catalog`                    | Create a new catalog.                                                          | `catalog`    |
 | `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`    |
@@ -144,7 +145,7 @@ You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows
 
 | Argument                         | Description                                                                                                                     | Default value               | Required |
 |----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`                     | The Gravitino metalake name.                                                                                                    | none                        | Yes      |
+| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                       | none                        | No       |
 | `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
 | `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
 | `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
@@ -233,6 +234,48 @@ To serve the MCP HTTP endpoint (the `--mcp-url`, not the `--gravitino-uri`) over
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --transport streamable-http --mcp-url https://localhost:8000/mcp \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+```
+
+## Selecting a metalake
+
+A metalake is Gravitino's top-level tenant boundary, and every tool operates inside one. `--metalake` sets the **default**: the metalake used by any tool call that does not name one itself. It is optional on every transport.
+
+Any tool call may name a different metalake with a `metalake` argument, which takes priority over the default. The argument is optional on every tool, so a server configured with `--metalake` behaves exactly as it always has for callers that ignore it.
+
+The metalake for a call is resolved in this order:
+
+1. The call's own `metalake` argument, when it passes one.
+2. The `--metalake` startup default, when it is configured.
+3. Otherwise the call fails, telling the agent to call `list_metalakes` and retry.
+
+Because each call carries its own metalake, one server instance can serve several metalakes at once: nothing is remembered between calls, so concurrent callers never see each other's metalake and the server stays correct however many replicas it runs as. This works identically over stdio and HTTP.
+
+Use the `list_metalakes` tool to discover which metalakes a caller may use. It is the one tool that does not need a metalake, so it works on a server started with no `--metalake` at all.
+
+The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) shipped their own `metalake_name` argument before metalake selection was unified. It is still accepted as a deprecated alias for `metalake`, so existing callers keep working; passing both with different values is rejected. New callers should use `metalake`.
+
+Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
+
+### Examples
+
+Single metalake, agents never think about it — the common case, and unchanged:
+
+```bash
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
+```
+
+Several metalakes behind one server, with `prod` as the default:
+
+```bash
+uv run mcp_server --metalake prod --transport http --mcp-url http://0.0.0.0:8000/mcp
+```
+
+An agent then works in `prod` by default and switches per request when asked — "which catalogs are in the staging metalake?" sends `metalake=staging` on that call alone, without restarting or reconfiguring anything.
+
+No default at all, every call chooses:
+
+```bash
+uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 ```
 
 ## Audit Logging

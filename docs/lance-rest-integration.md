@@ -138,7 +138,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 # it via Lance REST API `CreateNamespace` or Gravitino REST API `CreateCatalog`.
 spark = SparkSession.builder \
     .appName("lance_rest_integration") \
-    .config("spark.sql.catalog.lance", "com.lancedb.lance.spark.LanceNamespaceSparkCatalog") \
+    .config("spark.sql.catalog.lance", "org.lance.spark.LanceNamespaceSparkCatalog") \
     .config("spark.sql.catalog.lance.impl", "rest") \
     .config("spark.sql.catalog.lance.uri", "http://localhost:9101/lance") \
     .config("spark.sql.catalog.lance.parent", "lance_catalog") \
