@@ -58,6 +58,9 @@ paths:
   /health/ready:
     $ref: "./health.yaml#/paths/~1health~1ready"
 
+  /system/iceberg-rest:
+    $ref: "./system.yaml#/paths/~1system~1iceberg-rest"
+
   /metalakes:
     # escape the path name by replacing `/` with `~1`
     $ref: "./metalakes.yaml#/paths/~1metalakes"

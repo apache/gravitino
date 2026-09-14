@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.junit.jupiter.api.Test;
 
@@ -222,6 +224,80 @@ public class TestIcebergRESTServiceOperations {
                     "gravitino-metalake", "prod")),
             "gravitino-host");
     assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testAdvertisedUriIsReportedAsIs() {
+    // A reverse-proxied IRC: the public scheme, host, port and path all differ from the listener's.
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "0.0.0.0",
+                    "httpPort", "9001",
+                    "advertised-uri", "https://iceberg.example.com/iceberg/")),
+            "gravitino.example.com");
+    assertEquals("https://iceberg.example.com/iceberg/", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testAdvertisedUriStillRequiresMatchingMetalake() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "gravitino-metalake", "prod",
+                    "advertised-uri", "https://iceberg.example.com/iceberg")),
+            "gravitino-host");
+    assertNull(uriOf(ops.getIcebergRestServiceUri("test")));
+    assertEquals(
+        "https://iceberg.example.com/iceberg", uriOf(ops.getIcebergRestServiceUri("prod")));
+  }
+
+  @Test
+  public void testAdvertisedUriStillRequiresDynamicConfigProvider() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            ImmutableMap.of("advertised-uri", "https://iceberg.example.com/iceberg"),
+            "gravitino-host");
+    assertNull(uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testBlankAdvertisedUriFallsBackToDerivedEndpoint() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            withDynamicProvider(ImmutableMap.of("host", "irc-host", "advertised-uri", " ")),
+            "gravitino-host");
+    assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testInvalidAdvertisedUriIsAnInternalError() {
+    for (String invalid :
+        new String[] {
+          "iceberg.example.com/iceberg",
+          "ftp://iceberg.example.com/iceberg",
+          "https:///iceberg",
+          "https://iceberg.example.com/iceberg?x=1",
+          "https://iceberg.example.com/iceberg#frag",
+          "http://bad host/iceberg"
+        }) {
+      IcebergRESTServiceOperations ops =
+          newOps(
+              true,
+              withDynamicProvider(ImmutableMap.of("host", "irc-host", "advertised-uri", invalid)),
+              "gravitino-host");
+      Response response = ops.getIcebergRestServiceUri("");
+      assertEquals(
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus(), invalid);
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      assertTrue(error.getMessage().contains("advertised-uri"), invalid);
+    }
   }
 
   @Test
