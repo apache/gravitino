@@ -172,21 +172,6 @@ gravitino.lance-rest.gravitino-metalake = my_metalake
 In auxiliary mode, `gravitino.lance-rest.gravitino-uri` is not required because the Lance
 REST service uses Gravitino's internal API.
 
-**Authorization and Anonymous Requests**
-
-The `simple` authenticator performs no real authentication. It accepts any request and produces an
-`anonymous` principal when no credentials are provided. The behavior for anonymous requests depends
-on whether authorization is enabled:
-
-- **Authorization disabled (default):** The `LanceServiceIdentityFilter` is installed. Anonymous
-  requests run as the configured service user
-  (`gravitino.lance-rest.gravitino-simple.user-name`, default `lance-rest-server`). This preserves
-  backward compatibility.
-- **Authorization enabled (`gravitino.authorization.enable = true`):** The filter is **not**
-  installed. Anonymous requests are rejected by the authorization interceptor with HTTP 403,
-  provided `gravitino.lance-rest.gravitino-metalake` is configured. Every caller must present
-  valid credentials.
-
 ### Run Standalone
 
 To run Lance REST service independently without Gravitino server (You need to start Gravitino server first):
@@ -311,7 +296,7 @@ for diagnosis.
 
 | Mode                               | Identity used for Gravitino metadata operations                                                                                                               | Metadata authorization                                                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Auxiliary (running with Gravitino) | Authenticated caller, including active roles; anonymous requests fall back to `gravitino.lance-rest.gravitino-simple.user-name` (default `lance-rest-server`) | Enabled by `gravitino.authorization.enable=true` with a configured metalake                                                            |
+| Auxiliary (running with Gravitino) | Authenticated caller, including active roles; anonymous requests fall back to `gravitino.lance-rest.gravitino-simple.user-name` (default `lance-rest-server`) **only when authorization is disabled**. When authorization is enabled, the filter is not installed and anonymous requests are rejected with 403. | Enabled by `gravitino.authorization.enable=true` with a configured metalake                                                            |
 | Standalone                         | Configured service credentials (`gravitino.lance-rest.gravitino-auth-type` and its simple/OAuth2 settings)                                                    | No Lance REST per-user metadata authorization; the remote Gravitino server checks the service identity if its authorization is enabled |
 
 The auxiliary fallback applies only after authentication accepts an anonymous request. It does
