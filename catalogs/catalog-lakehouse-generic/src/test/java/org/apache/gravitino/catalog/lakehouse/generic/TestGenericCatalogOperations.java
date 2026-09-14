@@ -744,7 +744,6 @@ public class TestGenericCatalogOperations {
     List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     Assertions.assertTrue(unprovisioned.get(0).isExternal());
-    Assertions.assertTrue(unprovisioned.get(0).isPurge());
     // The location handed back is the one that was stored, which for this catalog is the one the
     // provider itself returned when it saw the supplied value.
     Assertions.assertEquals(
@@ -753,18 +752,28 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testTheContextTellsADropFromAPurge() {
+  public void testAnExternalTableIsUnprovisionedOnPurgeButNotOnDrop() {
     NameIdentifier schemaIdent = createSchema();
-    NameIdentifier dropped = createTable(schemaIdent, "to_drop");
-    NameIdentifier purged = createTable(schemaIdent, "to_purge");
+    Map<String, String> external =
+        ImmutableMap.of(
+            Table.PROPERTY_EXTERNAL, "true",
+            Table.PROPERTY_LOCATION, "s3://caller-owned-bucket/existing/");
+    createTableThroughCatalog(opsWithFakeProvider, schemaIdent, "to_drop", external);
+    createTableThroughCatalog(opsWithFakeProvider, schemaIdent, "to_purge", external);
 
-    opsWithFakeProvider.dropTable(dropped);
-    opsWithFakeProvider.purgeTable(purged);
+    opsWithFakeProvider.dropTable(
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "to_drop"));
+    opsWithFakeProvider.purgeTable(
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "to_purge"));
 
-    List<TableLocationContext> contexts = FakeTableLocationProvider.unprovisioned();
-    Assertions.assertEquals(2, contexts.size());
-    Assertions.assertFalse(contexts.get(0).isPurge());
-    Assertions.assertTrue(contexts.get(1).isPurge());
+    // The whole of the drop-versus-purge distinction, stated where it is actually made. The
+    // provider is told about the purge and not about the drop, which is the catalog's decision to
+    // make: by the time the callback runs the data is gone, so there is nothing left for a
+    // provider to decide differently, and the skipped case is the one where reclaiming by path
+    // would destroy a user's data.
+    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    Assertions.assertEquals(1, unprovisioned.size());
+    Assertions.assertEquals("to_purge", unprovisioned.get(0).tableIdentifier().name());
   }
 
   @Test

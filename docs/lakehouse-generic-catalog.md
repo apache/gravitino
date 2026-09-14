@@ -143,9 +143,13 @@ whose `external` property is true is dropped.
 
 A purge is the opposite request. `LanceTableOperations.purgeTable` deletes the external dataset that
 its `dropTable` leaves alone, so by the time the callback would run the data is gone and the reason
-to skip has gone with it; the location is handed back. `context.isPurge()` tells the two apart and
-`context.isExternal()` reports the flag itself, so a provider that deletes storage of its own can
-make the same distinction.
+to skip has gone with it; the location is handed back.
+
+The callback is therefore reached in exactly three situations -- a dropped managed table, a purged
+managed table, and a purged external one -- and in all three the data under the location has already
+been deleted by the table format. There is deliberately no flag distinguishing them on the context,
+because an implementation has the same job in all three: hand the location back. `context.isExternal()`
+is still readable and, given the skip above, its being true means this was a purge.
 
 Even so, `external` is only an approximation of the rule this callback wants, which is "hand back
 only what was handed out". An external table created *without* a location does get one provisioned,

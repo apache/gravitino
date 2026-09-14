@@ -185,9 +185,15 @@ public interface TableLocationProvider extends Closeable {
    * <p>It <em>is</em> called when an external table is <b>purged</b>. Purge and drop do not remove
    * the same things: {@code LanceTableOperations#purgeTable} deletes the external dataset that its
    * {@code dropTable} leaves alone, so by the time this runs the data is gone and the reason to
-   * skip has gone with it. {@link TableLocationContext#isPurge()} tells the two apart, and an
-   * implementation that deletes storage of its own should consult it rather than {@code external}
-   * alone.
+   * skip has gone with it.
+   *
+   * <p>Which means this callback is reached in exactly three situations -- a dropped managed table,
+   * a purged managed table, and a purged external one -- and in all three the table is gone and the
+   * data under its location has already been deleted by the table format. There is deliberately no
+   * flag distinguishing them, because there is nothing left to distinguish: an implementation has
+   * the same job in all three, which is to hand the location back. {@code external} is still
+   * readable through {@link TableLocationContext#isExternal()} and, given the skip above, it being
+   * true means this was a purge.
    *
    * <p>Even so, {@code external} is only an approximation of the rule this callback actually wants,
    * which is "hand back only what was handed out". An external table created without a location

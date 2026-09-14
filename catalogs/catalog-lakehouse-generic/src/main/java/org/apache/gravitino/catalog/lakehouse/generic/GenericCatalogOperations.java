@@ -403,7 +403,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             .withTableIdentifier(ident)
             .withTableProperties(tableProperties)
             .withSchema(schema)
-            .withPurge(purge)
             .build();
 
     // The properties just read are handed on rather than left to be read again: resolving the
@@ -437,11 +436,18 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       tableFormatCache.invalidate(ident);
     }
 
-    // External data is left in place by a drop, so asking for the location back would invite the
-    // provider to delete exactly what the catalog just promised not to touch. A purge is the
-    // opposite request: LanceTableOperations#purgeTable deletes an external dataset that its
-    // dropTable would have left alone, so the location is handed back there even when the table is
-    // external -- the data it pointed at is gone either way.
+    // The rule is "hand the location back once the data under it is gone", and `external` only
+    // approximates it on a drop: the table formats leave an external dataset in place there, so
+    // asking for the location back would invite the provider to delete exactly what the catalog
+    // just promised not to touch. A purge is the opposite request --
+    // LanceTableOperations#purgeTable
+    // deletes the external dataset its dropTable leaves alone -- so the location is handed back
+    // there whichever way `external` reads.
+    //
+    // The decision is made here rather than handed to the provider. By the time this runs the data
+    // is gone in all three cases that reach it, so there is nothing left for a provider to decide
+    // differently; and the case that is skipped is the one where a provider reclaiming by path
+    // would delete a user's data irrecoverably.
     if (dropped && (purge || !context.isExternal())) {
       TableLocationProvider provider = tableLocationProvider;
       try {
