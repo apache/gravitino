@@ -24,6 +24,7 @@ import org.apache.gravitino.auth.AuthProperties;
 public class GravitinoSparkConfig {
 
   private static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
+  public static final String GRAVITINO_ENABLED = GRAVITINO_PREFIX + "enabled";
   public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =

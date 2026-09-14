@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
@@ -37,6 +39,8 @@ import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergS
 import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.DynamicBearerTokenProvider;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.plugin.PluginContext;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -84,6 +88,53 @@ public class TestGravitinoDriverPlugin {
 
     assertEquals(AUTHZ_EXTENSION, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
+
+  @Test
+  void testDefaultEnabledRequiresUri() {
+    SparkConf sparkConf = new SparkConf(false);
+
+    NoSuchElementException e =
+        Assertions.assertThrows(
+            NoSuchElementException.class,
+            () ->
+                new GravitinoDriverPlugin(withoutPaimon())
+                    .init(sparkContext(sparkConf), Mockito.mock(PluginContext.class)));
+
+    assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_URI));
+  }
+
+  @Test
+  void testDisabledSkipsInitializationWithoutRequiredConfigs() {
+    SparkConf sparkConf = new SparkConf(false).set(GravitinoSparkConfig.GRAVITINO_ENABLED, "false");
+    SparkContext sparkContext = sparkContext(sparkConf);
+
+    Map<String, String> extraConf =
+        new GravitinoDriverPlugin(withoutPaimon())
+            .init(sparkContext, Mockito.mock(PluginContext.class));
+
+    assertTrue(extraConf.isEmpty());
+    Mockito.verify(sparkContext, Mockito.never()).sparkUser();
+    assertFalse(sparkConf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+  }
+
+  @Test
+  void testDisabledDoesNotRegisterCatalogsOrSqlExtensions() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set(GravitinoSparkConfig.GRAVITINO_ENABLED, "false")
+            .set(GravitinoSparkConfig.GRAVITINO_URI, "http://127.0.0.1:1")
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, "metalake")
+            .set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
+            .set(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, "true");
+    SparkContext sparkContext = sparkContext(sparkConf);
+
+    new GravitinoDriverPlugin(withPaimon()).init(sparkContext, Mockito.mock(PluginContext.class));
+
+    Mockito.verify(sparkContext, Mockito.never()).sparkUser();
+    assertFalse(sparkConf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+    assertEquals(0, sparkConf.getAllWithPrefix("spark.sql.catalog.").length);
+  }
+
   /**
    * Paimon publishes no paimon-spark artifact for every Spark version and Scala version this
    * connector supports, so some builds bind no Paimon catalog. Registering the Paimon session
@@ -387,5 +438,11 @@ public class TestGravitinoDriverPlugin {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE);
     return sparkConf;
+  }
+
+  private static SparkContext sparkContext(SparkConf sparkConf) {
+    SparkContext sparkContext = Mockito.mock(SparkContext.class);
+    Mockito.when(sparkContext.conf()).thenReturn(sparkConf);
+    return sparkContext;
   }
 }

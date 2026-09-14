@@ -28,9 +28,10 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 | Property                                         | Type    | Default Value | Description                                                                                                                                                              | Required |
 |--------------------------------------------------|---------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| spark.plugins                                    | string  | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin`                                                                          | Yes      |
-| spark.sql.gravitino.metalake                     | string  | (none)        | The metalake name that spark connector used to request to Gravitino.                                                                                                     | Yes      |
-| spark.sql.gravitino.uri                          | string  | (none)        | The uri of Gravitino server address.                                                                                                                                     | Yes      |
+| spark.plugins                                    | string  | (none)        | Gravitino Spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin`                                                                          | Yes      |
+| spark.sql.gravitino.enabled                      | boolean | `true`        | Set to `false` to skip Gravitino initialization while keeping the Spark plugin configured.                                                                               | No       |
+| spark.sql.gravitino.metalake                     | string  | (none)        | The Gravitino metalake name used by the Spark connector.                                                                                                                | Yes, when enabled |
+| spark.sql.gravitino.uri                          | string  | (none)        | The URI of the Gravitino server.                                                                                                                                         | Yes, when enabled |
 | spark.sql.gravitino.enableIcebergSupport         | string  | `false`       | Set to `true` to use Iceberg catalog.                                                                                                                                    | No       |
 | spark.sql.gravitino.enablePaimonSupport          | string  | `false`       | Set to `true` to use Paimon catalog.                                                                                                                                     | No       |
 | spark.sql.gravitino.client.                      | string  | (none)        | The configuration key prefix for the Gravitino client config.                                                                                                            | No       |
@@ -51,6 +52,13 @@ To configure the Gravitino client, use properties prefixed with `spark.sql.gravi
 **Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
+
+Set `spark.sql.gravitino.enabled` to `false` for a Spark application to opt out of
+Gravitino initialization while leaving the globally configured Spark plugin in place. This is useful
+for incremental rollout, or for existing jobs that use components the Gravitino Spark connector does
+not yet support. In this mode, Spark still loads the plugin class, but the driver plugin does not
+validate Gravitino URI or metalake settings, create a Gravitino client, load catalogs, register
+catalogs, or inject Gravitino SQL extensions.
 
 ### Per-user identity in `token` mode
 
