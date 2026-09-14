@@ -156,22 +156,12 @@ public final class IcebergJobUtils {
   }
 
   /**
-   * Applies Iceberg REST catalog authentication from process environment variables.
-   *
-   * @param sparkBuilder Spark session builder
-   * @param catalogName Spark catalog name
-   */
-  public static void applyIcebergRestAuth(SparkSession.Builder sparkBuilder, String catalogName) {
-    applyIcebergRestAuth(sparkBuilder, catalogName, null);
-  }
-
-  /**
    * Applies Iceberg REST catalog authentication from optimizer config, falling back to environment
    * variables.
    *
    * @param sparkBuilder Spark session builder
    * @param catalogName Spark catalog name
-   * @param config optimizer configuration, may be {@code null}
+   * @param config optimizer configuration, may be {@code null} to use environment variables only
    */
   public static void applyIcebergRestAuth(
       SparkSession.Builder sparkBuilder, String catalogName, OptimizerConfig config) {

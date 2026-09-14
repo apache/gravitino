@@ -58,10 +58,10 @@ When the Gravitino server has authentication enabled, the CLI and built-in Icebe
 ```properties
 gravitino.optimizer.auth.type = basic
 gravitino.optimizer.auth.username = admin
-gravitino.optimizer.auth.password = secret
+gravitino.optimizer.auth.password = YourSecureGravitinoPassword
 gravitino.optimizer.jobSubmitterConfig.gravitino_auth_type = basic
 gravitino.optimizer.jobSubmitterConfig.gravitino_auth_username = admin
-gravitino.optimizer.jobSubmitterConfig.gravitino_auth_password = secret
+gravitino.optimizer.jobSubmitterConfig.gravitino_auth_password = YourSecureGravitinoPassword
 ```
 
 `auth.type` may be `none` (default), `simple`, `basic`, or `oauth`. For OAuth2 client-credentials, set `gravitino.optimizer.auth.oauth.serverUri`, `path`, `credential`, and `scope`. A pre-issued token can be set with `gravitino.optimizer.auth.oauth.token` instead. The `jobSubmitterConfig.gravitino_auth_*` keys fill `GRAVITINO_AUTH_*` environment variables on the Spark process. `builtin-iceberg-update-stats` can also put `auth_type`, `username`, and `password` in `updater_options`.
@@ -89,7 +89,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "warehouse_location": "",
   "gravitino_auth_type": "basic",
   "gravitino_auth_username": "admin",
-  "gravitino_auth_password": "secret"
+  "gravitino_auth_password": "YourSecureGravitinoPassword"
 }
 ```
 
