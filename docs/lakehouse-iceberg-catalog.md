@@ -257,7 +257,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` and cloud credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
 :::
 
 ## Schema

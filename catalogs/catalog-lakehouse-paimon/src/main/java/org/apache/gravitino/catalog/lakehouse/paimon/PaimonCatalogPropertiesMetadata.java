@@ -199,7 +199,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */),
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
