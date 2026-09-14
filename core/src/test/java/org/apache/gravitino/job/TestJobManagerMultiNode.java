@@ -254,7 +254,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private JobTemplateEntity newSleepJobTemplateEntity() throws IOException {
     File script = new File(testDir, "sleep-job.sh");
-    Files.writeString(script.toPath(), "#!/bin/bash\nsleep \"$1\"\n");
+    // Exec the sleep, so that killing the job process also stops the sleep.
+    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep \"$1\"\n");
     Assertions.assertTrue(script.setExecutable(true));
 
     return JobTemplateEntity.builder()

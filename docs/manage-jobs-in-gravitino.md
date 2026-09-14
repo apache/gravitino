@@ -256,6 +256,11 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
 
+The local job executor runs up to `gravitino.jobExecutor.local.maxRunningJobs` jobs at the same
+time, each in its own process on the Gravitino server host, and queues the others. Make sure the
+host has enough resources for that many jobs, or lower this value, especially when running Spark
+jobs.
+
 When multiple Gravitino servers share the same metadata store, each server's local job executor
 only tracks the jobs it runs itself:
 

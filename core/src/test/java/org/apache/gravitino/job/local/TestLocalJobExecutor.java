@@ -359,7 +359,8 @@ public class TestLocalJobExecutor {
     File jobDir = new File(workingDir, name);
     Assertions.assertTrue(jobDir.mkdirs());
     File script = new File(jobDir, "sleep.sh");
-    Files.writeString(script.toPath(), "#!/bin/bash\nsleep 600\n");
+    // Exec the sleep, so that killing the job process also stops the sleep.
+    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep 600\n");
     Assertions.assertTrue(script.setExecutable(true));
 
     return ShellJobTemplate.builder()
