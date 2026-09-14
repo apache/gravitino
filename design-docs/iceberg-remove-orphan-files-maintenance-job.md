@@ -19,13 +19,13 @@
 
 # Design: Built-in Iceberg Remove Orphan Files Maintenance Job
 
-| Field   | Value                                                        |
-| ------- | ------------------------------------------------------------ |
-| Status  | Draft                                                        |
-| Authors | @laserninja                                                  |
-| Created | 2026-06-16                                                   |
-| Issue   | [#11195](https://github.com/apache/gravitino/issues/11195)   |
-| Module  | `api`, `maintenance/jobs`, `maintenance/optimizer`            |
+| Field   | Value                                                      |
+| ------- | ---------------------------------------------------------- |
+| Status  | Draft                                                      |
+| Authors | @laserninja                                                |
+| Created | 2026-06-16                                                 |
+| Issue   | [#11195](https://github.com/apache/gravitino/issues/11195) |
+| Module  | `api`, `maintenance/jobs`, `maintenance/optimizer`         |
 
 ---
 
@@ -34,7 +34,7 @@
 Orphan files accumulate in Iceberg table storage locations from failed writes,
 incomplete transactions, schema evolution, or concurrent operations. These files
 are no longer referenced by any table snapshot but remain on disk, wasting
-significant storage — especially in high-write-volume environments.
+significant storage - especially in high-write-volume environments.
 
 The existing built-in maintenance jobs (`builtin-iceberg-rewrite-data-files` for
 data compaction, `builtin-iceberg-update-stats` for metrics, and
@@ -57,7 +57,7 @@ execution.
 1. Add a new built-in policy type `system_iceberg_orphan_file_removal` for
    declarative orphan file cleanup configuration.
 2. Add a strategy handler that evaluates when orphan file removal should run
-   based on time since last cleanup or table statistics.
+   based on configured trigger conditions.
 3. Add a job adapter that converts strategy evaluation results into job
    configurations.
 4. Add the Spark job that executes Iceberg's `remove_orphan_files` procedure.
@@ -69,7 +69,7 @@ execution.
 ## 3. Non-Goals
 
 - Snapshot expiration (separate Iceberg procedure, separate issue [#11194](https://github.com/apache/gravitino/issues/11194)).
-- Automatic policy creation — users must explicitly create and attach
+- Automatic policy creation - users must explicitly create and attach
   policies.
 - Changes to the Optimizer scheduling framework itself.
 - Custom file-level filtering beyond what Iceberg's procedure supports.
@@ -98,12 +98,12 @@ IcebergRewriteDataFilesJob (Spark execution)
 
 ### 4.1 Layer Summary
 
-| Layer | Compaction Components | Purpose |
-| --- | --- | --- |
-| **Policy** | `Policy.BuiltInType.ICEBERG_COMPACTION`, `IcebergDataCompactionContent` | Define configuration, thresholds, expressions |
-| **Strategy** | `CompactionStrategyHandler` extends `BaseExpressionStrategyHandler` | Evaluate trigger conditions, score partitions |
-| **Adapter** | `GravitinoCompactionJobAdapter`, `CompactionJobContext` | Convert evaluation result to job configuration |
-| **Job** | `IcebergRewriteDataFilesJob`, registered in `BuiltInJobTemplateProvider` | Execute Spark procedure |
+| Layer        | Compaction Components                                                    | Purpose                                        |
+| ------------ | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| **Policy**   | `Policy.BuiltInType.ICEBERG_COMPACTION`, `IcebergDataCompactionContent`  | Define configuration, thresholds, expressions  |
+| **Strategy** | `CompactionStrategyHandler` extends `BaseExpressionStrategyHandler`      | Evaluate trigger conditions, score partitions  |
+| **Adapter**  | `GravitinoCompactionJobAdapter`, `CompactionJobContext`                  | Convert evaluation result to job configuration |
+| **Job**      | `IcebergRewriteDataFilesJob`, registered in `BuiltInJobTemplateProvider` | Execute Spark procedure                        |
 
 ---
 
@@ -132,8 +132,8 @@ pattern.
 ┌──────────────────────────────────────────────────────────────┐
 │  OrphanFileRemovalStrategyHandler                            │
 │  extends BaseExpressionStrategyHandler                       │
-│  dataRequirements: {TABLE_METADATA, TABLE_STATISTICS}        │
-│  Evaluates: custom-last-orphan-cleanup-time (statistic_meta) │
+│  dataRequirements: {TABLE_METADATA}                         │
+│  Evaluates: configured trigger conditions                   │
 │  Returns: StrategyEvaluation with score + context            │
 └──────────────────────────┬───────────────────────────────────┘
                            ↓
@@ -159,7 +159,7 @@ pattern.
 
 ---
 
-### 5.2 Layer 1 — Policy Definition (`api/`)
+### 5.2 Layer 1 - Policy Definition (`api/`)
 
 #### 5.2.1 New Policy Type
 
@@ -197,13 +197,7 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
     private final String location;        // default: null (table location)
     private final boolean dryRun;         // default: false
 
-    // Trigger / score expressions.
-    // The interval threshold comes from the uniform minimum-interval
-    // mechanism shared by all system built-in policies, not this content.
-    public static final String TRIGGER_EXPR =
-        "custom-days-since-last-orphan-cleanup >= minIntervalDays";
-    public static final String SCORE_EXPR =
-        "custom-days-since-last-orphan-cleanup";
+    // Trigger / score expressions will follow the shared scheduling design.
 
     // Defaults
     public static final long DEFAULT_OLDER_THAN_DAYS = 3;
@@ -213,11 +207,11 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
 
 #### 5.2.3 Policy Content Fields
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `olderThanDays` | `long` | 3 | Only remove orphan files older than this many days. See [5.2.4](#524-why-olderthandays-defaults-to-3) for the rationale. |
-| `location` | `String` | null | Custom location to scan. When specified, **only** this location is scanned instead of the table's default location. Must be validated against the table's own location — see [Section 6.1](#61-location-validation). If null, the table's registered storage location is used. |
-| `dryRun` | `boolean` | false | Preview-only mode — list orphan files without deleting |
+| Field           | Type      | Default | Description                                                                                                                                                                                                                                                                    |
+| --------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `olderThanDays` | `long`    | 3       | Only remove orphan files older than this many days. See [5.2.4](#524-why-olderthandays-defaults-to-3) for the rationale.                                                                                                                                                       |
+| `location`      | `String`  | null    | Custom location to scan. When specified, **only** this location is scanned instead of the table's default location. Must be validated against the table's own location - see [Section 6.1](#61-location-validation). If null, the table's registered storage location is used. |
+| `dryRun`        | `boolean` | false   | Preview-only mode - list orphan files without deleting                                                                                                                                                                                                                         |
 
 > **Note:** The minimum interval between runs is intentionally **not** a field
 > of this policy. A uniform minimum-interval mechanism will be defined across
@@ -243,7 +237,7 @@ The adapter then passes the current timestamp as `older_than`, so every
 unreferenced file is eligible for deletion.
 
 **This is unsafe while any writer is active** and should only be used when
-all writes to the table are known to be stopped — for example, during a
+all writes to the table are known to be stopped - for example, during a
 maintenance window or when reclaiming storage from a decommissioned table.
 Run with `dryRun: true` first to review the file list.
 
@@ -265,7 +259,7 @@ POST /metalakes/default/policies
 
 ---
 
-### 5.3 Layer 2 — Strategy Handler (`maintenance/optimizer/`)
+### 5.3 Layer 2 - Strategy Handler (`maintenance/optimizer/`)
 
 #### 5.3.1 Strategy Handler
 
@@ -284,11 +278,7 @@ public class OrphanFileRemovalStrategyHandler
 
     @Override
     public Set<DataRequirement> dataRequirements() {
-        return ImmutableSet.of(
-                DataRequirement.TABLE_METADATA,
-                DataRequirement.TABLE_STATISTICS);
-        // TABLE_STATISTICS supplies custom-last-orphan-cleanup-time,
-        // read from statistic_meta the same way compaction reads its metrics
+        return ImmutableSet.of(DataRequirement.TABLE_METADATA);
     }
 
     @Override
@@ -315,33 +305,17 @@ Therefore:
 **Trigger modes:** Gravitino supports two trigger mechanisms, and this
 design does not limit users to one:
 
-1. **Event trigger** — The strategy handler evaluates table metadata
+1. **Event trigger** - The strategy handler evaluates table metadata
    (e.g., snapshot count changes, write events) and triggers cleanup when
    conditions are met.
-2. **Time trigger** — The Optimizer's scheduling framework can invoke the
-   strategy handler periodically, and the handler decides whether cleanup
-   is needed based on the last cleanup time.
+2. **Time trigger** - The Optimizer's scheduling framework can invoke the
+   strategy handler periodically. Scheduling time and minimum run intervals
+   will be defined separately for all built-in strategies using job history.
 
 Both modes use the same strategy handler; the difference is in how
 often the handler is invoked.
 
-#### 5.3.2 Tracking the Last Cleanup Time
-
-The handler needs to know when orphan file removal last ran for a table.
-This is stored as a **table statistic** in `statistic_meta`, matching how
-compaction persists its metrics:
-
-| Statistic Name | Type | Description |
-| --- | --- | --- |
-| `custom-last-orphan-cleanup-time` | `Long` | Epoch millis of the last successful orphan file removal |
-| `custom-days-since-last-orphan-cleanup` | `Long` | Derived value used by the trigger expression |
-
-The statistic is written back after a successful (non-dry-run) job
-completion, following the same statistics update path that
-`IcebergUpdateStatsAndMetricsJob` uses. Tables with no recorded cleanup
-time are treated as never cleaned and are eligible on the first evaluation.
-
-#### 5.3.3 Job Execution Context
+#### 5.3.2 Job Execution Context
 
 ```java
 // NEW: maintenance/optimizer/src/main/java/…/handler/orphan/
@@ -357,7 +331,7 @@ public class OrphanFileRemovalJobContext implements JobExecutionContext {
 }
 ```
 
-#### 5.3.4 Handler Registration
+#### 5.3.3 Handler Registration
 
 The strategy handler type `"iceberg-orphan-file-removal"` must be registered so
 that the `Recommender` can instantiate it when it encounters a policy with that
@@ -366,7 +340,7 @@ looked up by strategy type name.
 
 ---
 
-### 5.4 Layer 3 — Job Adapter (`maintenance/optimizer/`)
+### 5.4 Layer 3 - Job Adapter (`maintenance/optimizer/`)
 
 #### 5.4.1 Job Adapter
 
@@ -428,7 +402,7 @@ private static final Map<String, Class<? extends GravitinoJobAdapter>>
 
 ---
 
-### 5.5 Layer 4 — Spark Job (`maintenance/jobs/`)
+### 5.5 Layer 4 - Spark Job (`maintenance/jobs/`)
 
 #### 5.5.1 Job Class
 
@@ -453,19 +427,19 @@ CALL catalog.system.remove_orphan_files(
 
 **Parameters (from Iceberg `remove_orphan_files` procedure):**
 
-| Parameter   | Type        | Required | Description                                                   |
-| ----------- | ----------- | -------- | ------------------------------------------------------------- |
-| `table`     | `string`    | Yes      | Fully qualified table name                                    |
-| `older_than`| `timestamp` | No       | Only remove files older than this timestamp (default: 3 days) |
-| `location`  | `string`    | No       | Custom directory to scan for orphans (replaces table location when set; must be within the table's own location) |
-| `dry_run`   | `boolean`   | No       | If true, list orphan files without deleting them              |
+| Parameter    | Type        | Required | Description                                                                                                      |
+| ------------ | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `table`      | `string`    | Yes      | Fully qualified table name                                                                                       |
+| `older_than` | `timestamp` | No       | Only remove files older than this timestamp (default: 3 days)                                                    |
+| `location`   | `string`    | No       | Custom directory to scan for orphans (replaces table location when set; must be within the table's own location) |
+| `dry_run`    | `boolean`   | No       | If true, list orphan files without deleting them                                                                 |
 
 #### 5.5.3 Output
 
 The procedure returns a result set with one column:
 
-| Column              | Type     | Description                        |
-| ------------------- | -------- | ---------------------------------- |
+| Column                 | Type     | Description                            |
+| ---------------------- | -------- | -------------------------------------- |
 | `orphan_file_location` | `string` | Path of each orphan file found/removed |
 
 The job will log the count of orphan files removed (or found in dry-run mode).
@@ -475,7 +449,7 @@ The job will log the count of orphan files removed (or found in dry-run mode).
 - SQL injection prevention via `escapeSqlString()` / `escapeSqlIdentifier()`
   (same utilities as `IcebergExpireSnapshotsJob`)
 - Input validation for `dry_run` (must be `true` or `false`)
-- `location` validated against the table's own storage location — see
+- `location` validated against the table's own storage location - see
   [Section 6.1](#61-location-validation)
 
 #### 5.5.5 Job Registration
@@ -498,13 +472,13 @@ Orphan file removal is inherently more dangerous than snapshot expiration or
 compaction because it **permanently deletes files**. Several safety mechanisms
 are built into the design:
 
-| Safety Mechanism | Description |
-| --- | --- |
-| **`older_than` default** | 3-day default ensures files from in-flight writes are not deleted |
-| **`dry_run` mode** | Allows previewing which files would be deleted before actual removal |
-| **Location validation** | Rejects any `location` outside the table's own storage location — see [6.1](#61-location-validation) |
-| **Policy-gated** | Must be explicitly enabled by an administrator via policy creation |
-| **Iceberg built-in safety** | The procedure itself only identifies files not referenced by any snapshot |
+| Safety Mechanism            | Description                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **`older_than` default**    | 3-day default ensures files from in-flight writes are not deleted                                    |
+| **`dry_run` mode**          | Allows previewing which files would be deleted before actual removal                                 |
+| **Location validation**     | Rejects any `location` outside the table's own storage location - see [6.1](#61-location-validation) |
+| **Policy-gated**            | Must be explicitly enabled by an administrator via policy creation                                   |
+| **Iceberg built-in safety** | The procedure itself only identifies files not referenced by any snapshot                            |
 
 ### 6.1 Location Validation
 
@@ -512,7 +486,7 @@ The `location` parameter is the single most dangerous input in this job.
 Iceberg's `remove_orphan_files` deletes **every file under the given
 location that the target table does not reference**. If a caller passes the
 location of a *different* table, that table's data files are all unreferenced
-from the target table's point of view, and the procedure deletes them —
+from the target table's point of view, and the procedure deletes them -
 silently destroying another table's data.
 
 The job must therefore validate `location` **before building the SQL**, not
@@ -534,7 +508,7 @@ static void validateLocation(NameIdentifier tableIdent, String location) {
 Validation rules:
 
 1. Resolve the target table's own storage location from table metadata.
-2. Normalize both paths — canonicalize the scheme and authority, collapse
+2. Normalize both paths - canonicalize the scheme and authority, collapse
    duplicate slashes, resolve `.` / `..` segments, and strip trailing slashes.
 3. Reject the request unless the normalized `location` is the table location
    itself or a descendant of it.
@@ -556,7 +530,7 @@ writes or concurrent operations may not yet be referenced by a committed
 snapshot. A minimum of 3 days is recommended.
 
 Setting `olderThanDays` to `0` removes all orphan files regardless of age.
-This is only safe when no writer is active against the table — see
+This is only safe when no writer is active against the table - see
 [Section 5.2.4](#524-why-olderthandays-defaults-to-3).
 
 ---
@@ -565,40 +539,40 @@ This is only safe when no writer is active against the table — see
 
 ### 7.1 New Files
 
-| File                                                                             | Layer    | Description                                |
-| -------------------------------------------------------------------------------- | -------- | ------------------------------------------ |
-| `api/…/policy/IcebergOrphanFileRemovalContent.java`                              | Policy   | Policy content with removal configuration  |
-| `maintenance/optimizer/…/handler/orphan/OrphanFileRemovalStrategyHandler.java`    | Strategy | Trigger / score evaluation                 |
-| `maintenance/optimizer/…/handler/orphan/OrphanFileRemovalJobContext.java`         | Strategy | Job execution context                      |
-| `maintenance/optimizer/…/job/GravitinoOrphanFileRemovalJobAdapter.java`           | Adapter  | Context → job config conversion            |
-| `maintenance/jobs/…/iceberg/IcebergRemoveOrphanFilesJob.java`                    | Job      | Spark job                                  |
+| File                                                                           | Layer    | Description                               |
+| ------------------------------------------------------------------------------ | -------- | ----------------------------------------- |
+| `api/…/policy/IcebergOrphanFileRemovalContent.java`                            | Policy   | Policy content with removal configuration |
+| `maintenance/optimizer/…/handler/orphan/OrphanFileRemovalStrategyHandler.java` | Strategy | Trigger / score evaluation                |
+| `maintenance/optimizer/…/handler/orphan/OrphanFileRemovalJobContext.java`      | Strategy | Job execution context                     |
+| `maintenance/optimizer/…/job/GravitinoOrphanFileRemovalJobAdapter.java`        | Adapter  | Context → job config conversion           |
+| `maintenance/jobs/…/iceberg/IcebergRemoveOrphanFilesJob.java`                  | Job      | Spark job                                 |
 
 ### 7.2 Modified Files
 
-| File                                                    | Change                                                        |
-| ------------------------------------------------------- | ------------------------------------------------------------- |
-| `api/…/policy/Policy.java`                              | Add `ICEBERG_ORPHAN_FILE_REMOVAL` to `BuiltInType` enum       |
-| `maintenance/optimizer/…/job/GravitinoJobSubmitter.java` | Register remove-orphan-files adapter in `jobAdapters` map      |
-| `maintenance/jobs/…/BuiltInJobTemplateProvider.java`     | Register `IcebergRemoveOrphanFilesJob`                         |
-| Handler registry                                        | Register `OrphanFileRemovalStrategyHandler`                    |
+| File                                                     | Change                                                    |
+| -------------------------------------------------------- | --------------------------------------------------------- |
+| `api/…/policy/Policy.java`                               | Add `ICEBERG_ORPHAN_FILE_REMOVAL` to `BuiltInType` enum   |
+| `maintenance/optimizer/…/job/GravitinoJobSubmitter.java` | Register remove-orphan-files adapter in `jobAdapters` map |
+| `maintenance/jobs/…/BuiltInJobTemplateProvider.java`     | Register `IcebergRemoveOrphanFilesJob`                    |
+| Handler registry                                         | Register `OrphanFileRemovalStrategyHandler`               |
 
 ### 7.3 Test Files
 
-| File                                                    | Description                           |
-| ------------------------------------------------------- | ------------------------------------- |
-| `TestIcebergOrphanFileRemovalContent.java`               | Policy content unit tests             |
-| `TestOrphanFileRemovalStrategyHandler.java`              | Strategy handler unit tests           |
-| `TestGravitinoOrphanFileRemovalJobAdapter.java`          | Job adapter unit tests                |
-| `TestIcebergRemoveOrphanFilesJob.java`                   | Spark job unit tests                  |
+| File                                            | Description                 |
+| ----------------------------------------------- | --------------------------- |
+| `TestIcebergOrphanFileRemovalContent.java`      | Policy content unit tests   |
+| `TestOrphanFileRemovalStrategyHandler.java`     | Strategy handler unit tests |
+| `TestGravitinoOrphanFileRemovalJobAdapter.java` | Job adapter unit tests      |
+| `TestIcebergRemoveOrphanFilesJob.java`          | Spark job unit tests        |
 
 ---
 
 ## 8. Proposed PR Plan
 
-| PR | Scope | Dependencies |
-| --- | --- | --- |
-| **PR 1** | Job layer: `IcebergRemoveOrphanFilesJob` + `BuiltInJobTemplateProvider` + tests | None |
-| **PR 2** | Policy + Strategy + Adapter: all remaining layers + tests | PR 1 |
+| PR       | Scope                                                                           | Dependencies |
+| -------- | ------------------------------------------------------------------------------- | ------------ |
+| **PR 1** | Job layer: `IcebergRemoveOrphanFilesJob` + `BuiltInJobTemplateProvider` + tests | None         |
+| **PR 2** | Policy + Strategy + Adapter: all remaining layers + tests                       | PR 1         |
 
 Since the total code size across the policy, strategy, and adapter layers is
 expected to be well under 1000 lines, PRs 2 and 3 from the original plan are
@@ -608,37 +582,35 @@ combined into a single PR.
 
 ## 9. Open Questions
 
-1. ~~**Cleanup interval tracking**~~ — Resolved: the last cleanup time is
-   stored as a table statistic (`custom-last-orphan-cleanup-time`) in
-   `statistic_meta`, aligned with how compaction persists its metrics.
-   See [Section 5.3.2](#532-tracking-the-last-cleanup-time).
-2. ~~**Location parameter**~~ — Resolved: when `location` is specified,
+1. **Cleanup scheduling** - Out of scope. A separate issue will define shared
+   scheduling logic using execution times from the Gravitino job table.
+2. ~~**Location parameter**~~ - Resolved: when `location` is specified,
    only that location is scanned, and it must be within the table's own
    storage location. See [Section 6.1](#61-location-validation).
-3. **Dry-run result persistence** — Should dry-run results be stored
+3. **Dry-run result persistence** - Should dry-run results be stored
    somewhere (e.g., job output metadata) for review before actual deletion?
-4. ~~**PR granularity**~~ — Resolved: single PR for policy + strategy +
+4. ~~**PR granularity**~~ - Resolved: single PR for policy + strategy +
    adapter layers since total code is expected to be under 1000 lines.
-5. ~~**`older_than` minimum**~~ — Resolved: no hard minimum is enforced.
+5. ~~**`older_than` minimum**~~ - Resolved: no hard minimum is enforced.
    `olderThanDays: 0` is a deliberate escape hatch for reclaiming storage
    when no writer is active. See
    [Section 5.2.4](#524-why-olderthandays-defaults-to-3).
-6. **Minimum run interval** — Out of scope. A uniform minimum-interval
+6. **Minimum run interval** - Out of scope. A uniform minimum-interval
    mechanism will be defined across all four system built-in policies.
 
 ---
 
 ## 10. Comparison with Other Maintenance Flows
 
-| Aspect | Compaction | Snapshot Expiration | Orphan File Removal |
-| --- | --- | --- | --- |
-| Policy type | `system_iceberg_compaction` | `system_iceberg_snapshot_expiration` | `system_iceberg_orphan_file_removal` |
-| Strategy type | `iceberg-data-compaction` | `iceberg-snapshot-expiration` | `iceberg-orphan-file-removal` |
-| Job template | `builtin-iceberg-rewrite-data-files` | `builtin-iceberg-expire-snapshots` | `builtin-iceberg-remove-orphan-files` |
-| Scope | Per-partition (scored, top-N selected) | Whole table | Whole table (or custom location) |
-| Data requirements | `TABLE_METADATA` + `TABLE_STATISTICS` + `PARTITION_STATISTICS` | `TABLE_METADATA` + `TABLE_STATISTICS` | `TABLE_METADATA` + `TABLE_STATISTICS` |
-| Trigger metric | `custom-data-file-mse`, `custom-delete-file-number` | `custom-snapshot-count` | `custom-days-since-last-orphan-cleanup` |
-| Iceberg procedure | `rewrite_data_files` | `expire_snapshots` | `remove_orphan_files` |
-| Key parameters | strategy, sort-order, where, options | older_than, retain_last, stream_results | older_than, location, dry_run |
-| Destructiveness | Rewrites data (recoverable via snapshots) | Removes metadata (irreversible) | Removes data files (irreversible) |
-| Safety concern | Low — data is rewritten, not lost | Medium — old snapshots are removed | High — files are permanently deleted |
+| Aspect            | Compaction                                                     | Snapshot Expiration                     | Orphan File Removal                                |
+| ----------------- | -------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------- |
+| Policy type       | `system_iceberg_compaction`                                    | `system_iceberg_snapshot_expiration`    | `system_iceberg_orphan_file_removal`               |
+| Strategy type     | `iceberg-data-compaction`                                      | `iceberg-snapshot-expiration`           | `iceberg-orphan-file-removal`                      |
+| Job template      | `builtin-iceberg-rewrite-data-files`                           | `builtin-iceberg-expire-snapshots`      | `builtin-iceberg-remove-orphan-files`              |
+| Scope             | Per-partition (scored, top-N selected)                         | Whole table                             | Whole table (or custom location)                   |
+| Data requirements | `TABLE_METADATA` + `TABLE_STATISTICS` + `PARTITION_STATISTICS` | `TABLE_METADATA` + `TABLE_STATISTICS`   | `TABLE_METADATA`                                   |
+| Trigger metric    | `custom-data-file-mse`, `custom-delete-file-number`            | `custom-snapshot-count`                 | Defined by shared scheduling design (out of scope) |
+| Iceberg procedure | `rewrite_data_files`                                           | `expire_snapshots`                      | `remove_orphan_files`                              |
+| Key parameters    | strategy, sort-order, where, options                           | older_than, retain_last, stream_results | older_than, location, dry_run                      |
+| Destructiveness   | Rewrites data (recoverable via snapshots)                      | Removes metadata (irreversible)         | Removes data files (irreversible)                  |
+| Safety concern    | Low - data is rewritten, not lost                              | Medium - old snapshots are removed      | High - files are permanently deleted               |
