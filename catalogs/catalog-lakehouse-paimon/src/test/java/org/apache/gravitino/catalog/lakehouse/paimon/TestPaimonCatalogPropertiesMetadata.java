@@ -31,7 +31,6 @@ public class TestPaimonCatalogPropertiesMetadata {
 
   @Test
   void testSensitivePropertiesAreHidden() {
-    assertTrue(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER));
     assertTrue(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
@@ -48,6 +47,8 @@ public class TestPaimonCatalogPropertiesMetadata {
   void testNonSensitivePropertiesAreNotHidden() {
     assertFalse(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.WAREHOUSE));
     assertFalse(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.URI));
+    // jdbc-user identifies the account rather than a secret — align with JDBC catalogs.
+    assertFalse(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER));
     // DLF token metadata (provider type, path, loader) is not a credential — stays visible.
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_TOKEN_PROVIDER));
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_TOKEN_PATH));
