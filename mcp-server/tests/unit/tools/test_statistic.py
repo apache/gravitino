@@ -106,7 +106,7 @@ class TestStatisticTool(unittest.TestCase):
                     (
                         "list_statistics_for_metadata",
                         {},
-                        "mock_statistics: table, catalog.schema.table",
+                        "mock_statistics: mock_metalake, table, catalog.schema.table",
                     ),
                     (
                         "list_statistics_for_partition",
@@ -116,7 +116,7 @@ class TestStatisticTool(unittest.TestCase):
                             "from_inclusive": False,
                             "to_inclusive": True,
                         },
-                        "mock_statistics_for_partition: table, "
+                        "mock_statistics_for_partition: mock_metalake, table, "
                         "catalog.schema.table, p1, p2, False, True",
                     ),
                 ):
@@ -124,6 +124,7 @@ class TestStatisticTool(unittest.TestCase):
                         result = await client.call_tool(
                             name,
                             {
+                                "metalake_name": "mock_metalake",
                                 "metadata_type": "table",
                                 "metadata_fullname": "catalog.schema.table",
                                 **extra,
@@ -161,6 +162,7 @@ class TestStatisticTool(unittest.TestCase):
                                 await client.call_tool(
                                     name,
                                     {
+                                        "metalake_name": "mock_metalake",
                                         "metadata_type": "table",
                                         **extra,
                                         **arguments,

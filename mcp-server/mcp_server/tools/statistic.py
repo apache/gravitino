@@ -48,13 +48,8 @@ def load_statistic_tools(mcp: FastMCP):
             ctx (Context): The request context.
             metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata (e.g., table, column). For
-<<<<<<< HEAD
-                more, please refer to too 'metadata_type_to_fullname_formats'
-            metadata_fullname (str): The full name of the metadata object. For
-=======
                 more, please refer to the tool 'metadata_type_to_fullname_formats'
             metadata_full_name (str): The full name of the metadata object. For
->>>>>>> 0ed110819 ([#13122] fix(mcp): unify statistics metadata full-name parameter (#13123))
                 more, please refer to tool 'metadata_type_to_fullname_formats'.
 
 
@@ -85,11 +80,7 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().list_of_statistics(
-<<<<<<< HEAD
-            metalake_name, metadata_type, metadata_fullname
-=======
-            metadata_type, metadata_full_name
->>>>>>> 0ed110819 ([#13122] fix(mcp): unify statistics metadata full-name parameter (#13123))
+            metalake_name, metadata_type, metadata_full_name
         )
 
     # pylint: disable=R0917

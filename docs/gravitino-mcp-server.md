@@ -204,53 +204,12 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 ```
 
-<<<<<<< HEAD
-=======
-## Selecting a metalake
+## Statistics tool parameters
 
-A metalake is Gravitino's top-level tenant boundary, and every tool operates inside one. `--metalake` sets the **default**: the metalake used by any tool call that does not name one itself. It is optional on every transport.
-
-Any tool call may name a different metalake with a `metalake` argument, which takes priority over the default. The argument is optional on every tool, so a server configured with `--metalake` behaves exactly as it always has for callers that ignore it.
-
-The metalake for a call is resolved in this order:
-
-1. The call's own `metalake` argument, when it passes one.
-2. The `--metalake` startup default, when it is configured.
-3. Otherwise the call fails, telling the agent to call `list_metalakes` and retry.
-
-Because each call carries its own metalake, one server instance can serve several metalakes at once: nothing is remembered between calls, so concurrent callers never see each other's metalake and the server stays correct however many replicas it runs as. This works identically over stdio and HTTP.
-
-Use the `list_metalakes` tool to discover which metalakes a caller may use. It is the one tool that does not need a metalake, so it works on a server started with no `--metalake` at all.
-
-The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) shipped their own `metalake_name` argument before metalake selection was unified. It is still accepted as a deprecated alias for `metalake`, so existing callers keep working; passing both with different values is rejected. New callers should use `metalake`.
+The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) require `metalake_name` to identify the metalake.
 
 These tools use `metadata_full_name` for the metadata object name, consistent with the tag and policy tools. The previous spelling, `metadata_fullname`, is accepted as a deprecated input alias but is not advertised in the tool schema. Supply only one spelling per call; passing both is rejected. New callers should use `metadata_full_name`.
 
-Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
-
-### Examples
-
-Single metalake, agents never think about it — the common case, and unchanged:
-
-```bash
-uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
-```
-
-Several metalakes behind one server, with `prod` as the default:
-
-```bash
-uv run mcp_server --metalake prod --transport http --mcp-url http://0.0.0.0:8000/mcp
-```
-
-An agent then works in `prod` by default and switches per request when asked — "which catalogs are in the staging metalake?" sends `metalake=staging` on that call alone, without restarting or reconfiguring anything.
-
-No default at all, every call chooses:
-
-```bash
-uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
-```
-
->>>>>>> 0ed110819 ([#13122] fix(mcp): unify statistics metadata full-name parameter (#13123))
 ## Audit Logging
 
 Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
