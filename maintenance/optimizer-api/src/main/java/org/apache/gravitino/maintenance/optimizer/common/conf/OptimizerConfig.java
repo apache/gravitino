@@ -223,14 +223,19 @@ public class OptimizerConfig extends Config {
 
   public static final ConfigEntry<String> AUTH_OAUTH_SERVER_URI_CONFIG =
       new ConfigBuilder(AUTH_OAUTH_SERVER_URI)
-          .doc("OAuth2 token endpoint URI used when gravitino.optimizer.auth.type is oauth.")
+          .doc(
+              "OAuth2 server base URI used when gravitino.optimizer.auth.type is oauth. Combined "
+                  + "with auth.oauth.path for the Gravitino client and for Iceberg REST "
+                  + "oauth2-server-uri.")
           .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> AUTH_OAUTH_PATH_CONFIG =
       new ConfigBuilder(AUTH_OAUTH_PATH)
-          .doc("OAuth2 token request path used when gravitino.optimizer.auth.type is oauth.")
+          .doc(
+              "OAuth2 token request path appended to auth.oauth.serverUri when "
+                  + "gravitino.optimizer.auth.type is oauth.")
           .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .create();
@@ -253,7 +258,8 @@ public class OptimizerConfig extends Config {
       new ConfigBuilder(AUTH_OAUTH_TOKEN)
           .doc(
               "Pre-issued OAuth2 access token. When set, the client sends a Bearer token instead "
-                  + "of fetching one from the token endpoint.")
+                  + "of fetching one from the token endpoint. The token is not refreshed; prefer "
+                  + "client-credentials for long-running jobs.")
           .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .create();

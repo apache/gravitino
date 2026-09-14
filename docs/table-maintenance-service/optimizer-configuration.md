@@ -64,7 +64,7 @@ gravitino.optimizer.jobSubmitterConfig.gravitino_auth_username = admin
 gravitino.optimizer.jobSubmitterConfig.gravitino_auth_password = YourSecureGravitinoPassword
 ```
 
-`auth.type` may be `none` (default), `simple`, `basic`, or `oauth`. For OAuth2 client-credentials, set `gravitino.optimizer.auth.oauth.serverUri`, `path`, `credential`, and `scope`. A pre-issued token can be set with `gravitino.optimizer.auth.oauth.token` instead. The `jobSubmitterConfig.gravitino_auth_*` keys fill `GRAVITINO_AUTH_*` environment variables on the Spark process. `builtin-iceberg-update-stats` can also put `auth_type`, `username`, and `password` in `updater_options`.
+`auth.type` may be `none` (default), `simple`, `basic`, or `oauth`. For OAuth2 client-credentials, set `gravitino.optimizer.auth.oauth.serverUri`, `path`, `credential`, and `scope` (`serverUri` + `path` become Iceberg REST `oauth2-server-uri`). A pre-issued token can be set with `gravitino.optimizer.auth.oauth.token` instead; that token is **not refreshed**, so prefer client-credentials for long-running jobs. The `jobSubmitterConfig.gravitino_auth_*` keys fill `GRAVITINO_AUTH_*` environment variables on the Spark process. Unresolved `{{gravitino_auth_*}}` placeholders are omitted from the job environment so unauthenticated deployments keep working. `builtin-iceberg-update-stats` can also put `auth_type`, `username`, and `password` in `updater_options`.
 
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
@@ -77,7 +77,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "catalog_name": "rest_catalog",
   "table_identifier": "db.t1",
   "update_mode": "all",
-  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"secret\"}",
+  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
   "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",

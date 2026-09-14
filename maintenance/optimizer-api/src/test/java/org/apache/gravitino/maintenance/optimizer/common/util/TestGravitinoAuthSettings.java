@@ -110,6 +110,50 @@ class TestGravitinoAuthSettings {
   }
 
   @Test
+  void testOauthClientCredentialsJoinsTokenEndpoint() {
+    Map<String, String> env = new HashMap<>();
+    env.put(GravitinoAuthSettings.ENV_AUTH_TYPE, "oauth");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_SERVER_URI, "http://idp/");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_PATH, "/oauth2/token");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_CREDENTIAL, "id:secret");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_SCOPE, "catalog");
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(null, env::get);
+
+    Map<String, String> catalogConfigs = settings.icebergRestCatalogConfigs("rest");
+    Assertions.assertEquals("oauth2", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.type"));
+    Assertions.assertEquals(
+        "http://idp/oauth2/token", catalogConfigs.get("spark.sql.catalog.rest.oauth2-server-uri"));
+    Assertions.assertEquals("id:secret", catalogConfigs.get("spark.sql.catalog.rest.credential"));
+    Assertions.assertEquals("catalog", catalogConfigs.get("spark.sql.catalog.rest.scope"));
+  }
+
+  @Test
+  void testOauthClientCredentialsRequiresPath() {
+    Map<String, String> env = new HashMap<>();
+    env.put(GravitinoAuthSettings.ENV_AUTH_TYPE, "oauth");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_SERVER_URI, "http://idp");
+    env.put(GravitinoAuthSettings.ENV_AUTH_OAUTH_CREDENTIAL, "id:secret");
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(null, env::get);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> settings.icebergRestCatalogConfigs("rest"));
+  }
+
+  @Test
+  void testSimpleAuthDefaultsUsernameForIcebergRest() {
+    Map<String, String> env = new HashMap<>();
+    env.put(GravitinoAuthSettings.ENV_AUTH_TYPE, "simple");
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(null, env::get);
+
+    Map<String, String> catalogConfigs = settings.icebergRestCatalogConfigs("rest");
+    Assertions.assertEquals("basic", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.type"));
+    Assertions.assertEquals(
+        System.getProperty("user.name"),
+        catalogConfigs.get("spark.sql.catalog.rest.rest.auth.basic.username"));
+    Assertions.assertEquals(
+        "dummy", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.basic.password"));
+  }
+
+  @Test
   void testBasicAuthRequiresPassword() {
     Map<String, String> env = new HashMap<>();
     env.put(GravitinoAuthSettings.ENV_AUTH_TYPE, "basic");

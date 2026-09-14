@@ -603,7 +603,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
             + "                                     \"metrics_updater\":\"gravitino-metrics-updater\",\\n"
-            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"secret\"}'\\n"
+            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}'\\n"
             + "  --"
             + IcebergJobUtils.OPTION_SPARK_CONF
             + " <json>                JSON map of custom Spark configs\\n"
