@@ -236,14 +236,6 @@ default configurations:
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
 
-:::caution
-`gravitino.job.stagingDirKeepTimeInMs` also decides when an active job is considered left
-behind. A queued, started or cancelling job whose status has not changed for longer than this time
-is marked as `FAILED`, or as `CANCELLED` if it was being cancelled, no matter which job executor
-runs it. Such a job keeps its terminal status even if it later finishes in the job executor. Set
-this time longer than any job can run, or stay queued, without changing its status.
-:::
-
 #### Configurations for Local Job Executor
 
 The local job executor is used for testing and development purposes, it runs the job in the local process.
@@ -274,6 +266,14 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
+
+:::caution
+The local job executor can't tell a job left behind by an exited server from a job that is still
+running without changing its status. A job of the local job executor that is still queued, started
+or cancelling after `gravitino.job.stagingDirKeepTimeInMs` is marked as `FAILED` (or `CANCELLED`),
+even if the job is still running, and keeps this status even if it later finishes. Set this time
+longer than any job can run, or stay queued, without changing its status.
+:::
 
 :::caution
 The local job executor gets a new identity every time the Gravitino server starts, so a restarted

@@ -750,10 +750,11 @@ public class JobManager implements JobOperationDispatcher {
           if (job.finishedAt() > 0 && job.finishedAt() + jobStagingDirKeepTimeInMs < now) {
             expiredJobs.add(job);
           }
-        } else if (isStaleActiveJob(job, now)) {
-          // An active job that has not been updated for the whole retention time is left behind,
-          // e.g. by a Gravitino server that exited while running it, so nobody can track it
-          // anymore. Mark it as finished, and it is cleaned up once it expires as a finished job.
+        } else if (jobExecutor.isJobStateNodeLocal() && isStaleActiveJob(job, now)) {
+          // The state of a node local job is lost when the Gravitino server running it exits, so
+          // an active job that has not been updated for the whole retention time is considered
+          // left behind. Mark it as finished, and it is cleaned up once it expires as a finished
+          // job. Jobs of other job executors can be tracked by any server, so they never expire.
           try {
             expireStaleActiveJob(metalake, job, now);
           } catch (RuntimeException e) {

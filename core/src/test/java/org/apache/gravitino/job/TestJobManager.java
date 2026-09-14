@@ -1499,6 +1499,7 @@ public class TestJobManager {
     JobEntity activeJob =
         newJobEntity("local-job-mine-1", JobHandle.Status.STARTED, longAgo, Instant.now());
     mockListActiveJobs(queuedJob, startedJob, cancellingJob, activeJob);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
     for (JobEntity job : ImmutableList.of(queuedJob, startedJob, cancellingJob, activeJob)) {
       stubEntityStoreUpdateToApply(job, job);
     }
@@ -1530,6 +1531,21 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCleanUpStagingDirsDoesNotExpireJobOfNonNodeLocalExecutor() throws IOException {
+    // Any server can track the jobs of an external job executor, so they are never considered left
+    // behind, no matter how long their status has not changed.
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity job = newJobEntity("external-job-1", JobHandle.Status.STARTED, longAgo, longAgo);
+    mockListActiveJobs(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    verify(entityStore, never())
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(entityStore, never()).delete(any(), any());
+  }
+
+  @Test
   public void testCleanUpStagingDirsDoesNotExpireJobUpdatedConcurrently() throws IOException {
     // listJobs() observes a stale job, but it is updated before entityStore.update() re-fetches
     // it, so it's still active and must be kept.
@@ -1544,6 +1560,7 @@ public class TestJobManager {
             longAgo,
             Instant.now());
     mockListActiveJobs(staleSnapshot);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
     stubEntityStoreUpdateToApply(latestUpdated);
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1560,6 +1577,7 @@ public class TestJobManager {
     JobEntity otherJob =
         newJobEntity("local-job-gone-2", JobHandle.Status.STARTED, longAgo, longAgo);
     mockListActiveJobs(failingJob, otherJob);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
     when(entityStore.update(
             eq(NameIdentifierUtil.ofJob(metalake, failingJob.name())),
             eq(JobEntity.class),
