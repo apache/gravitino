@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -105,9 +106,9 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     String identifier = requireOption(options, "table");
     boolean dryRun = parseDryRun(options.get("dry-run"));
     // Backslash escapes in string literals must retain Spark's default interpretation.
-    if (Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false"))) {
-      throw new IllegalArgumentException("spark.sql.parser.escapedStringLiterals must be false");
-    }
+    Preconditions.checkArgument(
+        !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
+        "spark.sql.parser.escapedStringLiterals must be false");
     Table table =
         Spark3Util.loadIcebergTable(
             spark, IcebergJobUtils.escapeSqlIdentifier(catalog) + "." + identifier);
@@ -161,13 +162,10 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   }
 
   static boolean parseDryRun(@Nullable String value) {
-    if (value == null || "false".equals(value)) {
-      return false;
-    }
-    if ("true".equals(value)) {
-      return true;
-    }
-    throw new IllegalArgumentException("--dry-run must be true or false");
+    Preconditions.checkArgument(
+        value == null || "false".equals(value) || "true".equals(value),
+        "--dry-run must be true or false");
+    return "true".equals(value);
   }
 
   static void validateLocation(String tableLocation, String location) {
@@ -178,28 +176,29 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     boolean sameStorage =
         Objects.equals(root.getScheme(), requested.getScheme())
             && Objects.equals(root.getAuthority(), requested.getAuthority());
-    if (!sameStorage
-        || !(childPath.equals(rootPath)
-            || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/"))) {
-      throw new IllegalArgumentException(
-          "location must be within the table's storage location: " + tableLocation);
-    }
+    Preconditions.checkArgument(
+        sameStorage
+            && (childPath.equals(rootPath)
+                || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
+        "location must be within the table's storage location: %s",
+        tableLocation);
   }
 
   private static URI normalizeLocation(String value) {
     // Reject ambiguous encoded paths rather than allowing different filesystem decoders to
     // interpret the containment check and the subsequent listing differently.
-    if (value.isEmpty() || value.contains("%") || value.contains("\\")) {
-      throw new IllegalArgumentException("Invalid scan location: " + value);
-    }
+    Preconditions.checkArgument(
+        !value.isEmpty() && !value.contains("%") && !value.contains("\\"),
+        "Invalid scan location: %s",
+        value);
     URI uri = URI.create(value);
-    if (uri.getQuery() != null
-        || uri.getFragment() != null
-        || uri.getPath() == null
-        || !uri.getPath().startsWith("/")) {
-      throw new IllegalArgumentException(
-          "Scan location must be an absolute path without query or fragment: " + value);
-    }
+    Preconditions.checkArgument(
+        uri.getQuery() == null
+            && uri.getFragment() == null
+            && uri.getPath() != null
+            && uri.getPath().startsWith("/"),
+        "Scan location must be an absolute path without query or fragment: %s",
+        value);
     if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
       return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
     }
@@ -215,22 +214,19 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     Path lexicalRoot = Paths.get(normalizeLocation(tableLocation));
     Path root = lexicalRoot.toRealPath();
     Path scan = Paths.get(requested);
-    if (!scan.toRealPath().startsWith(root)) {
-      throw new IllegalArgumentException(
-          "Scan location resolves outside the table's storage location");
-    }
+    Preconditions.checkArgument(
+        scan.toRealPath().startsWith(root),
+        "Scan location resolves outside the table's storage location");
     for (Path ancestor = scan;
         ancestor != null && ancestor.startsWith(lexicalRoot);
         ancestor = ancestor.getParent()) {
-      if (Files.isSymbolicLink(ancestor)) {
-        throw new IllegalArgumentException("Symlinks are not allowed in the scan location");
-      }
+      Preconditions.checkArgument(
+          !Files.isSymbolicLink(ancestor), "Symlinks are not allowed in the scan location");
     }
     // Do not follow symlinks during validation. Iceberg must never list another table through one.
     try (Stream<Path> paths = Files.walk(scan)) {
-      if (paths.anyMatch(Files::isSymbolicLink)) {
-        throw new IllegalArgumentException("Symlinks are not allowed in the scan location");
-      }
+      Preconditions.checkArgument(
+          paths.noneMatch(Files::isSymbolicLink), "Symlinks are not allowed in the scan location");
     }
   }
 
@@ -245,9 +241,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
 
   private static String requireOption(Map<String, String> options, String key) {
     String value = options.get(key);
-    if (value == null || value.trim().isEmpty()) {
-      throw new IllegalArgumentException("--" + key + " is required");
-    }
+    Preconditions.checkArgument(value != null && !value.trim().isEmpty(), "--%s is required", key);
     return value;
   }
 

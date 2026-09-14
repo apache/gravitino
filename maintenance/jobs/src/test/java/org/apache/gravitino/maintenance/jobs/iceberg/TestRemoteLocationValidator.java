@@ -18,80 +18,66 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.junit.jupiter.api.Test;
 
 class TestRemoteLocationValidator {
-  private final FileSystem fs = mock(FileSystem.class);
+  private final StubFileSystem fs = new StubFileSystem();
   private final Path root = new Path("hdfs://host/table");
   private final Path scan = new Path(root, "data");
 
   @Test
   void testObjectStoreDoesNotRequireSymlinkInspection() throws Exception {
-    when(fs.supportsSymlinks()).thenReturn(false);
+    fs.symlinksSupported = false;
     RemoteLocationValidator.validate(fs, root, scan);
-    verify(fs, never()).resolvePath(any());
+    assertEquals(0, fs.resolveCalls);
   }
 
   @Test
-  void testResolvedPathOutsideTableIsRejected() throws Exception {
-    when(fs.supportsSymlinks()).thenReturn(true);
-    when(fs.resolvePath(root)).thenReturn(root);
-    when(fs.resolvePath(scan)).thenReturn(new Path("hdfs://host/other/data"));
+  void testResolvedPathOutsideTableIsRejected() {
+    fs.resolvedPaths.put(scan, new Path("hdfs://host/other/data"));
     assertThrows(
         IllegalArgumentException.class, () -> RemoteLocationValidator.validate(fs, root, scan));
   }
 
   @Test
-  void testInspectionFailureIsNotIgnored() throws Exception {
-    when(fs.supportsSymlinks()).thenReturn(true);
-    when(fs.resolvePath(root)).thenThrow(new IOException("Permission denied"));
+  void testInspectionFailureIsNotIgnored() {
+    fs.failResolution = true;
     assertThrows(IOException.class, () -> RemoteLocationValidator.validate(fs, root, scan));
   }
 
   @Test
-  void testSymbolicLinkIsRejected() throws Exception {
-    prepare();
-    when(fs.getFileLinkStatus(scan)).thenReturn(link(scan));
+  void testSymbolicLinkIsRejected() {
+    fs.statuses.put(scan, link(scan));
     assertThrows(
         IllegalArgumentException.class, () -> RemoteLocationValidator.validate(fs, root, scan));
   }
 
   @Test
-  void testDescendantSymbolicLinkIsRejected() throws Exception {
-    prepare();
-    when(fs.listStatusIterator(scan)).thenReturn(children(link(new Path(scan, "link"))));
+  void testDescendantSymbolicLinkIsRejected() {
+    fs.listings.put(scan, new FileStatus[] {link(new Path(scan, "link"))});
     assertThrows(
         IllegalArgumentException.class, () -> RemoteLocationValidator.validate(fs, root, scan));
   }
 
   @Test
   void testDirectoriesAreInspectedRecursively() throws Exception {
-    prepare();
     Path sub = new Path(scan, "sub");
-    when(fs.listStatusIterator(scan)).thenReturn(children(directory(sub)));
-    when(fs.listStatusIterator(sub)).thenReturn(children());
+    fs.listings.put(scan, new FileStatus[] {directory(sub)});
     RemoteLocationValidator.validate(fs, root, scan);
-    verify(fs).listStatusIterator(sub);
-  }
-
-  private void prepare() throws Exception {
-    when(fs.supportsSymlinks()).thenReturn(true);
-    when(fs.resolvePath(root)).thenReturn(root);
-    when(fs.resolvePath(scan)).thenReturn(scan);
-    when(fs.getFileLinkStatus(any()))
-        .thenAnswer(invocation -> directory(invocation.getArgument(0)));
+    assertTrue(fs.listedPaths.contains(sub));
   }
 
   private static FileStatus directory(Path path) {
@@ -104,19 +90,54 @@ class TestRemoteLocationValidator {
     return status;
   }
 
-  private static RemoteIterator<FileStatus> children(FileStatus... statuses) {
-    return new RemoteIterator<FileStatus>() {
-      private int index;
+  /**
+   * In-memory filesystem responses for deterministic validation tests without external services.
+   */
+  private static class StubFileSystem extends FilterFileSystem {
+    private final Map<Path, Path> resolvedPaths = new HashMap<>();
+    private final Map<Path, FileStatus> statuses = new HashMap<>();
+    private final Map<Path, FileStatus[]> listings = new HashMap<>();
+    private final List<Path> listedPaths = new ArrayList<>();
+    private boolean symlinksSupported = true;
+    private boolean failResolution;
+    private int resolveCalls;
 
-      @Override
-      public boolean hasNext() {
-        return index < statuses.length;
-      }
+    @Override
+    public boolean supportsSymlinks() {
+      return symlinksSupported;
+    }
 
-      @Override
-      public FileStatus next() {
-        return statuses[index++];
+    @Override
+    public Path resolvePath(Path path) throws IOException {
+      resolveCalls++;
+      if (failResolution) {
+        throw new IOException("Permission denied");
       }
-    };
+      return resolvedPaths.getOrDefault(path, path);
+    }
+
+    @Override
+    public FileStatus getFileLinkStatus(Path path) {
+      return statuses.getOrDefault(path, directory(path));
+    }
+
+    @Override
+    public RemoteIterator<FileStatus> listStatusIterator(Path path) {
+      listedPaths.add(path);
+      FileStatus[] children = listings.getOrDefault(path, new FileStatus[0]);
+      return new RemoteIterator<FileStatus>() {
+        private int index;
+
+        @Override
+        public boolean hasNext() {
+          return index < children.length;
+        }
+
+        @Override
+        public FileStatus next() {
+          return children[index++];
+        }
+      };
+    }
   }
 }

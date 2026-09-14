@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -46,25 +47,23 @@ final class RemoteLocationValidator {
     Path root = fs.resolvePath(tableLocation);
     IcebergRemoveOrphanFilesJob.validateLocation(root.toString(), fs.resolvePath(scan).toString());
     for (Path ancestor = scan; ancestor != null; ancestor = ancestor.getParent()) {
-      if (fs.getFileLinkStatus(ancestor).isSymlink()) {
-        throw new IllegalArgumentException("Symlinks are not allowed in the scan location");
-      }
+      Preconditions.checkArgument(
+          !fs.getFileLinkStatus(ancestor).isSymlink(),
+          "Symlinks are not allowed in the scan location");
     }
     Deque<Path> pending = new ArrayDeque<>();
     pending.add(scan);
     while (!pending.isEmpty()) {
       Path path = pending.removeFirst();
       FileStatus status = fs.getFileLinkStatus(path);
-      if (status.isSymlink()) {
-        throw new IllegalArgumentException("Symlinks are not allowed in the scan location");
-      }
+      Preconditions.checkArgument(
+          !status.isSymlink(), "Symlinks are not allowed in the scan location");
       if (status.isDirectory()) {
         RemoteIterator<FileStatus> children = fs.listStatusIterator(path);
         while (children.hasNext()) {
           FileStatus child = children.next();
-          if (child.isSymlink()) {
-            throw new IllegalArgumentException("Symlinks are not allowed in the scan location");
-          }
+          Preconditions.checkArgument(
+              !child.isSymlink(), "Symlinks are not allowed in the scan location");
           if (child.isDirectory()) {
             pending.addLast(child.getPath());
           }
