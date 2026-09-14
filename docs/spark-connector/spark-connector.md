@@ -58,7 +58,9 @@ Gravitino initialization while leaving the globally configured Spark plugin in p
 for incremental rollout, or for existing jobs that use components the Gravitino Spark connector does
 not yet support. In this mode, Spark still loads the plugin class, but the driver plugin does not
 validate Gravitino URI or metalake settings, create a Gravitino client, load catalogs, register
-catalogs, or inject Gravitino SQL extensions.
+catalogs, or inject Gravitino SQL extensions. Gravitino SQL extensions in this connector also skip
+their Gravitino behavior when this configuration is `false`, even if they were configured directly
+in `spark.sql.extensions`.
 
 ### Per-user identity in `token` mode
 

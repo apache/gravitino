@@ -23,6 +23,7 @@ import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaLis
 import java.lang.reflect.Method;
 import java.util.Collections;
 import lombok.SneakyThrows;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.SparkSession;
@@ -68,6 +69,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
 
   @Override
   public Seq<SparkPlan> apply(LogicalPlan plan) {
+    if (!GravitinoSparkConfig.isGravitinoEnabled(spark)) {
+      return emptySeq();
+    }
+
     if (plan instanceof AddPartitionField) {
       AddPartitionField addPartitionField = (AddPartitionField) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -242,6 +247,13 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
 
   private Seq<SparkPlan> toSeq(SparkPlan plan) {
     return JavaConverters.asScalaIteratorConverter(Collections.singletonList(plan).listIterator())
+        .asScala()
+        .toIndexedSeq();
+  }
+
+  private Seq<SparkPlan> emptySeq() {
+    return JavaConverters.asScalaIteratorConverter(
+            Collections.<SparkPlan>emptyList().listIterator())
         .asScala()
         .toIndexedSeq();
   }
