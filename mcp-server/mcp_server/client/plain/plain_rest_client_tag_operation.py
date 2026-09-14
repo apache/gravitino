@@ -98,7 +98,7 @@ class PlainRESTClientTagOperation(TagOperation):
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_full_name)}/tags?details=true"
         )
-        return extract_content_from_response(response, "names", [])
+        return extract_content_from_response(response, "tags", [])
 
     async def list_metadata_by_tag(self, tag_name: str) -> str:
         response = await self.rest_client.get(
