@@ -1734,6 +1734,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
           try {
+<<<<<<< HEAD
             String[][] fields = parseIndexFields(expression);
             if (ArrayUtils.isEmpty(fields)) {
               continue;
@@ -1754,6 +1755,29 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 databaseName,
                 tableName,
                 expression);
+=======
+            indexType = getClickHouseIndexType(type);
+          } catch (IllegalArgumentException ignored) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with unsupported type {}",
+                name,
+                databaseName,
+                tableName,
+                type);
+            continue;
+          }
+          try {
+            fields = parseIndexFields(expression);
+          } catch (IllegalArgumentException ignored) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with type {} because its "
+                    + "expression cannot be represented as index field names",
+                name,
+                databaseName,
+                tableName,
+                type);
+            continue;
+>>>>>>> 441e590b9 ([#12915] fix(clickhouse): skip function-based index expressions on load (#12917))
           }
         }
       }
