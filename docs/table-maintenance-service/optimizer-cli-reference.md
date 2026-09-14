@@ -343,34 +343,49 @@ Expire Snapshots Results:
 
 ## Rewrite Manifests
 
-`builtin-iceberg-rewrite-manifests` consolidates a table's manifest files. Frequent commits leave behind many small manifests, and scan planning has to open every one of them to decide which data files a filter matches. Rewriting them into fewer, larger manifests aligned with the current partition spec cuts that planning cost.
+`builtin-iceberg-rewrite-manifests` consolidates a table's manifest files. Frequent writes can leave many small manifests. Scan planning uses manifest-list summaries to prune them, then reads the remaining manifests. Rewriting consolidates and clusters entries for one existing partition spec without repartitioning data files.
 
 This complements `builtin-iceberg-rewrite-data-files`: that job improves the data file layout, this one improves the metadata that points at it.
 
 The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 
-| Property    | Value                                                                        |
-|-------------|------------------------------------------------------------------------------|
-| Name        | `builtin-iceberg-rewrite-manifests`                                          |
-| Type        | Spark                                                                        |
-| Version     | `v1`                                                                         |
-| Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob`   |
+| Property      | Value                                                                          |
+| ------------- | ------------------------------------------------------------------------------ |
+| Name          | `builtin-iceberg-rewrite-manifests`                                            |
+| Type          | Spark                                                                          |
+| Version       | `v1`                                                                           |
+| Main class    | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob`     |
 
 ### Parameters
 
 `catalog_name` and `table_identifier` are required. The rest are optional.
 
-| Key                | Description                                                        | Default                     |
-|--------------------|--------------------------------------------------------------------|-----------------------------|
-| `catalog_name`     | Iceberg catalog name as registered in Spark                        | Required                    |
-| `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
-| `use_caching`      | Caches table metadata in Spark while rewriting; `true` or `false`  | `true` (Iceberg default)    |
-| `spec_id`          | Partition spec ID to rewrite manifests to; non-negative integer    | The table's current spec    |
-| `spark_conf`       | JSON map of Spark configuration                                    | None                        |
+| Key                  | Description                                                              | Default                             |
+| -------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
+| `catalog_name`       | Iceberg catalog name as registered in Spark                              | Required                            |
+| `table_identifier`   | Fully qualified table name, such as `db.sample`                          | Required                            |
+| `use_caching`        | Caches table metadata in Spark while rewriting; `true` or `false`        | Installed Iceberg version's default |
+| `spec_id`            | Existing partition spec whose manifests to rewrite; non-negative integer | The table's current spec            |
+| `spark_conf`         | JSON map of Spark configuration                                          | None                                |
 
-Leave `use_caching` unset unless the driver is memory constrained. Caching keeps the table metadata in Spark for the duration of the rewrite, which is faster but holds more memory.
+Leave `use_caching` unset to use the installed Iceberg version's default (`false` in Iceberg 1.11.0). Set it explicitly when consistent behavior across versions is required.
 
-Leave `spec_id` unset for routine consolidation. Set it after a partition spec evolution, when manifests written under the old spec should be re-clustered onto a specific one; `GET .../tables/{table}` and the table's `partitions` metadata table show which spec IDs exist. An unknown ID fails the job rather than falling back to the current spec.
+### How to find `spec_id`
+
+Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
+
+To discover which specs have manifests in the current snapshot, run:
+
+```sql
+SELECT DISTINCT partition_spec_id
+FROM rest_catalog.db.t1.manifests;
+```
+
+This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use the metadata JSON to identify the default and interpret the transforms.
+
+For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec_id` rewrites eligible manifests for spec `1`. Passing `"spec_id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
+
+`spec_id` selects the existing spec whose manifests are eligible for rewriting, and replacement manifests use that same spec. Iceberg validates that the ID exists. This follows the [Iceberg 1.11.0 action implementation](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/actions/RewriteManifestsSparkAction.java), where `findMatchingManifests` compares each manifest's `partitionSpecId()` to the selected spec. It is not a partition-evolution operation.
 
 ### Submitting the Job
 
@@ -392,7 +407,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "warehouse_location": ""
     }
   }' \
-  http://localhost:8090/api/metalakes/test/jobs
+  http://localhost:8090/api/metalakes/test/jobs/runs
 ```
 
 The job builds this statement, including `use_caching` and `spec_id` only when you supply them:
@@ -408,8 +423,8 @@ CALL `rest_catalog`.system.rewrite_manifests(
 ### Verifying the Result
 
 ```bash
-curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
-cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-manifests/{job_id}/stdout.log
+curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/{job_id}" | jq '.job.status'
+cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-manifests/{job_id}/output.log
 ```
 
 A successful run reports its state as `SUCCEEDED` and logs how many manifests it replaced:
@@ -420,7 +435,8 @@ Rewrite Manifests Results:
   Added manifests: 2
 ```
 
-Both counts at zero means the table's manifests were already consolidated, which is a successful no-op rather than a failure.
+Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
+
 
 ## Related
 
