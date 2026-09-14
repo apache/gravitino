@@ -86,7 +86,16 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         if (columnSize == null || columnSize == 0) {
           return Types.ExternalType.of(NUMERIC);
         }
-        return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
+        int numericScale = scale == null ? 0 : scale;
+        // PostgreSQL stores scale as a signed 11-bit value. JDBC metadata can expose the
+        // unsigned representation, for example 2045 for NUMERIC(2, -3).
+        if (numericScale >= 1024 && numericScale <= 2047) {
+          numericScale -= 2048;
+        }
+        if (columnSize > 38 || numericScale < 0 || numericScale > columnSize) {
+          return Types.ExternalType.of(NUMERIC + "(" + columnSize + "," + numericScale + ")");
+        }
+        return Types.DecimalType.of(columnSize, numericScale);
       case VARCHAR:
         return typeBean.getColumnSize() == null
             ? Types.StringType.get()
