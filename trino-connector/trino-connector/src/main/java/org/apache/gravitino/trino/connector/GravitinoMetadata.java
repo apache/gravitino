@@ -78,6 +78,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
@@ -85,6 +86,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.function.SQLImpl;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
@@ -102,6 +104,94 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   // The column handle name that will generate row IDs for the merge operation.
   public static final String MERGE_ROW_ID = "$row_id";
+
+  private static final Pattern PLAIN_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+  // Trino reserved keywords, which must be quoted when used as identifiers
+  private static final ImmutableSet<String> TRINO_RESERVED_WORDS =
+      ImmutableSet.of(
+          "ALTER",
+          "AND",
+          "AS",
+          "BETWEEN",
+          "BY",
+          "CASE",
+          "CAST",
+          "CONSTRAINT",
+          "CREATE",
+          "CROSS",
+          "CUBE",
+          "CURRENT_CATALOG",
+          "CURRENT_DATE",
+          "CURRENT_PATH",
+          "CURRENT_ROLE",
+          "CURRENT_SCHEMA",
+          "CURRENT_TIME",
+          "CURRENT_TIMESTAMP",
+          "CURRENT_USER",
+          "DEALLOCATE",
+          "DELETE",
+          "DESCRIBE",
+          "DISTINCT",
+          "DROP",
+          "ELSE",
+          "END",
+          "ESCAPE",
+          "EXCEPT",
+          "EXECUTE",
+          "EXISTS",
+          "EXTRACT",
+          "FALSE",
+          "FOR",
+          "FROM",
+          "FULL",
+          "GROUP",
+          "GROUPING",
+          "HAVING",
+          "IN",
+          "INNER",
+          "INSERT",
+          "INTERSECT",
+          "INTO",
+          "IS",
+          "JOIN",
+          "JSON_ARRAY",
+          "JSON_EXISTS",
+          "JSON_OBJECT",
+          "JSON_QUERY",
+          "JSON_TABLE",
+          "JSON_VALUE",
+          "LEFT",
+          "LIKE",
+          "LISTAGG",
+          "LOCALTIME",
+          "LOCALTIMESTAMP",
+          "NATURAL",
+          "NORMALIZE",
+          "NOT",
+          "NULL",
+          "ON",
+          "OR",
+          "ORDER",
+          "OUTER",
+          "PREPARE",
+          "RECURSIVE",
+          "RIGHT",
+          "ROLLUP",
+          "SELECT",
+          "SKIP",
+          "TABLE",
+          "THEN",
+          "TRIM",
+          "TRUE",
+          "UESCAPE",
+          "UNION",
+          "UNNEST",
+          "USING",
+          "VALUES",
+          "WHEN",
+          "WHERE",
+          "WITH");
 
   // Handling metadata operations on gravitino server
   protected final CatalogConnectorMetadata catalogConnectorMetadata;
@@ -884,6 +974,10 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
    * function specification.
    */
   private Collection<LanguageFunction> toLanguageFunctions(Function function) {
+    // Trino language functions are scalar SQL routines
+    if (function.functionType() != FunctionType.SCALAR) {
+      return List.of();
+    }
     List<LanguageFunction> result = new ArrayList<>();
     for (FunctionDefinition definition : function.definitions()) {
       if (definition.returnType() == null) {
@@ -920,14 +1014,15 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (startsWithKeyword(body, "FUNCTION")) {
       return body;
     }
-    StringBuilder sb = new StringBuilder("FUNCTION ").append(function.name()).append("(");
+    StringBuilder sb =
+        new StringBuilder("FUNCTION ").append(quoteIdentifier(function.name())).append("(");
     FunctionParam[] params = definition.parameters();
     for (int i = 0; i < params.length; i++) {
       if (i > 0) {
         sb.append(", ");
       }
       Type trinoType = metadataAdapter.getDataTypeTransformer().getTrinoType(params[i].dataType());
-      sb.append(params[i].name()).append(" ").append(trinoType.getDisplayName());
+      sb.append(quoteIdentifier(params[i].name())).append(" ").append(trinoType.getDisplayName());
     }
     sb.append(") RETURNS ");
     Type returnType =
@@ -938,6 +1033,19 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       sb.append("RETURN ");
     }
     return sb.append(body).toString();
+  }
+
+  /**
+   * Quotes an identifier for the routine specification when it is not a plain identifier or is a
+   * Trino reserved word. Plain identifiers are left unquoted so that Trino applies its usual
+   * case-insensitive resolution, matching how they are referenced in the function body.
+   */
+  private static String quoteIdentifier(String name) {
+    if (PLAIN_IDENTIFIER.matcher(name).matches()
+        && !TRINO_RESERVED_WORDS.contains(name.toUpperCase(Locale.ENGLISH))) {
+      return name;
+    }
+    return "\"" + name.replace("\"", "\"\"") + "\"";
   }
 
   private static boolean startsWithKeyword(String sql, String keyword) {

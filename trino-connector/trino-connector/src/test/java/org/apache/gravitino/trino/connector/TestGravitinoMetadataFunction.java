@@ -272,6 +272,48 @@ public class TestGravitinoMetadataFunction {
   }
 
   @Test
+  public void testReservedWordAndSpecialParameterNamesAreQuoted() {
+    FunctionParam p1 = createMockParam("select", Types.IntegerType.get());
+    FunctionParam p2 = createMockParam("value-with-dash", Types.IntegerType.get());
+    FunctionParam p3 = createMockParam("myParam", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "1");
+    FunctionDefinition def = createMockDefinition(new FunctionParam[] {p1, p2, p3}, impl);
+    Function function = createMockFunctionWithDefinitions("order", def);
+
+    CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
+    when(catalogMetadata.supportsFunctions()).thenReturn(true);
+    when(catalogMetadata.listFunctionInfos("s")).thenReturn(new Function[] {function});
+
+    GravitinoMetadata metadata = createTestMetadata(catalogMetadata);
+    ConnectorSession session = mock(ConnectorSession.class);
+
+    Collection<LanguageFunction> functions = metadata.listLanguageFunctions(session, "s");
+    assertEquals(1, functions.size());
+    assertEquals(
+        "FUNCTION \"order\"(\"select\" integer, \"value-with-dash\" integer, myParam integer) "
+            + "RETURNS integer DETERMINISTIC RETURN 1",
+        functions.iterator().next().sql());
+  }
+
+  @Test
+  public void testNonScalarFunctionIsSkipped() {
+    FunctionParam param = createMockParam("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "sum(x)");
+    FunctionDefinition def = createMockDefinition(new FunctionParam[] {param}, impl);
+    Function function = createMockFunctionWithDefinitions("agg_func", def);
+    when(function.functionType()).thenReturn(FunctionType.AGGREGATE);
+
+    CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
+    when(catalogMetadata.supportsFunctions()).thenReturn(true);
+    when(catalogMetadata.listFunctionInfos("s")).thenReturn(new Function[] {function});
+
+    GravitinoMetadata metadata = createTestMetadata(catalogMetadata);
+    ConnectorSession session = mock(ConnectorSession.class);
+
+    assertTrue(metadata.listLanguageFunctions(session, "s").isEmpty());
+  }
+
+  @Test
   public void testFullSpecificationBodyIsPassedThrough() {
     FunctionParam param = createMockParam("x", Types.IntegerType.get());
     String spec = "FUNCTION my_func(x integer) RETURNS bigint BEGIN RETURN x; END";

@@ -29,6 +29,8 @@ The `sql` field of a `SQL`/`TRINO` implementation is the function body. The conn
 - A control statement, e.g. `RETURN x + 1` or `BEGIN ... END`.
 - A complete `FUNCTION ...` specification, which is passed through unchanged.
 
+Function and parameter names that are Trino reserved words or are not plain identifiers are quoted in the generated specification; reference them quoted in the body as well. Plain identifiers are left unquoted, so they resolve case-insensitively as in a `CREATE FUNCTION` statement.
+
 ## Prerequisites
 
 - The Gravitino catalog must support function operations (i.e., implement `FunctionCatalog`).
@@ -71,5 +73,6 @@ SELECT catalog.my_schema.add_one(5);
 - **Read-only**: The Trino connector supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
 - **SQL only**: Only SQL-language implementations are mapped. Java and Python implementations are not exposed to Trino.
 - **TRINO runtime only**: Only functions with `RuntimeType.TRINO` are visible. Functions registered with `RuntimeType.SPARK` or other runtimes are filtered out and fail with `Function ... not registered` when invoked.
-- **Scalar only**: Table-valued function definitions (no return type) are skipped.
+- **Scalar only**: Only `SCALAR` functions are exposed. Aggregate and table-valued functions are skipped.
+- **No parameter defaults**: Trino SQL routines do not support parameter default values, so a parameter's `defaultValue` is ignored and the parameter is required when calling from Trino.
 - **Type mapping**: Function parameter and return types are converted from Gravitino types to Trino types. Unsupported types will cause the function to be skipped with a warning log.

@@ -110,8 +110,8 @@ const buildImplDetails = impl => {
     {
       label: 'Trino Connector',
       value: isTrinoVisible(impl)
-        ? 'Visible and callable from Trino'
-        : 'Not exposed through the Trino connector (requires language SQL and runtime TRINO)'
+        ? 'Eligible (language SQL, runtime TRINO)'
+        : 'Not exposed (requires language SQL and runtime TRINO)'
     }
   ]
 
