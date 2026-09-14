@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
-import static java.lang.Thread.sleep;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,34 +76,7 @@ public class TrinoUDFIT extends TrinoQueryITBase {
   private static void createHiveCatalog() throws Exception {
     Map<String, String> properties = new HashMap<>();
     properties.put("metastore.uris", hiveMetastoreUri);
-
-    boolean exists = metalake.catalogExists(CATALOG_NAME);
-    if (!exists) {
-      metalake.createCatalog(
-          CATALOG_NAME, Catalog.Type.RELATIONAL, "hive", "UDF test catalog", properties);
-    }
-
-    // Wait for catalog to sync to Trino. The IT connector runs in single-metalake mode, so the
-    // catalog is exposed under its bare name.
-    boolean catalogReady = false;
-    int tries = 180;
-    while (!catalogReady && tries-- >= 0) {
-      try {
-        String result = trinoQueryRunner.runQuery("show catalogs");
-        if (result.contains(CATALOG_NAME)) {
-          catalogReady = true;
-          break;
-        }
-      } catch (Exception e) {
-        LOG.info("Waiting for catalog to sync to Trino: {}", e.getMessage());
-      }
-      sleep(1000);
-    }
-
-    if (!catalogReady) {
-      throw new Exception("Catalog " + CATALOG_NAME + " sync timeout");
-    }
-
+    createCatalog(CATALOG_NAME, "hive", properties);
     catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 

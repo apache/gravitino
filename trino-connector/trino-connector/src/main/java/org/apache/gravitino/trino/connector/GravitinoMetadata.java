@@ -78,7 +78,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
@@ -92,6 +91,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.TrinoRoutineSpecification;
 
 /**
  * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
@@ -104,94 +104,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   // The column handle name that will generate row IDs for the merge operation.
   public static final String MERGE_ROW_ID = "$row_id";
-
-  private static final Pattern PLAIN_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-
-  // Trino reserved keywords, which must be quoted when used as identifiers
-  private static final ImmutableSet<String> TRINO_RESERVED_WORDS =
-      ImmutableSet.of(
-          "ALTER",
-          "AND",
-          "AS",
-          "BETWEEN",
-          "BY",
-          "CASE",
-          "CAST",
-          "CONSTRAINT",
-          "CREATE",
-          "CROSS",
-          "CUBE",
-          "CURRENT_CATALOG",
-          "CURRENT_DATE",
-          "CURRENT_PATH",
-          "CURRENT_ROLE",
-          "CURRENT_SCHEMA",
-          "CURRENT_TIME",
-          "CURRENT_TIMESTAMP",
-          "CURRENT_USER",
-          "DEALLOCATE",
-          "DELETE",
-          "DESCRIBE",
-          "DISTINCT",
-          "DROP",
-          "ELSE",
-          "END",
-          "ESCAPE",
-          "EXCEPT",
-          "EXECUTE",
-          "EXISTS",
-          "EXTRACT",
-          "FALSE",
-          "FOR",
-          "FROM",
-          "FULL",
-          "GROUP",
-          "GROUPING",
-          "HAVING",
-          "IN",
-          "INNER",
-          "INSERT",
-          "INTERSECT",
-          "INTO",
-          "IS",
-          "JOIN",
-          "JSON_ARRAY",
-          "JSON_EXISTS",
-          "JSON_OBJECT",
-          "JSON_QUERY",
-          "JSON_TABLE",
-          "JSON_VALUE",
-          "LEFT",
-          "LIKE",
-          "LISTAGG",
-          "LOCALTIME",
-          "LOCALTIMESTAMP",
-          "NATURAL",
-          "NORMALIZE",
-          "NOT",
-          "NULL",
-          "ON",
-          "OR",
-          "ORDER",
-          "OUTER",
-          "PREPARE",
-          "RECURSIVE",
-          "RIGHT",
-          "ROLLUP",
-          "SELECT",
-          "SKIP",
-          "TABLE",
-          "THEN",
-          "TRIM",
-          "TRUE",
-          "UESCAPE",
-          "UNION",
-          "UNNEST",
-          "USING",
-          "VALUES",
-          "WHEN",
-          "WHERE",
-          "WITH");
 
   // Handling metadata operations on gravitino server
   protected final CatalogConnectorMetadata catalogConnectorMetadata;
@@ -980,10 +892,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     }
     List<LanguageFunction> result = new ArrayList<>();
     for (FunctionDefinition definition : function.definitions()) {
-      if (definition.returnType() == null) {
-        LOG.warn("Skipping function %s: definition has no return type", function.name());
-        continue;
-      }
       for (FunctionImpl impl : definition.impls()) {
         if (!isTrinoSqlImplementation(impl)) {
           continue;
@@ -991,7 +899,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         String sql = ((SQLImpl) impl).sql();
         try {
           String signatureToken = buildSignatureToken(function.name(), definition.parameters());
-          String specification = buildFunctionSpecification(function, definition, sql);
+          String specification =
+              TrinoRoutineSpecification.build(
+                  function, definition, sql, metadataAdapter.getDataTypeTransformer());
           result.add(
               new LanguageFunction(signatureToken, specification, List.of(), Optional.empty()));
         } catch (TrinoException e) {
@@ -1000,60 +910,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       }
     }
     return result;
-  }
-
-  /**
-   * Builds the SQL routine specification Trino expects for a language function: {@code FUNCTION
-   * name(params) RETURNS type [NOT] DETERMINISTIC SECURITY INVOKER RETURN body}. The stored body
-   * may be a bare expression, a control statement ({@code RETURN ...} / {@code BEGIN ... END}), or
-   * already a full specification; only the missing parts are added. {@code SECURITY INVOKER} is
-   * required because the function has no owner identity for the {@code SECURITY DEFINER} default.
-   */
-  private String buildFunctionSpecification(
-      Function function, FunctionDefinition definition, String sql) {
-    String body = sql.trim();
-    if (startsWithKeyword(body, "FUNCTION")) {
-      return body;
-    }
-    StringBuilder sb =
-        new StringBuilder("FUNCTION ").append(quoteIdentifier(function.name())).append("(");
-    FunctionParam[] params = definition.parameters();
-    for (int i = 0; i < params.length; i++) {
-      if (i > 0) {
-        sb.append(", ");
-      }
-      Type trinoType = metadataAdapter.getDataTypeTransformer().getTrinoType(params[i].dataType());
-      sb.append(quoteIdentifier(params[i].name())).append(" ").append(trinoType.getDisplayName());
-    }
-    sb.append(") RETURNS ");
-    Type returnType =
-        metadataAdapter.getDataTypeTransformer().getTrinoType(definition.returnType());
-    sb.append(returnType.getDisplayName()).append(" ");
-    sb.append(function.deterministic() ? "DETERMINISTIC " : "NOT DETERMINISTIC ");
-    sb.append("SECURITY INVOKER ");
-    if (!startsWithKeyword(body, "RETURN") && !startsWithKeyword(body, "BEGIN")) {
-      sb.append("RETURN ");
-    }
-    return sb.append(body).toString();
-  }
-
-  /**
-   * Quotes an identifier for the routine specification when it is not a plain identifier or is a
-   * Trino reserved word. Plain identifiers are left unquoted so that Trino applies its usual
-   * case-insensitive resolution, matching how they are referenced in the function body.
-   */
-  private static String quoteIdentifier(String name) {
-    if (PLAIN_IDENTIFIER.matcher(name).matches()
-        && !TRINO_RESERVED_WORDS.contains(name.toUpperCase(Locale.ENGLISH))) {
-      return name;
-    }
-    return "\"" + name.replace("\"", "\"\"") + "\"";
-  }
-
-  private static boolean startsWithKeyword(String sql, String keyword) {
-    return sql.regionMatches(true, 0, keyword, 0, keyword.length())
-        && (sql.length() == keyword.length()
-            || Character.isWhitespace(sql.charAt(keyword.length())));
   }
 
   private boolean isTrinoSqlImplementation(FunctionImpl impl) {

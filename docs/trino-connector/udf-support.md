@@ -27,9 +27,10 @@ The `sql` field of a `SQL`/`TRINO` implementation is the function body. The conn
 
 - A bare expression, e.g. `x + 1`. The connector wraps it as `RETURN x + 1`.
 - A control statement, e.g. `RETURN x + 1` or `BEGIN ... END`.
-- A complete `FUNCTION ...` specification, which is passed through unchanged.
 
-Function and parameter names that are Trino reserved words or are not plain identifiers are quoted in the generated specification; reference them quoted in the body as well. Plain identifiers are left unquoted, so they resolve case-insensitively as in a `CREATE FUNCTION` statement.
+A body that is itself a complete `FUNCTION ...` specification is not supported and the function is skipped with a warning. Leading SQL comments in the body are ignored when detecting the statement form.
+
+Function, parameter and row field names are quoted in the generated specification. Trino resolves routine and parameter names case-insensitively regardless of quoting, so the body can reference parameters as plain identifiers.
 
 ## Prerequisites
 

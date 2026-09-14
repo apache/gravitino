@@ -38,13 +38,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
@@ -180,7 +178,9 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     // instead of the configured service identity.
     String forwardedUser = "alice";
     String schema = "forwarded";
-    try (Connection connection = openJdbcConnection(forwardedUser, mintToken(forwardedUser));
+    try (Connection connection =
+            trinoContainer.openJdbcConnection(
+                forwardedUser, ImmutableMap.of("token", mintToken(forwardedUser)));
         Statement statement = connection.createStatement()) {
       statement.executeUpdate("CREATE SCHEMA " + catalogName + "." + schema);
     }
@@ -496,23 +496,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     String uri = getIcebergRestServiceUri();
     return uri.replace("127.0.0.1", "host.docker.internal")
         .replace("0.0.0.0", "host.docker.internal");
-  }
-
-  private Connection openJdbcConnection(String user, String userToken) throws Exception {
-    Properties properties = new Properties();
-    properties.setProperty("user", user);
-    properties.setProperty("extraCredentials", "token:" + userToken);
-    properties.setProperty("SSL", "true");
-    properties.setProperty("SSLVerification", "FULL");
-    properties.setProperty(
-        "SSLTrustStorePath", trinoConfigDirectory.resolve("tls/truststore.p12").toString());
-    properties.setProperty("SSLTrustStorePassword", STORE_PASSWORD);
-    properties.setProperty("SSLTrustStoreType", "PKCS12");
-    String url =
-        String.format(
-            "jdbc:trino://127.0.0.1:%d",
-            trinoContainer.getMappedPort(TrinoContainer.TRINO_HTTPS_PORT));
-    return DriverManager.getConnection(url, properties);
   }
 
   @SuppressWarnings("JavaUtilDate")
