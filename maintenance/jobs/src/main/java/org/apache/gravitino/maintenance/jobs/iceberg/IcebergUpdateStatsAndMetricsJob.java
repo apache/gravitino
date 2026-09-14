@@ -43,6 +43,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
@@ -80,6 +81,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         .withClassName(IcebergUpdateStatsAndMetricsJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(buildSparkConfigs())
+        .withEnvironments(GravitinoAuthSettings.jobTemplateEnvironments())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -106,9 +108,12 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     Map<String, String> updaterOptions =
         parseJsonOptions(argMap.get(OPTION_UPDATER_OPTIONS), OPTION_UPDATER_OPTIONS);
     String sparkConfJson = argMap.get(IcebergJobUtils.OPTION_SPARK_CONF);
+    Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
+    IcebergJobUtils.applyIcebergRestAuth(
+        sparkBuilder, catalogName, new OptimizerConfig(optimizerProperties));
 
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
@@ -122,7 +127,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
-      Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
       if (updateMode.updateStats) {
         String statisticsUpdaterName =
             updaterOptions.getOrDefault("statistics_updater", DEFAULT_STATISTICS_UPDATER).trim();
@@ -441,6 +445,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
     metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
+    GravitinoAuthSettings.copyAliases(optimizerProperties);
     return optimizerProperties;
   }
 
@@ -597,7 +602,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + " <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\\n"
+            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\",\\n"
+            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"secret\"}'\\n"
             + "  --"
             + IcebergJobUtils.OPTION_SPARK_CONF
             + " <json>                JSON map of custom Spark configs\\n"
