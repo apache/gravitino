@@ -20,6 +20,8 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.SparkSession;
 
@@ -151,6 +153,33 @@ public final class IcebergJobUtils {
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
     return new HashMap<>(
         IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
+  }
+
+  /**
+   * Applies Iceberg REST catalog authentication from process environment variables.
+   *
+   * @param sparkBuilder Spark session builder
+   * @param catalogName Spark catalog name
+   */
+  public static void applyIcebergRestAuth(SparkSession.Builder sparkBuilder, String catalogName) {
+    applyIcebergRestAuth(sparkBuilder, catalogName, null);
+  }
+
+  /**
+   * Applies Iceberg REST catalog authentication from optimizer config, falling back to environment
+   * variables.
+   *
+   * @param sparkBuilder Spark session builder
+   * @param catalogName Spark catalog name
+   * @param config optimizer configuration, may be {@code null}
+   */
+  public static void applyIcebergRestAuth(
+      SparkSession.Builder sparkBuilder, String catalogName, OptimizerConfig config) {
+    Map<String, String> authConfigs =
+        GravitinoAuthSettings.from(config).icebergRestCatalogConfigs(catalogName);
+    for (Map.Entry<String, String> entry : authConfigs.entrySet()) {
+      sparkBuilder.config(entry.getKey(), entry.getValue());
+    }
   }
 
   /** Visible for unit tests that assert the missing-class error message. */

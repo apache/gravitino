@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -59,6 +60,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         .withClassName(IcebergRewriteDataFilesJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(buildSparkConfigs())
+        .withEnvironments(GravitinoAuthSettings.jobTemplateEnvironments())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -150,6 +152,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     // Build Spark session with custom configs if provided
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Data Files");
+    IcebergJobUtils.applyIcebergRestAuth(sparkBuilder, catalogName);
 
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
