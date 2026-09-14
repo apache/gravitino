@@ -219,20 +219,14 @@ public class TestLanceTableOperations {
                     .build()),
             Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(tableEntity);
+        .thenReturn(tableEntity, alreadyRepairedTableEntity);
     when(idGenerator.nextId()).thenReturn(10L, 11L);
 
     // First repair attempt loses the optimistic-lock CAS (a concurrent load already bumped the
-    // version). The retry re-reads the winner's already-repaired entity, against which the
-    // idempotent updater succeeds.
+    // version). The retry re-reads the winner's already-repaired entity before deciding whether
+    // another dataset observation and metadata update are needed.
     when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenThrow(new OptimisticLockException("mock conflict"))
-        .thenAnswer(
-            invocation -> {
-              @SuppressWarnings("unchecked")
-              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
-              return updater.apply(alreadyRepairedTableEntity);
-            });
+        .thenThrow(new OptimisticLockException("mock conflict"));
 
     Dataset dataset = mock(Dataset.class);
     when(dataset.getSchema())
@@ -257,6 +251,103 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(2, loadedTable.columns().length);
     Assertions.assertEquals("id", loadedTable.columns()[0].name());
     Assertions.assertEquals("name", loadedTable.columns()[1].name());
+  }
+
+  @Test
+  public void testRepairDoesNotOverwriteNewerDatasetVersion() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("stale-version-observation").toString();
+    TableEntity observedTable =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_DECLARED, "true"));
+    TableEntity newerTable =
+        tableEntity(
+            ident,
+            List.of(columnEntity(20L, "new_column")),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "9"));
+    AtomicReference<TableEntity> storedTable = new AtomicReference<>(observedTable);
+    stubMutableTable(ident, storedTable);
+    when(idGenerator.nextId()).thenReturn(10L);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenAnswer(
+            invocation -> {
+              storedTable.set(newerTable);
+              return new Schema(List.of(Field.nullable("old_column", new ArrowType.Utf8())));
+            });
+    when(dataset.version()).thenReturn(8L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals("9", loaded.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals("new_column", loaded.columns()[0].name());
+    Assertions.assertSame(newerTable, storedTable.get());
+  }
+
+  @ParameterizedTest(name = "changeTableId={0}")
+  @ValueSource(booleans = {false, true})
+  public void testRepairDoesNotCrossTableIdentityOrLocationChange(boolean changeTableId)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String oldLocation = tempDir.resolve("replaced-table-old").toString();
+    String newLocation = tempDir.resolve("replaced-table-new").toString();
+    TableEntity observedTable =
+        tableEntity(
+            1L,
+            ident,
+            List.of(),
+            Map.of(Table.PROPERTY_LOCATION, oldLocation, LANCE_TABLE_DECLARED, "true"));
+    TableEntity replacement =
+        tableEntity(
+            changeTableId ? 2L : 1L,
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                changeTableId ? oldLocation : newLocation,
+                LANCE_TABLE_DECLARED,
+                "true"));
+    AtomicReference<TableEntity> storedTable = new AtomicReference<>(observedTable);
+    stubMutableTable(ident, storedTable);
+    when(idGenerator.nextId()).thenReturn(10L, 20L);
+
+    Dataset oldDataset = mock(Dataset.class);
+    when(oldDataset.getSchema())
+        .thenAnswer(
+            invocation -> {
+              storedTable.set(replacement);
+              return new Schema(List.of(Field.nullable("old_column", new ArrowType.Utf8())));
+            });
+    when(oldDataset.version()).thenReturn(8L);
+    Dataset replacementDataset = mock(Dataset.class);
+    when(replacementDataset.getSchema())
+        .thenReturn(
+            new Schema(List.of(Field.nullable("replacement_column", new ArrowType.Utf8()))));
+    when(replacementDataset.version()).thenReturn(9L);
+    if (changeTableId) {
+      Mockito.doReturn(oldDataset, replacementDataset)
+          .when(lanceTableOps)
+          .openDataset(oldLocation, Map.of());
+    } else {
+      Mockito.doReturn(oldDataset).when(lanceTableOps).openDataset(oldLocation, Map.of());
+      Mockito.doReturn(replacementDataset).when(lanceTableOps).openDataset(newLocation, Map.of());
+    }
+
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(
+        changeTableId ? oldLocation : newLocation,
+        loaded.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertEquals("9", loaded.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals("replacement_column", loaded.columns()[0].name());
+    Assertions.assertEquals(changeTableId ? 2L : 1L, storedTable.get().id());
+    Assertions.assertEquals("replacement_column", storedTable.get().columns().get(0).name());
   }
 
   @Test
@@ -455,7 +546,7 @@ public class TestLanceTableOperations {
                     .build()),
             Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "9"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(staleTableEntity);
+        .thenReturn(staleTableEntity, alreadyRepairedTableEntity);
     when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
         .thenAnswer(
             invocation -> {
@@ -1104,8 +1195,13 @@ public class TestLanceTableOperations {
 
   private static TableEntity tableEntity(
       NameIdentifier ident, List<ColumnEntity> columns, Map<String, String> properties) {
+    return tableEntity(1L, ident, columns, properties);
+  }
+
+  private static TableEntity tableEntity(
+      long id, NameIdentifier ident, List<ColumnEntity> columns, Map<String, String> properties) {
     return TableEntity.builder()
-        .withId(1L)
+        .withId(id)
         .withName(ident.name())
         .withNamespace(ident.namespace())
         .withComment("comment")
@@ -1113,6 +1209,16 @@ public class TestLanceTableOperations {
         .withProperties(properties)
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
+        .build();
+  }
+
+  private static ColumnEntity columnEntity(long id, String name) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withDataType(Types.StringType.get())
+        .withPosition(0)
+        .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
 
