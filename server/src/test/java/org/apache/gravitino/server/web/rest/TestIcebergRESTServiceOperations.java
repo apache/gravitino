@@ -33,6 +33,8 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergRESTServiceOperations {
 
@@ -289,30 +291,28 @@ public class TestIcebergRESTServiceOperations {
     assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
 
-  @Test
-  public void testInvalidAdvertisedUriIsAnInternalError() {
-    for (String invalid :
-        new String[] {
-          "iceberg.example.com/iceberg",
-          "ftp://iceberg.example.com/iceberg",
-          "https:///iceberg",
-          "https://iceberg.example.com/iceberg?x=1",
-          "https://iceberg.example.com/iceberg#frag",
-          "https://iceberg.example.com:0/iceberg",
-          "https://iceberg.example.com:70000/iceberg",
-          "http://bad host/iceberg"
-        }) {
-      IcebergRESTServiceOperations ops =
-          newOps(
-              true,
-              withDynamicProvider(ImmutableMap.of("host", "irc-host", "advertised-uri", invalid)),
-              "gravitino-host");
-      Response response = ops.getIcebergRestServiceUri("");
-      assertEquals(
-          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus(), invalid);
-      ErrorResponse error = (ErrorResponse) response.getEntity();
-      assertTrue(error.getMessage().contains("advertised-uri"), invalid);
-    }
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "iceberg.example.com/iceberg",
+        "ftp://iceberg.example.com/iceberg",
+        "https:///iceberg",
+        "https://iceberg.example.com/iceberg?x=1",
+        "https://iceberg.example.com/iceberg#frag",
+        "https://iceberg.example.com:0/iceberg",
+        "https://iceberg.example.com:70000/iceberg",
+        "http://bad host/iceberg"
+      })
+  public void testInvalidAdvertisedUriIsAnInternalError(String invalid) {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            withDynamicProvider(ImmutableMap.of("host", "irc-host", "advertised-uri", invalid)),
+            "gravitino-host");
+    Response response = ops.getIcebergRestServiceUri("");
+    assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+    ErrorResponse error = (ErrorResponse) response.getEntity();
+    assertTrue(error.getMessage().contains("advertised-uri"));
   }
 
   @Test

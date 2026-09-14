@@ -65,9 +65,7 @@ public class IcebergRESTServiceOperations {
   // The post-strip key used by the Iceberg REST server itself; see
   // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
   private static final String SERVED_METALAKE_KEY = "gravitino-metalake";
-  // The endpoint to report as-is instead of one derived from the listener config, for
-  // deployments where clients reach the Iceberg REST server through a reverse proxy whose public
-  // scheme, host, port or path differs from the listener's.
+  // Overrides the listener-derived endpoint; see docs/iceberg-rest-service.md.
   private static final String ADVERTISED_URI_KEY = "advertised-uri";
   private static final String HOST_KEY = "host";
   private static final String HTTP_PORT_KEY = "httpPort";
@@ -101,9 +99,9 @@ public class IcebergRESTServiceOperations {
       uri = resolveUri(metalake);
     } catch (IllegalStateException e) {
       // A misconfiguration, re-reported on every discovery poll until fixed; the message alone
-      // identifies it, so a stack trace would only add noise.
+      // identifies it, so the stack trace is omitted from both the log and the response.
       LOG.error("Failed to resolve the Iceberg REST service endpoint: {}", e.getMessage());
-      return Utils.internalError(e.getMessage(), e);
+      return Utils.internalError(e.getMessage());
     }
     // The reported host can depend on the caller's own Host header (see resolveUri), so this
     // response must never be cached and replayed to a different caller.
@@ -162,16 +160,9 @@ public class IcebergRESTServiceOperations {
       return null;
     }
 
-    String advertisedUri = config.getOrDefault(ADVERTISED_URI_KEY, "").trim();
-    if (StringUtils.isNotBlank(advertisedUri)) {
-      if (!isValidAdvertisedUri(advertisedUri)) {
-        throw new IllegalStateException(
-            String.format(
-                "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
-                    + "host, a port in 1-65535 if present, and no query or fragment",
-                ADVERTISED_URI_KEY, advertisedUri));
-      }
-      return advertisedUri;
+    String advertisedUri = StringUtils.trimToNull(config.get(ADVERTISED_URI_KEY));
+    if (advertisedUri != null) {
+      return checkAdvertisedUri(advertisedUri);
     }
 
     String host = config.getOrDefault(HOST_KEY, DEFAULT_HOST);
@@ -193,21 +184,29 @@ public class IcebergRESTServiceOperations {
     return String.format("%s://%s:%d/iceberg", scheme, bracketIfIPv6(host), port);
   }
 
-  private static boolean isValidAdvertisedUri(String value) {
-    URI uri;
+  private static String checkAdvertisedUri(String value) {
+    boolean valid;
     try {
-      uri = new URI(value);
+      URI uri = new URI(value);
+      // URI accepts any non-negative integer as a port; -1 means no explicit port.
+      int port = uri.getPort();
+      valid =
+          StringUtils.equalsAnyIgnoreCase(uri.getScheme(), "http", "https")
+              && StringUtils.isNotBlank(uri.getHost())
+              && (port == -1 || (port >= 1 && port <= 65535))
+              && uri.getQuery() == null
+              && uri.getFragment() == null;
     } catch (URISyntaxException e) {
-      return false;
+      valid = false;
     }
-    String scheme = uri.getScheme();
-    // URI accepts any non-negative integer as a port; -1 means no explicit port.
-    int port = uri.getPort();
-    return ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
-        && StringUtils.isNotBlank(uri.getHost())
-        && (port == -1 || (port >= 1 && port <= 65535))
-        && uri.getQuery() == null
-        && uri.getFragment() == null;
+    if (!valid) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
+                  + "host, a port in 1-65535 if present, and no query or fragment",
+              ADVERTISED_URI_KEY, value));
+    }
+    return value;
   }
 
   // An IPv6 literal host (e.g. "::1", from an explicit config value or from
