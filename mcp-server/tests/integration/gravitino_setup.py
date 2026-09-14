@@ -49,6 +49,8 @@ class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
         catalog_allowed: str = "cat_allowed",
         catalog_denied: str = "cat_denied",
         role_name: str = "reader_role",
+        schema_name: str = "model_schema",
+        model_name: str = "authz_model",
     ):
         self.gravitino_uri = gravitino_uri.rstrip("/")
         self.metalake = metalake
@@ -57,6 +59,14 @@ class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
         self.catalog_allowed = catalog_allowed
         self.catalog_denied = catalog_denied
         self.role_name = role_name
+        # A schema/model/version owned by admin under ``catalog_allowed``. They
+        # give entity-level write tools (e.g. update_model_version_aliases) a
+        # real target so a denied call is a genuine authorization denial rather
+        # than a "not found".
+        self.schema_name = schema_name
+        self.model_name = model_name
+        # The first linked model version is always version 0.
+        self.model_version = 0
         self._client = httpx.Client(
             base_url=self.gravitino_uri,
             headers={"Authorization": basic_auth_header(admin_user)},
@@ -83,6 +93,13 @@ class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
         self._create_metalake()
         self._create_model_catalog(self.catalog_allowed)
         self._create_model_catalog(self.catalog_denied)
+        self._create_schema(self.catalog_allowed, self.schema_name)
+        self._register_model(
+            self.catalog_allowed, self.schema_name, self.model_name
+        )
+        self._link_model_version(
+            self.catalog_allowed, self.schema_name, self.model_name
+        )
         self._add_user(self.granted_user)
         self._create_reader_role()
         self._grant_role_to_user()
@@ -105,6 +122,43 @@ class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
                 "type": "MODEL",
                 "provider": "model",
                 "comment": "model catalog for authz test",
+                "properties": {},
+            },
+        )
+
+    def _create_schema(self, catalog: str, schema: str) -> None:
+        self._post(
+            f"/api/metalakes/{self.metalake}/catalogs/{catalog}/schemas",
+            {
+                "name": schema,
+                "comment": "schema for authz model test",
+                "properties": {},
+            },
+        )
+
+    def _register_model(self, catalog: str, schema: str, model: str) -> None:
+        self._post(
+            f"/api/metalakes/{self.metalake}/catalogs/{catalog}"
+            f"/schemas/{schema}/models",
+            {
+                "name": model,
+                "comment": "model for authz test",
+                "properties": {},
+            },
+        )
+
+    def _link_model_version(
+        self, catalog: str, schema: str, model: str
+    ) -> None:
+        # Links version 0 of the model. A model URI is metadata only; no
+        # artifact needs to exist at the location.
+        self._post(
+            f"/api/metalakes/{self.metalake}/catalogs/{catalog}"
+            f"/schemas/{schema}/models/{model}/versions",
+            {
+                "uri": "file:///tmp/authz-model/v0",
+                "comment": "version for authz test",
+                "aliases": [],
                 "properties": {},
             },
         )
