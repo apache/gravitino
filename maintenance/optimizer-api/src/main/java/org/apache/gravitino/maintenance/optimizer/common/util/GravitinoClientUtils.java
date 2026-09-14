@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.base.Preconditions;
+import java.util.function.Function;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -36,10 +37,24 @@ public final class GravitinoClientUtils {
    * @return configured Gravitino client
    */
   public static GravitinoClient createClient(OptimizerEnv optimizerEnv) {
+    return createClient(optimizerEnv, System::getenv);
+  }
+
+  /**
+   * Creates a {@link GravitinoClient} using optimizer configuration and an environment lookup.
+   *
+   * @param optimizerEnv optimizer environment
+   * @param getenv environment lookup used for {@code GRAVITINO_AUTH_*} credentials
+   * @return configured Gravitino client
+   */
+  public static GravitinoClient createClient(
+      OptimizerEnv optimizerEnv, Function<String, String> getenv) {
     Preconditions.checkArgument(optimizerEnv != null, "optimizerEnv must not be null");
     OptimizerConfig config = optimizerEnv.config();
     String uri = config.get(OptimizerConfig.GRAVITINO_URI_CONFIG);
     String metalake = config.get(OptimizerConfig.GRAVITINO_METALAKE_CONFIG);
-    return GravitinoClient.builder(uri).withMetalake(metalake).build();
+    GravitinoClient.ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
+    GravitinoAuthSettings.from(config, getenv).applyTo(builder);
+    return builder.build();
   }
 }

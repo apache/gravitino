@@ -96,6 +96,8 @@ Cannot translate Spark expression ... day(cast(ts as date)) ... to data source f
 
 Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_id}` and reading `error.log` under `builtin-iceberg-rewrite-data-files`. The only workaround is to compact identity-partitioned tables and leave the rest alone.
 
+**`The provided credentials did not support` or Iceberg `Not authorized`** — the built-in Iceberg jobs run against a server with authentication enabled but received no credentials. Set `gravitino.optimizer.auth.type` for the optimizer client, and pass `gravitino_auth_type` / `gravitino_auth_username` / `gravitino_auth_password` (or the OAuth `gravitino_auth_oauth_*` keys) in `jobConf` so Spark gets `GRAVITINO_AUTH_*` environment variables. See [Configuration](./optimizer-configuration.md).
+
 Observed in `1.2.0`:
 
 | Partitioning                                                                  | Rewrite |

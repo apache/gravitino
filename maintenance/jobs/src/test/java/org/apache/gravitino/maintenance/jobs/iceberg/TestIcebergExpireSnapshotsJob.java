@@ -92,6 +92,14 @@ public class TestIcebergExpireSnapshotsJob {
   }
 
   @Test
+  public void testJobTemplateDeclaresAuthEnvironments() {
+    IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
+    Map<String, String> environments = job.jobTemplate().environments();
+    assertEquals("{{gravitino_auth_type}}", environments.get("GRAVITINO_AUTH_TYPE"));
+    assertEquals("{{gravitino_auth_password}}", environments.get("GRAVITINO_AUTH_PASSWORD"));
+  }
+
+  @Test
   public void testJobTemplateHasSparkConfigs() {
     IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
     SparkJobTemplate template = job.jobTemplate();

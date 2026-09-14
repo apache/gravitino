@@ -64,6 +64,15 @@ public class TestIcebergUpdateStatsJob {
   }
 
   @Test
+  public void testJobTemplateDeclaresAuthEnvironments() {
+    IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
+    Map<String, String> environments = job.jobTemplate().environments();
+    assertEquals("{{gravitino_auth_type}}", environments.get("GRAVITINO_AUTH_TYPE"));
+    assertEquals("{{gravitino_auth_username}}", environments.get("GRAVITINO_AUTH_USERNAME"));
+    assertEquals("{{gravitino_auth_password}}", environments.get("GRAVITINO_AUTH_PASSWORD"));
+  }
+
+  @Test
   public void testJobTemplateHasSparkConfigs() {
     IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
@@ -201,6 +210,21 @@ public class TestIcebergUpdateStatsJob {
     assertEquals(
         "jdbc:mysql://localhost:3306/metrics",
         optimizerProperties.get("gravitino.optimizer.jdbcMetrics.jdbcUrl"));
+  }
+
+  @Test
+  public void testBuildOptimizerPropertiesCopiesAuthAliases() {
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "ml");
+    options.put("auth_type", "basic");
+    options.put("username", "admin");
+    options.put("password", "secret");
+    Map<String, String> optimizerProperties =
+        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+    assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
+    assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
+    assertEquals("secret", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
   }
 
   @Test

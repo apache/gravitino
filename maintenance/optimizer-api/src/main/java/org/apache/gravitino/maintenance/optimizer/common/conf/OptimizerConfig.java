@@ -41,6 +41,14 @@ public class OptimizerConfig extends Config {
   public static final String GRAVITINO_METALAKE = OPTIMIZER_PREFIX + "gravitinoMetalake";
   public static final String GRAVITINO_DEFAULT_CATALOG =
       OPTIMIZER_PREFIX + "gravitinoDefaultCatalog";
+  public static final String AUTH_TYPE = OPTIMIZER_PREFIX + "auth.type";
+  public static final String AUTH_USERNAME = OPTIMIZER_PREFIX + "auth.username";
+  public static final String AUTH_PASSWORD = OPTIMIZER_PREFIX + "auth.password";
+  public static final String AUTH_OAUTH_SERVER_URI = OPTIMIZER_PREFIX + "auth.oauth.serverUri";
+  public static final String AUTH_OAUTH_PATH = OPTIMIZER_PREFIX + "auth.oauth.path";
+  public static final String AUTH_OAUTH_CREDENTIAL = OPTIMIZER_PREFIX + "auth.oauth.credential";
+  public static final String AUTH_OAUTH_SCOPE = OPTIMIZER_PREFIX + "auth.oauth.scope";
+  public static final String AUTH_OAUTH_TOKEN = OPTIMIZER_PREFIX + "auth.oauth.token";
   public static final String JOB_ADAPTER_PREFIX = OPTIMIZER_PREFIX + "jobAdapter.";
   public static final String JOB_SUBMITTER_CONFIG_PREFIX = OPTIMIZER_PREFIX + "jobSubmitterConfig.";
 
@@ -186,6 +194,67 @@ public class OptimizerConfig extends Config {
       new ConfigBuilder(GRAVITINO_DEFAULT_CATALOG)
           .doc("The default catalog name in Gravitino.")
           .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_TYPE_CONFIG =
+      new ConfigBuilder(AUTH_TYPE)
+          .doc(
+              "Authenticator for the optimizer Gravitino client and built-in Iceberg jobs. "
+                  + "Supported values: none, simple, basic, oauth. Built-in Spark jobs also "
+                  + "read GRAVITINO_AUTH_* environment variables from the job template.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_USERNAME_CONFIG =
+      new ConfigBuilder(AUTH_USERNAME)
+          .doc("Username for simple or basic authentication.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_PASSWORD_CONFIG =
+      new ConfigBuilder(AUTH_PASSWORD)
+          .doc("Password for basic authentication.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_OAUTH_SERVER_URI_CONFIG =
+      new ConfigBuilder(AUTH_OAUTH_SERVER_URI)
+          .doc("OAuth2 token endpoint URI used when gravitino.optimizer.auth.type is oauth.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_OAUTH_PATH_CONFIG =
+      new ConfigBuilder(AUTH_OAUTH_PATH)
+          .doc("OAuth2 token request path used when gravitino.optimizer.auth.type is oauth.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_OAUTH_CREDENTIAL_CONFIG =
+      new ConfigBuilder(AUTH_OAUTH_CREDENTIAL)
+          .doc("OAuth2 client credential used when gravitino.optimizer.auth.type is oauth.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_OAUTH_SCOPE_CONFIG =
+      new ConfigBuilder(AUTH_OAUTH_SCOPE)
+          .doc("OAuth2 scope used when gravitino.optimizer.auth.type is oauth.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> AUTH_OAUTH_TOKEN_CONFIG =
+      new ConfigBuilder(AUTH_OAUTH_TOKEN)
+          .doc(
+              "Pre-issued OAuth2 access token. When set, the client sends a Bearer token instead "
+                  + "of fetching one from the token endpoint.")
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .create();
 
