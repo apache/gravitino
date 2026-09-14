@@ -1,0 +1,148 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: RustFS Image Maintenance
+
+on:
+  pull_request:
+    paths:
+      - integration-test-common/src/test/resources/docker-compose-rustfs.yml
+      - .github/dependabot.yml
+      - .github/workflows/rustfs-image-maintenance.yml
+      - dev/ci/rustfs_image.py
+      - dev/ci/test_rustfs_image.py
+  push:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - integration-test-common/src/test/resources/docker-compose-rustfs.yml
+      - .github/dependabot.yml
+      - .github/workflows/rustfs-image-maintenance.yml
+      - dev/ci/rustfs_image.py
+      - dev/ci/test_rustfs_image.py
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reference: ${{ steps.image.outputs.reference }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Test maintenance checks
+        run: python3 -m unittest discover -s dev/ci -p test_rustfs_image.py -v
+      - name: Read the fixture image pin
+        id: image
+        shell: bash
+        run: |
+          image=$(docker compose -f integration-test-common/src/test/resources/docker-compose-rustfs.yml config --format json | python3 dev/ci/rustfs_image.py image)
+          printf 'reference=%s\n' "$image" >> "$GITHUB_OUTPUT"
+
+  vulnerabilities:
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RUSTFS_IMAGE: ${{ needs.image.outputs.reference }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Record scan target
+        run: |
+          mkdir -p rustfs-reports
+          printf '%s\n' "$RUSTFS_IMAGE" > rustfs-reports/image.txt
+      - name: Inventory the pinned Linux amd64 image
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        env:
+          SYFT_PLATFORM: linux/amd64
+        with:
+          image: registry:${{ env.RUSTFS_IMAGE }}
+          format: syft-json
+          output-file: rustfs-reports/sbom.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - name: Scan all inventoried packages, including unfixed vulnerabilities
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: rustfs-reports/sbom.json
+          output-format: json
+          output-file: rustfs-reports/vulnerabilities.json
+          fail-build: false
+          only-fixed: false
+      - name: Report coverage and require triage of high or critical findings
+        shell: bash
+        run: |
+          python3 dev/ci/rustfs_image.py report --image "$RUSTFS_IMAGE" \
+            --sbom rustfs-reports/sbom.json --scan rustfs-reports/vulnerabilities.json \
+            | tee rustfs-reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain inventory and vulnerability evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rustfs-image-reports
+          path: rustfs-reports/
+          retention-days: 30
+          if-no-files-found: error
+
+  releases:
+    needs: image
+    # This also detects release-candidate/stable transitions that Docker
+    # Dependabot's matching-suffix rule may not propose. Do not fail unrelated PRs.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      RUSTFS_IMAGE: ${{ needs.image.outputs.reference }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Read upstream RustFS releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p rustfs-release-reports
+          gh api --paginate --slurp 'repos/rustfs/rustfs/releases?per_page=100' \
+            | jq 'add' > rustfs-release-reports/releases.json
+      - name: Flag a newer release for maintainer review
+        shell: bash
+        run: |
+          python3 dev/ci/rustfs_image.py releases --image "$RUSTFS_IMAGE" \
+            --releases rustfs-release-reports/releases.json \
+            | tee rustfs-release-reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain release-check evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rustfs-release-reports
+          path: rustfs-release-reports/
+          retention-days: 30
+          if-no-files-found: error
