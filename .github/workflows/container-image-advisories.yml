@@ -1,0 +1,154 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Container Image Advisories
+
+# Advisory maintenance only: no pull_request or push checks and no merge gate.
+on:
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    outputs:
+      matrix: ${{ steps.inventory.outputs.matrix }}
+      count: ${{ steps.inventory.outputs.count }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install inventory parser
+        id: setup
+        continue-on-error: true
+        run: |
+          python3 -m venv "$RUNNER_TEMP/container-image-venv"
+          "$RUNNER_TEMP/container-image-venv/bin/pip" install -r dev/ci/requirements-container-images.txt
+      - name: Test advisory helpers
+        id: tests
+        if: steps.setup.outcome == 'success'
+        continue-on-error: true
+        run: |
+          "$RUNNER_TEMP/container-image-venv/bin/python" -m unittest discover -s dev/ci -p test_container_images.py -v
+      - name: Discover image references from tracked source files
+        id: inventory
+        if: steps.setup.outcome == 'success'
+        continue-on-error: true
+        run: |
+          "$RUNNER_TEMP/container-image-venv/bin/python" dev/ci/container_images.py inventory \
+            --root . --output container-inventory --github-output "$GITHUB_OUTPUT"
+          cat container-inventory/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain inventory and coverage gaps
+        id: upload
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-image-inventory
+          path: container-inventory/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Warn about incomplete discovery
+        if: always() && (steps.setup.outcome != 'success' || steps.tests.outcome != 'success' || steps.inventory.outcome != 'success' || steps.upload.outcome != 'success')
+        run: |
+          echo '::warning title=Container inventory incomplete::Discovery or artifact retention failed; this is not a clean scan. Inspect this run.'
+          echo 'Container inventory is incomplete. Inspect failed steps; no clean scan is claimed.' >> "$GITHUB_STEP_SUMMARY"
+
+  scan:
+    needs: inventory
+    if: needs.inventory.outputs.count != '' && needs.inventory.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.inventory.outputs.matrix) }}
+    name: Advisory / ${{ matrix.reference }}
+    env:
+      CONTAINER_IMAGE: ${{ matrix.reference }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Record image reference
+        run: |
+          mkdir -p container-report
+          printf '%s\n' "$CONTAINER_IMAGE" > container-report/image.txt
+      - name: Inventory Linux amd64 registry image without running it
+        id: sbom
+        continue-on-error: true
+        timeout-minutes: 12
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        env:
+          SYFT_PLATFORM: linux/amd64
+        with:
+          image: registry:${{ env.CONTAINER_IMAGE }}
+          format: syft-json
+          output-file: container-report/sbom.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - name: Scan inventoried packages, including unfixed vulnerabilities
+        id: scan
+        if: steps.sbom.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: container-report/sbom.json
+          output-format: json
+          output-file: container-report/vulnerabilities.json
+          fail-build: false
+          only-fixed: false
+      - name: Summarize findings and coverage as warnings only
+        id: report
+        if: always()
+        continue-on-error: true
+        env:
+          SBOM_OUTCOME: ${{ steps.sbom.outcome }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          python3 dev/ci/container_images.py report --image "$CONTAINER_IMAGE" \
+            --directory container-report --sbom-outcome "$SBOM_OUTCOME" --scan-outcome "$SCAN_OUTCOME" \
+            | tee container-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain per-image evidence
+        id: upload
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-image-${{ matrix.id }}
+          path: container-report/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Warn about unavailable reports
+        if: always() && (steps.report.outcome != 'success' || steps.upload.outcome != 'success')
+        run: |
+          echo '::warning title=Container report unavailable::Summary or artifact retention failed. Inspect the per-image steps; no clean scan is claimed.'
+          echo 'Summary or artifact retention failed; scan evidence is incomplete.' >> "$GITHUB_STEP_SUMMARY"

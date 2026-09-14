@@ -1,13 +1,29 @@
 version: 2
 updates:
-  # The shared RustFS fixture consumes this Compose image pin directly.
-  - package-ecosystem: "docker-compose"
-    directory: "/integration-test-common/src/test/resources"
+  # Container manifests, including new Compose fixtures when they are added.
+  - package-ecosystem: "docker"
+    directories:
+      - "/dev/docker/*"
+      - "/dev/charts/*"
+      - "/dev/charts/*/templates/tests"
+    exclude-paths:
+      - "**/*compose*.yml"
+      - "**/*compose*.yaml"
     schedule:
       interval: "weekly"
-    allow:
-      - dependency-name: "rustfs/rustfs"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "**/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "pip"
+    directory: "/dev/ci"
+    schedule:
+      interval: "monthly"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
