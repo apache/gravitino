@@ -189,6 +189,18 @@ public class TestSparkProcessBuilder {
       Assertions.assertEquals(
           "spark-submit is not found or not executable: " + invalidPath + "/bin/spark-submit",
           e.getMessage());
+
+      // A directory at bin/spark-submit is not a valid executable, even if it is searchable.
+      File sparkSubmitDir = new File(invalidSparkHome, "bin/spark-submit");
+      Assertions.assertTrue(sparkSubmitDir.mkdirs());
+      Assertions.assertTrue(sparkSubmitDir.setExecutable(true));
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), invalidPath));
+      Assertions.assertEquals(
+          "spark-submit is not found or not executable: " + invalidPath + "/bin/spark-submit",
+          e.getMessage());
     } finally {
       FileUtils.deleteDirectory(validSparkHome);
       FileUtils.deleteDirectory(invalidSparkHome);

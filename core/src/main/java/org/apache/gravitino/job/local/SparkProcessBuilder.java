@@ -77,8 +77,10 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
             + " be set for Spark jobs");
 
     String sparkSubmit = sparkHome + "/bin/spark-submit";
+    File sparkSubmitFile = new File(sparkSubmit);
+    // canExecute() alone is also true for a searchable directory, so require a regular file.
     Preconditions.checkArgument(
-        new File(sparkSubmit).canExecute(),
+        sparkSubmitFile.isFile() && sparkSubmitFile.canExecute(),
         "spark-submit is not found or not executable: %s",
         sparkSubmit);
     return sparkSubmit;

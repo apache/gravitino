@@ -476,10 +476,10 @@ public class JobManager implements JobOperationDispatcher {
     } catch (IllegalArgumentException e) {
       // The job executor rejects the job because it cannot be launched, for example, a required
       // configuration is missing. Rethrow it as is so the caller gets the original reason.
-      FileUtils.deleteQuietly(jobStagingDir);
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw e;
     } catch (Exception e) {
-      FileUtils.deleteQuietly(jobStagingDir);
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw new RuntimeException(
           String.format("Failed to submit job template %s for execution", jobTemplate), e);
     }
@@ -1102,6 +1102,20 @@ public class JobManager implements JobOperationDispatcher {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  private void deleteStagingDirOfUnsubmittedJob(File jobStagingDir, long jobId) {
+    // The job is not tracked by any job entity, so the periodic cleanup will never remove its
+    // staging directory. A cleanup failure must not mask the original submission failure.
+    try {
+      FileUtils.deleteDirectory(jobStagingDir);
+    } catch (IOException e) {
+      LOG.warn(
+          "Failed to delete staging directory {} of job {} whose submission failed",
+          jobStagingDir,
+          jobId,
+          e);
+    }
   }
 
   private <T> T updatedValue(T currentValue, Optional<T> newValue) {
