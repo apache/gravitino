@@ -61,7 +61,8 @@ public class TestGravitinoMetadataFunction {
 
     LanguageFunction langFunc = functions.iterator().next();
     assertEquals(
-        "FUNCTION my_func(x integer) RETURNS integer DETERMINISTIC RETURN x + 1", langFunc.sql());
+        "FUNCTION my_func(x integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
+        langFunc.sql());
     assertEquals("my_func(integer)", langFunc.signatureToken());
   }
 
@@ -82,7 +83,8 @@ public class TestGravitinoMetadataFunction {
 
     LanguageFunction langFunc = functions.iterator().next();
     assertEquals(
-        "FUNCTION my_func(x integer) RETURNS integer DETERMINISTIC RETURN x + 1", langFunc.sql());
+        "FUNCTION my_func(x integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
+        langFunc.sql());
   }
 
   @Test
@@ -103,7 +105,7 @@ public class TestGravitinoMetadataFunction {
     Collection<LanguageFunction> functions = metadata.listLanguageFunctions(session, "test_schema");
     assertEquals(1, functions.size());
     assertEquals(
-        "FUNCTION trino_func(x integer) RETURNS integer DETERMINISTIC RETURN 2",
+        "FUNCTION trino_func(x integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN 2",
         functions.iterator().next().sql());
   }
 
@@ -178,10 +180,10 @@ public class TestGravitinoMetadataFunction {
 
     List<String> sqlBodies = functions.stream().map(LanguageFunction::sql).sorted().toList();
     assertEquals(
-        "FUNCTION multi_func(x integer) RETURNS integer DETERMINISTIC RETURN x + 1",
+        "FUNCTION multi_func(x integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
         sqlBodies.get(0));
     assertEquals(
-        "FUNCTION multi_func(x varchar) RETURNS integer DETERMINISTIC RETURN length(x)",
+        "FUNCTION multi_func(x varchar) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN length(x)",
         sqlBodies.get(1));
   }
 
@@ -225,7 +227,8 @@ public class TestGravitinoMetadataFunction {
     assertEquals(1, functions.size());
     LanguageFunction lf = functions.iterator().next();
     assertEquals("const_func()", lf.signatureToken());
-    assertEquals("FUNCTION const_func() RETURNS integer DETERMINISTIC RETURN 42", lf.sql());
+    assertEquals(
+        "FUNCTION const_func() RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN 42", lf.sql());
   }
 
   @Test
@@ -245,7 +248,7 @@ public class TestGravitinoMetadataFunction {
     Collection<LanguageFunction> functions = metadata.listLanguageFunctions(session, "s");
     assertEquals(1, functions.size());
     assertEquals(
-        "FUNCTION fn_sql_double(n integer) RETURNS integer DETERMINISTIC RETURN n * 2",
+        "FUNCTION fn_sql_double(n integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN n * 2",
         functions.iterator().next().sql());
   }
 
@@ -267,7 +270,7 @@ public class TestGravitinoMetadataFunction {
     Collection<LanguageFunction> functions = metadata.listLanguageFunctions(session, "s");
     assertEquals(1, functions.size());
     assertEquals(
-        "FUNCTION rand_func(x integer) RETURNS integer NOT DETERMINISTIC RETURN x + random()",
+        "FUNCTION rand_func(x integer) RETURNS integer NOT DETERMINISTIC SECURITY INVOKER RETURN x + random()",
         functions.iterator().next().sql());
   }
 
@@ -291,7 +294,7 @@ public class TestGravitinoMetadataFunction {
     assertEquals(1, functions.size());
     assertEquals(
         "FUNCTION \"order\"(\"select\" integer, \"value-with-dash\" integer, myParam integer) "
-            + "RETURNS integer DETERMINISTIC RETURN 1",
+            + "RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN 1",
         functions.iterator().next().sql());
   }
 

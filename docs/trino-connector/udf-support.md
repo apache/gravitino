@@ -23,7 +23,7 @@ Only functions with language `SQL` and runtime `TRINO` are visible to and callab
 
 ### SQL body format
 
-The `sql` field of a `SQL`/`TRINO` implementation is the function body. The connector assembles a complete [Trino SQL routine](https://trino.io/docs/current/routines/function.html) specification (`FUNCTION <name>(<params>) RETURNS <type> [NOT] DETERMINISTIC ...`) from the function name, parameters, return type and deterministic flag before handing it to Trino. The body may be:
+The `sql` field of a `SQL`/`TRINO` implementation is the function body. The connector assembles a complete [Trino SQL routine](https://trino.io/docs/current/routines/function.html) specification (`FUNCTION <name>(<params>) RETURNS <type> [NOT] DETERMINISTIC SECURITY INVOKER ...`) from the function name, parameters, return type and deterministic flag before handing it to Trino. The body may be:
 
 - A bare expression, e.g. `x + 1`. The connector wraps it as `RETURN x + 1`.
 - A control statement, e.g. `RETURN x + 1` or `BEGIN ... END`.

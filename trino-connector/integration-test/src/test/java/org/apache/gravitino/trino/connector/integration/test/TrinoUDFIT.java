@@ -197,14 +197,7 @@ public class TrinoUDFIT extends TrinoQueryITBase {
     String result = trinoQueryRunner.runQuery(selectQuery);
 
     LOG.info("SELECT result: {}", result);
-    // Parse the query result and verify the exact numeric output
-    String trimmedResult = result.trim();
-    Assertions.assertTrue(
-        trimmedResult.contains("10"),
-        "Expected SELECT test_add_five(5) to return 10. Got: " + trimmedResult);
-    Assertions.assertFalse(
-        trimmedResult.contains("100"),
-        "Result should be exactly 10, not a number containing 10. Got: " + trimmedResult);
+    Assertions.assertEquals("\"10\"", result.trim(), "Expected test_add_five(5) to return 10");
 
     // Cleanup
     functionCatalog.dropFunction(NameIdentifier.of(SCHEMA_NAME, functionName));
@@ -238,8 +231,7 @@ public class TrinoUDFIT extends TrinoQueryITBase {
         trinoQueryRunner
             .runQuery(String.format("SELECT %s.%s.%s(21)", CATALOG_NAME, SCHEMA_NAME, functionName))
             .trim();
-    Assertions.assertTrue(
-        selectResult.contains("42"), "Expected test_double(21) to return 42. Got: " + selectResult);
+    Assertions.assertEquals("\"42\"", selectResult, "Expected test_double(21) to return 42");
 
     functionCatalog.dropFunction(NameIdentifier.of(SCHEMA_NAME, functionName));
   }

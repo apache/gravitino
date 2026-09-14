@@ -1004,9 +1004,10 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   /**
    * Builds the SQL routine specification Trino expects for a language function: {@code FUNCTION
-   * name(params) RETURNS type [NOT] DETERMINISTIC RETURN body}. The stored body may be a bare
-   * expression, a control statement ({@code RETURN ...} / {@code BEGIN ... END}), or already a full
-   * specification; only the missing parts are added.
+   * name(params) RETURNS type [NOT] DETERMINISTIC SECURITY INVOKER RETURN body}. The stored body
+   * may be a bare expression, a control statement ({@code RETURN ...} / {@code BEGIN ... END}), or
+   * already a full specification; only the missing parts are added. {@code SECURITY INVOKER} is
+   * required because the function has no owner identity for the {@code SECURITY DEFINER} default.
    */
   private String buildFunctionSpecification(
       Function function, FunctionDefinition definition, String sql) {
@@ -1029,6 +1030,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         metadataAdapter.getDataTypeTransformer().getTrinoType(definition.returnType());
     sb.append(returnType.getDisplayName()).append(" ");
     sb.append(function.deterministic() ? "DETERMINISTIC " : "NOT DETERMINISTIC ");
+    sb.append("SECURITY INVOKER ");
     if (!startsWithKeyword(body, "RETURN") && !startsWithKeyword(body, "BEGIN")) {
       sb.append("RETURN ");
     }
