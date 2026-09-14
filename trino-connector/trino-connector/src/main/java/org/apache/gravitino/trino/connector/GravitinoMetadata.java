@@ -880,11 +880,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
    * Converts a Gravitino function to a collection of Trino LanguageFunction instances. Only SQL
    * implementations with TRINO runtime are included. Each definition with a Trino SQL
    * implementation produces one LanguageFunction. The signature token is generated from the
-   * function name and parameter types.
+   * function name and parameter types, and the stored SQL body is expanded into a complete Trino
+   * function specification.
    */
   private Collection<LanguageFunction> toLanguageFunctions(Function function) {
     List<LanguageFunction> result = new ArrayList<>();
     for (FunctionDefinition definition : function.definitions()) {
+      if (definition.returnType() == null) {
+        LOG.warn("Skipping function %s: definition has no return type", function.name());
+        continue;
+      }
       for (FunctionImpl impl : definition.impls()) {
         if (!isTrinoSqlImplementation(impl)) {
           continue;
@@ -892,13 +897,53 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         String sql = ((SQLImpl) impl).sql();
         try {
           String signatureToken = buildSignatureToken(function.name(), definition.parameters());
-          result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
+          String specification = buildFunctionSpecification(function, definition, sql);
+          result.add(
+              new LanguageFunction(signatureToken, specification, List.of(), Optional.empty()));
         } catch (TrinoException e) {
-          LOG.warn(e, "Failed to build signature token for function %s", function.name());
+          LOG.warn(e, "Failed to build language function for %s", function.name());
         }
       }
     }
     return result;
+  }
+
+  /**
+   * Builds the SQL routine specification Trino expects for a language function: {@code FUNCTION
+   * name(params) RETURNS type [NOT] DETERMINISTIC RETURN body}. The stored body may be a bare
+   * expression, a control statement ({@code RETURN ...} / {@code BEGIN ... END}), or already a full
+   * specification; only the missing parts are added.
+   */
+  private String buildFunctionSpecification(
+      Function function, FunctionDefinition definition, String sql) {
+    String body = sql.trim();
+    if (startsWithKeyword(body, "FUNCTION")) {
+      return body;
+    }
+    StringBuilder sb = new StringBuilder("FUNCTION ").append(function.name()).append("(");
+    FunctionParam[] params = definition.parameters();
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) {
+        sb.append(", ");
+      }
+      Type trinoType = metadataAdapter.getDataTypeTransformer().getTrinoType(params[i].dataType());
+      sb.append(params[i].name()).append(" ").append(trinoType.getDisplayName());
+    }
+    sb.append(") RETURNS ");
+    Type returnType =
+        metadataAdapter.getDataTypeTransformer().getTrinoType(definition.returnType());
+    sb.append(returnType.getDisplayName()).append(" ");
+    sb.append(function.deterministic() ? "DETERMINISTIC " : "NOT DETERMINISTIC ");
+    if (!startsWithKeyword(body, "RETURN") && !startsWithKeyword(body, "BEGIN")) {
+      sb.append("RETURN ");
+    }
+    return sb.append(body).toString();
+  }
+
+  private static boolean startsWithKeyword(String sql, String keyword) {
+    return sql.regionMatches(true, 0, keyword, 0, keyword.length())
+        && (sql.length() == keyword.length()
+            || Character.isWhitespace(sql.charAt(keyword.length())));
   }
 
   private boolean isTrinoSqlImplementation(FunctionImpl impl) {

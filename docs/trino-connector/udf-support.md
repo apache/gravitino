@@ -19,7 +19,24 @@ When Gravitino catalogs contain registered functions, the Trino connector:
 2. Filters to include only functions with `RuntimeType.TRINO` and `Language.SQL`.
 3. Maps each function implementation to a Trino `LanguageFunction` with a signature token derived from the function name and parameter types.
 
-Functions registered with other runtimes (e.g., `SPARK`) are **not** visible in Trino.
+Only functions with language `SQL` and runtime `TRINO` are visible to and callable from Trino.
+Functions registered for other languages or runtimes (for example a Python or Java implementation
+with runtime `SPARK`) are managed in Gravitino but are **not** exposed through this connector: they
+do not appear in `SHOW FUNCTIONS`, and invoking one fails with a Trino
+`Function "<catalog>.<schema>.<name>" not registered` error. The function still exists in
+Gravitino; the connector simply filters it out. The Gravitino UI function detail view shows, per
+implementation, whether it is exposed through the Trino connector.
+
+### SQL body format
+
+The `sql` field of a `SQL`/`TRINO` implementation is the function body. The connector assembles a
+complete [Trino SQL routine](https://trino.io/docs/current/routines/function.html) specification
+(`FUNCTION <name>(<params>) RETURNS <type> [NOT] DETERMINISTIC ...`) from the function name,
+parameters, return type and deterministic flag before handing it to Trino. The body may be:
+
+- A bare expression, e.g. `x + 1`. The connector wraps it as `RETURN x + 1`.
+- A control statement, e.g. `RETURN x + 1` or `BEGIN ... END`.
+- A complete `FUNCTION ...` specification, which is passed through unchanged.
 
 ## Prerequisites
 
@@ -62,5 +79,6 @@ SELECT catalog.my_schema.add_one(5);
 
 - **Read-only**: The Trino connector supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
 - **SQL only**: Only SQL-language implementations are mapped. Java and Python implementations are not exposed to Trino.
-- **TRINO runtime only**: Only functions with `RuntimeType.TRINO` are visible. Functions registered with `RuntimeType.SPARK` or other runtimes are filtered out.
+- **TRINO runtime only**: Only functions with `RuntimeType.TRINO` are visible. Functions registered with `RuntimeType.SPARK` or other runtimes are filtered out and fail with `Function ... not registered` when invoked.
+- **Scalar only**: Table-valued function definitions (no return type) are skipped.
 - **Type mapping**: Function parameter and return types are converted from Gravitino types to Trino types. Unsupported types will cause the function to be skipped with a warning log.
