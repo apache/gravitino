@@ -223,18 +223,23 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 **Memory engine data volatility**: Tables created with `engine=Memory` store data in RAM only. After a ClickHouse server restart the table definition persists (Gravitino's `loadTable` succeeds), but all data is permanently lost. Gravitino metadata and ClickHouse remain consistent at the schema level, but users are responsible for repopulating data after restarts. Consider using `TinyLog`, `StripeLog`, or a MergeTree-family engine if data durability is required.
 :::
 
-| Property Name             | Description                                                                                              | Default Value | Required | Reserved | Immutable |
-|---------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
-| `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       |
-| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        |
-| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        |
-| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        |
-| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        |
-| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        |
-| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        |
+| Property Name             | Description                                                                                              | Default Value | Required   | Reserved | Immutable |
+|---------------------------|----------------------------------------------------------------------------------------------------------|---------------|------------|----------|-----------|
+| `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No         | No       | Yes       |
+| `graphite.config`         | Name of the `<graphite_rollup>` configuration element used by `GraphiteMergeTree`                        | (none)        | No\*\*\*   | No       | No        |
+| `engine_parameters`       | Parameters for supported parameterized MergeTree engines                                                 | (none)        | No         | No       | No        |
+| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*       | No       | No        |
+| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No         | No       | No        |
+| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*     | No       | No        |
+| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*     | No       | No        |
+| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*     | No       | No        |
+| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No         | No       | No        |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
+\*\*\* Required when `engine=GraphiteMergeTree`.
+
+The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeTree`, `CollapsingMergeTree`, and `VersionedCollapsingMergeTree`. Values are restored when loading these tables and must be provided without outer parentheses. For `GraphiteMergeTree`, use `graphite.config` instead.
 
 ### Table Indexes
 
@@ -249,6 +254,8 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
   On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  ClickHouse data-skipping indexes whose field expressions cannot be represented as Gravitino field names, such as `lower(name)` or `name + 1`, are skipped with a warning when the table is loaded and are not recreated. Direct column references and tuples containing only column references remain supported.
 
 ### Partitioning, Sorting, and Distribution
 
