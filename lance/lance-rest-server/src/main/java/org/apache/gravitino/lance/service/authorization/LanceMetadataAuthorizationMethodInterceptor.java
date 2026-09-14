@@ -186,9 +186,7 @@ public class LanceMetadataAuthorizationMethodInterceptor
     String namespaceId = pathArgument(method.getParameters(), args, "id").orElse("");
     Exception exception;
     if (throwable instanceof ForbiddenException) {
-      exception =
-          new PermissionDeniedException(
-              throwable.getMessage(), LanceExceptionMapper.errorDetail(throwable), namespaceId);
+      exception = new PermissionDeniedException(throwable.getMessage(), "", namespaceId);
     } else if (throwable instanceof Exception) {
       exception = (Exception) throwable;
     } else {

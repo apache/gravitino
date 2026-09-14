@@ -23,8 +23,10 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.lance.namespace.errors.ConcurrentModificationException;
@@ -94,7 +96,13 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   }
 
   private static LanceNamespaceException toLanceNamespaceException(String instance, Throwable ex) {
-    if (ex instanceof NoSuchTableException) {
+    if (ex instanceof ForbiddenException) {
+      return new PermissionDeniedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof UnauthorizedException) {
+      return new UnauthenticatedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof NoSuchTableException) {
       return new TableNotFoundException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof NotFoundException) {
@@ -112,7 +120,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
     } else {
       LOG.warn("Lance REST server unexpected exception:", ex);
-      return new InternalException(ex.getMessage(), errorDetail(ex), instance);
+      return new InternalException("Internal server error", "", instance);
     }
   }
 
