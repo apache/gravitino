@@ -44,6 +44,7 @@ import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,10 +151,26 @@ public class LocalJobExecutor implements JobExecutor {
         TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
+
+    // Spark is optional for the local job executor, so a missing Spark installation must not fail
+    // the server startup. Warn early instead; Spark jobs will be rejected at submission.
+    try {
+      SparkProcessBuilder.resolveSparkSubmit(configs);
+    } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "Spark jobs cannot be run by the local job executor and will be rejected: {}",
+          e.getMessage());
+    }
   }
 
   @Override
   public String submitJob(JobTemplate jobTemplate) {
+    // Validate the job can be launched before queueing it, so that a misconfiguration is reported
+    // to the caller directly instead of only failing the job asynchronously in the worker thread.
+    if (jobTemplate instanceof SparkJobTemplate) {
+      SparkProcessBuilder.resolveSparkSubmit(configs);
+    }
+
     String newJobId = LOCAL_JOB_PREFIX + UUID.randomUUID();
     Pair<String, JobTemplate> jobPair = Pair.of(newJobId, jobTemplate);
 
