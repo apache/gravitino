@@ -474,6 +474,11 @@ public final class JettyServerConfig {
     return responseHeaderSize;
   }
 
+  /**
+   * Returns whether HTTP error responses include server-side stack traces.
+   *
+   * @return {@code true} if HTTP error responses include server-side stack traces
+   */
   public boolean isIncludeErrorStackTrace() {
     return includeErrorStackTrace;
   }
