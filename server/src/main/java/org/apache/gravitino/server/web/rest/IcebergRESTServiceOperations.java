@@ -168,7 +168,7 @@ public class IcebergRESTServiceOperations {
         throw new IllegalStateException(
             String.format(
                 "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
-                    + "host and no query or fragment",
+                    + "host, a port in 1-65535 if present, and no query or fragment",
                 ADVERTISED_URI_KEY, advertisedUri));
       }
       return advertisedUri;
@@ -201,8 +201,11 @@ public class IcebergRESTServiceOperations {
       return false;
     }
     String scheme = uri.getScheme();
+    // URI accepts any non-negative integer as a port; -1 means no explicit port.
+    int port = uri.getPort();
     return ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
         && StringUtils.isNotBlank(uri.getHost())
+        && (port == -1 || (port >= 1 && port <= 65535))
         && uri.getQuery() == null
         && uri.getFragment() == null;
   }

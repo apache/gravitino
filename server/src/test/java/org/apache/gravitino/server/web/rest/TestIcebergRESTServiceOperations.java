@@ -228,7 +228,8 @@ public class TestIcebergRESTServiceOperations {
 
   @Test
   public void testAdvertisedUriIsReportedAsIs() {
-    // A reverse-proxied IRC: the public scheme, host, port and path all differ from the listener's.
+    // A reverse-proxied IRC: the public scheme, host, port and path all differ from the listener's,
+    // and the path prefix and trailing slash must survive untouched.
     IcebergRESTServiceOperations ops =
         newOps(
             true,
@@ -236,9 +237,21 @@ public class TestIcebergRESTServiceOperations {
                 ImmutableMap.of(
                     "host", "0.0.0.0",
                     "httpPort", "9001",
-                    "advertised-uri", "https://iceberg.example.com/iceberg/")),
+                    "advertised-uri", "https://iceberg.example.com:8443/proxy/iceberg/")),
             "gravitino.example.com");
-    assertEquals("https://iceberg.example.com/iceberg/", uriOf(ops.getIcebergRestServiceUri("")));
+    assertEquals(
+        "https://iceberg.example.com:8443/proxy/iceberg/", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testAdvertisedUriStillRequiresRegisteredAuxService() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            false,
+            withDynamicProvider(
+                ImmutableMap.of("advertised-uri", "https://iceberg.example.com/iceberg")),
+            "gravitino-host");
+    assertNull(uriOf(ops.getIcebergRestServiceUri("")));
   }
 
   @Test
@@ -285,6 +298,8 @@ public class TestIcebergRESTServiceOperations {
           "https:///iceberg",
           "https://iceberg.example.com/iceberg?x=1",
           "https://iceberg.example.com/iceberg#frag",
+          "https://iceberg.example.com:0/iceberg",
+          "https://iceberg.example.com:70000/iceberg",
           "http://bad host/iceberg"
         }) {
       IcebergRESTServiceOperations ops =
