@@ -63,6 +63,7 @@ dependencies {
     exclude("javax.servlet")
   }
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.awaitility)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
