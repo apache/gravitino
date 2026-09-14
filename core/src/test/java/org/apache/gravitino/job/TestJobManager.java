@@ -520,6 +520,94 @@ public class TestJobManager {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testRunJobPropagatesJobExecutorRejection() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity shellJobTemplate =
+        newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+
+    IllegalArgumentException rejection =
+        new IllegalArgumentException(
+            "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
+                + " be set for Spark jobs");
+    doThrow(rejection).when(jobExecutor).submitJob(any());
+
+    // The rejection must reach the caller as is, so the REST layer reports the original reason
+    // with a 400 instead of wrapping it into a generic 500 error.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+    Assertions.assertSame(rejection, e);
+
+    // No job entity is registered and the staging directory of the rejected job is removed.
+    verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
+    File templateStagingDir =
+        new File(testStagingDir, metalake + File.separator + shellJobTemplate.name());
+    String[] jobStagingDirs = templateStagingDir.list();
+    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+  }
+
+  @Test
+  public void testRunJobPopulatesResolvedRuntimeJobTemplate() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    ShellJobTemplate templateWithPlaceholder =
+        ShellJobTemplate.builder()
+            .withName("shell_job_with_placeholder")
+            .withComment("A shell job template with a placeholder")
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("{{greeting}}"))
+            .build();
+    JobTemplateEntity jobTemplateEntity =
+        JobTemplateEntity.builder()
+            .withId(new Random().nextLong())
+            .withName(templateWithPlaceholder.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+            .withTemplateContent(
+                JobTemplateEntity.TemplateContent.fromJobTemplate(templateWithPlaceholder))
+            .withComment(templateWithPlaceholder.comment())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    JobEntity jobEntity =
+        jobManager.runJob(
+            metalake, jobTemplateEntity.name(), Collections.singletonMap("greeting", "Hello!"));
+
+    Assertions.assertNotNull(jobEntity.runtimeJobTemplate());
+    ShellJobTemplateDTO runtimeJobTemplateDTO =
+        (ShellJobTemplateDTO)
+            JsonUtils.anyFieldMapper()
+                .readValue(jobEntity.runtimeJobTemplate(), JobTemplateDTO.class);
+
+    // The resolved runtime template must carry the actual value substituted for the placeholder,
+    // not the original template's raw {{greeting}} string.
+    Assertions.assertEquals(Lists.newArrayList("Hello!"), runtimeJobTemplateDTO.arguments());
+    Assertions.assertEquals(jobTemplateEntity.name(), runtimeJobTemplateDTO.name());
+    Assertions.assertEquals(jobTemplateEntity.comment(), runtimeJobTemplateDTO.comment());
+    // createRuntimeJobTemplate() also resolves the executable by fetching it into the job's
+    // staging directory, so it ends up as a local staging-dir path rather than the original
+    // "/bin/echo" - just confirm it was actually resolved to something under that directory.
+    Assertions.assertTrue(
+        runtimeJobTemplateDTO.executable().endsWith("echo"),
+        () -> "Unexpected resolved executable: " + runtimeJobTemplateDTO.executable());
+  }
+
+  @Test
+>>>>>>> 0f2d22cd6 ([#13131] fix(core): Reject Spark jobs at submission when Spark is not available in the local job executor (#13132))
   public void testRunJobSucceedsWhenStagingDirectoryAlreadyExists() throws Exception {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
