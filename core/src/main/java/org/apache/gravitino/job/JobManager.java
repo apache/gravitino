@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -851,12 +852,7 @@ public class JobManager implements JobOperationDispatcher {
             content.arguments().stream()
                 .map(arg -> replacePlaceholder(arg, jobConf))
                 .collect(Collectors.toList()));
-    Map<String, String> environments =
-        content.environments().entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    entry -> replacePlaceholder(entry.getKey(), jobConf),
-                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
+    Map<String, String> environments = omitUnresolvedTemplateMap(content.environments(), jobConf);
     Map<String, String> customFields =
         content.customFields().entrySet().stream()
             .collect(
@@ -949,10 +945,10 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
-        matcher.appendReplacement(result, matcher.group(0));
+        matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
       }
     }
     matcher.appendTail(result);
@@ -986,13 +982,13 @@ public class JobManager implements JobOperationDispatcher {
     List<String> result = new ArrayList<>(arguments.size());
     for (int i = 0; i < arguments.size(); i++) {
       String arg = arguments.get(i);
-      if (isOmittedArgumentValue(arg)) {
+      if (isUnresolvedOptionalValue(arg)) {
         continue;
       }
 
       if (arg.startsWith("--") && i + 1 < arguments.size()) {
         String next = arguments.get(i + 1);
-        if (!next.startsWith("--") && isOmittedArgumentValue(next)) {
+        if (!next.startsWith("--") && isUnresolvedOptionalValue(next)) {
           i++;
           continue;
         }
@@ -1003,7 +999,34 @@ public class JobManager implements JobOperationDispatcher {
     return result;
   }
 
-  private static boolean isOmittedArgumentValue(String value) {
+  /**
+   * Resolves optional template maps such as {@code environments}. Entries whose keys or values are
+   * blank or still an unresolved {@code {{placeholder}}} after substitution are dropped so
+   * unauthenticated / optional credentials do not become literal placeholder strings.
+   *
+   * <p>{@code arguments} use {@link #omitEmptyArguments(List)}; {@code customFields} still keep
+   * unresolved placeholders as literal text.
+   *
+   * @param source template map before substitution
+   * @param jobConf replacement values
+   * @return resolved map without blank or unresolved optional entries
+   */
+  private static Map<String, String> omitUnresolvedTemplateMap(
+      Map<String, String> source, Map<String, String> jobConf) {
+    Map<String, String> resolved = new LinkedHashMap<>();
+    for (Map.Entry<String, String> entry : source.entrySet()) {
+      String key = replacePlaceholder(entry.getKey(), jobConf);
+      String value = replacePlaceholder(entry.getValue(), jobConf);
+      if (isUnresolvedOptionalValue(key) || isUnresolvedOptionalValue(value)) {
+        continue;
+      }
+      resolved.put(key, value);
+    }
+    return resolved;
+  }
+
+  @VisibleForTesting
+  static boolean isUnresolvedOptionalValue(String value) {
     return StringUtils.isBlank(value) || PLACEHOLDER_PATTERN.matcher(value).matches();
   }
 

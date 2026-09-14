@@ -490,6 +490,65 @@ public class TestJobTemplate {
   }
 
   @Test
+  public void testCreateSparkRuntimeJobTemplateOmitsUnresolvedEnvironments() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
+    SparkJobTemplate sparkJobTemplate =
+        SparkJobTemplate.builder()
+            .withName("testSparkJobAuthEnv")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.TestSparkJob")
+            .withEnvironments(
+                ImmutableMap.of(
+                    "GRAVITINO_AUTH_TYPE",
+                    "{{gravitino_auth_type}}",
+                    "GRAVITINO_AUTH_USERNAME",
+                    "{{gravitino_auth_username}}",
+                    "KEEP_ME",
+                    "literal"))
+            .build();
+
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(2L)
+            .withName(sparkJobTemplate.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(
+                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplate omitted =
+        JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    Assertions.assertEquals(ImmutableMap.of("KEEP_ME", "literal"), omitted.environments());
+
+    JobTemplate resolved =
+        JobManager.createRuntimeJobTemplate(
+            entity,
+            ImmutableMap.of(
+                "gravitino_auth_type", "basic",
+                "gravitino_auth_username", "admin"),
+            tempStagingDir);
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            "GRAVITINO_AUTH_TYPE",
+            "basic",
+            "GRAVITINO_AUTH_USERNAME",
+            "admin",
+            "KEEP_ME",
+            "literal"),
+        resolved.environments());
+  }
+
+  @Test
+  public void testReplacePlaceholderQuotesDollarAndBackslash() {
+    Assertions.assertEquals(
+        "pa$$word\\path",
+        JobManager.replacePlaceholder(
+            "{{password}}", ImmutableMap.of("password", "pa$$word\\path")));
+  }
+
+  @Test
   public void testCreateSparkRuntimeJobTemplateOmitsEmptyOptionalArguments() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
 
