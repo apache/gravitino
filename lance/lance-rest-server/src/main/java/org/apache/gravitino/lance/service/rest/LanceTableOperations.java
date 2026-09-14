@@ -22,6 +22,11 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -49,6 +54,7 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -84,6 +90,7 @@ public class LanceTableOperations {
   @Path("/describe")
   @Timed(name = "describe-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-table", absolute = true)
+  @AuthorizationExpression(expression = READ_TABLE_AUTHORIZATION_EXPRESSION)
   public Response describeTable(
       @PathParam("id") String tableId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -117,6 +124,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
@@ -156,6 +164,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "declare-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "declare-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response declareTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
@@ -184,6 +193,7 @@ public class LanceTableOperations {
   @Path("/register")
   @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response registerTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -213,6 +223,7 @@ public class LanceTableOperations {
   @Path("/deregister")
   @Timed(name = "deregister-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "deregister-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response deregisterTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -232,6 +243,7 @@ public class LanceTableOperations {
   @Path("/exists")
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exists", absolute = true)
+  @AuthorizationExpression(expression = PROBE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response tableExists(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -254,6 +266,7 @@ public class LanceTableOperations {
   @Path("/drop")
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -272,6 +285,7 @@ public class LanceTableOperations {
   @Path("/drop_columns")
   @Timed(name = "drop-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -295,6 +309,7 @@ public class LanceTableOperations {
   @Path("/alter_columns")
   @Timed(name = "alter-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response alterColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,

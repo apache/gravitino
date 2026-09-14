@@ -47,6 +47,7 @@ public class AuthorizeExecutorFactory {
           expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);
       case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
           parameters,
           args,
@@ -59,6 +60,15 @@ public class AuthorizeExecutorFactory {
           allowCheckExistenceExpression);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
     };
   }
 }

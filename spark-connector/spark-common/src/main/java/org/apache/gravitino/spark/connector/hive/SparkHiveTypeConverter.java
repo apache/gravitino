@@ -24,6 +24,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 
 public class SparkHiveTypeConverter extends SparkTypeConverter {
@@ -35,6 +36,7 @@ public class SparkHiveTypeConverter extends SparkTypeConverter {
    *
    * <ul>
    *   <li>{@link TimestampType} ➔ {@link Types.TimestampType#withoutTimeZone()} (Hive limitation)
+   *   <li>{@link TimestampNTZType} is rejected: Hive has no equivalent type
    *   <li>Other types follow base class conversion rules
    * </ul>
    *
@@ -47,6 +49,9 @@ public class SparkHiveTypeConverter extends SparkTypeConverter {
   public Type toGravitinoType(DataType sparkType) {
     if (sparkType instanceof TimestampType) {
       return Types.TimestampType.withoutTimeZone();
+    } else if (sparkType instanceof TimestampNTZType) {
+      throw new UnsupportedOperationException(
+          "Hive does not support 'timestamp_ntz' (timestamp without time zone), please use 'timestamp' instead.");
     } else {
       return super.toGravitinoType(sparkType);
     }

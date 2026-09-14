@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -60,6 +61,10 @@ public class GravitinoCatalogManager {
   private final Cache<GravitinoIdentity, GravitinoClient> clients;
   private final Cache<String, Catalog> gravitinoCatalogs;
   private volatile Map<String, Catalog> applicationCatalogs = ImmutableMap.of();
+
+  // Resolved lazily on first access and cached for the life of this manager; Spark catalogs are
+  // initialized once, so there is no refresh path if the Iceberg REST endpoint changes later.
+  private volatile Optional<String> icebergRestUri;
 
   private GravitinoCatalogManager(
       SparkConf sparkConf, Function<GravitinoIdentity, GravitinoClient> clientBuilder) {
@@ -207,6 +212,29 @@ public class GravitinoCatalogManager {
 
   private GravitinoIdentity applicationIdentity() {
     return GravitinoIdentity.application(authType);
+  }
+
+  /**
+   * Resolves the Gravitino Iceberg REST server endpoint for this manager's metalake, if the server
+   * exposes one. The lookup is performed once and a successful response, including a response with
+   * no endpoint, is cached for the lifetime of this manager. Request failures are propagated.
+   *
+   * @return the discovered Iceberg REST endpoint, or empty if none is available
+   */
+  public Optional<String> getIcebergRestUri() {
+    if (icebergRestUri == null) {
+      synchronized (this) {
+        if (icebergRestUri == null) {
+          icebergRestUri = resolveIcebergRestUri();
+        }
+      }
+    }
+    return icebergRestUri;
+  }
+
+  private Optional<String> resolveIcebergRestUri() {
+    String metalakeName = sparkConf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
+    return getClient(applicationIdentity()).icebergRestServiceUri(metalakeName);
   }
 
   private Catalog loadCatalog(GravitinoIdentity identity, String catalogName) {

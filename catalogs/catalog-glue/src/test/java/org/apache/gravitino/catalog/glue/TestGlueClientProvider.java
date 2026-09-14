@@ -22,13 +22,21 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_ACCESS_KEY_ID;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_ENDPOINT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.GlueClient;
 
 class TestGlueClientProvider {
@@ -45,15 +53,48 @@ class TestGlueClientProvider {
     }
   }
 
-  @Test
-  void testBuildClientWithDefaultCredentialChain() {
-    // Without explicit credentials the default chain is used.
-    Map<String, String> config = new HashMap<>();
-    config.put(AWS_REGION, "eu-west-1");
+  // Note: buildClient()'s default-credential-chain branch is not exercised end-to-end here with
+  // no static credentials — whether it resolves depends on the machine's real AWS environment
+  // (e.g. a developer's ~/.aws/credentials), which would make the test flaky. The fail-fast
+  // validation logic itself (validateCredentials) is covered deterministically below with a
+  // fake provider instead.
 
-    try (GlueClient client = GlueClientProvider.buildClient(config)) {
-      assertNotNull(client);
-    }
+  @Test
+  void testValidateCredentialsWithResolvableCredentialsSucceeds() {
+    AwsCredentialsProvider provider =
+        StaticCredentialsProvider.create(AwsBasicCredentials.create("ak", "sk"));
+
+    GlueClientProvider.validateCredentials(provider);
+  }
+
+  @Test
+  void testValidateCredentialsWithUnresolvableCredentialsThrows() {
+    AwsCredentialsProvider provider = mock(AwsCredentialsProvider.class);
+    doThrow(SdkClientException.create("Unable to load credentials from any of the providers"))
+        .when(provider)
+        .resolveCredentials();
+
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class, () -> GlueClientProvider.validateCredentials(provider));
+    assertTrue(ex.getMessage().contains(AWS_ACCESS_KEY_ID));
+    assertTrue(ex.getMessage().contains(AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testValidateCredentialsWithNonCredentialFailureDoesNotClaimNoCredentials() {
+    // A network/IMDS error while resolving credentials is not the same as "no credentials
+    // configured" — the message must not assert that no usable credentials exist.
+    AwsCredentialsProvider provider = mock(AwsCredentialsProvider.class);
+    SdkClientException cause = SdkClientException.create("connection refused");
+    doThrow(cause).when(provider).resolveCredentials();
+
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class, () -> GlueClientProvider.validateCredentials(provider));
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains("connection refused"));
+    assertFalse(ex.getMessage().contains("No usable AWS credentials"));
   }
 
   @Test

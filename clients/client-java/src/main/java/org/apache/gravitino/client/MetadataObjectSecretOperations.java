@@ -28,7 +28,7 @@ import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * The implementation of {@link SupportsSecrets}. This interface will be composited into catalog,
- * schema, and fileset to provide secret property operations for these metadata objects.
+ * schema, fileset, and table to provide secret property operations for these metadata objects.
  */
 class MetadataObjectSecretOperations implements SupportsSecrets {
 

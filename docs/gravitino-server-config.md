@@ -208,33 +208,39 @@ Gravitino exposes three health endpoints following
 of them are exempt from authentication, so Kubernetes probes, load balancers, and traffic managers
 reach them without credentials.
 
-| Endpoint                | Root Alias          | Description                                                                                                                                 | HTTP Status |
-|-------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 as long as an HTTP server thread can respond. Use it to decide whether to restart a pod.                              | 200         |
-| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when the entity store answers within the probe timeout, 503 when it is unavailable or slow. Use it to route traffic. | 200 or 503  |
-| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                     | 200 or 503  |
+| Endpoint                | Root Alias          | Description                                                                                                                                         | HTTP Status |
+|-------------------------|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 if an HTTP thread can respond and no OOM has been observed; otherwise 503. Use it to decide whether to restart a pod.         | 200 or 503  |
+| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when no OOM has been observed and the entity store answers within the probe timeout; otherwise 503. Use it to route traffic. | 200 or 503  |
+| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                             | 200 or 503  |
 
 | Configuration Item                                   | Description                                                         | Default Value |
 |------------------------------------------------------|---------------------------------------------------------------------|---------------|
 | `gravitino.server.health.entityStore.probeTimeoutMs` | Timeout in milliseconds for the entity store probe behind `/ready`. | `2000`        |
 
 Every endpoint returns the same JSON shape, but not the same checks. `code` is always `0`,
-`status` is `UP` or `DOWN`, and `checks` carries one entry per component probed. `/live` reports
-`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both:
+`status` is `up` or `down`, and `checks` carries one entry per component probed. `/live` reports
+`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both
+while no OOM has been observed:
 
 ```json
 {
   "code": 0,
-  "status": "DOWN",
+  "status": "down",
   "checks": [
-    { "name": "httpServer", "status": "UP", "details": {} },
-    { "name": "entityStore", "status": "DOWN", "details": { "reason": "timeout" } }
+    { "name": "httpServer", "status": "up", "details": {} },
+    { "name": "entityStore", "status": "down", "details": { "reason": "timeout" } }
   ]
 }
 ```
 
 A failing `entityStore` check reports `timeout`, `interrupted`, `probe-rejected`,
 `entity store not initialized`, or the simple class name of an unexpected exception.
+
+After an observed `OutOfMemoryError` (including Metaspace OOM), all three endpoints and their root
+aliases return 503 with a single `jvm: down` check and the reason `OutOfMemoryError; restart required`.
+This state persists until process restart; successful requests do not reset it. See
+[Out-of-memory failures](./health-and-readiness.md#out-of-memory-failures) for detection scope.
 
 #### JVM Memory
 
@@ -248,9 +254,9 @@ line with catalog count, plugin count, and query concurrency: `-Xms4g -Xmx4g
 
 #### Metrics
 
-| Configuration Item                        | Description                                          | Default Value |
-|-------------------------------------------|------------------------------------------------------|---------------|
-| `gravitino.metrics.timeSlidingWindowSecs` | Width in seconds of the metrics time sliding window. | `60`          |
+| Configuration Item                        | Description                                                                                                                                                                                                                                                                                                                                                                                    | Default Value |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.metrics.timeSlidingWindowSecs` | Deprecated, no longer used. Duration timers and histograms now use an exponentially-decaying reservoir instead of a fixed time window, so infrequently-invoked operations keep reporting a real duration for far longer (on the order of half a day) instead of reading zero after 60 seconds of inactivity. Operations idle longer than that will still eventually report a duration of zero. | `60`          |
 
 ### Storing Metadata
 
@@ -402,9 +408,27 @@ pipeline can replace either.
 
 `SimpleFormatterV2` is the default formatter. `JsonAuditFormatter` is available where structured
 output is wanted: it emits one JSON object per line, serializes `customInfo`, and writes timestamps
-as ISO 8601 with millisecond precision and a zone offset. Both formatters replace the value of a
-sensitive `customInfo` key with `***`. The masked keys are `authorization`, `cookie`,
-`x-amz-security-token`, `s3.access-key-id`, and `jdbc-password`.
+as ISO 8601 with millisecond precision and a zone offset.
+
+`customInfo` always includes the request's query parameters, captured automatically for every
+event — not just the ones an operation dispatcher explicitly reports. For example, a listing
+endpoint's `?details=true` shows up in the audit entry for that request even though no dispatcher
+code added it. Both formatters redact a `customInfo` value, replacing it with `***`, when its key
+either exactly matches `authorization`, `cookie`, `x-amz-security-token`, `s3.access-key-id`, or
+`jdbc-password`, or contains (case-insensitively) `password`, `secret`, `token`, `credential`,
+`apikey`, `accesskey`, `privatekey`, `auth`, or `signature` — so a caller-named parameter like
+`?token=...` or `?myApiKey=...` is masked even though its exact name was never enumerated. A short,
+fixed list of keys the server itself always uses (e.g. `http.method`, `http.status`, `auth.method`)
+is exempt from that substring check, since otherwise `auth.method` would be masked for merely
+containing "auth".
+
+Every request that reaches the server produces at least one audit entry, even one whose operation
+has no dedicated `Event` subclass: `HttpAuditFilter` dispatches a generic fallback event (method,
+URI, status code, and the same auto-captured query parameters) for any request where no
+operation-layer event fired. On a server that sees a high rate of otherwise-unaudited calls to the
+same endpoint — for example an Iceberg REST catalog's `/v1/config`, which some clients poll
+frequently — this can measurably increase audit log volume; size log rotation and retention in
+`conf/log4j2.properties` (below) accordingly.
 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
@@ -455,6 +479,12 @@ package.
 
 Throwing a `ForbiddenException` from a pre-event handler stops the operation before it runs, which
 makes pre-events a veto point rather than a notification.
+
+`customInfo()` on every event includes the request's query parameters, and a custom listener
+receives them **unredacted** — the masking described under "Audit Logging" above is applied only by
+the two built-in audit-log formatters at format time, not to the event object itself. A listener
+that forwards `customInfo()` elsewhere (logs, a metrics pipeline, a downstream service) is
+responsible for its own redaction if that matters for its destination.
 
 A plugin declares how its events are dispatched:
 

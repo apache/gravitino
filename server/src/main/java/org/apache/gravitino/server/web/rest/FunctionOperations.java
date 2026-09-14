@@ -160,7 +160,16 @@ public class FunctionOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FunctionRegisterRequest request) {
-    String functionName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received register function request with null request body");
+      return ExceptionHandlers.handleFunctionException(
+          OperationType.REGISTER,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String functionName = request.getName();
     LOG.info(
         "Received register function request: {}.{}.{}.{}", metalake, catalog, schema, functionName);
     try {

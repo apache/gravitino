@@ -299,8 +299,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> createLanceTable(nonExistentSchemaName, tableName));
-    assertFailureContainsAll(
-        exception, "NoSuchSchemaException", nonExistentSchemaName, "does not exist");
+    assertFailureContainsAll(exception, nonExistentSchemaName, "does not exist");
     Assertions.assertFalse(catalog.asSchemas().schemaExists(nonExistentSchemaName));
   }
 

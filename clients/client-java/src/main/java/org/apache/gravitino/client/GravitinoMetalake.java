@@ -132,6 +132,7 @@ import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -143,7 +144,12 @@ import org.apache.gravitino.tag.TagValueConstraint;
  * create, load, alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO
-    implements SupportsCatalogs, TagOperations, SupportsRoles, SupportsJobs, PolicyOperations {
+    implements SupportsCatalogs,
+        TagOperations,
+        SupportsRoles,
+        SupportsJobs,
+        PolicyOperations,
+        SupportsSecrets {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -158,6 +164,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
   private final RESTClient restClient;
   private final MetadataObjectRoleOperations metadataObjectRoleOperations;
+  private final MetadataObjectSecretOperations metadataObjectSecretOperations;
 
   GravitinoMetalake(
       String name,
@@ -167,9 +174,11 @@ public class GravitinoMetalake extends MetalakeDTO
       RESTClient restClient) {
     super(name, comment, properties, auditDTO);
     this.restClient = restClient;
+    MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
-        new MetadataObjectRoleOperations(
-            name, MetadataObjects.of(null, name, MetadataObject.Type.METALAKE), restClient);
+        new MetadataObjectRoleOperations(name, metalakeObject, restClient);
+    this.metadataObjectSecretOperations =
+        new MetadataObjectSecretOperations(name, metalakeObject, restClient);
   }
 
   /**
@@ -497,9 +506,59 @@ public class GravitinoMetalake extends MetalakeDTO
     ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(catalogName);
+      return;
+    }
+
+    List<CatalogUpdateRequest> requests =
+        Arrays.stream(changes)
+            .map(DTOConverters::toCatalogUpdateRequest)
+            .collect(Collectors.toList());
+    CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(requests);
+    updatesRequest.validate();
+
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            updatesRequest,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
   @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return metadataObjectSecretOperations.getSecrets();
   }
 
   /**
@@ -892,35 +951,6 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Adds a new User with an external identifier.
-   *
-   * @param user The name of the User.
-   * @param externalId The external identifier of the User.
-   * @param enabled Whether the User is enabled.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String user, String externalId, boolean enabled)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    UserAddRequest req = new UserAddRequest(user, externalId, enabled);
-    req.validate();
-
-    UserResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            UserResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.getUser();
-  }
-
-  /**
    * Removes a User.
    *
    * @param user The name of the User.
@@ -1021,35 +1051,6 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     GroupAddRequest req = new GroupAddRequest(group);
-    req.validate();
-
-    GroupResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            GroupResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.groupErrorHandler());
-    resp.validate();
-
-    return resp.getGroup();
-  }
-
-  /**
-   * Adds a new Group with an external identifier.
-   *
-   * @param group The name of the Group.
-   * @param externalId The external identifier of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
-   *     exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String group, String externalId)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    GroupAddRequest req = new GroupAddRequest(group, externalId);
     req.validate();
 
     GroupResponse resp =

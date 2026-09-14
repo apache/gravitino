@@ -151,7 +151,16 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       TagCreateRequest request) {
-    String tagName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received create tag request with null request body");
+      return ExceptionHandlers.handleTagException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String tagName = request.getName();
     LOG.info("Received create tag request under metalake: {}", metalake);
 
     try {

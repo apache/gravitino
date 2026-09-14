@@ -30,6 +30,7 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -38,9 +39,26 @@ public class TestIdpUserPO {
     Assertions.assertEquals(1L, userPO.getUserId());
     Assertions.assertEquals("alice", userPO.getUsername());
     Assertions.assertEquals("hash", userPO.getPasswordHash());
+    Assertions.assertTrue(userPO.getEnabled());
+    Assertions.assertEquals("{}", userPO.getAuditInfo());
     Assertions.assertEquals(1L, userPO.getCurrentVersion());
     Assertions.assertEquals(1L, userPO.getLastVersion());
     Assertions.assertEquals(0L, userPO.getDeletedAt());
+  }
+
+  @Test
+  public void testIdpUserPOBuilderRequiresAuditInfo() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            IdpUserPO.builder()
+                .withUserId(1L)
+                .withUsername("alice")
+                .withPasswordHash("hash")
+                .withCurrentVersion(1L)
+                .withLastVersion(1L)
+                .withDeletedAt(0L)
+                .build());
   }
 
   @Test
@@ -49,6 +67,7 @@ public class TestIdpUserPO {
         IdpUserPO.builder()
             .withUserId(1L)
             .withUsername("alice")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -66,6 +85,7 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -76,6 +96,7 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -92,6 +113,7 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L);

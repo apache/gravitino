@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,8 +29,10 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -108,6 +111,39 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(OperationType.CREATE_TABLE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testCreateTableOwnerFailureProducesCreateFailureEvent() {
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Arrays.asList(listener));
+    OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(ownerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    TableEventDispatcher dispatcherWithHook =
+        new TableEventDispatcher(
+            eventBus, new TableHookDispatcher(mockTableDispatcher(), () -> ownerDispatcher));
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", table.name());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                dispatcherWithHook.createTable(
+                    identifier,
+                    table.columns(),
+                    table.comment(),
+                    table.properties(),
+                    table.partitioning(),
+                    table.distribution(),
+                    table.sortOrder(),
+                    table.index()));
+
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
+    Event event = listener.popPostEvent();
+    Assertions.assertEquals(CreateTableFailureEvent.class, event.getClass());
+    Assertions.assertTrue(listener.getPostEvents().isEmpty());
   }
 
   @Test
@@ -289,6 +325,27 @@ public class TestTableEvent {
     Assertions.assertEquals(LoadTableEvent.class, loadEvent.getClass());
     Assertions.assertEquals("cache-miss", loadEvent.customInfo().get("audit.reason"));
     dummyEventListener.popPreEvent();
+  }
+
+  /**
+   * customInfo now has two contributors: the request's automatically captured query parameters
+   * (from {@code Event}) and this dispatcher's explicitly stashed extras. Pins that both are
+   * visible on the event and that an explicit key wins over an automatic one of the same name.
+   */
+  @Test
+  void testCustomInfoMergesAutomaticQueryParamsWithExplicitExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setRequestQueryParams(
+        ImmutableMap.of("details", "true", "audit.reason", "from-query-param"));
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    dispatcher.loadTable(identifier);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals("true", event.customInfo().get("details"));
+    Assertions.assertEquals(
+        "policy-applied",
+        event.customInfo().get("audit.reason"),
+        "explicit extras must override the automatically captured value for the same key");
   }
 
   @Test

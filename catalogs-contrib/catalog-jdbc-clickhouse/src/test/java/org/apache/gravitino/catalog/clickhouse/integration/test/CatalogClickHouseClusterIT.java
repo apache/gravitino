@@ -814,7 +814,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       Assertions.assertEquals(String.valueOf(true), renamed.properties().get(ON_CLUSTER));
       Assertions.assertEquals(
           ClickHouseContainer.DEFAULT_CLUSTER_NAME, renamed.properties().get(CLUSTER_NAME));
-      Assertions.assertTrue(renamed.properties().containsKey(StringIdentifier.ID_KEY));
+      Assertions.assertFalse(renamed.properties().containsKey(StringIdentifier.ID_KEY));
 
       awaitTableStateOnEveryNode(oldName, false, newName, true);
       assertRenameQueryUsesOnCluster(oldName, newName);

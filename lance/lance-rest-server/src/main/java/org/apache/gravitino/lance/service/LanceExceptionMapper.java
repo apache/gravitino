@@ -23,8 +23,11 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.lance.namespace.errors.ConcurrentModificationException;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
@@ -42,11 +45,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Provider
-public class LanceExceptionMapper implements ExceptionMapper<Exception> {
+public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
-  public static Response toRESTResponse(String instance, Exception ex) {
+  public static Response toRESTResponse(String instance, Throwable ex) {
+    ServerHealth.getInstance().recordFailure(ex);
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex
@@ -61,12 +65,18 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
   }
 
   @Override
-  public Response toResponse(Exception ex) {
+  public Response toResponse(Throwable ex) {
     return toRESTResponse("", ex);
   }
 
-  private static LanceNamespaceException toLanceNamespaceException(String instance, Exception ex) {
-    if (ex instanceof NoSuchTableException) {
+  private static LanceNamespaceException toLanceNamespaceException(String instance, Throwable ex) {
+    if (ex instanceof ForbiddenException) {
+      return new PermissionDeniedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof UnauthorizedException) {
+      return new UnauthenticatedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof NoSuchTableException) {
       return new TableNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
 
     } else if (ex instanceof NotFoundException) {
@@ -84,7 +94,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
 
     } else {
       LOG.warn("Lance REST server unexpected exception:", ex);
-      return new InternalException(ex.getMessage(), getStackTrace(ex), instance);
+      return new InternalException("Internal server error", "", instance);
     }
   }
 

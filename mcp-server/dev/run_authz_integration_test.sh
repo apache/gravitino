@@ -150,6 +150,11 @@ rm -f "${MCP_AUDIT_LOG}"
 ) &
 MCP_PID=$!
 
+if ! command -v nc >/dev/null 2>&1; then
+  log "ERROR: nc (netcat) is required to wait for the MCP server"
+  exit 1
+fi
+
 log "Waiting for MCP server to become reachable..."
 for i in $(seq 1 30); do
   if nc -z localhost "${MCP_PORT}" 2>/dev/null; then

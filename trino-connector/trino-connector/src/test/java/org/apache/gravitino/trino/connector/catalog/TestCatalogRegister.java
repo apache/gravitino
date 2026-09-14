@@ -22,8 +22,10 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -40,6 +42,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -492,10 +495,11 @@ public class TestCatalogRegister {
   }
 
   @Test
-  public void testRegisterCatalogRedactsSecretsFromSqlExceptionMessage() throws Exception {
-    // Regression test: some JDBC drivers echo the failing statement back in a SQLException
-    // message. registerCatalog must redact that message the same way it redacts its own success
-    // log, so a failed CREATE CATALOG never surfaces the embedded credential to the caller.
+  public void testRegisterCatalogPassesTheDriverFailureOnUnchanged() throws Exception {
+    // The driver's exception travels to the caller with its type, message and stack intact:
+    // redacting it here would have to rebuild every level of the cause chain as a different
+    // exception type. Whatever a message carries is masked where it is rendered instead, which
+    // for the load loop is CatalogConnectorManager.toErrorMessage().
     String secretValue = "hunter2";
     Statement statement = mock(Statement.class);
     when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
@@ -529,13 +533,114 @@ public class TestCatalogRegister {
         assertThrows(
             TrinoException.class, () -> catalogRegister.registerCatalog("hive_catalog", catalog));
 
-    // The original driver SQLException carrying the credential is two levels down the cause
-    // chain: registerCatalog's generic wrapper -> executeSql's generic wrapper -> the redacted
-    // SQLException. No exception in that chain may still carry the raw secret.
+    // registerCatalog's generic wrapper -> executeSql's generic wrapper -> the driver exception.
+    Throwable driverFailure = e.getCause().getCause();
+    assertInstanceOf(SQLException.class, driverFailure);
+    assertTrue(driverFailure.getMessage().contains(secretValue));
+  }
+
+  @Test
+  public void testRegisterCatalogKeepsTheDeepCause() throws Exception {
+    // The reason a registration failed usually sits at the bottom of the chain, e.g. a
+    // connector's own configuration validation error, and that is what the status tables end up
+    // reporting.
+    Statement statement = mock(Statement.class);
+    when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(statement.getResultSet()).thenReturn(resultSet);
+    when(resultSet.next()).thenReturn(false);
+
+    RuntimeException deepCause =
+        new RuntimeException("Configuration property 'unknown-direct-key' was not used");
+    SQLException sqlException =
+        new SQLException("Query failed: Failed to create connector: memory1", null, 0, deepCause);
+    when(statement.execute(startsWith("CREATE CATALOG"))).thenThrow(sqlException);
+
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test")));
+    setPrivateField(catalogRegister, "connection", connection);
+    setPrivateField(catalogRegister, "catalogStoreDirectory", tempDir.toString());
+
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog", "hive", "test catalog", Catalog.Type.RELATIONAL, Map.of());
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> catalogRegister.registerCatalog("hive_catalog", catalog));
+
+    boolean deepCauseSurvived = false;
     for (Throwable t = e; t != null; t = t.getCause()) {
-      assertFalse(String.valueOf(t.getMessage()).contains(secretValue));
+      if (String.valueOf(t.getMessage()).contains("unknown-direct-key")) {
+        deepCauseSurvived = true;
+      }
     }
-    assertTrue(e.getCause().getCause().getMessage().contains("***"));
+    assertTrue(deepCauseSurvived, "the deep cause must reach the caller");
+  }
+
+  @Test
+  public void testDescribeMasksSecretsThroughTheWholeCauseChain() {
+    // What a Jackson parse failure on the catalog JSON looks like: the source it echoes is the
+    // very payload that carries the resolved secrets.
+    RuntimeException deepCause =
+        new RuntimeException(
+            "Unexpected end-of-input at [Source: (String)\"{\"properties\":"
+                + "{\"jdbc-password\":\"hunter2\"}}\"; line: 1]");
+    Exception failure =
+        new IllegalStateException("Failed on \"trino.bypass.password\"='letmein'", deepCause);
+
+    String described = CatalogRegister.describe(failure);
+
+    assertFalse(described.contains("hunter2"));
+    assertFalse(described.contains("letmein"));
+    assertTrue(described.contains("\"jdbc-password\":\"***\""));
+    assertTrue(described.contains("\"trino.bypass.password\"='***'"));
+    // The rendering keeps what makes it useful: the types, the chain and the frames.
+    assertTrue(described.contains("IllegalStateException"));
+    assertTrue(described.contains("Caused by"));
+    assertTrue(described.contains("testDescribeMasksSecretsThroughTheWholeCauseChain"));
+  }
+
+  @Test
+  public void testDescribeTerminatesOnACauseCycle() {
+    // Java permits A -> B -> A. The JDK's own stack trace printer stops at the repeated node,
+    // which is why rendering the throwable needs no cycle guard of its own.
+    Exception first = new IllegalStateException("first");
+    Exception second = new IllegalStateException("second", first);
+    first.initCause(second);
+
+    String described =
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> CatalogRegister.describe(first));
+
+    assertTrue(described.contains("CIRCULAR REFERENCE"));
+  }
+
+  @Test
+  public void testReachabilityIsProbedOnEveryCall() throws Exception {
+    Statement statement = mock(Statement.class);
+    when(statement.execute("SELECT 1"))
+        .thenReturn(true)
+        .thenThrow(new SQLException("Connection reset"));
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    setPrivateField(catalogRegister, "connection", connection);
+
+    // A reachability latched on the first success would keep the load loop issuing statements
+    // over a connection that stopped working, and report every catalog failing separately
+    // instead of the one reason they all did.
+    assertTrue(catalogRegister.isTrinoReachable());
+    assertNull(catalogRegister.getLastConnectionError());
+    assertFalse(catalogRegister.isTrinoReachable());
+    assertEquals("Connection reset", catalogRegister.getLastConnectionError());
   }
 
   private static void setPrivateField(Object target, String fieldName, Object value)

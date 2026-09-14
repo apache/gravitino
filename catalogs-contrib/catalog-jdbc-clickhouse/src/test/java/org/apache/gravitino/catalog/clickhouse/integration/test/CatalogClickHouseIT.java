@@ -534,6 +534,110 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testLoadExpressionIndexDoesNotFabricateColumnIndex() {
+    String sourceTableName = GravitinoITUtils.genRandomName("expression_index_source");
+    String recreatedTableName = GravitinoITUtils.genRandomName("expression_index_recreated");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "id UInt64, "
+                + "name String, "
+                + "INDEX idx_name name TYPE minmax GRANULARITY 1, "
+                + "INDEX idx_lower lower(name) TYPE minmax GRANULARITY 1"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, sourceTableName));
+
+    String sourceCreateSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, sourceTableName));
+    String normalizedSourceCreateSql = sourceCreateSql.replace("`", "").replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        StringUtils.containsIgnoreCase(
+            normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
+        "Source table should retain its expression index: " + sourceCreateSql);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table loaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, sourceTableName));
+    Index[] loadedIndexes = loaded.index();
+    Index loadedSimpleIndex =
+        Arrays.stream(loadedIndexes)
+            .filter(index -> "idx_name".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, loadedSimpleIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"name"}}, loadedSimpleIndex.fieldNames());
+    Assertions.assertFalse(
+        Arrays.stream(loadedIndexes).anyMatch(index -> "idx_lower".equals(index.name())));
+
+    tableCatalog.createTable(
+        NameIdentifier.of(schemaName, recreatedTableName),
+        loaded.columns(),
+        loaded.comment(),
+        loaded.properties(),
+        loaded.partitioning(),
+        loaded.distribution(),
+        loaded.sortOrder(),
+        loaded.index());
+
+    String recreatedCreateSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, recreatedTableName));
+    String normalizedRecreatedCreateSql =
+        recreatedCreateSql.replace("`", "").replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
+        "Recreated table should retain the simple index: " + recreatedCreateSql);
+    Assertions.assertFalse(
+        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "idx_lower"),
+        "Recreated table must not contain a fabricated replacement index: " + recreatedCreateSql);
+  }
+
+  @Test
+  void testCreateAndLoadCompositePrimaryKey() {
+    String table = GravitinoITUtils.genRandomName("composite_primary_key");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "ts",
+              Types.TimestampType.withoutTimeZone(),
+              "timestamp",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of("value", Types.StringType.get(), "value")
+        };
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING),
+          SortOrders.of(NamedReference.field("ts"), SortDirection.ASCENDING)
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"id"}, {"ts"}})
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            columns,
+            "composite primary key roundtrip",
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Index[] loadedIndexes = catalog.asTableCatalog().loadTable(ident).index();
+    Assertions.assertEquals(1, loadedIndexes.length);
+    Assertions.assertEquals(Index.IndexType.PRIMARY_KEY, loadedIndexes[0].type());
+    Assertions.assertEquals(Indexes.DEFAULT_PRIMARY_KEY_NAME, loadedIndexes[0].name());
+    Assertions.assertArrayEquals(new String[][] {{"id"}, {"ts"}}, loadedIndexes[0].fieldNames());
+  }
+
+  @Test
   void testCreateAndLoadWithPartitionSortAndIndexes() {
     String table = GravitinoITUtils.genRandomName("meta_roundtrip");
     NameIdentifier ident = NameIdentifier.of(schemaName, table);
@@ -1577,7 +1681,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
-    Assertions.assertTrue(table.properties().containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertFalse(table.properties().containsKey(StringIdentifier.ID_KEY));
 
     Assertions.assertEquals(CLICKHOUSE_COL_NAME1, table.columns()[0].name());
     Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());

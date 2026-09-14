@@ -22,6 +22,7 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.trino.jdbc.TrinoDriver;
@@ -38,6 +39,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -80,23 +82,44 @@ public class CatalogRegister {
           Pattern.CASE_INSENSITIVE);
 
   private Connection connection;
-  private boolean isStarted = false;
+  private volatile String lastConnectionError;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
 
-  boolean isTrinoStarted() {
-    if (isStarted) {
-      return true;
-    }
-
+  /**
+   * Whether the Trino server currently answers over the connector's own JDBC connection.
+   *
+   * <p>Probed on every call rather than latched once: this gates a load cycle, and the connection
+   * is created lazily, so a coordinator that was reachable when the connector started can be gone
+   * by the next cycle. Answering from a past probe would keep the loop issuing statements over a
+   * connection that no longer works, and would report each catalog failing separately instead of
+   * the one reason they all did.
+   *
+   * @return true if the Trino server answered
+   */
+  boolean isTrinoReachable() {
     String command = "SELECT 1";
     try (Statement statement = connection.createStatement()) {
-      isStarted = statement.execute(command);
-      return isStarted;
+      boolean reachable = statement.execute(command);
+      lastConnectionError = null;
+      return reachable;
     } catch (Exception e) {
-      LOG.warn("Trino server is not started: %s", e.getMessage());
+      // Keep the reason: wrong credentials, a wrong port and a coordinator that is still booting
+      // are indistinguishable to the caller otherwise, and only the first two are actionable.
+      lastConnectionError = e.getMessage() == null ? e.getClass().getName() : e.getMessage();
+      LOG.warn("The Trino server is not reachable: %s", lastConnectionError);
       return false;
     }
+  }
+
+  /**
+   * Retrieves the error from the last failed attempt to reach the Trino server.
+   *
+   * @return the error message, null if the Trino server was reached
+   */
+  @Nullable
+  String getLastConnectionError() {
+    return lastConnectionError;
   }
 
   /**
@@ -341,20 +364,33 @@ public class CatalogRegister {
         config.toCatalogConfig());
   }
 
-  @VisibleForTesting
-  static String redactSecrets(String createCatalogCommand) {
-    return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
+  /**
+   * Renders a throwable, stack trace and cause chain included, with every secret it carries masked.
+   *
+   * <p>Logging a throwable directly would print the driver's own message, which for a failed CREATE
+   * CATALOG can hold the credentials the statement embedded. Rendering it here first is what makes
+   * that impossible, and it leaves the exception itself untouched. Cause cycles are handled by the
+   * JDK's own stack trace printer.
+   *
+   * @param e the throwable to render
+   * @return the rendered throwable with every secret value replaced
+   */
+  public static String describe(Throwable e) {
+    return redactSecrets(Throwables.getStackTraceAsString(e));
   }
 
-  // Some JDBC drivers echo the failing statement back in the exception message, which for a
-  // failed CREATE CATALOG would otherwise carry its embedded credentials into every caller and
-  // log line downstream. The original exception is deliberately not kept as the cause, since a
-  // logged stack trace prints causes' messages too and would defeat the redaction.
-  private static SQLException redactedSqlException(SQLException e) {
-    String message = e.getMessage() == null ? null : redactSecrets(e.getMessage());
-    SQLException redacted = new SQLException(message, e.getSQLState(), e.getErrorCode());
-    redacted.setStackTrace(e.getStackTrace());
-    return redacted;
+  /**
+   * Masks the values of the secret bearing properties of a CREATE CATALOG statement, in both its
+   * SQL assignments and the catalog JSON it carries.
+   *
+   * <p>Applied where a message is rendered for a user or a log rather than to the exceptions
+   * themselves, so that the original failure keeps its type and its cause chain.
+   *
+   * @param createCatalogCommand the text to redact
+   * @return the text with every secret value replaced
+   */
+  public static String redactSecrets(String createCatalogCommand) {
+    return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
   }
 
   private static String redactSqlSecrets(String createCatalogCommand) {
@@ -424,7 +460,7 @@ public class CatalogRegister {
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
-      LOG.error(e, message);
+      LOG.error("%s%n%s", message, describe(e));
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -477,10 +513,13 @@ public class CatalogRegister {
           statement.execute(sql);
           return;
         } catch (SQLException e) {
-          throw redactedSqlException(e);
+          // Fail fast: the statement was rejected, so retrying it would only repeat the same
+          // rejection. The exception is passed on untouched, and the redaction happens where its
+          // message is rendered.
+          throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn(e, "Failed to execute command: %s", redactSecrets(sql));
+          LOG.warn("Failed to execute command: %s%n%s", redactSecrets(sql), describe(e));
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }

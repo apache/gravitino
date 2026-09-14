@@ -273,6 +273,17 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTag() {
     TagEntity tag1 =
         TagEntity.builder()
@@ -1154,6 +1165,22 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    // The deprecated route delegates to MetadataObjectTagOperations, so it inherits the same guard.
+    Response response =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
   }
 
   private String tagPath(String metalake) {

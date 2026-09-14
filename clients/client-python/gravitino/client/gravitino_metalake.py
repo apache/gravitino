@@ -35,6 +35,7 @@ from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.secret import SecretBinding, SecretReference
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
@@ -42,6 +43,9 @@ from gravitino.client.generic_job_handle import GenericJobHandle
 from gravitino.client.generic_tag import GenericTag
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
 )
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
@@ -122,6 +126,7 @@ class GravitinoMetalake(
     SupportsJobs,
     SupportsRoles,
     TagOperations,
+    SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
@@ -168,6 +173,9 @@ class GravitinoMetalake(
             [self.name()], MetadataObject.Type.METALAKE
         )
         self._metadata_object_role_operations = MetadataObjectRoleOperations(
+            self.name(), metalake_object, client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             self.name(), metalake_object, client
         )
 
@@ -377,11 +385,12 @@ class GravitinoMetalake(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
 
-    def test_connection(self, name: str) -> None:
-        """Test an existing catalog connection using its stored configuration.
+    def test_connection(self, name: str, *changes: CatalogChange) -> None:
+        """Test an existing catalog connection with optional proposed changes.
 
         Args:
             name: The name of the existing catalog.
+            changes: Proposed catalog changes to apply temporarily without persisting.
 
         Raises:
             NoSuchCatalogException: If the catalog does not exist.
@@ -394,7 +403,17 @@ class GravitinoMetalake(
             )
             + "/testConnection"
         )
-        response = self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+        if changes:
+            requests = [
+                DTOConverters.to_catalog_update_request(change) for change in changes
+            ]
+            updates_request = CatalogUpdatesRequest(requests)
+            updates_request.validate()
+            response = self.rest_client.post(
+                url, json=updates_request, error_handler=CATALOG_ERROR_HANDLER
+            )
+        else:
+            response = self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
         base_response = BaseResponse.from_json(response.body, infer_missing=True)
         base_response.validate()
         if base_response.code() == 0:
@@ -1092,6 +1111,12 @@ class GravitinoMetalake(
 
     def supports_roles(self) -> SupportsRoles:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def create_role(
         self,
