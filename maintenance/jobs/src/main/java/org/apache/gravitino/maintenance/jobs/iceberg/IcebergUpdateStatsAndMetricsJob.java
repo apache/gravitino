@@ -67,6 +67,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   private static final long SMALL_FILE_THRESHOLD_BYTES = 32L * 1024 * 1024;
   private static final String DEFAULT_UPDATE_MODE = UpdateMode.ALL.modeName;
   private static final String CUSTOM_STAT_PREFIX = "custom-";
+  private static final String OPTION_UPDATER_OPTIONS = "updater-options";
+  private static final String OPTION_SPARK_CONF = "spark-conf";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -96,8 +98,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
-    String sparkConfJson = argMap.get("spark-conf");
+    Map<String, String> updaterOptions =
+        parseJsonOptions(argMap.get(OPTION_UPDATER_OPTIONS), OPTION_UPDATER_OPTIONS);
+    String sparkConfJson = argMap.get(OPTION_SPARK_CONF);
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
@@ -110,6 +113,13 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    try {
+      IcebergJobUtils.requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
+    }
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
@@ -391,15 +401,22 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson);
+    return parseJsonOptions(sparkConfJson, OPTION_SPARK_CONF);
   }
 
+  /**
+   * Parse a flat JSON option map and report parse errors with the real CLI flag name.
+   *
+   * @param json flat JSON map text, or null/empty for an empty map
+   * @param optionName CLI flag name without leading dashes (for example {@code updater-options})
+   * @return parsed string map
+   */
   @VisibleForTesting
-  static Map<String, String> parseJsonOptions(String json) {
+  static Map<String, String> parseJsonOptions(String json, String optionName) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, optionName);
   }
 
   @VisibleForTesting
@@ -548,9 +565,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         "{{table_identifier}}",
         "--update-mode",
         "{{update_mode}}",
-        "--updater-options",
+        "--" + OPTION_UPDATER_OPTIONS,
         "{{updater_options}}",
-        "--spark-conf",
+        "--" + OPTION_SPARK_CONF,
         "{{spark_conf}}");
   }
 

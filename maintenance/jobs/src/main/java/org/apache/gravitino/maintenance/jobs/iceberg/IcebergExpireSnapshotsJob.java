@@ -148,6 +148,13 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    try {
+      IcebergJobUtils.requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
+    }
 
     try {
       // Build the procedure call SQL

@@ -18,20 +18,68 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
  *
- * <p>Provides SQL escaping, argument parsing, and Spark configuration utilities used by both {@link
- * IcebergRewriteDataFilesJob} and {@link IcebergExpireSnapshotsJob}.
+ * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, and classpath checks
+ * used by built-in Iceberg Spark jobs.
  */
 public final class IcebergJobUtils {
 
+  private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
+  private static final String OPTION_SPARK_CONF = "spark-conf";
+
   private IcebergJobUtils() {}
+
+  /**
+   * Ensures the Iceberg Spark runtime is on the current classpath.
+   *
+   * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
+   * but Spark only warns when those classes are missing and continues without Iceberg support. Call
+   * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
+   * visible) and fail the job when the runtime is absent.
+   *
+   * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
+   */
+  public static void requireIcebergSparkRuntime() {
+    requireClass(
+        IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, "Iceberg Spark session extensions");
+    requireClass(ICEBERG_SPARK_CATALOG, "Iceberg Spark catalog");
+  }
+
+  /** Visible for unit tests that assert the missing-class error message. */
+  static void requireClassForTest(String className, String description) {
+    requireClass(className, description);
+  }
+
+  private static void requireClass(String className, String description) {
+    ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+    ClassLoader fallbackLoader = IcebergJobUtils.class.getClassLoader();
+    try {
+      Class.forName(className, true, contextLoader != null ? contextLoader : fallbackLoader);
+    } catch (ClassNotFoundException | LinkageError first) {
+      if (contextLoader != null && contextLoader != fallbackLoader) {
+        try {
+          Class.forName(className, true, fallbackLoader);
+          return;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+          // Fall through to the user-facing error.
+        }
+      }
+      throw new IllegalStateException(
+          String.format(
+              "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
+                  + "classpath (for example via spark.jars in spark_conf, or installed into the "
+                  + "Spark environment). A stock Spark distribution does not include it. Match "
+                  + "the artifact to your Spark, Scala, and Iceberg versions.",
+              description, className),
+          first);
+    }
+  }
 
   /**
    * Escape single quotes in SQL string literals by replacing ' with ''.
@@ -105,29 +153,7 @@ public final class IcebergJobUtils {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
-      return new HashMap<>();
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
-
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        configs.put(key, value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse Spark configurations JSON: "
-              + sparkConfJson
-              + ". Error: "
-              + e.getMessage(),
-          e);
-    }
+    return new HashMap<>(
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
   }
 }

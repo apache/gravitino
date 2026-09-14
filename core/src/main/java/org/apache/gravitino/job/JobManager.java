@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -846,9 +847,10 @@ public class JobManager implements JobOperationDispatcher {
             replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
-        content.arguments().stream()
-            .map(arg -> replacePlaceholder(arg, jobConf))
-            .collect(Collectors.toList());
+        omitEmptyArguments(
+            content.arguments().stream()
+                .map(arg -> replacePlaceholder(arg, jobConf))
+                .collect(Collectors.toList()));
     Map<String, String> environments =
         content.environments().entrySet().stream()
             .collect(
@@ -956,6 +958,53 @@ public class JobManager implements JobOperationDispatcher {
     matcher.appendTail(result);
 
     return result.toString();
+  }
+
+  /**
+   * Drop blank / unresolved optional template arguments after placeholder substitution.
+   *
+   * <p>Built-in templates always list optional flags as {@code --flag} + {@code {{placeholder}}}.
+   * When the job conf omits that key or supplies an empty value, leaving the flag in the command
+   * produces dangling arguments such as {@code --updater-options --spark-conf}. This method
+   * removes:
+   *
+   * <ul>
+   *   <li>blank tokens
+   *   <li>tokens that are still an entire unresolved {@code {{placeholder}}}
+   *   <li>{@code --flag} pairs whose following value is blank or an unresolved placeholder
+   * </ul>
+   *
+   * @param arguments arguments after {@link #replacePlaceholder(String, Map)}
+   * @return compacted argument list suitable for process execution
+   */
+  @VisibleForTesting
+  static List<String> omitEmptyArguments(List<String> arguments) {
+    if (arguments == null || arguments.isEmpty()) {
+      return arguments;
+    }
+
+    List<String> result = new ArrayList<>(arguments.size());
+    for (int i = 0; i < arguments.size(); i++) {
+      String arg = arguments.get(i);
+      if (isOmittedArgumentValue(arg)) {
+        continue;
+      }
+
+      if (arg.startsWith("--") && i + 1 < arguments.size()) {
+        String next = arguments.get(i + 1);
+        if (!next.startsWith("--") && isOmittedArgumentValue(next)) {
+          i++;
+          continue;
+        }
+      }
+
+      result.add(arg);
+    }
+    return result;
+  }
+
+  private static boolean isOmittedArgumentValue(String value) {
+    return StringUtils.isBlank(value) || PLACEHOLDER_PATTERN.matcher(value).matches();
   }
 
   @VisibleForTesting
