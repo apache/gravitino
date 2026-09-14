@@ -204,6 +204,12 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 ```
 
+## Statistics tool parameters
+
+The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) require `metalake_name` to identify the metalake.
+
+These tools use `metadata_full_name` for the metadata object name, consistent with the tag and policy tools. The previous spelling, `metadata_fullname`, is accepted as a deprecated input alias but is not advertised in the tool schema. Supply only one spelling per call; passing both is rejected. New callers should use `metadata_full_name`.
+
 ## Audit Logging
 
 Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).

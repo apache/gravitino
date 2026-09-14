@@ -15,7 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Annotated
+
 from fastmcp import Context, FastMCP
+from pydantic import AliasChoices, Field
 
 
 def load_statistic_tools(mcp: FastMCP):
@@ -24,12 +27,19 @@ def load_statistic_tools(mcp: FastMCP):
         ctx: Context,
         metalake_name: str,
         metadata_type: str,
-        metadata_fullname: str,
+        metadata_full_name: Annotated[
+            str,
+            Field(
+                validation_alias=AliasChoices(
+                    "metadata_full_name", "metadata_fullname"
+                )
+            ),
+        ],
     ) -> str:
         """
         Retrieve a list of statistics for a specific metadata object. Currently,
             this tool only supports statistics for tables, so `metadata_type`
-            should always be "table" and metadata_fullname should be in the format
+            should always be "table" and metadata_full_name should be in the format
             "{catalog}.{schema}.{table}". For more information about the metadata
             type and full name formats, please refer to the tool
             'metadata_type_to_fullname_formats'.
@@ -38,8 +48,8 @@ def load_statistic_tools(mcp: FastMCP):
             ctx (Context): The request context.
             metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata (e.g., table, column). For
-                more, please refer to too 'metadata_type_to_fullname_formats'
-            metadata_fullname (str): The full name of the metadata object. For
+                more, please refer to the tool 'metadata_type_to_fullname_formats'
+            metadata_full_name (str): The full name of the metadata object. For
                 more, please refer to tool 'metadata_type_to_fullname_formats'.
 
 
@@ -70,7 +80,7 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().list_of_statistics(
-            metalake_name, metadata_type, metadata_fullname
+            metalake_name, metadata_type, metadata_full_name
         )
 
     # pylint: disable=R0917
@@ -79,7 +89,14 @@ def load_statistic_tools(mcp: FastMCP):
         ctx: Context,
         metalake_name: str,
         metadata_type: str,
-        metadata_fullname: str,
+        metadata_full_name: Annotated[
+            str,
+            Field(
+                validation_alias=AliasChoices(
+                    "metadata_full_name", "metadata_fullname"
+                )
+            ),
+        ],
         from_partition_name: str,
         to_partition_name: str,
         from_inclusive: bool = True,
@@ -94,7 +111,7 @@ def load_statistic_tools(mcp: FastMCP):
             ctx (Context): The request context.
             metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata, should be "table" for partition statistics.
-            metadata_fullname (str): The full name of the metadata item, the format should be
+            metadata_full_name (str): The full name of the metadata item, the format should be
                 "{catalog}.{schema}.{table}".
             from_partition_name (str): Starting partition name.
             to_partition_name (str): Ending partition name.
@@ -138,7 +155,7 @@ def load_statistic_tools(mcp: FastMCP):
             await client.as_statistic_operation().list_statistic_for_partition(
                 metalake_name,
                 metadata_type,
-                metadata_fullname,
+                metadata_full_name,
                 from_partition_name,
                 to_partition_name,
                 from_inclusive,
