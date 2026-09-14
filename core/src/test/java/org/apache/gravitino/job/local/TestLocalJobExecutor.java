@@ -33,6 +33,7 @@ import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -157,6 +158,41 @@ public class TestLocalJobExecutor {
     Assertions.assertTrue(output.contains("in common script"));
 
     Assertions.assertEquals(JobHandle.Status.FAILED, jobExecutor.getJobStatus(jobId));
+  }
+
+  @Test
+  public void testSubmitSparkJobRejectedWhenSparkSubmitIsNotAvailable() throws IOException {
+    File sparkHome = new File(workingDir, "spark");
+    LocalJobExecutor exec = new LocalJobExecutor();
+    exec.initialize(
+        ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, sparkHome.getAbsolutePath()));
+
+    try {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("spark-job")
+              .withExecutable(new File(workingDir, "spark-demo.jar").getAbsolutePath())
+              .withClassName("com.example.MainClass")
+              .build();
+
+      // spark-submit does not exist, the job is rejected at submission instead of being queued.
+      IllegalArgumentException e =
+          Assertions.assertThrows(IllegalArgumentException.class, () -> exec.submitJob(template));
+      Assertions.assertTrue(e.getMessage().contains("spark-submit is not found or not executable"));
+
+      // Once spark-submit is available, the same job is accepted.
+      File sparkSubmit = new File(sparkHome, "bin/spark-submit");
+      FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\nexit 0\n", "UTF-8");
+      Assertions.assertTrue(sparkSubmit.setExecutable(true));
+
+      String jobId = exec.submitJob(template);
+      Assertions.assertNotNull(jobId);
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> exec.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+    } finally {
+      exec.close();
+    }
   }
 
   @Test

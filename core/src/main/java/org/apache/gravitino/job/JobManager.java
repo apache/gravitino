@@ -473,7 +473,13 @@ public class JobManager implements JobOperationDispatcher {
     String jobExecutionId;
     try {
       jobExecutionId = jobExecutor.submitJob(jobTemplate);
+    } catch (IllegalArgumentException e) {
+      // The job executor rejects the job because it cannot be launched, for example, a required
+      // configuration is missing. Rethrow it as is so the caller gets the original reason.
+      FileUtils.deleteQuietly(jobStagingDir);
+      throw e;
     } catch (Exception e) {
+      FileUtils.deleteQuietly(jobStagingDir);
       throw new RuntimeException(
           String.format("Failed to submit job template %s for execution", jobTemplate), e);
     }

@@ -22,8 +22,13 @@ package org.apache.gravitino.job.local;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.junit.jupiter.api.Assertions;
@@ -142,6 +147,52 @@ public class TestSparkProcessBuilder {
     Assertions.assertTrue(command4.contains("/path/to/spark-demo.jar"));
     Assertions.assertTrue(command4.contains("arg1"));
     Assertions.assertTrue(command4.contains("arg2"));
+  }
+
+  @Test
+  public void testResolveSparkSubmit() throws IOException {
+    File validSparkHome = Files.createTempDirectory("gravitino-test-spark-home").toFile();
+    File invalidSparkHome = Files.createTempDirectory("gravitino-test-no-spark-home").toFile();
+    try {
+      File sparkSubmit = new File(validSparkHome, "bin/spark-submit");
+      FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\n", "UTF-8");
+      Assertions.assertTrue(sparkSubmit.setExecutable(true));
+      String validPath = validSparkHome.getAbsolutePath();
+      String invalidPath = invalidSparkHome.getAbsolutePath();
+
+      // Neither the configuration nor the environment variable is set.
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), null));
+      Assertions.assertEquals(
+          "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
+              + " be set for Spark jobs",
+          e.getMessage());
+
+      // Falls back to the environment variable when the configuration is not set.
+      Assertions.assertEquals(
+          sparkSubmit.getAbsolutePath(),
+          SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), validPath));
+
+      // The configuration takes precedence over the environment variable.
+      Assertions.assertEquals(
+          sparkSubmit.getAbsolutePath(),
+          SparkProcessBuilder.resolveSparkSubmit(
+              ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, validPath), invalidPath));
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  SparkProcessBuilder.resolveSparkSubmit(
+                      ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, invalidPath), validPath));
+      Assertions.assertEquals(
+          "spark-submit is not found or not executable: " + invalidPath + "/bin/spark-submit",
+          e.getMessage());
+    } finally {
+      FileUtils.deleteDirectory(validSparkHome);
+      FileUtils.deleteDirectory(invalidSparkHome);
+    }
   }
 
   @Test

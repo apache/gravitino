@@ -21,14 +21,15 @@ package org.apache.gravitino.job.local;
 
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.SPARK_HOME;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.arrow.util.Preconditions;
-import org.apache.arrow.util.VisibleForTesting;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.slf4j.Logger;
@@ -51,18 +52,36 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
 
   protected SparkProcessBuilder(SparkJobTemplate sparkJobTemplate, Map<String, String> configs) {
     super(sparkJobTemplate, configs);
-    String sparkHome =
-        Optional.ofNullable(configs.get(SPARK_HOME)).orElse(System.getenv(ENV_SPARK_HOME));
+    this.sparkSubmit = resolveSparkSubmit(configs);
+  }
+
+  /**
+   * Resolves the spark-submit executable from the local job executor configurations, falling back
+   * to the {@code SPARK_HOME} environment variable.
+   *
+   * @param configs The local job executor configurations.
+   * @return The absolute path of the spark-submit executable.
+   * @throws IllegalArgumentException If neither the Spark home configuration nor the {@code
+   *     SPARK_HOME} environment variable is set, or spark-submit is not found or not executable.
+   */
+  static String resolveSparkSubmit(Map<String, String> configs) {
+    return resolveSparkSubmit(configs, System.getenv(ENV_SPARK_HOME));
+  }
+
+  @VisibleForTesting
+  static String resolveSparkSubmit(Map<String, String> configs, @Nullable String envSparkHome) {
+    String sparkHome = Optional.ofNullable(configs.get(SPARK_HOME)).orElse(envSparkHome);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sparkHome),
         "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
             + " be set for Spark jobs");
 
-    this.sparkSubmit = sparkHome + "/bin/spark-submit";
-    File sparkSubmitFile = new File(sparkSubmit);
+    String sparkSubmit = sparkHome + "/bin/spark-submit";
     Preconditions.checkArgument(
-        sparkSubmitFile.canExecute(),
-        "spark-submit is not found or not executable: " + sparkSubmit);
+        new File(sparkSubmit).canExecute(),
+        "spark-submit is not found or not executable: %s",
+        sparkSubmit);
+    return sparkSubmit;
   }
 
   @VisibleForTesting
