@@ -24,9 +24,12 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -798,6 +801,12 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
+
+    // All artifacts are fetched into a single staging directory keyed by their basename, so two
+    // distinct source URIs sharing a basename would overwrite each other (or the executable)
+    // and silently run different code than requested. Reject such templates before staging.
+    ensureDistinctArtifactBasenames(content, jobConf);
+
     String executable =
         fetchFileFromUri(
             replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
@@ -935,6 +944,39 @@ public class JobManager implements JobOperationDispatcher {
               null /* hadoopConf: job file URIs never use the hdfs scheme */);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
+    }
+  }
+
+  private static void ensureDistinctArtifactBasenames(
+      JobTemplateEntity.TemplateContent content, Map<String, String> jobConf) {
+    List<String> uris = Lists.newArrayList();
+    uris.add(content.executable());
+    if (content.jobType() == JobTemplate.JobType.SHELL) {
+      uris.addAll(content.scripts());
+    } else if (content.jobType() == JobTemplate.JobType.SPARK) {
+      uris.addAll(content.jars());
+      uris.addAll(content.files());
+      uris.addAll(content.archives());
+    }
+
+    Map<String, String> basenameToUri = Maps.newHashMap();
+    for (String uriTemplate : uris) {
+      String uri = replacePlaceholder(uriTemplate, jobConf);
+      String basename;
+      try {
+        basename = new File(new URI(uri).getPath()).getName();
+      } catch (URISyntaxException e) {
+        // The staging itself will surface the malformed URI with a clearer message.
+        continue;
+      }
+      String previous = basenameToUri.putIfAbsent(basename, uri);
+      if (previous != null && !previous.equals(uri)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Job template artifacts %s and %s share the same file name %s; "
+                    + "staging would overwrite one of them. Rename one of the files.",
+                previous, uri, basename));
+      }
     }
   }
 
