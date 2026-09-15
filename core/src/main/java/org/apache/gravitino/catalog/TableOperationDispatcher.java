@@ -28,6 +28,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,6 +39,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -533,6 +535,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               + "when Table is renamed by external systems not controlled by Gravitino. In this "
               + "case, we need to overwrite the stored entity to keep the consistency.",
           stringId);
+      checkImportedIdNotCopied(identifier, stringId.id());
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -567,6 +570,57 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
         .withHiddenProperties(table.hiddenProperties());
+  }
+
+  /**
+   * Tells an external rename apart from a copied id before an import re-binds a row.
+   *
+   * <p>An import that finds a {@link StringIdentifier} but no row under this name overwrites the
+   * row that owns the id. That is right after an external rename: the old name is gone and the row
+   * should follow the table. It is wrong when the id was copied ({@code CREATE TABLE t2 LIKE t1}
+   * carries {@code TBLPROPERTIES}, so does a copy tool or a restored backup): the source table is
+   * still there, and re-binding would move its row and every attachment keyed by that id (owner,
+   * tags, policies, role grants) to the copy. The store cannot tell the two apart; only the
+   * external catalog can, so this asks it whether the id's current owner still exists.
+   */
+  private void checkImportedIdNotCopied(NameIdentifier identifier, long id) {
+    NameIdentifier currentOwner = findRegisteredTableById(identifier.namespace(), id);
+    if (currentOwner == null || currentOwner.equals(identifier)) {
+      return;
+    }
+    NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
+    boolean ownerStillExists =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithTableOps(t -> t.tableExists(currentOwner)),
+            RuntimeException.class);
+    if (ownerStillExists) {
+      throw new GravitinoRuntimeException(
+          "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
+              + "identifier was most likely copied with the table properties. Remove the property "
+              + "'%s' from %s and load it again",
+          identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
+    }
+    LOG.info(
+        "Table {} was renamed to {} outside Gravitino; re-binding the registration {}",
+        currentOwner,
+        identifier,
+        id);
+  }
+
+  /** Returns the identifier of the live table in the schema that owns this id, if any. */
+  @Nullable
+  private NameIdentifier findRegisteredTableById(Namespace namespace, long id) {
+    try {
+      return store.list(namespace, TableEntity.class, TABLE).stream()
+          .filter(t -> t.id() == id)
+          .map(TableEntity::nameIdentifier)
+          .findFirst()
+          .orElse(null);
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to look up the table registered with id %d under %s", id, namespace);
+    }
   }
 
   private SchemaDispatcher getSchemaDispatcher() {

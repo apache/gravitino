@@ -91,6 +91,34 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteRejectsIdOwnedByTopicInAnotherSchema() throws IOException {
+    String otherSchemaName = "other_schema_for_topic_test";
+    createAndInsertSchema(metalakeName, catalogName, otherSchemaName);
+
+    TopicEntity original =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "topic_id_owner",
+            AUDIT_INFO);
+    backend.insert(original, false);
+
+    TopicEntity copiedId =
+        createTopicEntity(
+            original.id(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, otherSchemaName),
+            "topic_with_copied_id",
+            AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, true));
+
+    TopicEntity stored =
+        TopicMetaService.getInstance().getTopicByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals(original.name(), stored.name());
+    Assertions.assertFalse(backend.exists(copiedId.nameIdentifier(), Entity.EntityType.TOPIC));
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
     SchemaPO observedSchemaPO =
         SessionUtils.getWithoutCommit(

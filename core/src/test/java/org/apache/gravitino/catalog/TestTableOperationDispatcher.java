@@ -310,6 +310,87 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testLoadTableRejectsCopiedIdentifierWhileSourceStillExists() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCopiedId");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier sourceIdent = NameIdentifier.of(tableNs, "source");
+    NameIdentifier copyIdent = NameIdentifier.of(tableNs, "copy");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(sourceIdent, columns, "comment", props, new Transform[0]);
+    TableEntity sourceEntity = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+
+    // CREATE TABLE copy LIKE source outside Gravitino: the copy carries source's properties,
+    // including the Gravitino identifier.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> copiedProps =
+        new HashMap<>(testCatalogOperations.loadTable(sourceIdent).properties());
+    Assertions.assertTrue(copiedProps.containsKey(ID_KEY));
+    testCatalogOperations.createTable(
+        copyIdent, columns, "copy", copiedProps, new Transform[0], null, null, null);
+
+    GravitinoRuntimeException e =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+    Assertions.assertTrue(e.getMessage().contains(ID_KEY), e.getMessage());
+
+    // The source keeps its registration; nothing was moved to the copy.
+    TableEntity sourceAfter = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(sourceEntity.id(), sourceAfter.id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, TABLE));
+  }
+
+  @Test
+  public void testLoadTableRebindsIdentifierAfterExternalRename() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaExternalRename");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "after");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(oldIdent, columns, "comment", props, new Transform[0]);
+    TableEntity oldEntity = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    // Renamed outside Gravitino: the old name is gone, the new one carries the identifier. The
+    // test catalog's alterTable keeps the old key, so the rename is simulated as drop + create.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> movedProps =
+        new HashMap<>(testCatalogOperations.loadTable(oldIdent).properties());
+    Assertions.assertTrue(testCatalogOperations.dropTable(oldIdent));
+    testCatalogOperations.createTable(
+        newIdent, columns, "comment", movedProps, new Transform[0], null, null, null);
+    Assertions.assertFalse(testCatalogOperations.tableExists(oldIdent));
+
+    Table loaded = tableOperationDispatcher.loadTable(newIdent);
+    Assertions.assertEquals(newIdent.name(), loaded.name());
+    TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
+    // The relational store renames the row in place (see the meta service tests); the in-memory
+    // test store keeps the old key, so only the id continuity is asserted here.
+    Assertions.assertEquals(oldEntity.id(), newEntity.id());
+  }
+
+  private TestCatalogOperations testCatalogOperations() {
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    return (TestCatalogOperations) testCatalog.ops();
+  }
+
+  @Test
   public void testConcurrentImportTableReusesExistingEntity() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema52");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

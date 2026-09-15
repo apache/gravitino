@@ -41,6 +41,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -644,6 +645,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
               + "we need to overwrite the stored entity to keep consistency.",
           stringId);
+      checkImportedIdNotCopied(identifier, stringId.id());
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
@@ -672,6 +674,51 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import schema entity to the store", e);
+    }
+  }
+
+  /**
+   * Tells an external rename apart from a copied id before an import re-binds a row. See {@code
+   * TableOperationDispatcher#checkImportedIdNotCopied}: the store cannot distinguish the two, so
+   * the external catalog is asked whether the id's current owner still exists.
+   */
+  private void checkImportedIdNotCopied(NameIdentifier identifier, long id) {
+    NameIdentifier currentOwner = findRegisteredSchemaById(identifier.namespace(), id);
+    if (currentOwner == null || currentOwner.equals(identifier)) {
+      return;
+    }
+    NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
+    boolean ownerStillExists =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithSchemaOps(s -> s.schemaExists(currentOwner)),
+            RuntimeException.class);
+    if (ownerStillExists) {
+      throw new GravitinoRuntimeException(
+          "Schema %s carries the Gravitino identifier %d of schema %s, which still exists. The "
+              + "identifier was most likely copied with the schema properties. Remove the property "
+              + "'%s' from %s and load it again",
+          identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
+    }
+    LOG.info(
+        "Schema {} was renamed to {} outside Gravitino; re-binding the registration {}",
+        currentOwner,
+        identifier,
+        id);
+  }
+
+  /** Returns the identifier of the live schema in the catalog that owns this id, if any. */
+  @Nullable
+  private NameIdentifier findRegisteredSchemaById(Namespace namespace, long id) {
+    try {
+      return store.list(namespace, SchemaEntity.class, SCHEMA).stream()
+          .filter(s -> s.id() == id)
+          .map(SchemaEntity::nameIdentifier)
+          .findFirst()
+          .orElse(null);
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to look up the schema registered with id %d under %s", id, namespace);
     }
   }
 

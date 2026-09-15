@@ -100,6 +100,36 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteRejectsIdOwnedBySchemaInAnotherCatalog() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    String otherCatalogName = "other_catalog_for_schema_test";
+    createAndInsertCatalog(metalakeName, otherCatalogName);
+
+    SchemaEntity original =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_id_owner",
+            AUDIT_INFO);
+    backend.insert(original, false);
+
+    SchemaEntity copiedId =
+        createSchemaEntity(
+            original.id(),
+            NamespaceUtil.ofSchema(metalakeName, otherCatalogName),
+            "schema_with_copied_id",
+            AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, true));
+
+    SchemaEntity stored =
+        SchemaMetaService.getInstance().getSchemaByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals(original.name(), stored.name());
+    Assertions.assertFalse(backend.exists(copiedId.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
   public void testInsertSchemaLocksCatalogWithoutChangingVersion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
