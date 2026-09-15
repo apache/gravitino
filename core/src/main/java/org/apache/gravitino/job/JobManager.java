@@ -31,7 +31,9 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -798,35 +800,41 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executable =
-        fetchFileFromUri(
-            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
+    String executableUri = replacePlaceholder(content.executable(), jobConf);
+    rejectEmbeddedUnresolvedPlaceholder(executableUri, "executable");
+    String executable = fetchFileFromUri(executableUri, stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
-        content.arguments().stream()
-            .map(arg -> replacePlaceholder(arg, jobConf))
-            .collect(Collectors.toList());
+        omitEmptyArguments(
+            content.arguments().stream()
+                .map(arg -> replacePlaceholder(arg, jobConf))
+                .collect(Collectors.toList()));
+    for (String arg : args) {
+      rejectEmbeddedUnresolvedPlaceholder(arg, "argument");
+    }
     Map<String, String> environments =
-        content.environments().entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    entry -> replacePlaceholder(entry.getKey(), jobConf),
-                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
+        omitUnresolvedTemplateMap(content.environments(), jobConf, "environment");
     Map<String, String> customFields =
         content.customFields().entrySet().stream()
             .collect(
                 Collectors.toMap(
                     entry -> replacePlaceholder(entry.getKey(), jobConf),
                     entry -> replacePlaceholder(entry.getValue(), jobConf)));
+    for (Map.Entry<String, String> entry : customFields.entrySet()) {
+      rejectEmbeddedUnresolvedPlaceholder(entry.getKey(), "customFields key");
+      rejectEmbeddedUnresolvedPlaceholder(entry.getValue(), "customFields value");
+    }
 
     // For shell job template
     if (content.jobType() == JobTemplate.JobType.SHELL) {
       List<String> scripts =
           content.scripts().stream()
               .map(
-                  script ->
-                      fetchFileFromUri(
-                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
+                  script -> {
+                    String resolved = replacePlaceholder(script, jobConf);
+                    rejectEmbeddedUnresolvedPlaceholder(resolved, "script");
+                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
+                  })
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -843,35 +851,39 @@ public class JobManager implements JobOperationDispatcher {
     // For Spark job template
     if (content.jobType() == JobTemplate.JobType.SPARK) {
       String className = replacePlaceholder(content.className(), jobConf);
+      rejectEmbeddedUnresolvedPlaceholder(className, "className");
       List<String> jars =
           content.jars().stream()
               .map(
-                  jar ->
-                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
+                  jar -> {
+                    String resolved = replacePlaceholder(jar, jobConf);
+                    rejectEmbeddedUnresolvedPlaceholder(resolved, "jar");
+                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
+                  })
               .collect(Collectors.toList());
 
       List<String> files =
           content.files().stream()
               .map(
-                  file ->
-                      fetchFileFromUri(
-                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
+                  file -> {
+                    String resolved = replacePlaceholder(file, jobConf);
+                    rejectEmbeddedUnresolvedPlaceholder(resolved, "file");
+                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
+                  })
               .collect(Collectors.toList());
 
       List<String> archives =
           content.archives().stream()
               .map(
-                  archive ->
-                      fetchFileFromUri(
-                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
+                  archive -> {
+                    String resolved = replacePlaceholder(archive, jobConf);
+                    rejectEmbeddedUnresolvedPlaceholder(resolved, "archive");
+                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
+                  })
               .collect(Collectors.toList());
 
       Map<String, String> configs =
-          content.configs().entrySet().stream()
-              .collect(
-                  Collectors.toMap(
-                      entry -> replacePlaceholder(entry.getKey(), jobConf),
-                      entry -> replacePlaceholder(entry.getValue(), jobConf)));
+          omitUnresolvedTemplateMap(content.configs(), jobConf, "configs");
 
       return SparkJobTemplate.builder()
           .withName(name)
@@ -904,15 +916,141 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
-        matcher.appendReplacement(result, matcher.group(0));
+        matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
       }
     }
     matcher.appendTail(result);
 
     return result.toString();
+  }
+
+  /**
+   * Drop unresolved optional {@code --flag}/value pairs after placeholder substitution.
+   *
+   * <p>Built-in templates list optional flags as {@code --flag} + {@code {{placeholder}}} with
+   * matching names (for example {@code --updater-options} / {@code {{updater_options}}}). When the
+   * job conf omits that key, leaving the unresolved placeholder produces dangling arguments such as
+   * {@code --updater-options {{updater_options}}}. This method removes a pair only when the
+   * following token is an entire unresolved placeholder whose name matches the flag (after
+   * normalizing {@code -} / {@code _} and case).
+   *
+   * <p>A boolean flag followed by an unrelated placeholder (for example {@code --verbose} / {@code
+   * {{unset_flag}}}) is not treated as a pair. Bare / positional unresolved placeholders (for
+   * example {@code {{slices}}} in SparkPi) are kept so a missing required argument stays visible.
+   * An explicit empty string in {@code jobConf} is also kept.
+   *
+   * @param arguments arguments after {@link #replacePlaceholder(String, Map)}; must not be null
+   * @return compacted argument list suitable for process execution; never null
+   */
+  @VisibleForTesting
+  static List<String> omitEmptyArguments(List<String> arguments) {
+    Preconditions.checkNotNull(arguments, "arguments");
+    if (arguments.isEmpty()) {
+      return arguments;
+    }
+
+    List<String> result = new ArrayList<>(arguments.size());
+    for (int i = 0; i < arguments.size(); i++) {
+      String arg = arguments.get(i);
+      if (arg.startsWith("--") && i + 1 < arguments.size()) {
+        String next = arguments.get(i + 1);
+        if (!next.startsWith("--") && isMatchingUnresolvedFlagValue(arg, next)) {
+          i++;
+          continue;
+        }
+      }
+
+      result.add(arg);
+    }
+    return result;
+  }
+
+  /**
+   * Whether {@code value} is an unresolved {@code {{placeholder}}} whose name matches {@code
+   * flagArg} (for example {@code --updater-options} matches {@code {{updater_options}}}).
+   */
+  @VisibleForTesting
+  static boolean isMatchingUnresolvedFlagValue(String flagArg, String value) {
+    if (!flagArg.startsWith("--") || !isUnresolvedPlaceholder(value)) {
+      return false;
+    }
+    Matcher matcher = PLACEHOLDER_PATTERN.matcher(value);
+    if (!matcher.matches()) {
+      return false;
+    }
+    String normalizedFlag = flagArg.substring(2).replace('-', '_').toLowerCase(Locale.ROOT);
+    String normalizedPlaceholder = matcher.group(1).replace('-', '_').toLowerCase(Locale.ROOT);
+    return normalizedFlag.equals(normalizedPlaceholder);
+  }
+
+  /**
+   * Resolves optional template maps such as {@code environments} and Spark {@code configs}. Entries
+   * whose keys or values are still an unresolved {@code {{placeholder}}} after substitution are
+   * dropped so optional credentials / Spark confs do not become literal placeholder strings.
+   *
+   * <p>Explicit empty strings from {@code jobConf} are kept. {@code arguments} use {@link
+   * #omitEmptyArguments(List)}; {@code customFields} still keep unresolved placeholders as literal
+   * text when the entire token is one placeholder.
+   *
+   * <p>If two entries resolve to the same key after placeholder substitution, this method fails
+   * fast with {@link IllegalStateException}, matching {@link Collectors#toMap}.
+   *
+   * <p>Composite values that still embed an unresolved placeholder (for example {@code
+   * prefix-{{missing}}} or {@code {{a}}.{{b}}} with only one key supplied) fail fast with {@link
+   * IllegalArgumentException} instead of being passed through as literal text.
+   *
+   * @param source template map before substitution
+   * @param jobConf replacement values
+   * @param context label used in error messages (for example {@code environment} or {@code
+   *     configs})
+   * @return resolved map without unresolved optional entries
+   */
+  private static Map<String, String> omitUnresolvedTemplateMap(
+      Map<String, String> source, Map<String, String> jobConf, String context) {
+    Map<String, String> resolved = new LinkedHashMap<>();
+    for (Map.Entry<String, String> entry : source.entrySet()) {
+      String key = replacePlaceholder(entry.getKey(), jobConf);
+      String value = replacePlaceholder(entry.getValue(), jobConf);
+      if (isUnresolvedPlaceholder(key) || isUnresolvedPlaceholder(value)) {
+        continue;
+      }
+      rejectEmbeddedUnresolvedPlaceholder(key, context + " key");
+      rejectEmbeddedUnresolvedPlaceholder(value, context + " value");
+      if (resolved.containsKey(key)) {
+        throw new IllegalStateException(
+            String.format(
+                "Duplicate key %s (attempted merging values %s and %s)",
+                key, resolved.get(key), value));
+      }
+      resolved.put(key, value);
+    }
+    return resolved;
+  }
+
+  /**
+   * Whether {@code value} is exactly one unresolved {@code {{placeholder}}} token.
+   *
+   * <p>Blank / empty strings are not unresolved placeholders: a present {@code jobConf} key with
+   * value {@code ""} means the caller explicitly supplied an empty value.
+   */
+  @VisibleForTesting
+  static boolean isUnresolvedPlaceholder(String value) {
+    return value != null && PLACEHOLDER_PATTERN.matcher(value).matches();
+  }
+
+  @VisibleForTesting
+  static void rejectEmbeddedUnresolvedPlaceholder(String value, String context) {
+    if (value != null
+        && !isUnresolvedPlaceholder(value)
+        && PLACEHOLDER_PATTERN.matcher(value).find()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unresolved placeholder remains embedded in %s after substitution: %s",
+              context, value));
+    }
   }
 
   @VisibleForTesting

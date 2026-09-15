@@ -375,7 +375,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseOptionsJson(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse options JSON"));
+      assertTrue(e.getMessage().contains("Option --options"));
     }
   }
 
@@ -706,7 +706,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
+      assertTrue(e.getMessage().contains("Option --spark-conf"));
     }
   }
 }
