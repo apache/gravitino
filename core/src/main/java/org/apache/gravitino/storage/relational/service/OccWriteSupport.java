@@ -69,6 +69,28 @@ public class OccWriteSupport {
   }
 
   /**
+   * Refuses an overwrite whose stable ID is already owned by a live row under another parent.
+   *
+   * <p>An import trusts the ID it finds in the external object. When that ID was copied from
+   * another object (copied table properties, a restored backup), an upsert keyed by the primary key
+   * would move the existing row, and every attachment keyed by that ID, to the new name and parent.
+   * The lookup must lock the row so the decision holds until the transaction ends. A same-parent
+   * match is allowed: that is how an external rename is re-registered.
+   *
+   * @param <T> the persistent object type
+   * @param byIdLockingLookup the locking lookup by stable ID
+   * @param sameParent checks whether the ID owner belongs to the target parent
+   * @throws EntityAlreadyExistsException if the ID belongs to a live row under another parent
+   */
+  public static <T> void checkOverwriteIdNotOwnedByOtherParent(
+      Supplier<T> byIdLockingLookup, Predicate<T> sameParent) {
+    T owner = byIdLockingLookup.get();
+    if (owner != null && !sameParent.test(owner)) {
+      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
+    }
+  }
+
+  /**
    * Classifies a write-failure for an entity during an optimistic concurrency control operation.
    *
    * <p>Executes a lookup to re-read the target entity. The caller is responsible for choosing the
