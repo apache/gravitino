@@ -43,6 +43,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
@@ -67,6 +68,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   private static final long SMALL_FILE_THRESHOLD_BYTES = 32L * 1024 * 1024;
   private static final String DEFAULT_UPDATE_MODE = UpdateMode.ALL.modeName;
   private static final String CUSTOM_STAT_PREFIX = "custom-";
+  private static final String OPTION_UPDATE_MODE = "update-mode";
+  private static final String OPTION_UPDATER_OPTIONS = "updater-options";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -78,6 +81,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         .withClassName(IcebergUpdateStatsAndMetricsJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(buildSparkConfigs())
+        .withEnvironments(GravitinoAuthSettings.jobTemplateEnvironments())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -86,21 +90,30 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   /** Main entry point. */
   public static void main(String[] args) {
     Map<String, String> argMap = parseArguments(args);
-    String catalogName = argMap.get("catalog");
-    String tableIdentifier = argMap.get("table");
-    UpdateMode updateMode = parseUpdateMode(argMap.get("update-mode"));
+    String catalogName = argMap.get(IcebergJobUtils.OPTION_CATALOG);
+    String tableIdentifier = argMap.get(IcebergJobUtils.OPTION_TABLE);
+    UpdateMode updateMode = parseUpdateMode(argMap.get(OPTION_UPDATE_MODE));
 
     if (catalogName == null || tableIdentifier == null) {
-      System.err.println("Error: --catalog and --table are required arguments");
+      System.err.println(
+          "Error: --"
+              + IcebergJobUtils.OPTION_CATALOG
+              + " and --"
+              + IcebergJobUtils.OPTION_TABLE
+              + " are required arguments");
       printUsage();
       System.exit(1);
     }
 
-    Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
-    String sparkConfJson = argMap.get("spark-conf");
+    Map<String, String> updaterOptions =
+        parseJsonOptions(argMap.get(OPTION_UPDATER_OPTIONS), OPTION_UPDATER_OPTIONS);
+    String sparkConfJson = argMap.get(IcebergJobUtils.OPTION_SPARK_CONF);
+    Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
+    IcebergJobUtils.applyIcebergRestAuth(
+        sparkBuilder, catalogName, new OptimizerConfig(optimizerProperties));
 
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
@@ -110,10 +123,10 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
-      Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
       if (updateMode.updateStats) {
         String statisticsUpdaterName =
             updaterOptions.getOrDefault("statistics_updater", DEFAULT_STATISTICS_UPDATER).trim();
@@ -391,15 +404,22 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson);
+    return parseJsonOptions(sparkConfJson, IcebergJobUtils.OPTION_SPARK_CONF);
   }
 
+  /**
+   * Parse a flat JSON option map and report parse errors with the real CLI flag name.
+   *
+   * @param json flat JSON map text, or null/empty for an empty map
+   * @param optionName CLI flag name without leading dashes (for example {@code updater-options})
+   * @return parsed string map
+   */
   @VisibleForTesting
-  static Map<String, String> parseJsonOptions(String json) {
+  static Map<String, String> parseJsonOptions(String json, String optionName) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, optionName);
   }
 
   @VisibleForTesting
@@ -425,6 +445,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
     metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
+    GravitinoAuthSettings.copyAliases(optimizerProperties);
     return optimizerProperties;
   }
 
@@ -542,15 +563,15 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static List<String> buildArguments() {
     return Arrays.asList(
-        "--catalog",
+        "--" + IcebergJobUtils.OPTION_CATALOG,
         "{{catalog_name}}",
-        "--table",
+        "--" + IcebergJobUtils.OPTION_TABLE,
         "{{table_identifier}}",
-        "--update-mode",
+        "--" + OPTION_UPDATE_MODE,
         "{{update_mode}}",
-        "--updater-options",
+        "--" + OPTION_UPDATER_OPTIONS,
         "{{updater_options}}",
-        "--spark-conf",
+        "--" + IcebergJobUtils.OPTION_SPARK_CONF,
         "{{spark_conf}}");
   }
 
@@ -563,19 +584,32 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\\n"
             + "\\n"
             + "Required Options:\\n"
-            + "  --catalog <name>                   Iceberg catalog name registered in Spark\\n"
-            + "  --table <identifier>               Table name in schema.table format\\n"
+            + "  --"
+            + IcebergJobUtils.OPTION_CATALOG
+            + " <name>                   Iceberg catalog name registered in Spark\\n"
+            + "  --"
+            + IcebergJobUtils.OPTION_TABLE
+            + " <identifier>               Table name in schema.table format\\n"
             + "\\n"
             + "Optional Options:\\n"
-            + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
+            + "  --"
+            + OPTION_UPDATE_MODE
+            + " <stats|metrics|all> Update behavior mode, default: all\\n"
             + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
             + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
-            + "  --updater-options <json>           JSON map for updater and repository settings\\n"
+            + "  --"
+            + OPTION_UPDATER_OPTIONS
+            + " <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\\n"
-            + "  --spark-conf <json>                JSON map of custom Spark configs\\n"
-            + "                                     Must include Iceberg catalog configs for --catalog\\n"
+            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\",\\n"
+            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}'\\n"
+            + "  --"
+            + IcebergJobUtils.OPTION_SPARK_CONF
+            + " <json>                JSON map of custom Spark configs\\n"
+            + "                                     Must include Iceberg catalog configs for --"
+            + IcebergJobUtils.OPTION_CATALOG
+            + "\\n"
             + "                                     Example: '{\"spark.master\":\"local[2]\","
             + "\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\","
             + "\"spark.sql.catalog.rest_catalog.type\":\"rest\","

@@ -94,6 +94,14 @@ public class TestIcebergRewriteDataFilesJob {
   }
 
   @Test
+  public void testJobTemplateDeclaresAuthEnvironments() {
+    IcebergRewriteDataFilesJob job = new IcebergRewriteDataFilesJob();
+    Map<String, String> environments = job.jobTemplate().environments();
+    assertEquals("{{gravitino_auth_type}}", environments.get("GRAVITINO_AUTH_TYPE"));
+    assertEquals("{{gravitino_auth_password}}", environments.get("GRAVITINO_AUTH_PASSWORD"));
+  }
+
+  @Test
   public void testJobTemplateHasSparkConfigs() {
     IcebergRewriteDataFilesJob job = new IcebergRewriteDataFilesJob();
     SparkJobTemplate template = job.jobTemplate();
@@ -375,7 +383,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseOptionsJson(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse options JSON"));
+      assertTrue(e.getMessage().contains("Option --options"));
     }
   }
 
@@ -706,7 +714,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
+      assertTrue(e.getMessage().contains("Option --spark-conf"));
     }
   }
 }

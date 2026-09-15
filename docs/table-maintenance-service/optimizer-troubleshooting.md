@@ -72,6 +72,22 @@ spark.hadoop.fs.defaultFS=file:///
 }
 ```
 
+**Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
+Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
+classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
+runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
+`gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
+Put a version-matched Iceberg Spark runtime on the job classpath, for example:
+
+```json
+{
+  "spark.jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+}
+```
+
+Use the Spark, Scala, and Iceberg versions that match your cluster. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+
 **Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
 
 ```text
@@ -79,6 +95,8 @@ Cannot translate Spark expression ... day(cast(ts as date)) ... to data source f
 ```
 
 Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_id}` and reading `error.log` under `builtin-iceberg-rewrite-data-files`. The only workaround is to compact identity-partitioned tables and leave the rest alone.
+
+**`The provided credentials did not support` or Iceberg `Not authorized`** — the built-in Iceberg jobs run against a server with authentication enabled but received no credentials. Set `gravitino.optimizer.auth.type` for the optimizer client, and pass `gravitino_auth_type` / `gravitino_auth_username` / `gravitino_auth_password` (or the OAuth `gravitino_auth_oauth_*` keys) in `jobConf` so Spark gets `GRAVITINO_AUTH_*` environment variables. See [Configuration](./optimizer-configuration.md).
 
 Observed in `1.2.0`:
 

@@ -29,6 +29,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionCo
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 
@@ -124,6 +125,7 @@ public class GravitinoJobSubmitter implements JobSubmitter {
     Map<String, String> mergedConfigs = new LinkedHashMap<>();
     mergedConfigs.putAll(submitterConfigs);
     mergedConfigs.putAll(adapterConfigs);
+    GravitinoAuthSettings.copyToJobConf(mergedConfigs, optimizerConfig);
     return mergedConfigs;
   }
 
