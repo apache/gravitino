@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
@@ -44,6 +45,7 @@ import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,12 @@ public class LocalJobExecutor implements JobExecutor {
   private static final String LOCAL_JOB_PREFIX = "local-job-";
 
   private static final long UNEXPIRED_TIME_IN_MS = -1L;
+
+  // A random id of this executor instance, it is embedded in every job id submitted by this
+  // instance, so that each Gravitino server only tracks the jobs it runs itself.
+  private String executorId;
+
+  private String ownedJobIdPrefix;
 
   private Map<String, String> configs;
 
@@ -79,6 +87,9 @@ public class LocalJobExecutor implements JobExecutor {
   @Override
   public void initialize(Map<String, String> configs) {
     this.configs = configs;
+    this.executorId = String.format("%08x", ThreadLocalRandom.current().nextInt());
+    this.ownedJobIdPrefix = LOCAL_JOB_PREFIX + executorId + "-";
+    LOG.info("Initializing local job executor with executor id {}", executorId);
 
     int waitingQueueSize =
         configs.containsKey(WAITING_QUEUE_SIZE)
@@ -108,9 +119,11 @@ public class LocalJobExecutor implements JobExecutor {
     Preconditions.checkArgument(
         maxRunningJobs > 0, "Max running jobs must be greater than 0, but got: %s", maxRunningJobs);
 
-    this.jobExecutorService =
+    // With an unbounded queue, the pool never grows beyond its core size, so the core size must be
+    // the max running jobs. Idle core threads are still allowed to time out.
+    ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(
-            0,
+            maxRunningJobs,
             maxRunningJobs,
             60L,
             TimeUnit.SECONDS,
@@ -121,6 +134,8 @@ public class LocalJobExecutor implements JobExecutor {
               thread.setDaemon(true);
               return thread;
             });
+    threadPoolExecutor.allowCoreThreadTimeOut(true);
+    this.jobExecutorService = threadPoolExecutor;
 
     this.jobStatus = Maps.newHashMap();
 
@@ -150,11 +165,27 @@ public class LocalJobExecutor implements JobExecutor {
         TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
+
+    // Spark is optional for the local job executor, so a missing Spark installation must not fail
+    // the server startup. Warn early instead; Spark jobs will be rejected at submission.
+    try {
+      SparkProcessBuilder.resolveSparkSubmit(configs);
+    } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "Spark jobs cannot be run by the local job executor and will be rejected: {}",
+          e.getMessage());
+    }
   }
 
   @Override
   public String submitJob(JobTemplate jobTemplate) {
-    String newJobId = LOCAL_JOB_PREFIX + UUID.randomUUID();
+    // Validate the job can be launched before queueing it, so that a misconfiguration is reported
+    // to the caller directly instead of only failing the job asynchronously in the worker thread.
+    if (jobTemplate instanceof SparkJobTemplate) {
+      SparkProcessBuilder.resolveSparkSubmit(configs);
+    }
+
+    String newJobId = ownedJobIdPrefix + UUID.randomUUID();
     Pair<String, JobTemplate> jobPair = Pair.of(newJobId, jobTemplate);
 
     synchronized (lock) {
@@ -221,6 +252,16 @@ public class LocalJobExecutor implements JobExecutor {
         jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLING, UNEXPIRED_TIME_IN_MS));
       }
     }
+  }
+
+  @Override
+  public boolean ownsJob(String jobId) {
+    return jobId != null && jobId.startsWith(ownedJobIdPrefix);
+  }
+
+  @Override
+  public boolean isJobStateNodeLocal() {
+    return true;
   }
 
   @Override
@@ -321,6 +362,11 @@ public class LocalJobExecutor implements JobExecutor {
         finished = true;
       }
     }
+  }
+
+  @VisibleForTesting
+  String executorId() {
+    return executorId;
   }
 
   @VisibleForTesting

@@ -48,6 +48,12 @@ as part of that catalog's own definition — the same way Trino replicates any o
 cluster-wide. A catalog that could not be registered before the IRC started is registered
 automatically after a later discovery poll succeeds; no Trino restart is required.
 
+The Gravitino server derives the discovered endpoint from the IRC's listener configuration, so
+behind a reverse proxy it may report an endpoint clients cannot reach. In that case, set
+`gravitino.iceberg-rest.advertised-uri` on the Gravitino server to the public endpoint (see
+[Iceberg REST service](../iceberg-rest-service.md#http-server)); discovery then reports that URI
+instead.
+
 Set `gravitino.iceberg.rest-uri` to override the discovered endpoint, and it is required — not just
 an override — for a standalone IRC (its own process, not the Gravitino server's auxiliary service):
 the Gravitino server has no way to know a standalone IRC exists, so discovery never finds one. See

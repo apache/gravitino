@@ -254,6 +254,8 @@ Use the `list_metalakes` tool to discover which metalakes a caller may use. It i
 
 The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) shipped their own `metalake_name` argument before metalake selection was unified. It is still accepted as a deprecated alias for `metalake`, so existing callers keep working; passing both with different values is rejected. New callers should use `metalake`.
 
+These tools use `metadata_full_name` for the metadata object name, consistent with the tag and policy tools. The previous spelling, `metadata_fullname`, is accepted as a deprecated input alias but is not advertised in the tool schema. Supply only one spelling per call; passing both is rejected. New callers should use `metadata_full_name`.
+
 Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
 
 ### Examples
