@@ -53,11 +53,14 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -177,6 +180,25 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                         0,
                         Collections.emptyMap(),
                         AUDIT_INFO),
+                    false),
+            namespace ->
+                backend.insert(
+                    SemanticModelEntity.builder()
+                        .withId(RandomIdGenerator.INSTANCE.nextId())
+                        .withName("child_semantic_model")
+                        .withNamespace(namespace)
+                        .withDefinition(
+                            SemanticModelDefinition.builder()
+                                .withDatasets(
+                                    new Dataset[] {
+                                      Dataset.builder()
+                                          .withName("child_dataset")
+                                          .withSource(NameIdentifier.of("source_table"))
+                                          .build()
+                                    })
+                                .build())
+                        .withAuditInfo(AUDIT_INFO)
+                        .build(),
                     false),
             namespace ->
                 backend.insert(
