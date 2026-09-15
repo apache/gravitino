@@ -693,13 +693,20 @@ public class TestJobTemplate {
   }
 
   @Test
-  public void testHasEmbeddedUnresolvedPlaceholder() {
-    Assertions.assertFalse(JobManager.hasEmbeddedUnresolvedPlaceholder(null));
-    Assertions.assertFalse(JobManager.hasEmbeddedUnresolvedPlaceholder("literal"));
-    Assertions.assertFalse(JobManager.hasEmbeddedUnresolvedPlaceholder("{{whole}}"));
-    Assertions.assertTrue(JobManager.hasEmbeddedUnresolvedPlaceholder("prefix-{{missing}}"));
-    Assertions.assertTrue(JobManager.hasEmbeddedUnresolvedPlaceholder("{{a}}.{{b}}"));
-    Assertions.assertTrue(JobManager.hasEmbeddedUnresolvedPlaceholder("hello.{{b}}"));
+  public void testRejectEmbeddedUnresolvedPlaceholder() {
+    JobManager.rejectEmbeddedUnresolvedPlaceholder(null, "test");
+    JobManager.rejectEmbeddedUnresolvedPlaceholder("literal", "test");
+    JobManager.rejectEmbeddedUnresolvedPlaceholder("{{whole}}", "test");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("prefix-{{missing}}", "test"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("{{a}}.{{b}}", "test"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("hello.{{b}}", "test"));
   }
 
   @Test

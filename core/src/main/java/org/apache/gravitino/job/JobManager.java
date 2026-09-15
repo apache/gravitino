@@ -853,7 +853,9 @@ public class JobManager implements JobOperationDispatcher {
             content.arguments().stream()
                 .map(arg -> replacePlaceholder(arg, jobConf))
                 .collect(Collectors.toList()));
-    rejectEmbeddedUnresolvedPlaceholders(args, "argument");
+    for (String arg : args) {
+      rejectEmbeddedUnresolvedPlaceholder(arg, "argument");
+    }
     Map<String, String> environments =
         omitUnresolvedTemplateMap(content.environments(), jobConf, "environment");
     Map<String, String> customFields =
@@ -862,7 +864,10 @@ public class JobManager implements JobOperationDispatcher {
                 Collectors.toMap(
                     entry -> replacePlaceholder(entry.getKey(), jobConf),
                     entry -> replacePlaceholder(entry.getValue(), jobConf)));
-    rejectEmbeddedUnresolvedPlaceholders(customFields, "customFields");
+    for (Map.Entry<String, String> entry : customFields.entrySet()) {
+      rejectEmbeddedUnresolvedPlaceholder(entry.getKey(), "customFields key");
+      rejectEmbeddedUnresolvedPlaceholder(entry.getValue(), "customFields value");
+    }
 
     // For shell job template
     if (content.jobType() == JobTemplate.JobType.SHELL) {
@@ -1020,16 +1025,9 @@ public class JobManager implements JobOperationDispatcher {
     if (!matcher.matches()) {
       return false;
     }
-    return normalizeTemplateName(flagArg.substring(2))
-        .equals(normalizeTemplateName(matcher.group(1)));
-  }
-
-  /**
-   * Normalize flag / placeholder names so {@code updater-options} matches {@code updater_options}.
-   */
-  @VisibleForTesting
-  static String normalizeTemplateName(String name) {
-    return name.replace('-', '_').toLowerCase(Locale.ROOT);
+    String normalizedFlag = flagArg.substring(2).replace('-', '_').toLowerCase(Locale.ROOT);
+    String normalizedPlaceholder = matcher.group(1).replace('-', '_').toLowerCase(Locale.ROOT);
+    return normalizedFlag.equals(normalizedPlaceholder);
   }
 
   /**
@@ -1087,39 +1085,15 @@ public class JobManager implements JobOperationDispatcher {
     return value != null && PLACEHOLDER_PATTERN.matcher(value).matches();
   }
 
-  /**
-   * Whether {@code value} still contains an unresolved {@code {{placeholder}}} that is not the
-   * entire string (composite / partially substituted values).
-   */
-  @VisibleForTesting
-  static boolean hasEmbeddedUnresolvedPlaceholder(String value) {
-    if (value == null || isUnresolvedPlaceholder(value)) {
-      return false;
-    }
-    return PLACEHOLDER_PATTERN.matcher(value).find();
-  }
-
   @VisibleForTesting
   static void rejectEmbeddedUnresolvedPlaceholder(String value, String context) {
-    if (hasEmbeddedUnresolvedPlaceholder(value)) {
+    if (value != null
+        && !isUnresolvedPlaceholder(value)
+        && PLACEHOLDER_PATTERN.matcher(value).find()) {
       throw new IllegalArgumentException(
           String.format(
               "Unresolved placeholder remains embedded in %s after substitution: %s",
               context, value));
-    }
-  }
-
-  private static void rejectEmbeddedUnresolvedPlaceholders(List<String> values, String context) {
-    for (String value : values) {
-      rejectEmbeddedUnresolvedPlaceholder(value, context);
-    }
-  }
-
-  private static void rejectEmbeddedUnresolvedPlaceholders(
-      Map<String, String> values, String context) {
-    for (Map.Entry<String, String> entry : values.entrySet()) {
-      rejectEmbeddedUnresolvedPlaceholder(entry.getKey(), context + " key");
-      rejectEmbeddedUnresolvedPlaceholder(entry.getValue(), context + " value");
     }
   }
 
