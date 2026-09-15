@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -83,8 +82,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   private volatile TableLocationProvider tableLocationProvider;
 
   private volatile Map<String, String> catalogProperties = Map.of();
-
-  private final AtomicBoolean closed = new AtomicBoolean();
 
   private final Cache<NameIdentifier, String> tableFormatCache;
 
@@ -152,22 +149,12 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                     .catalogPropertiesMetadata()
                     .getOrDefault(conf, GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER),
             DefaultTableLocationProvider.NAME);
-    this.tableLocationProvider =
-        TableLocationProviderFactory.create(providerName, catalogProperties);
+    this.tableLocationProvider = TableLocationProviderFactory.create(providerName);
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     tableFormatCache.cleanUp();
-
-    // A flag rather than clearing the field: closing the catalog twice must not close the provider
-    // twice, but a drop in flight while the catalog shuts down must not meet a null provider
-    // either. The contract asks a provider to tolerate close after a failed initialize, not
-    // repeated closes from its owner.
-    TableLocationProvider provider = tableLocationProvider;
-    if (provider != null && closed.compareAndSet(false, true)) {
-      provider.close();
-    }
   }
 
   @Override
@@ -309,7 +296,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Table createdTable =
         tableOps.createTable(
             ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
-    releaseLocationIfUnused(ident, schema, newProperties, tableLocation, createdTable);
     // Cache the table format for future use.
     tableFormatCache.put(ident, format);
     return createdTable;
@@ -403,6 +389,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             .withTableIdentifier(ident)
             .withTableProperties(tableProperties)
             .withSchema(schema)
+            .withCatalogProperties(catalogProperties)
             .build();
 
     // The properties just read are handed on rather than left to be read again: resolving the
@@ -448,7 +435,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // is gone in all three cases that reach it, so there is nothing left for a provider to decide
     // differently; and the case that is skipped is the one where a provider reclaiming by path
     // would delete a user's data irrecoverably.
-    if (dropped && (purge || !context.isExternal())) {
+    // Read the same way the table formats and the property metadata read it: a catalog that
+    // disagreed with the format about a value like `external=yes` would skip reclaiming a location
+    // the format had just deleted the data under.
+    boolean external = Boolean.parseBoolean(context.tableProperties().get(Table.PROPERTY_EXTERNAL));
+    if (dropped && (purge || !external)) {
       TableLocationProvider provider = tableLocationProvider;
       try {
         provider.unprovisionTableLocation(context);
@@ -537,19 +528,18 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   /**
    * Asks the {@link TableLocationProvider} where the table being created should live.
    *
-   * <p>Called only when the request does not carry a location of its own. A caller that supplies a
-   * location has already decided where the data goes, and in this catalog it usually does so
-   * because the data is already there: an external Delta table, or a Lance registration, both of
-   * which point at a dataset that exists. Handing such a request to a provider that allocates
-   * storage would do two wrong things at once -- repoint the table at a freshly allocated empty
-   * path, leaving the caller's data orphaned while the creation still reports success, and leave
-   * behind an allocation that is never written to and never handed back.
+   * <p>Called for every creation, including one whose request carries a location of its own, which
+   * reaches the provider as the {@code location} entry of the context's table properties. Deciding
+   * it here instead would leave a provider that exists to enforce a placement policy with nothing
+   * to enforce, since a caller-supplied path is exactly the case such a policy is for.
    *
-   * <p>The catalog cannot tell those requests apart from a caller merely overriding placement, and
-   * a rule each provider has to re-derive for itself is a rule most of them will get wrong. So the
-   * provider is consulted only when the catalog is the one choosing, which is also what this
-   * catalog has always done with a supplied location. A deployment that wants allocation to be
-   * mandatory has to reject a caller-supplied location before it reaches the catalog.
+   * <p>What a provider does with it is its own decision, and one it has to make deliberately: in
+   * this catalog a caller usually supplies a location because the data is already there -- an
+   * external Delta table, or a Lance registration, both pointing at a dataset that exists.
+   * Allocating a fresh path for one of those and returning it repoints the table at an empty
+   * directory and orphans the caller's data while the creation still reports success. The built-in
+   * provider returns the supplied value verbatim as its first branch, so a catalog on it is
+   * unaffected.
    *
    * @param ident the identifier of the table being created
    * @param properties the table properties the caller supplied
@@ -565,6 +555,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                 .withTableIdentifier(ident)
                 .withTableProperties(properties)
                 .withSchema(schema)
+                .withCatalogProperties(catalogProperties)
                 .build());
 
     // Only blankness is checked. The shape of the path belongs to the provider: nothing downstream
@@ -577,105 +568,5 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
         ident);
 
     return location;
-  }
-
-  /**
-   * Hands back a location that was provisioned for this creation and that the created table does
-   * not point at.
-   *
-   * <p>A format may decline the location it was given and still report success. Lance's {@code
-   * EXIST_OK} creation mode returns the table that already exists, at the location that table
-   * already had, and a client retrying a create is the ordinary way to reach that path. Without
-   * this, every such call would leak one allocation with nothing in the logs to show for it.
-   *
-   * <p>This is {@link TableLocationProvider#releaseUnusedLocation(TableLocationContext)} and not
-   * {@link TableLocationProvider#unprovisionTableLocation(TableLocationContext)}, even though for
-   * the built-in provider the two do the same nothing. The table here is alive and is about to be
-   * returned to the caller; a provider that reclaims by table identity rather than by path would
-   * read the drop callback literally and delete the registration of a table that exists. Releasing
-   * defaults to doing nothing for exactly that reason, so a provider opts in to it knowingly.
-   *
-   * <p>Releasing is safe here in a way it is not on the creation failure path: nothing can have
-   * been written to a location the created table does not point at. A failure to release is logged
-   * and otherwise ignored, as it is on drop -- the table was created, and reporting the creation as
-   * failed would be the worse answer.
-   *
-   * <p>The two locations are compared with a trailing slash added to both, since that is the one
-   * rewrite this catalog performs itself. A format that rewrites the location further -- collapsing
-   * a duplicated separator, or normalizing a URI scheme -- is indistinguishable from here from a
-   * format that declined the location outright, which the contract warns providers about.
-   *
-   * @param ident the identifier of the table that was created
-   * @param schema the schema the table was created in
-   * @param properties the properties the format was given, carrying the provisioned location
-   * @param provisionedLocation the location the provider handed out
-   * @param createdTable the table the format returned, which may be null
-   */
-  private void releaseLocationIfUnused(
-      NameIdentifier ident,
-      Schema schema,
-      Map<String, String> properties,
-      String provisionedLocation,
-      Table createdTable) {
-    // Neither built-in delegator returns null, but a third-party one that did would otherwise
-    // fail a creation that has already succeeded, and only on this path: the same delegator would
-    // serve a request that carried its own location without complaint. An asymmetry like that is
-    // far harder to diagnose than the leaked location that returning here may cost.
-    if (createdTable == null) {
-      return;
-    }
-
-    Map<String, String> createdProperties = createdTable.properties();
-    String storedLocation =
-        createdProperties == null ? null : createdProperties.get(Table.PROPERTY_LOCATION);
-
-    // Only a location that is visibly different is released. A format reporting no location at all
-    // may still be using the one it was handed, and leaking it is the safer reading of that.
-    if (StringUtils.isBlank(storedLocation)
-        || DefaultTableLocationProvider.ensureTrailingSlash(provisionedLocation)
-            .equals(DefaultTableLocationProvider.ensureTrailingSlash(storedLocation))) {
-      return;
-    }
-
-    TableLocationProvider provider = tableLocationProvider;
-    // The exact class, not instanceof: the built-in provider composes its location from
-    // configuration and registers it nowhere, so nothing was allocated and nothing can leak. A
-    // subclass of it may well allocate, and silencing that one would be the same lie in the other
-    // direction. Warning unconditionally would be the more common lie, since a client retrying a
-    // create reaches this path routinely on a default deployment.
-    if (provider.getClass() == DefaultTableLocationProvider.class) {
-      LOG.debug(
-          "Table {} was created at '{}' rather than at the composed location '{}'. The composed "
-              + "location was never allocated anywhere, so there is nothing to release.",
-          ident,
-          storedLocation,
-          provisionedLocation);
-    } else {
-      LOG.warn(
-          "Table {} was created at '{}' rather than at the provisioned location '{}'. Asking "
-              + "table location provider '{}' to release the unused location; a provider that "
-              + "does not implement the release callback leaves it allocated.",
-          ident,
-          storedLocation,
-          provisionedLocation,
-          provider.name());
-    }
-
-    try {
-      provider.releaseUnusedLocation(
-          TableLocationContext.builder()
-              .withTableIdentifier(ident)
-              .withTableProperties(properties)
-              .withSchema(schema)
-              .build());
-    } catch (Exception e) {
-      LOG.warn(
-          "Table location provider '{}' failed to release the unused location '{}' provisioned for "
-              + "table {}. The storage may be leaked and needs to be reclaimed manually.",
-          provider.name(),
-          provisionedLocation,
-          ident,
-          e);
-    }
   }
 }

@@ -18,10 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.Map;
-
 /**
  * A pluggable strategy for deciding where the data of a newly created table lives.
  *
@@ -31,18 +27,23 @@ import java.util.Map;
  * location} properties; deployments that allocate storage through an external service can register
  * their own implementation instead.
  *
- * <p>An instance is created per catalog, {@link #initialize(Map)} is called once before any
- * provisioning, and {@link #close()} is called when the catalog is closed. Implementations must be
- * thread-safe: {@link #provisionTableLocation(TableLocationContext)}, {@link
- * #unprovisionTableLocation(TableLocationContext)} and {@link
- * #releaseUnusedLocation(TableLocationContext)} are all called concurrently by table requests.
+ * <p>The interface is deliberately two operations wide: hand out a location for a table being
+ * created, and hand one back for a table that is gone. Every decision that can be made from what
+ * the catalog already knows is made by the catalog, so that an implementation has as little to get
+ * right as possible. In particular, whether an external table's data survives a drop is decided
+ * here and not there -- see {@link #unprovisionTableLocation(TableLocationContext)}.
  *
- * <p>The catalog does not fence in-flight requests against {@link #close()}, so a request that
- * started before the catalog was closed can reach any of the three callbacks afterwards. An
- * implementation is not asked to keep working across a close; it is asked to fail cleanly rather
- * than corrupt anything, which is what a closed client throwing does on its own. On the drop and
- * release paths the failure is logged at WARN and nothing else happens; on the provisioning path it
- * fails the table creation, which is the right answer for a catalog that is shutting down.
+ * <p><b>There is no lifecycle.</b> An instance is created per catalog and is never initialized or
+ * closed by the catalog, so an implementation needing configuration of its own -- a service
+ * endpoint, a credential -- has to obtain it without help from here, and anything it acquires is
+ * held for the lifetime of the instance with no callback to release it. An implementation holding a
+ * remote client should therefore acquire it lazily and make it safe to abandon, because catalogs
+ * are evicted from the server's catalog cache when idle and a discarded provider is not told.
+ *
+ * <p>Implementations must be thread-safe: {@link #provisionTableLocation(TableLocationContext)} and
+ * {@link #unprovisionTableLocation(TableLocationContext)} are both called concurrently by table
+ * requests. A failure on the provisioning path fails the table creation; one on the drop path is
+ * logged at WARN and nothing else happens.
  *
  * <p>Implementations must satisfy two constraints imposed by the {@link java.util.ServiceLoader}
  * based discovery:
@@ -53,10 +54,8 @@ import java.util.Map;
  *       the catalog property is selected, so a heavy constructor slows the initialization of every
  *       catalog, including those using the built-in provider. One that throws is logged and skipped
  *       rather than failing the lookup, which costs that provider the ability to be selected at
- *       all. The instances that were not selected are then discarded without {@link #close()} being
- *       called on them, so anything a constructor acquires is leaked once per catalog creation.
- *       Connection pools, remote clients and any other expensive setup belong in {@link
- *       #initialize(Map)}.
+ *       all. The instances that were not selected are then discarded, and nothing is closed on
+ *       them, so anything a constructor acquires is leaked once per catalog creation.
  *   <li>{@link #name()} must be unique across the classpath, and must not be {@value
  *       DefaultTableLocationProvider#NAME}, which is reserved by {@link
  *       DefaultTableLocationProvider}. If two providers share a name, every catalog selecting that
@@ -66,7 +65,7 @@ import java.util.Map;
  *       that cannot be loaded at all still fails the lookup.
  * </ul>
  *
- * <p><b>Known limitations.</b> Four of them, and they all point the same way: a provider that
+ * <p><b>Known limitations.</b> Five of them, and they all point the same way: a provider that
  * manages real storage needs its own reconciliation against the catalog and cannot treat the
  * callbacks here as a complete record of what it handed out.
  *
@@ -85,6 +84,15 @@ import java.util.Map;
  *       before failing, which this interface cannot express. Every check this catalog can make on
  *       its own is made before the provider is consulted, so the cases that remain are the ones
  *       only the table format can detect.
+ *   <li>A creation the table format serves from a table that already exists leaks the location
+ *       provisioned for that call. An {@code EXIST_OK}-style creation mode returns the existing
+ *       table at the location it already had, and a client retrying a create is the ordinary way to
+ *       reach it, so this is not a rare path. The unused location is neither reported nor handed
+ *       back, because the table is alive: an implementation that books allocations against {@code
+ *       (schema, table)} would read a reclaim keyed by that identity as an instruction to delete a
+ *       live table's storage, and there is no callback that would let it tell the two apart. Such
+ *       an implementation meets this case on its own, since a retried create arrives as a second
+ *       provisioning request for a table it already holds an allocation for.
  *   <li>A table format that drops a table through its own internals, rather than through the
  *       catalog, does not trigger {@link #unprovisionTableLocation(TableLocationContext)}. Lance's
  *       {@code OVERWRITE} creation mode does this: it drops the existing table and creates a new
@@ -99,7 +107,7 @@ import java.util.Map;
  *       forbid renaming tables in this catalog.
  * </ul>
  */
-public interface TableLocationProvider extends Closeable {
+public interface TableLocationProvider {
 
   /**
    * Returns the name identifying this provider. The value is matched case-insensitively against the
@@ -108,24 +116,6 @@ public interface TableLocationProvider extends Closeable {
    * @return the provider name, never null or blank
    */
   String name();
-
-  /**
-   * Initializes the provider with the properties of the catalog it belongs to. Called exactly once,
-   * before any call to {@link #provisionTableLocation(TableLocationContext)}.
-   *
-   * <p>The default implementation does nothing, because a provider that derives the location purely
-   * from {@link TableLocationContext} has nothing to prepare. Providers that hold a remote client,
-   * a connection or any state that must outlive a single table creation must override it, and
-   * release those resources in {@link #close()}.
-   *
-   * <p>Throwing from here fails the initialization of the catalog. The instance is closed before
-   * the failure propagates, so a provider that acquired part of its resources before giving up
-   * still gets to release them in {@link #close()}.
-   *
-   * @param catalogProperties the properties of the catalog owning this provider, never null and
-   *     never modified after this call
-   */
-  default void initialize(Map<String, String> catalogProperties) {}
 
   /**
    * Provisions the location for the table that is being created.
@@ -179,8 +169,7 @@ public interface TableLocationProvider extends Closeable {
    * <p>It is <em>not</em> called when an external table is <b>dropped</b>. The catalog does not own
    * their data -- the table formats leave the dataset in place on drop -- so asking a provider to
    * hand the location back would invite it to delete exactly the data the catalog just promised not
-   * to touch. A leak is recoverable and a deletion is not, so the callback is skipped. {@link
-   * TableLocationContext#isExternal()} reports the same flag on the paths where it is called.
+   * to touch. A leak is recoverable and a deletion is not, so the callback is skipped.
    *
    * <p>It <em>is</em> called when an external table is <b>purged</b>. Purge and drop do not remove
    * the same things: {@code LanceTableOperations#purgeTable} deletes the external dataset that its
@@ -191,9 +180,9 @@ public interface TableLocationProvider extends Closeable {
    * a purged managed table, and a purged external one -- and in all three the table is gone and the
    * data under its location has already been deleted by the table format. There is deliberately no
    * flag distinguishing them, because there is nothing left to distinguish: an implementation has
-   * the same job in all three, which is to hand the location back. {@code external} is still
-   * readable through {@link TableLocationContext#isExternal()} and, given the skip above, it being
-   * true means this was a purge.
+   * the same job in all three, which is to hand the location back. The catalog makes that
+   * distinction rather than passing it on, because the catalog is where the knowledge lives about
+   * which formats leave data in place.
    *
    * <p>Even so, {@code external} is only an approximation of the rule this callback actually wants,
    * which is "hand back only what was handed out". An external table created without a location
@@ -204,9 +193,8 @@ public interface TableLocationProvider extends Closeable {
    * this method must tolerate a location it does not recognize.
    *
    * <p>This method is only ever called for a table that is gone. A location provisioned for a table
-   * that then went on to exist somewhere else is handed back through {@link
-   * #releaseUnusedLocation(TableLocationContext)} instead, which is a separate method precisely so
-   * that an implementation deleting by table identity does not delete a live table.
+   * that then went on to exist somewhere else is never handed back, so an implementation deleting
+   * by table identity cannot be told to delete a live table through this callback.
    *
    * <p>It is called once per dropped table, but it is not guaranteed to be called at all. A crash
    * between the removal and this call skips it, and so does a failure raised inside the drop after
@@ -219,57 +207,4 @@ public interface TableLocationProvider extends Closeable {
    * @param context the table that was dropped and the context needed to release its location
    */
   void unprovisionTableLocation(TableLocationContext context);
-
-  /**
-   * Hands back a location that was provisioned for a table creation the table format did not use,
-   * so that it is not leaked. The location to release is the {@code location} entry of {@link
-   * TableLocationContext#tableProperties()}.
-   *
-   * <p><b>The table is alive.</b> This is the one callback here that does not mean the table went
-   * away: the creation succeeded, the caller is about to be handed the table, and only the location
-   * this provider issued for that call went unused, because the format answered with a table living
-   * somewhere else. An {@code EXIST_OK}-style creation mode reaching a table that already exists is
-   * the ordinary way to get here. An implementation must therefore release <em>the location</em>
-   * and must not delete anything keyed by the table identity in the context, because that identity
-   * belongs to a table that exists. This is why the callback is not {@link
-   * #unprovisionTableLocation(TableLocationContext)}: for a provider deriving paths from
-   * configuration the two are the same operation, but for one that books allocations against {@code
-   * (schema, table)} they are opposites, and no runtime flag would have made that difference as
-   * hard to overlook as two methods do.
-   *
-   * <p>For the same reason the {@code external} entry of the properties is not a signal to skip
-   * here, though it is on the drop path. The location being released was allocated by this provider
-   * moments ago, on request, so nobody else's data can be under it.
-   *
-   * <p>The default implementation does nothing, which leaks the unused location. That is the
-   * deliberate default: not releasing is what this catalog did before the callback existed and
-   * costs one stray allocation, whereas releasing something the implementation has misidentified
-   * costs live data. A provider that allocates real storage should implement it.
-   *
-   * <p>This is deliberately the opposite call from {@link
-   * #unprovisionTableLocation(TableLocationContext)}, which has no default so that no provider can
-   * stay silent about drops by accident. The two differ because the cost of silence differs: there,
-   * silence leaks a location on every drop, on the ordinary path, forever; here it leaks one
-   * location in the uncommon case that a format declined the one it was given. A provider that
-   * cannot release by path -- because the service behind it only deletes by table identity --
-   * should leave this method alone and reclaim through its own reconciliation, which the default
-   * lets it do without writing a body that would be wrong.
-   *
-   * <p>The catalog decides that a location went unused by comparing the location it handed the
-   * format with the one the created table reports, ignoring a trailing slash. A format that
-   * rewrites the location it was given -- normalizing a URI scheme, say -- looks from here like a
-   * format that declined it, so a provider whose paths may come back rewritten should verify before
-   * reclaiming. Throwing is logged at WARN and does not fail the creation, which already succeeded.
-   *
-   * @param context the table that was created and the unused location provisioned for it
-   */
-  default void releaseUnusedLocation(TableLocationContext context) {}
-
-  /**
-   * Releases the resources held by this provider. The default implementation does nothing.
-   *
-   * @throws IOException if closing the underlying resources fails
-   */
-  @Override
-  default void close() throws IOException {}
 }

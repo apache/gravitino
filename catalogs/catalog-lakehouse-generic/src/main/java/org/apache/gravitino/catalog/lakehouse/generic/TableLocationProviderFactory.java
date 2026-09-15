@@ -38,11 +38,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Selecting by name costs one instantiation of every registered provider, because {@link
  * TableLocationProvider#name()} is an instance method and there is no way to learn the names
- * without one. That is why the interface requires a constructor that acquires nothing: everything
- * worth closing belongs in {@link TableLocationProvider#initialize(Map)}, which only the selected
- * provider ever reaches. The scan is repeated per catalog rather than remembered, matching {@code
- * LakehouseTableDelegatorFactory} in this module, and catalog creation is rare enough that the
- * trivial constructions it costs do not justify a cache keyed by class loader.
+ * without one. That is why the interface requires a constructor that acquires nothing: the
+ * candidates that are not selected are discarded on the spot, and the interface has no close
+ * callback with which to release anything they took. The scan is repeated per catalog rather than
+ * remembered, matching {@code LakehouseTableDelegatorFactory} in this module, and catalog creation
+ * is rare enough that the trivial constructions it costs do not justify a cache keyed by class
+ * loader.
  */
 public class TableLocationProviderFactory {
 
@@ -51,23 +52,22 @@ public class TableLocationProviderFactory {
   private TableLocationProviderFactory() {}
 
   /**
-   * Creates and initializes the {@link TableLocationProvider} registered under the given name.
+   * Creates the {@link TableLocationProvider} registered under the given name.
    *
-   * <p>A new instance is returned on every call, so the caller owns its lifecycle and is
-   * responsible for closing it. The instances made while scanning for the name are discarded
-   * without {@link TableLocationProvider#close()} being called on them, which is safe only because
-   * the interface requires a constructor that acquires nothing.
+   * <p>A new instance is returned on every call. Nothing is initialized and nothing is closed, here
+   * or later: the interface has no lifecycle callbacks, so the instances made while scanning for
+   * the name are simply discarded, which is safe only because the interface requires a constructor
+   * that acquires nothing.
    *
    * @param name the provider name to look up, matched case-insensitively against {@link
    *     TableLocationProvider#name()}
-   * @param catalogProperties the properties of the catalog the provider belongs to
-   * @return the initialized provider
+   * @return the provider
    * @throws IllegalArgumentException if no provider, or more than one provider, is registered under
    *     the given name, or if the selected provider cannot be instantiated
    * @throws ServiceConfigurationError if a {@code META-INF/services} file for this interface is
    *     itself malformed, which fails the scan before any candidate is reached
    */
-  public static TableLocationProvider create(String name, Map<String, String> catalogProperties) {
+  public static TableLocationProvider create(String name) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "Table location provider name must not be blank");
 
@@ -87,20 +87,6 @@ public class TableLocationProviderFactory {
     Preconditions.checkArgument(type != null, "No TableLocationProvider found for name '%s'", name);
 
     TableLocationProvider provider = instantiate(type);
-    try {
-      // Passed on as given rather than copied again. The caller hands over a map it already
-      // made unmodifiable, and copying it here would only re-introduce the rejection of a null
-      // property value that the caller deliberately tolerates.
-      provider.initialize(catalogProperties == null ? Map.of() : catalogProperties);
-    } catch (RuntimeException | Error e) {
-      // initialize is where a provider opens its clients and connections, so one that fails
-      // halfway has resources to release. Nobody else can do it: the instance never reaches the
-      // caller that would have owned its lifecycle. Error is caught alongside RuntimeException
-      // because a plugin loaded through its own classloader fails with NoClassDefFoundError as
-      // readily as with an exception, and it is rethrown either way.
-      closeQuietly(provider, name);
-      throw e;
-    }
 
     LOG.info("Loaded TableLocationProvider '{}': {}", name, type.getName());
     return provider;
@@ -187,20 +173,6 @@ public class TableLocationProviderFactory {
               "Failed to instantiate TableLocationProvider %s. It must have a public no-argument "
                   + "constructor that does not throw.",
               type.getName()),
-          e);
-    }
-  }
-
-  private static void closeQuietly(TableLocationProvider provider, String name) {
-    try {
-      provider.close();
-    } catch (Exception | Error e) {
-      // Error too: this runs while the initialize failure is being unwound, and a close that threw
-      // one would replace the failure the caller actually needs to see.
-      LOG.warn(
-          "Failed to close TableLocationProvider '{}' after it failed to initialize. Any resource "
-              + "it acquired before failing may be leaked.",
-          name,
           e);
     }
   }

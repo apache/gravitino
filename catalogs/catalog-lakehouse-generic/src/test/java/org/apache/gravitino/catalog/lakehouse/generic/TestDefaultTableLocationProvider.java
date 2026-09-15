@@ -34,13 +34,16 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testTableLocationWins() {
-    DefaultTableLocationProvider provider =
-        newProvider(ImmutableMap.of("location", "/tmp/catalog"));
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema"));
 
     String location =
         provider.provisionTableLocation(
-            context(schema, ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/explicit")));
+            context(
+                schema,
+                ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/explicit"),
+                catalogProperties));
 
     // The table's own location is used as-is, the table name is not appended.
     Assertions.assertEquals("/tmp/explicit/", location);
@@ -48,22 +51,24 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testFallBackToSchemaLocation() {
-    DefaultTableLocationProvider provider =
-        newProvider(ImmutableMap.of("location", "/tmp/catalog"));
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema"));
 
-    String location = provider.provisionTableLocation(context(schema, ImmutableMap.of()));
+    String location =
+        provider.provisionTableLocation(context(schema, ImmutableMap.of(), catalogProperties));
 
     Assertions.assertEquals("/tmp/schema/table1/", location);
   }
 
   @Test
   void testFallBackToCatalogLocation() {
-    DefaultTableLocationProvider provider =
-        newProvider(ImmutableMap.of("location", "/tmp/catalog"));
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of());
 
-    String location = provider.provisionTableLocation(context(schema, ImmutableMap.of()));
+    String location =
+        provider.provisionTableLocation(context(schema, ImmutableMap.of(), catalogProperties));
 
     // The schema name is taken from the table identifier's namespace.
     Assertions.assertEquals("/tmp/catalog/schema1/table1/", location);
@@ -71,41 +76,67 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testTrailingSlashIsNotDuplicated() {
-    DefaultTableLocationProvider provider =
-        newProvider(ImmutableMap.of("location", "/tmp/catalog/"));
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog/");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema/"));
 
     Assertions.assertEquals(
-        "/tmp/schema/table1/", provider.provisionTableLocation(context(schema, ImmutableMap.of())));
+        "/tmp/schema/table1/",
+        provider.provisionTableLocation(context(schema, ImmutableMap.of(), catalogProperties)));
     Assertions.assertEquals(
         "/tmp/explicit/",
         provider.provisionTableLocation(
-            context(schema, ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/explicit/"))));
+            context(
+                schema,
+                ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/explicit/"),
+                catalogProperties)));
   }
 
   @Test
   void testNullSchemaPropertiesFallsBackToCatalogLocation() {
-    DefaultTableLocationProvider provider =
-        newProvider(ImmutableMap.of("location", "/tmp/catalog"));
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(null);
 
     Assertions.assertEquals(
         "/tmp/catalog/schema1/table1/",
-        provider.provisionTableLocation(context(schema, ImmutableMap.of())));
+        provider.provisionTableLocation(context(schema, ImmutableMap.of(), catalogProperties)));
   }
 
   @Test
   void testNoLocationAnywhereThrows() {
-    DefaultTableLocationProvider provider = newProvider(ImmutableMap.of());
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Map<String, String> catalogProperties = ImmutableMap.of();
     Schema schema = mockSchema(ImmutableMap.of());
 
     IllegalArgumentException e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> provider.provisionTableLocation(context(schema, ImmutableMap.of())));
+            () ->
+                provider.provisionTableLocation(
+                    context(schema, ImmutableMap.of(), catalogProperties)));
     Assertions.assertTrue(
         e.getMessage().contains("'location' property is neither set in table properties"),
         "Unexpected message: " + e.getMessage());
+  }
+
+  @Test
+  void testTheCatalogLocationIsReadPerCallRatherThanCaptured() {
+    // There is no initialization callback to capture it in, so one instance must serve contexts
+    // carrying different catalog properties. Pinned because the provider used to hold the value
+    // in a field, and a leftover field would make every catalog on a shared instance resolve to
+    // whichever one initialized it first.
+    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    Schema schema = mockSchema(ImmutableMap.of());
+
+    Assertions.assertEquals(
+        "/tmp/one/schema1/table1/",
+        provider.provisionTableLocation(
+            context(schema, ImmutableMap.of(), ImmutableMap.of("location", "/tmp/one"))));
+    Assertions.assertEquals(
+        "/tmp/two/schema1/table1/",
+        provider.provisionTableLocation(
+            context(schema, ImmutableMap.of(), ImmutableMap.of("location", "/tmp/two"))));
   }
 
   @Test
@@ -119,17 +150,12 @@ public class TestDefaultTableLocationProvider {
     // unprovisioning one has to be harmless rather than unsupported.
     Assertions.assertDoesNotThrow(
         () ->
-            newProvider(ImmutableMap.of())
+            new DefaultTableLocationProvider()
                 .unprovisionTableLocation(
                     context(
                         mockSchema(ImmutableMap.of()),
-                        ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/schema/table1/"))));
-  }
-
-  private static DefaultTableLocationProvider newProvider(Map<String, String> catalogProperties) {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
-    provider.initialize(catalogProperties);
-    return provider;
+                        ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/schema/table1/"),
+                        ImmutableMap.of())));
   }
 
   private static Schema mockSchema(Map<String, String> properties) {
@@ -141,11 +167,13 @@ public class TestDefaultTableLocationProvider {
     return schema;
   }
 
-  private static TableLocationContext context(Schema schema, Map<String, String> tableProperties) {
+  private static TableLocationContext context(
+      Schema schema, Map<String, String> tableProperties, Map<String, String> catalogProperties) {
     return TableLocationContext.builder()
         .withTableIdentifier(TABLE_IDENT)
         .withTableProperties(tableProperties)
         .withSchema(schema)
+        .withCatalogProperties(catalogProperties)
         .build();
   }
 }

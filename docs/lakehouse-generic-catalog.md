@@ -62,18 +62,23 @@ Implement `org.apache.gravitino.catalog.lakehouse.generic.TableLocationProvider`
 into `catalogs/lakehouse-generic/libs`, and select it with the `table-location-provider` catalog
 property (matched case-insensitively against `TableLocationProvider#name()`).
 
-One provider instance is created per catalog. `initialize` is called once with the catalog properties
-before the first provisioning, `provisionTableLocation` is called for every table creation and must
-be thread-safe, and `close` is called when the catalog is closed. The property is immutable, so a catalog
-keeps the provider it was created with.
+The interface is two operations wide -- `provisionTableLocation` and `unprovisionTableLocation` --
+plus `name()`. Every decision the catalog can make from what it already knows is made by the catalog,
+so an implementation has as little to get right as possible.
 
-Implementing `initialize` is optional: a provider that derives the location purely from the context it
-is given has nothing to prepare. Override it when the provider holds a remote client, a connection or
-any state that must outlive a single table creation, and release those resources in `close`.
+One provider instance is created per catalog, and the property is immutable, so a catalog keeps the
+provider it was created with. **There is no lifecycle**: the provider is never initialized and never
+closed. A provider needing a remote client should create it lazily on first use and make it safe to
+abandon, since a catalog is evicted from the server's catalog cache when idle and the provider it
+held is simply discarded. Both callbacks are called concurrently and must be thread-safe.
 
-All three callbacks receive a `TableLocationContext`, which carries `tableIdentifier()`,
+Both callbacks receive a `TableLocationContext`, which carries `tableIdentifier()`,
 `tableProperties()`, `schema()` -- the parent schema including its properties -- and
-`isExternal()`, the `external` property read as a boolean. Selection is per catalog, so a provider
+`catalogProperties()`. The last is how a provider receives configuration of its own, such as a
+service endpoint or a quota group: the same map is handed to every call, so a provider that turns it
+into something expensive should build that once and hold it rather than rebuilding it per table. The
+`external` flag is available as the `external` entry of `tableProperties()`; read it with
+`Boolean.parseBoolean`, which is how the table formats read it. Selection is per catalog, so a provider
 that needs different behaviour for different schemas has to read a schema property and dispatch on it
 itself. A provider doing that should reject an unrecognized value rather than falling back to another
 strategy, and should treat the property as immutable: a table provisioned under one strategy has to be
@@ -99,13 +104,6 @@ Everything else reaches the provider as well, including an external table that c
 `provisionTableLocation` runs on the server thread handling the table creation request. The catalog
 applies no timeout, so a provider that calls a remote service must bound every call itself and fail
 fast when the service is unavailable; a call that blocks holds that request thread until it returns.
-
-The catalog does not fence in-flight requests against `close()`, so a request that started before
-the catalog was closed can reach `provisionTableLocation`, `unprovisionTableLocation` or
-`releaseUnusedLocation` afterwards. A provider is not asked to keep working across a close, only to
-fail cleanly rather than corrupt anything -- which a closed client throwing already does. On the
-drop and release paths that failure is logged at WARN and nothing else happens; on the provisioning
-path it fails the table creation, which is the right answer for a catalog that is shutting down.
 
 `provisionTableLocation` must return a non-blank location; the catalog rejects the table creation
 otherwise. That is the only check: the shape of the path belongs to the provider, nothing downstream
@@ -148,8 +146,9 @@ to skip has gone with it; the location is handed back.
 The callback is therefore reached in exactly three situations -- a dropped managed table, a purged
 managed table, and a purged external one -- and in all three the data under the location has already
 been deleted by the table format. There is deliberately no flag distinguishing them on the context,
-because an implementation has the same job in all three: hand the location back. `context.isExternal()`
-is still readable and, given the skip above, its being true means this was a purge.
+because an implementation has the same job in all three: hand the location back. The catalog makes
+that distinction rather than passing it on, because the catalog is where the knowledge lives about
+which formats leave data in place.
 
 Even so, `external` is only an approximation of the rule this callback wants, which is "hand back
 only what was handed out". An external table created *without* a location does get one provisioned,
@@ -164,42 +163,24 @@ reconciliation, and why it must tolerate a location it does not recognize.
 it the two paths remove the same things -- but Lance overrides both, and its purge deletes data its
 drop does not. A provider must not assume the two are interchangeable.
 
-##### Releasing a location the table format did not use
+##### A location the table format did not use is leaked
 
 A format may decline the location it was given and still report success. Lance's `EXIST_OK`
 creation mode returns the table that already exists, at the location it already had, and a client
-retrying a create is the ordinary way to reach that. Without a callback the location provisioned for
-that call would leak, once per retried create, with nothing in the logs to show it.
+retrying a create is the ordinary way to reach that. The location provisioned for that call is
+leaked: the table is stored pointing at the location the format chose, so the later drop hands back
+that one and the provisioned one is never mentioned again.
 
-That callback is **`releaseUnusedLocation`, not `unprovisionTableLocation`**, and the difference
-matters. The table here is alive: the creation succeeded and the caller is about to be handed the
-table. Only the location went unused. A provider that derives paths from configuration does the same
-nothing in both methods, but a provider that books allocations against `(schema, table)` would read
-the drop callback literally and delete the registration of a table that exists. Two methods make
-that difference hard to overlook in a way no runtime flag would. For the same reason the `external`
-property is *not* a signal to skip here, though it is on the drop path: the location being released
-was allocated by this provider moments ago, on request, so nobody else's data can be under it.
+Nothing is reported and nothing is handed back. The table here is alive, so a provider that books
+allocations against `(schema, table)` would read a reclaim keyed by that identity as an instruction
+to delete the storage of a table that exists -- and there is no callback that would let it tell the
+two apart. Reclaiming the stray allocation is the provider's own job, through the reconciliation it
+needs regardless: the same sweep that catches renames, a `location` property edited through
+`alterTable`, a format-internal drop, and a crash between the removal and the unprovision call. A
+provider that books by table identity also meets this case directly, since a retried create arrives
+as a second provisioning request for a table it already has an allocation for.
 
-`releaseUnusedLocation` has a default implementation that does nothing, which leaks the unused
-location. That is the deliberate default: not releasing is what this catalog did before the callback
-existed and costs one stray allocation, whereas releasing something the provider has misidentified
-costs live data. A provider that allocates real storage should implement it. A failure is logged at
-WARN and does not fail the creation, which already succeeded.
-
-This is deliberately the opposite call from `unprovisionTableLocation`, which has no default at all
-so that no provider can stay silent about drops by accident. The cost of silence is what differs:
-there it leaks a location on every drop, on the ordinary path, forever; here it leaks one location
-in the uncommon case that a format declined the one it was given. A provider that cannot release by
-path -- because the service behind it only deletes by table identity -- should leave the method
-alone and reclaim through its own reconciliation, rather than write a body that would be wrong.
-
-The catalog decides a location went unused by comparing the location it handed the format with the
-one the created table reports, ignoring a trailing slash, since that is the one rewrite the catalog
-performs itself. A format that rewrites the location further -- collapsing a duplicated separator,
-or normalizing a URI scheme -- looks from here like a format that declined it, so a provider whose
-paths may come back rewritten should verify before reclaiming.
-
-**Known limitations.** Four of them, and they all point the same way: a provider that manages real
+**Known limitations.** Five of them, and they all point the same way: a provider that manages real
 storage needs its own reconciliation against the catalog, and cannot treat these callbacks as a
 complete record of the locations it handed out.
 
@@ -217,8 +198,12 @@ complete record of the locations it handed out.
   the metadata write then fails. Everything the catalog can check on its own -- the table format is
   given, the format is supported -- is checked before the provider is consulted, so the cases that
   remain are the ones only the table format can detect.
+- A creation the table format serves from a table that already exists leaks the location
+  provisioned for that call, as described above. It is neither reported nor handed back, because
+  the table is alive and the catalog cannot ask for one location back without naming a table that
+  exists.
 - A table format that drops a table through its own internals rather than through the catalog does
-  not trigger the release callback. Lance's `OVERWRITE` creation mode does this: it drops the
+  not trigger the unprovision callback. Lance's `OVERWRITE` creation mode does this: it drops the
   existing table and creates a new one, so the old location is never handed back. This is the same
   shape as the cascading schema drop, which the catalog does route through its own `dropTable`, but
   a format-internal drop is not visible to the catalog at all.
@@ -236,7 +221,9 @@ Two constraints follow from `ServiceLoader` discovery:
   every provider on the classpath is constructed once, per catalog, before the named one is
   selected -- including when the provider being constructed is not the one selected. A constructor
   that throws costs that provider the ability to be selected at all. Put clients, connection pools
-  and other expensive setup in `initialize`, which runs only on the selected provider.
+  and other expensive setup out of the constructor and create them lazily on first use, since the
+  candidates that are not selected are discarded and there is no close callback to release anything
+  they took.
 - `name()` must be unique across the classpath and must not be `default`, which is reserved by the
   built-in provider. If two providers share a name, every catalog selecting that name fails to
   initialize. A candidate whose constructor or `name()` throws is logged and skipped, so one

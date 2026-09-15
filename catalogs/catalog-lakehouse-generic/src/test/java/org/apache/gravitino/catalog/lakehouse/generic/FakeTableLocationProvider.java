@@ -21,12 +21,11 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A {@link TableLocationProvider} registered only in the test classpath, used to verify that a
- * custom provider is discovered, initialized and closed by the generic catalog.
+ * custom provider is discovered and consulted by the generic catalog.
  */
 public class FakeTableLocationProvider implements TableLocationProvider {
 
@@ -44,26 +43,15 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   private static final List<TableLocationContext> UNPROVISIONED =
       Collections.synchronizedList(Lists.newArrayList());
 
-  private static final List<TableLocationContext> RELEASED =
-      Collections.synchronizedList(Lists.newArrayList());
-
-  private static final AtomicInteger CLOSED = new AtomicInteger();
-
   // Selection has to construct every registered provider to ask it its name, so counting
   // constructions is how a test observes whether a lookup scanned or answered from the index.
   private static final AtomicInteger CONSTRUCTED = new AtomicInteger();
 
   private static volatile boolean failOnUnprovision;
 
-  private static volatile boolean failOnInitialize;
-
   private static volatile boolean overrideLocation;
 
   private static volatile String locationOverride;
-
-  private Map<String, String> catalogProperties;
-
-  private boolean closed;
 
   /** Public and no-argument, as the SPI requires; it acquires nothing. */
   public FakeTableLocationProvider() {
@@ -90,17 +78,6 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   }
 
   /**
-   * Returns the contexts this provider was asked to release as unused, in the order the calls came
-   * in. Kept apart from {@link #unprovisioned()} so that a test can tell the drop callback from the
-   * creation-path one, which a provider reclaiming by table identity has to tell apart too.
-   *
-   * @return the recorded release contexts
-   */
-  public static List<TableLocationContext> released() {
-    return Lists.newArrayList(RELEASED);
-  }
-
-  /**
    * Makes every subsequent unprovision call fail, to verify how the catalog reports a provider that
    * cannot reclaim a location.
    *
@@ -108,26 +85,6 @@ public class FakeTableLocationProvider implements TableLocationProvider {
    */
   public static void failOnUnprovision(boolean fail) {
     failOnUnprovision = fail;
-  }
-
-  /**
-   * Makes every subsequent initialization fail, to verify that a provider failing halfway through
-   * {@link #initialize(Map)} is still closed.
-   *
-   * @param fail whether initialization should throw
-   */
-  public static void failOnInitialize(boolean fail) {
-    failOnInitialize = fail;
-  }
-
-  /**
-   * Returns how many instances of this provider have been closed since the last {@link #reset()},
-   * so that a test can observe an instance it never gets a reference to.
-   *
-   * @return the number of recorded close calls
-   */
-  public static int closedCount() {
-    return CLOSED.get();
   }
 
   /**
@@ -151,30 +108,19 @@ public class FakeTableLocationProvider implements TableLocationProvider {
     locationOverride = location;
   }
 
-  /** Clears the recorded calls and stops initialization and unprovisioning from failing. */
+  /** Clears the recorded calls and stops unprovisioning from failing. */
   public static void reset() {
     overrideLocation = false;
     locationOverride = null;
     PROVISIONED.clear();
     UNPROVISIONED.clear();
-    RELEASED.clear();
-    CLOSED.set(0);
     CONSTRUCTED.set(0);
     failOnUnprovision = false;
-    failOnInitialize = false;
   }
 
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public void initialize(Map<String, String> catalogProperties) {
-    this.catalogProperties = catalogProperties;
-    if (failOnInitialize) {
-      throw new IllegalStateException("The path allocation service is unreachable");
-    }
   }
 
   @Override
@@ -191,35 +137,5 @@ public class FakeTableLocationProvider implements TableLocationProvider {
     if (failOnUnprovision) {
       throw new IllegalStateException("The path allocation service is unavailable");
     }
-  }
-
-  @Override
-  public void releaseUnusedLocation(TableLocationContext context) {
-    RELEASED.add(context);
-  }
-
-  @Override
-  public void close() {
-    this.closed = true;
-    CLOSED.incrementAndGet();
-  }
-
-  /**
-   * Returns the catalog properties this provider was initialized with, or null if {@link
-   * #initialize(Map)} was never called.
-   *
-   * @return the catalog properties seen at initialization time
-   */
-  public Map<String, String> catalogProperties() {
-    return catalogProperties;
-  }
-
-  /**
-   * Returns whether {@link #close()} has been called on this instance.
-   *
-   * @return true if this provider was closed
-   */
-  public boolean isClosed() {
-    return closed;
   }
 }

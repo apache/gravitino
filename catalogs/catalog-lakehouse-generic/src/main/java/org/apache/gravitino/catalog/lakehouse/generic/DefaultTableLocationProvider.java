@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import java.util.Map;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -41,9 +39,11 @@ import org.apache.gravitino.rel.Table;
  *
  * If none of them is set, provisioning fails with an {@link IllegalArgumentException}.
  *
- * <p>The first level is unreachable through the catalog, which keeps a caller-supplied location
- * without consulting any provider. It is kept so that the three levels still read as one rule, and
- * so that calling this provider directly behaves as it always has.
+ * <p>The first level is what makes a caller-supplied location survive: a creation request carrying
+ * its own {@code location} reaches this provider like any other, and returning it unchanged is how
+ * this provider honours it. The catalog-level fallback is read from {@link
+ * TableLocationContext#catalogProperties()} on each call, since this interface has no
+ * initialization callback in which to capture it.
  */
 public class DefaultTableLocationProvider implements TableLocationProvider {
 
@@ -52,20 +52,9 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
 
   private static final String SLASH = "/";
 
-  private volatile Optional<String> catalogLocation = Optional.empty();
-
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public void initialize(Map<String, String> catalogProperties) {
-    String location = catalogProperties.get(Catalog.PROPERTY_LOCATION);
-    this.catalogLocation =
-        StringUtils.isNotBlank(location)
-            ? Optional.of(location).map(DefaultTableLocationProvider::ensureTrailingSlash)
-            : Optional.empty();
   }
 
   @Override
@@ -88,8 +77,10 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
     }
 
     // If the schema location is not set, use catalog lakehouse dir as the base path. Or else, throw
-    // an exception.
-    if (catalogLocation.isEmpty()) {
+    // an exception. The catalog property is read per call rather than captured once, because the
+    // interface has no initialization callback to capture it in.
+    String catalogLocation = context.catalogProperties().get(Catalog.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(catalogLocation)) {
       throw new IllegalArgumentException(
           "'location' property is neither set in table properties "
               + "nor in schema properties, and no location is set in catalog properties either. "
@@ -97,11 +88,7 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
               + tableIdent);
     }
 
-    return ensureTrailingSlash(catalogLocation.get())
-        + schema.name()
-        + SLASH
-        + tableIdent.name()
-        + SLASH;
+    return ensureTrailingSlash(catalogLocation) + schema.name() + SLASH + tableIdent.name() + SLASH;
   }
 
   /**
@@ -115,28 +102,12 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
   public void unprovisionTableLocation(TableLocationContext context) {}
 
   /**
-   * Does nothing, for the same reason as {@link #unprovisionTableLocation(TableLocationContext)}: a
-   * composed location was never allocated anywhere, so a location the table did not use costs
-   * nothing and there is nothing to release. Written out rather than inherited so that the two
-   * callbacks are visibly deliberate here, not overlooked.
-   *
-   * @param context the table that was created, unused
-   */
-  @Override
-  public void releaseUnusedLocation(TableLocationContext context) {}
-
-  /**
    * Appends a trailing slash to the given path unless it already ends with one.
-   *
-   * <p>Package-private rather than private so that {@link GenericCatalogOperations} can apply the
-   * very same normalization to a caller-supplied location, which bypasses this provider, and when
-   * comparing a provisioned location against the one the created table reports. Sharing the method
-   * is what keeps those and this provider from drifting apart.
    *
    * @param path the path to normalize
    * @return the path, ending with a slash
    */
-  static String ensureTrailingSlash(String path) {
+  private static String ensureTrailingSlash(String path) {
     return path.endsWith(SLASH) ? path : path + SLASH;
   }
 }

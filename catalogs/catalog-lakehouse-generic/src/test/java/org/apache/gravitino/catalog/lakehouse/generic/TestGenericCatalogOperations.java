@@ -160,8 +160,9 @@ public class TestGenericCatalogOperations {
 
     ops = new GenericCatalogOperations(store, idGenerator);
 
-    // A second instance, initialized so that it uses the test provider, to exercise the location
-    // release callbacks. The shared instance above is never initialized and has no provider.
+    // A second instance, initialized so that it uses the test provider, to exercise the provision
+    // and unprovision callbacks. The shared instance above is never initialized and has no
+    // provider.
     opsWithFakeProvider = new GenericCatalogOperations(store, idGenerator);
     opsWithFakeProvider.initialize(
         ImmutableMap.of(
@@ -449,7 +450,8 @@ public class TestGenericCatalogOperations {
     // supplied path unchanged, place the table elsewhere, or refuse the creation outright.
     Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
     TableLocationContext context = FakeTableLocationProvider.provisioned().get(0);
-    Assertions.assertTrue(context.isExternal());
+    Assertions.assertTrue(
+        Boolean.parseBoolean(context.tableProperties().get(Table.PROPERTY_EXTERNAL)));
     Assertions.assertEquals(
         suppliedLocation, context.tableProperties().get(Table.PROPERTY_LOCATION));
   }
@@ -513,7 +515,7 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testProvisionedLocationIsHandedBackWhenTheFormatDoesNotUseIt() {
+  public void testAnUnusedProvisionedLocationIsNotHandedBack() {
     NameIdentifier schemaIdent = createSchema();
     String preExistingLocation = "s3://already-there/exist-ok-table/";
     FakeTableDelegator.useLocationInstead(preExistingLocation);
@@ -523,60 +525,18 @@ public class TestGenericCatalogOperations {
             opsWithFakeProvider, schemaIdent, "exist_ok_table", ImmutableMap.of());
 
     // A format may decline the location it was given and still report success: an EXIST_OK
-    // creation mode returns the table that already exists, at the location it already had. Nothing
-    // can have been written to the location provisioned for this call, so it goes back rather than
-    // leaking once per retried create.
+    // creation mode returns the table that already exists, at the location it already had.
     Assertions.assertEquals(preExistingLocation, created.properties().get(Table.PROPERTY_LOCATION));
     Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
-    Assertions.assertEquals(1, FakeTableLocationProvider.released().size());
-    Assertions.assertEquals(
-        locationOf("exist_ok_table"),
-        FakeTableLocationProvider.released().get(0).tableProperties().get(Table.PROPERTY_LOCATION));
 
-    // The table this was called for is alive. A provider that reclaims by table identity rather
-    // than by path would delete a live registration if the drop callback were reused here, so the
-    // drop callback must not fire on the creation path at all.
+    // The location provisioned for this call is leaked, silently, and that is deliberate rather
+    // than overlooked. The table this was called for is alive, so a provider that reclaims by
+    // table identity would delete a live registration if the drop callback fired here. Reclaiming
+    // the stray allocation is left to the provider's own reconciliation, which the contract
+    // already requires for four other cases it cannot be told about either.
     Assertions.assertTrue(
         FakeTableLocationProvider.unprovisioned().isEmpty(),
-        "The drop callback must not be used to release a location of a table that exists");
-  }
-
-  @Test
-  public void testUnusedLocationIsNotReleasedByDefault() {
-    // The built-in provider derives the location, so this schema has to carry one.
-    NameIdentifier schemaIdent = createSchema("s3://schema-owned/");
-    FakeTableDelegator.useLocationInstead("s3://already-there/exist-ok-table/");
-
-    // The built-in provider inherits the default body of releaseUnusedLocation, which does nothing.
-    // Leaking a stray allocation is the deliberate default; a provider that reclaims real storage
-    // opts in.
-    Table created =
-        createTableThroughCatalog(
-            opsWithDefaultProvider, schemaIdent, "exist_ok_default", ImmutableMap.of());
-
-    Assertions.assertEquals(
-        "s3://already-there/exist-ok-table/", created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertTrue(FakeTableLocationProvider.released().isEmpty());
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
-  }
-
-  @Test
-  public void testATrailingSlashAloneDoesNotMakeALocationLookUnused() {
-    NameIdentifier schemaIdent = createSchema();
-    String provisioned = locationOf("slash_table");
-    String withoutSlash = provisioned.substring(0, provisioned.length() - 1);
-    FakeTableDelegator.useLocationInstead(withoutSlash);
-
-    Table created =
-        createTableThroughCatalog(
-            opsWithFakeProvider, schemaIdent, "slash_table", ImmutableMap.of());
-
-    // The catalog adds the trailing slash itself, so a format storing the location without one is
-    // using the location it was given, not declining it.
-    Assertions.assertEquals(withoutSlash, created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertTrue(
-        FakeTableLocationProvider.released().isEmpty(),
-        "A location differing only by a trailing slash is the same location");
+        "A creation must never reach the drop callback, even when its location went unused");
   }
 
   @Test
@@ -610,8 +570,8 @@ public class TestGenericCatalogOperations {
         locationOf("normal_table"), created.properties().get(Table.PROPERTY_LOCATION));
     Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
     Assertions.assertTrue(
-        FakeTableLocationProvider.released().isEmpty(),
-        "A location the format actually used must not be handed back");
+        FakeTableLocationProvider.unprovisioned().isEmpty(),
+        "Creating a table must not reach the drop callback");
   }
 
   @Test
@@ -677,33 +637,6 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testContextReportsWhetherTheTableIsExternal() {
-    Assertions.assertTrue(
-        TableLocationContext.builder()
-            .withTableIdentifier(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "s", "t"))
-            .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, "TRUE"))
-            .withSchema(Mockito.mock(Schema.class))
-            .build()
-            .isExternal());
-
-    // Absent, and unparseable, both mean "not external" rather than an error.
-    Assertions.assertFalse(
-        TableLocationContext.builder()
-            .withTableIdentifier(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "s", "t"))
-            .withTableProperties(ImmutableMap.of())
-            .withSchema(Mockito.mock(Schema.class))
-            .build()
-            .isExternal());
-    Assertions.assertFalse(
-        TableLocationContext.builder()
-            .withTableIdentifier(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "s", "t"))
-            .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, "not-a-boolean"))
-            .withSchema(Mockito.mock(Schema.class))
-            .build()
-            .isExternal());
-  }
-
-  @Test
   public void testACascadeResolvesTheSchemaOnlyOnce() {
     NameIdentifier schemaIdent = createSchema();
     createTableThroughCatalog(opsWithFakeProvider, schemaIdent, "t1", ImmutableMap.of());
@@ -743,7 +676,8 @@ public class TestGenericCatalogOperations {
     // whose data the catalog had just deleted.
     List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
-    Assertions.assertTrue(unprovisioned.get(0).isExternal());
+    Assertions.assertTrue(
+        Boolean.parseBoolean(unprovisioned.get(0).tableProperties().get(Table.PROPERTY_EXTERNAL)));
     // The location handed back is the one that was stored, which for this catalog is the one the
     // provider itself returned when it saw the supplied value.
     Assertions.assertEquals(
@@ -848,25 +782,6 @@ public class TestGenericCatalogOperations {
     } finally {
       catalogOps.close();
     }
-  }
-
-  @Test
-  public void testClosingTwiceClosesTheProviderOnce() throws IOException {
-    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
-    catalogOps.initialize(
-        ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeTableLocationProvider.NAME),
-        null /* CatalogInfo, unused */,
-        new GenericCatalog());
-    FakeTableLocationProvider.reset();
-
-    catalogOps.close();
-    catalogOps.close();
-
-    // close() is documented on Closeable as idempotent, and a provider closing a remote client
-    // twice is entitled to throw the second time.
-    Assertions.assertEquals(1, FakeTableLocationProvider.closedCount());
   }
 
   @Test
@@ -1019,33 +934,51 @@ public class TestGenericCatalogOperations {
 
   @Test
   public void testANonCanonicalExternalValueIsReadTheSameWayTheFormatsReadIt() {
-    // `external` is stored as the string the caller sent, and the property metadata decodes it
-    // with Boolean::valueOf, so a value like "yes" is accepted and means false. Both table formats
-    // read it with Boolean.parseBoolean or an equalsIgnoreCase("true"), so they see false too and
-    // treat the table as managed -- deleting its data on drop. If this context disagreed and
-    // reported true, the catalog would skip handing the location back for a table whose data was
-    // just deleted: the data lost and the allocation leaked at once.
-    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "s", "t");
-    Schema schema = Mockito.mock(Schema.class);
+    // `external=yes` is not external to the table formats: they read the flag with
+    // Boolean.parseBoolean or an equalsIgnoreCase("true"), so they see false and treat the table
+    // as managed, deleting its data on drop. If the catalog disagreed and read it as external, it
+    // would skip handing the location back for a table whose data was just deleted: the data lost
+    // and the allocation leaked at once. So the drop must reach the provider.
+    NameIdentifier schemaIdent = createSchema();
+    createTableThroughCatalog(
+        opsWithFakeProvider,
+        schemaIdent,
+        "yes_table",
+        ImmutableMap.of(Table.PROPERTY_EXTERNAL, "yes"));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "yes_table");
 
-    for (String notTrue : Arrays.asList("yes", "on", "y", "t", "1")) {
-      Assertions.assertFalse(
-          TableLocationContext.builder()
-              .withTableIdentifier(ident)
-              .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, notTrue))
-              .withSchema(schema)
-              .build()
-              .isExternal(),
-          notTrue + " must not be read as external, because the table formats do not read it so");
+    Assertions.assertTrue(opsWithFakeProvider.dropTable(tableIdent));
+
+    Assertions.assertEquals(
+        1,
+        FakeTableLocationProvider.unprovisioned().size(),
+        "'yes' is not read as external by the formats, so the catalog must not read it so either");
+  }
+
+  @Test
+  public void testTheCatalogPropertiesReachTheProvider() throws IOException {
+    // The built-in provider's last fallback is the catalog's own `location`, and with no
+    // initialization callback the only way it can see that property is through the context. This
+    // is the end-to-end wiring of it: a catalog that has a location, a schema that does not, and a
+    // table that must therefore land under {catalog location}/{schema}/{table}/.
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    catalogOps.initialize(
+        ImmutableMap.of(Catalog.PROPERTY_LOCATION, "s3://catalog-owned"),
+        null /* CatalogInfo, unused */,
+        new GenericCatalog());
+    try {
+      NameIdentifier schemaIdent = createSchema();
+
+      Table created =
+          createTableThroughCatalog(catalogOps, schemaIdent, "catalog_level", ImmutableMap.of());
+
+      Assertions.assertEquals(
+          "s3://catalog-owned/" + schemaIdent.name() + "/catalog_level/",
+          created.properties().get(Table.PROPERTY_LOCATION));
+    } finally {
+      catalogOps.close();
     }
-
-    Assertions.assertTrue(
-        TableLocationContext.builder()
-            .withTableIdentifier(ident)
-            .withTableProperties(ImmutableMap.of(Table.PROPERTY_EXTERNAL, "TrUe"))
-            .withSchema(schema)
-            .build()
-            .isExternal());
   }
 
   @Test
@@ -1059,6 +992,7 @@ public class TestGenericCatalogOperations {
     List<TableLocationContext> provisioned = FakeTableLocationProvider.provisioned();
     Assertions.assertEquals(1, provisioned.size());
     Assertions.assertEquals("managed_table", provisioned.get(0).tableIdentifier().name());
-    Assertions.assertFalse(provisioned.get(0).isExternal());
+    Assertions.assertFalse(
+        Boolean.parseBoolean(provisioned.get(0).tableProperties().get(Table.PROPERTY_EXTERNAL)));
   }
 }
