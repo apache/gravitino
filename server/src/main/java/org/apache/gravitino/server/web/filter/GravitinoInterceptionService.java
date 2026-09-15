@@ -323,7 +323,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             "User validation failed - User: {}, Metalake: {}, Reason: {}",
             currentUser,
             metalakeIdent.name(),
-            ex.getMessage());
+            ex.getMessage(),
+            ex);
         dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
         return Optional.of(Utils.forbidden(ex.getMessage(), ex));
       } catch (Exception ex) {
