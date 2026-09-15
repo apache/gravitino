@@ -67,8 +67,6 @@ import org.mockito.Mockito;
  * and drop) must only retire the wrapper; the catalog and the ClassLoader are cleaned up when the
  * last lease is released, exactly once.
  */
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestCatalogWrapperLease {
 
   private static final String METALAKE = "metalake";

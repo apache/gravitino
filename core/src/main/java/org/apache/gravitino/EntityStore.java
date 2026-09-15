@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -99,14 +98,15 @@ public interface EntityStore extends Closeable {
   boolean exists(NameIdentifier ident, EntityType entityType) throws IOException;
 
   /**
-   * Creates an entity in the underlying storage without overwriting an existing entity.
+   * Store the entity into the underlying storage. If the entity already exists, it will overwrite
+   * the existing entity.
    *
    * @param e the entity to store
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    */
   default <E extends Entity & HasIdentifier> void put(E e) throws IOException {
-    put(e, EntityWriteIntent.CREATE);
+    put(e, false);
   }
 
   /**
@@ -117,104 +117,14 @@ public interface EntityStore extends Closeable {
    * store of entities.
    *
    * @param e the entity to store
-   * @deprecated use an explicit {@link EntityWriteIntent}; this compatibility entry point retains
-   *     the historical overwrite behavior for existing callers
    * @param overwritten whether to overwrite the existing entity
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     set to false
    */
-  @Deprecated
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
-
-  /**
-   * Writes an entity with explicit conflict semantics. Existing entities are never blindly
-   * replaced.
-   *
-   * @param e the proposed entity
-   * @param intent the purpose of this write; RECONCILE requires the snapshot overload
-   * @param <E> the entity type
-   * @return the inserted entity, or the unchanged existing entity for an idempotent write
-   * @throws IOException if storage access fails
-   * @throws EntityAlreadyExistsException if the name or ID conflicts with the requested intent
-   */
-  @SuppressWarnings("unchecked")
-  default <E extends Entity & HasIdentifier> E put(E e, EntityWriteIntent intent)
-      throws IOException {
-    Objects.requireNonNull(intent, "intent must not be null");
-    if (intent == EntityWriteIntent.RECONCILE) {
-      throw new IllegalArgumentException("RECONCILE requires an observed ID and storage version");
-    }
-    try {
-      put(e, false);
-      return e;
-    } catch (EntityAlreadyExistsException conflict) {
-      if (intent == EntityWriteIntent.CREATE) {
-        throw conflict;
-      }
-      E existing;
-      try {
-        existing = get(e.nameIdentifier(), e.type(), (Class<E>) e.getClass());
-      } catch (NoSuchEntityException missing) {
-        // A primary-key conflict at another name is never permission to move that entity.
-        throw conflict;
-      }
-      if (intent == EntityWriteIntent.IMPORT && !existing.id().equals(e.id())) {
-        throw conflict;
-      }
-      return existing;
-    }
-  }
-
-  /**
-   * Reconciles an entity using a previously observed identity and storage version.
-   *
-   * @param e the proposed replacement
-   * @param intent must be RECONCILE
-   * @param observed the snapshot captured before the external read
-   * @param <E> the entity type
-   * @return the reconciled entity
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> E put(
-      E e, EntityWriteIntent intent, EntityWriteSnapshot<E> observed) throws IOException {
-    throw new UnsupportedOperationException("Conditional reconciliation is not supported");
-  }
-
-  /**
-   * Reads an entity and its storage version atomically, bypassing caches.
-   *
-   * @param ident the entity name
-   * @param entityType the entity type
-   * @param clazz the concrete entity class
-   * @param <E> the entity type
-   * @return the observed entity and storage version
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> EntityWriteSnapshot<E> getWriteSnapshot(
-      NameIdentifier ident, EntityType entityType, Class<E> clazz) throws IOException {
-    throw new UnsupportedOperationException("Write snapshots are not supported");
-  }
-
-  /**
-   * Creates an entity and invokes an action only after the strict insert wins, before commit.
-   *
-   * <p>The action is never called for a duplicate. If it fails, the metadata insert is rolled back.
-   * External effects of the action cannot themselves be rolled back by the store.
-   *
-   * @param e the entity to create
-   * @param intent must be CREATE
-   * @param postInsertAction the action to run inside the insert transaction
-   * @param <E> the entity type
-   * @return the created entity
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> E put(
-      E e, EntityWriteIntent intent, Consumer<E> postInsertAction) throws IOException {
-    throw new UnsupportedOperationException("Transactional post-insert actions are not supported");
-  }
 
   /**
    * Update the entity into the underlying storage.

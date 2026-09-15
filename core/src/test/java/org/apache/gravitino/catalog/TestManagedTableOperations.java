@@ -58,8 +58,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestManagedTableOperations {
 
   public static class InMemoryManagedTableOperations extends ManagedTableOperations {

@@ -56,7 +56,6 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
-import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
@@ -74,7 +73,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -85,7 +83,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -157,8 +154,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestFilesetCatalogOperations {
 
   private static final String STORE_PATH =
@@ -1007,7 +1002,7 @@ public class TestFilesetCatalogOperations {
     }
   }
 
-  /** Checks concurrent catalog instances preserve the winner and create only its directory. */
+  /** Checks independent catalog instances cannot both create the same fileset. */
   @Test
   public void testConcurrentCreateAcrossIndependentNodesPreservesWinner() throws Exception {
     long testId = generateTestId();
@@ -1020,6 +1015,8 @@ public class TestFilesetCatalogOperations {
     EntityStore secondStore = independentNodeStore(ident, checkedAbsent);
     String firstPath = catalogPath + "/" + schemaName + "/first";
     String secondPath = catalogPath + "/" + schemaName + "/second";
+    long firstId = idGenerator.nextId();
+    long secondId = idGenerator.nextId();
     ExecutorService executor = Executors.newFixedThreadPool(2);
     try (FilesetCatalogOperations firstOps =
             new FilesetCatalogOperations(firstStore, secretManager);
@@ -1028,20 +1025,22 @@ public class TestFilesetCatalogOperations {
       firstOps.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       secondOps.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Future<Boolean> first =
-          executor.submit(() -> createConcurrentFileset(firstOps, ident, firstPath, "first"));
+          executor.submit(
+              () -> createConcurrentFileset(firstOps, ident, firstPath, "first", firstId));
       Future<Boolean> second =
-          executor.submit(() -> createConcurrentFileset(secondOps, ident, secondPath, "second"));
+          executor.submit(
+              () -> createConcurrentFileset(secondOps, ident, secondPath, "second", secondId));
       boolean firstWon = first.get(30, TimeUnit.SECONDS);
       boolean secondWon = second.get(30, TimeUnit.SECONDS);
       Assertions.assertNotEquals(firstWon, secondWon);
       FilesetEntity actual = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+      Assertions.assertEquals(firstWon ? firstId : secondId, actual.id());
       Assertions.assertEquals(firstWon ? "first" : "second", actual.comment());
+      Assertions.assertEquals(
+          actual.id(), StringIdentifier.fromProperties(actual.properties()).id());
       String winnerPath = firstWon ? firstPath : secondPath;
-      String loserPath = firstWon ? secondPath : firstPath;
       try (FileSystem fs = FileSystem.newInstance(new Configuration())) {
         Assertions.assertTrue(fs.exists(new Path(winnerPath)));
-        Assertions.assertFalse(
-            fs.exists(new Path(loserPath)), "The losing create must not create a directory");
         Assertions.assertEquals(
             new Path(winnerPath).makeQualified(fs.getUri(), fs.getWorkingDirectory()).toString(),
             new Path(actual.storageLocations().values().iterator().next()).toString());
@@ -1049,71 +1048,6 @@ public class TestFilesetCatalogOperations {
     } finally {
       executor.shutdownNow();
       Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
-    }
-  }
-
-  /** Checks a filesystem failure rolls back the strict metadata insert. */
-  @Test
-  public void testMkdirFailureRollsBackFilesetCreate() throws Exception {
-    long testId = generateTestId();
-    String schemaName = "schema" + testId;
-    String catalogPath = TEST_ROOT_PATH + "/catalog" + testId;
-    createSchema(schemaName, "comment", catalogPath, null, true);
-    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "failed");
-    FileSystem failingFs = Mockito.mock(FileSystem.class);
-    Mockito.when(failingFs.getUri()).thenReturn(URI.create("file:///"));
-    Mockito.when(failingFs.getWorkingDirectory()).thenReturn(new Path("/"));
-    Mockito.when(failingFs.exists(Mockito.any(Path.class))).thenReturn(false);
-    Mockito.when(failingFs.mkdirs(Mockito.any(Path.class)))
-        .thenThrow(new IOException("mkdir failure"));
-    try (FilesetCatalogOperations ops =
-        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
-      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
-      Mockito.doReturn(failingFs)
-          .when(ops)
-          .getFileSystemWithCache(Mockito.any(Path.class), Mockito.anyMap());
-      Assertions.assertThrows(
-          RuntimeException.class,
-          () ->
-              createConcurrentFileset(
-                  ops, ident, catalogPath + "/" + schemaName + "/failed", "failed"));
-      Mockito.verify(failingFs).mkdirs(Mockito.any(Path.class));
-      Assertions.assertFalse(store.exists(ident, Entity.EntityType.FILESET));
-    }
-  }
-
-  private EntityStore independentNodeStore(NameIdentifier ident, CountDownLatch checkedAbsent)
-      throws Exception {
-    RelationalEntityStore node = new RelationalEntityStore();
-    FieldUtils.writeField(node, "backend", FieldUtils.readField(store, "backend", true), true);
-    FieldUtils.writeField(node, "cache", new NoOpsCache(Mockito.mock(Config.class)), true);
-    EntityStore racingStore = Mockito.spy(node);
-    Mockito.doAnswer(
-            invocation -> {
-              boolean exists = (boolean) invocation.callRealMethod();
-              Assertions.assertFalse(exists);
-              checkedAbsent.countDown();
-              Assertions.assertTrue(checkedAbsent.await(30, TimeUnit.SECONDS));
-              return exists;
-            })
-        .when(racingStore)
-        .exists(ident, Entity.EntityType.FILESET);
-    return racingStore;
-  }
-
-  private boolean createConcurrentFileset(
-      FilesetCatalogOperations ops, NameIdentifier ident, String location, String comment) {
-    try {
-      ops.createMultipleLocationFileset(
-          ident,
-          comment,
-          Fileset.Type.MANAGED,
-          ImmutableMap.of("default", location),
-          ImmutableMap.of(
-              StringIdentifier.ID_KEY, StringIdentifier.fromId(idGenerator.nextId()).toString()));
-      return true;
-    } catch (FilesetAlreadyExistsException expected) {
-      return false;
     }
   }
 
@@ -1131,10 +1065,7 @@ public class TestFilesetCatalogOperations {
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "schema", schemaName);
     Mockito.doThrow(deletedSchema)
         .when(racingStore)
-        .put(
-            Mockito.any(FilesetEntity.class),
-            Mockito.eq(EntityWriteIntent.CREATE),
-            Mockito.any(Consumer.class));
+        .put(Mockito.any(FilesetEntity.class), Mockito.eq(false));
 
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(racingStore, secretManager)) {
       ops.initialize(
@@ -4002,5 +3933,43 @@ public class TestFilesetCatalogOperations {
             SecretConstants.ATTR_ENTITY_TYPE, entityType,
             SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
             SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private EntityStore independentNodeStore(NameIdentifier ident, CountDownLatch checkedAbsent)
+      throws Exception {
+    RelationalEntityStore node = new RelationalEntityStore();
+    FieldUtils.writeField(node, "backend", FieldUtils.readField(store, "backend", true), true);
+    FieldUtils.writeField(node, "cache", new NoOpsCache(Mockito.mock(Config.class)), true);
+    EntityStore racingStore = Mockito.spy(node);
+    Mockito.doAnswer(
+            invocation -> {
+              boolean exists = (boolean) invocation.callRealMethod();
+              Assertions.assertFalse(exists);
+              checkedAbsent.countDown();
+              Assertions.assertTrue(checkedAbsent.await(30, TimeUnit.SECONDS));
+              return exists;
+            })
+        .when(racingStore)
+        .exists(ident, Entity.EntityType.FILESET);
+    return racingStore;
+  }
+
+  private boolean createConcurrentFileset(
+      FilesetCatalogOperations ops,
+      NameIdentifier ident,
+      String location,
+      String comment,
+      long id) {
+    try {
+      ops.createMultipleLocationFileset(
+          ident,
+          comment,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("default", location),
+          ImmutableMap.of(StringIdentifier.ID_KEY, StringIdentifier.fromId(id).toString()));
+      return true;
+    } catch (FilesetAlreadyExistsException expected) {
+      return false;
+    }
   }
 }

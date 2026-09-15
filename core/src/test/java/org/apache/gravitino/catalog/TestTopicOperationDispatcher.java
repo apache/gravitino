@@ -42,7 +42,6 @@ import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -60,7 +59,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-@SuppressWarnings("deprecation")
 public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
   static SchemaOperationDispatcher schemaOperationDispatcher;
@@ -166,14 +164,15 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
-    entityStore.put(unmatchedEntity, true);
-    RuntimeException conflict =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> topicOperationDispatcher.loadTopic(topicIdent1));
-    Assertions.assertInstanceOf(EntityAlreadyExistsException.class, conflict.getCause());
-    TopicEntity retained = entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
-    Assertions.assertEquals(unmatchedEntity.id(), retained.id());
-    Assertions.assertEquals("gravitino", retained.auditInfo().creator());
+    doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.TOPIC), any());
+    Topic loadedTopic4 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    reset(entityStore);
+    TopicEntity topicEntity =
+        entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals("test", topicEntity.auditInfo().creator());
+    // Audit info is gotten from the catalog, not from the entity store
+    Assertions.assertEquals("test", loadedTopic4.auditInfo().creator());
   }
 
   @Test

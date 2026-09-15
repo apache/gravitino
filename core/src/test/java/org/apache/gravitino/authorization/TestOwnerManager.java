@@ -81,8 +81,6 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.Mockito;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestOwnerManager {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");

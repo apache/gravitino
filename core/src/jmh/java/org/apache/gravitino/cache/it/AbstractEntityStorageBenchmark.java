@@ -160,8 +160,6 @@ import org.slf4j.LoggerFactory;
 @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Thread)
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class AbstractEntityStorageBenchmark<E extends Entity & HasIdentifier> {
   protected static final Random random = ThreadLocalRandom.current();
   private static final Logger LOG =

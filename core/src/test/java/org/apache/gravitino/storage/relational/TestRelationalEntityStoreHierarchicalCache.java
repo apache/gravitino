@@ -53,8 +53,6 @@ import org.mockito.Mockito;
  * drops its nested descendants from the entity cache, for the default and a non-default schema
  * separator.
  */
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestRelationalEntityStoreHierarchicalCache {
 
   private static final String METALAKE = "metalake_hs";

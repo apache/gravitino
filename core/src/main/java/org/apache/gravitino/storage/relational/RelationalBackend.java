@@ -29,7 +29,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteSnapshot;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -87,48 +86,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException;
-
-  /**
-   * Reads an entity with its storage OCC version under a common row lock.
-   *
-   * @param ident the entity name
-   * @param entityType the entity type
-   * @param <E> the entity type
-   * @return the observed entity and version
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> EntityWriteSnapshot<E> getWriteSnapshot(
-      NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    throw new UnsupportedOperationException("Write snapshots are not supported");
-  }
-
-  /**
-   * Replaces an entity only if the observed identity and version are still current.
-   *
-   * @param entity the replacement
-   * @param observed the expected snapshot
-   * @param <E> the entity type
-   * @return the replacement
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> E reconcile(E entity, EntityWriteSnapshot<E> observed)
-      throws IOException {
-    throw new UnsupportedOperationException("Conditional reconciliation is not supported");
-  }
-
-  /**
-   * Strictly inserts an entity, then runs an action in the same transaction.
-   *
-   * @param entity the entity to create
-   * @param postInsertAction the action, invoked only for the successful insert
-   * @param <E> the entity type
-   * @return the created entity
-   * @throws IOException if storage access fails
-   */
-  default <E extends Entity & HasIdentifier> E create(E entity, Consumer<E> postInsertAction)
-      throws IOException {
-    throw new UnsupportedOperationException("Transactional post-insert actions are not supported");
-  }
 
   /**
    * Updates the entity.

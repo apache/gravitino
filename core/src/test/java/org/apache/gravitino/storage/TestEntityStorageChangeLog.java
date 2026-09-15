@@ -45,8 +45,6 @@ import org.mockito.Mockito;
 
 /** Tests entity change logs through the relational {@link EntityStore}. */
 @Tag("gravitino-docker-test")
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestEntityStorageChangeLog extends AbstractEntityStorageTest {
   private static final String METALAKE_NAME = "metalake_for_entity_store_change_log_test";
   private static final String CATALOG_NAME = "catalog_for_entity_store_change_log_test";

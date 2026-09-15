@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
@@ -185,7 +184,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .build();
 
     try {
-      store.put(functionEntity, EntityWriteIntent.CREATE);
+      store.put(functionEntity, false /* overwrite */);
       return functionEntity;
 
     } catch (NoSuchEntityException e) {

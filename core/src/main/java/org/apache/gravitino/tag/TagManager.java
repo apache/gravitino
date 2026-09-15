@@ -35,7 +35,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
@@ -149,7 +148,7 @@ public class TagManager implements TagDispatcher {
                   .build();
 
           try {
-            entityStore.put(tagEntity, EntityWriteIntent.CREATE);
+            entityStore.put(tagEntity, false /* overwritten */);
             return tagEntity;
           } catch (EntityAlreadyExistsException e) {
             throw new TagAlreadyExistsException(

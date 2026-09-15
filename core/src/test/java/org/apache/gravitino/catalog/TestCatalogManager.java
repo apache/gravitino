@@ -56,7 +56,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -111,8 +110,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestCatalogManager {
 
   /** Test-only external-reference provider. */
@@ -531,9 +528,7 @@ public class TestCatalogManager {
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
             EntityType.METALAKE.name().toLowerCase(),
             metalake);
-    Mockito.doThrow(missingMetalake)
-        .when(store)
-        .put(any(CatalogEntity.class), eq(EntityWriteIntent.CREATE));
+    Mockito.doThrow(missingMetalake).when(store).put(any(CatalogEntity.class), eq(false));
 
     CatalogManager manager =
         new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));

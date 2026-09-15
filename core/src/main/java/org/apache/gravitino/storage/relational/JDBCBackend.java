@@ -38,7 +38,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.EntityWriteSnapshot;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -75,7 +74,6 @@ import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
-import org.apache.gravitino.storage.relational.service.EntityWriteSnapshotSupport;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
@@ -98,7 +96,6 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -210,86 +207,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         SessionUtils.commitTransaction();
       }
       committed = true;
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> EntityWriteSnapshot<E> getWriteSnapshot(
-      NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      E initial = get(ident, entityType);
-      long version = EntityWriteSnapshotSupport.lockVersion(entityType, initial.id());
-      E current = get(ident, entityType);
-      if (!current.id().equals(initial.id())) {
-        throw ExceptionUtils.concurrentModification(entityType, ident);
-      }
-      EntityWriteSnapshot<E> snapshot = new EntityWriteSnapshot<>(current, version);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return snapshot;
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E reconcile(E entity, EntityWriteSnapshot<E> observed)
-      throws IOException {
-    observed.validateReplacement(entity);
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      long version = EntityWriteSnapshotSupport.lockVersion(observed.type(), observed.id());
-      E current = get(observed.identifier(), observed.type());
-      if (current.id() != observed.id() || version != observed.version()) {
-        throw ExceptionUtils.concurrentModification(observed.type(), observed.identifier());
-      }
-      // Keep the root locked through the existing CAS, dependent writes, and change-log insert.
-      E result = update(observed.identifier(), observed.type(), ignored -> entity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return result;
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E create(E entity, Consumer<E> postInsertAction)
-      throws IOException {
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      insertEntity(entity, false);
-      postInsertAction.accept(entity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return entity;
     } finally {
       if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();

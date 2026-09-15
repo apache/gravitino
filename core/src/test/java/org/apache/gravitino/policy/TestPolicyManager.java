@@ -99,8 +99,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestPolicyManager {
   private static final String METALAKE = "metalake_for_policy_test";
   private static final String CATALOG = "catalog_for_policy_test";

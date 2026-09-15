@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -119,7 +118,7 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
     try {
       // Insert only. Overwriting used to hide a lost race: two servers creating the same schema
       // name would both "succeed", and the second one silently replaced the first one's schema.
-      store().put(schemaEntity, EntityWriteIntent.CREATE);
+      store().put(schemaEntity, false /* overwrite */);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to create schema " + ident, ioe);
     } catch (EntityAlreadyExistsException e) {

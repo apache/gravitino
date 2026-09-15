@@ -34,7 +34,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -226,7 +225,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build();
 
             try {
-              store.put(schemaEntity, EntityWriteIntent.CREATE);
+              store.put(schemaEntity, true /* overwrite */);
             } catch (Exception e) {
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
               return EntityCombinedSchema.of(schema)
@@ -638,10 +637,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     long uid;
     if (stringId != null) {
-      // Preserve the external ID, but let IMPORT reject an ID or name already owned elsewhere.
-      LOG.info(
-          "Importing schema {} with external ID {}; existing ownership is preserved",
-          identifier,
+      // If the entity in the store doesn't match the one in the external system, we use the data
+      // of external system to correct it.
+      LOG.warn(
+          "The Schema uid {} existed but still needs to be imported, this could be happened "
+              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
+              + "we need to overwrite the stored entity to keep consistency.",
           stringId);
       uid = stringId.id();
     } else {
@@ -665,7 +666,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      schemaEntity = store.put(schemaEntity, EntityWriteIntent.IMPORT);
+      store.put(schemaEntity, true);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {

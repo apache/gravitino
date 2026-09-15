@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -310,7 +309,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      topicEntity = store.put(topicEntity, EntityWriteIntent.IMPORT);
+      store.put(topicEntity, true);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);
@@ -398,7 +397,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, EntityWriteIntent.CREATE);
+      store.put(topicEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)

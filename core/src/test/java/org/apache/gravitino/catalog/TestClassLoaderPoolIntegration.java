@@ -51,8 +51,6 @@ import org.junit.jupiter.api.Test;
  * Integration tests for ClassLoaderPool with CatalogManager. Tests that same-type catalogs share a
  * ClassLoader and that closing one catalog does not affect others of the same type.
  */
-// Retain coverage of the legacy write API during its deprecation period.
-@SuppressWarnings("deprecation")
 public class TestClassLoaderPoolIntegration {
 
   private static CatalogManager catalogManager;

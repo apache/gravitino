@@ -35,7 +35,6 @@ import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
@@ -147,7 +146,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
             .build();
 
     try {
-      store().put(tableEntity, EntityWriteIntent.CREATE);
+      store().put(tableEntity, false /* overwrite */);
     } catch (NoSuchEntityException e) {
       // The put operation in the current JDBC entity store will check the existence of the
       // namespace when creating an entity under the namespace. If not, it will throw a

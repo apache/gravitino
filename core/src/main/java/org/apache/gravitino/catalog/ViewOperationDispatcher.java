@@ -34,7 +34,6 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -429,7 +428,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .build();
 
     try {
-      store.put(viewEntity, EntityWriteIntent.CREATE);
+      store.put(viewEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)
@@ -536,10 +535,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     long uid;
     if (stringId != null) {
-      // Preserve the external ID, but let IMPORT reject an ID or name already owned elsewhere.
-      LOG.info(
-          "Importing view {} with external ID {}; existing ownership is preserved",
-          ident,
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      LOG.warn(
+          "The View uid {} existed but still need to be imported, this could happen "
+              + "when View is renamed by external systems not controlled by Gravitino. In this "
+              + "case, we need to overwrite the stored entity to keep the consistency.",
           stringId);
       uid = stringId.id();
     } else {
@@ -572,7 +573,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      viewEntity = store.put(viewEntity, EntityWriteIntent.IMPORT);
+      store.put(viewEntity, true /* overwrite */);
     } catch (EntityAlreadyExistsException e) {
       LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
       throw new UnsupportedOperationException(

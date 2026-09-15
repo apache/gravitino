@@ -32,7 +32,6 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
@@ -165,7 +164,7 @@ public class PolicyManager implements PolicyDispatcher {
                   .build();
 
           try {
-            entityStore.put(policyEntity, EntityWriteIntent.CREATE);
+            entityStore.put(policyEntity, false /* overwritten */);
             return policyEntity;
           } catch (EntityAlreadyExistsException e) {
             throw new PolicyAlreadyExistsException(
