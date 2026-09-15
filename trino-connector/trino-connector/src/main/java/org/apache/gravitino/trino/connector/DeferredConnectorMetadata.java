@@ -73,6 +73,9 @@ final class DeferredConnectorMetadata {
         return null;
       }
     } else {
+      if (method.getName().equals("beginQuery")) {
+        closed = false;
+      }
       if (closed) {
         throw new IllegalStateException("Metadata query is already closed");
       }
@@ -92,11 +95,11 @@ final class DeferredConnectorMetadata {
         }
         ConnectorMetadata metadata =
             Objects.requireNonNull(factory.apply(currentSession), "native metadata");
+        delegate = metadata;
         if (pendingBegin != null) {
+          pendingBegin = null;
           metadata.beginQuery(currentSession);
         }
-        pendingBegin = null;
-        delegate = metadata;
       }
     }
     try {

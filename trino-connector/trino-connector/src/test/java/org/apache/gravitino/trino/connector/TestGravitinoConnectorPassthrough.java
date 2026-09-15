@@ -32,8 +32,10 @@ import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.security.ConnectorIdentity;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
@@ -93,6 +95,67 @@ class TestGravitinoConnectorPassthrough {
     }
   }
 
+  @Test
+  void catalogPassthroughDefersMetadata() {
+    assertSecurityPrecedence(null, null, "OAUTH2_PASSTHROUGH", true);
+  }
+
+  @Test
+  void clusterNoneOverridesCatalogPassthrough() {
+    assertSecurityPrecedence(null, "NONE", "OAUTH2_PASSTHROUGH", false);
+  }
+
+  @Test
+  void clusterOAuth2OverridesCatalogPassthrough() {
+    assertSecurityPrecedence(null, "OAUTH2", "OAUTH2_PASSTHROUGH", false);
+  }
+
+  @Test
+  void clusterPassthroughOverridesCatalogNone() {
+    assertSecurityPrecedence(null, "OAUTH2_PASSTHROUGH", "NONE", true);
+  }
+
+  @Test
+  void inheritedClusterOAuth2OverridesCatalogPassthrough() {
+    assertSecurityPrecedence("oauth2", null, "OAUTH2_PASSTHROUGH", false);
+  }
+
+  private void assertSecurityPrecedence(
+      @Nullable String authType,
+      @Nullable String clusterSecurity,
+      String catalogSecurity,
+      boolean deferred) {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.metalake", "demo");
+    if (authType != null) {
+      config.put("gravitino.client.authType", authType);
+    }
+    if (clusterSecurity != null) {
+      config.put("gravitino.iceberg.rest-catalog.security", clusterSecurity);
+    }
+    Connector delegate = mock(Connector.class);
+    ConnectorMetadata nativeMetadata = mock(ConnectorMetadata.class);
+    ConnectorSession session = mock(ConnectorSession.class);
+    ConnectorTransactionHandle transaction = mock(ConnectorTransactionHandle.class);
+    when(delegate.getMetadata(session, transaction)).thenReturn(nativeMetadata);
+    GravitinoConnector connector =
+        connector(
+            context(
+                new GravitinoConfig(config),
+                "lakehouse-iceberg",
+                delegate,
+                Map.of("trino.bypass.iceberg.rest-catalog.security", catalogSecurity)));
+    ConnectorMetadata metadata = connector.getInternalMetadata(session, transaction);
+    if (deferred) {
+      verifyNoInteractions(delegate);
+      metadata.listSchemaNames(session);
+      verify(nativeMetadata).listSchemaNames(session);
+    } else {
+      assertSame(nativeMetadata, metadata);
+    }
+    verify(delegate).getMetadata(session, transaction);
+  }
+
   private GravitinoConnector connector(CatalogConnectorContext context) {
     return new GravitinoConnector(context) {
       @Override
@@ -106,10 +169,28 @@ class TestGravitinoConnectorPassthrough {
   }
 
   private CatalogConnectorContext context(String security, String provider, Connector delegate) {
+    return context(
+        new GravitinoConfig(
+            Map.of(
+                "gravitino.metalake", "demo",
+                "gravitino.client.authType", "oauth2",
+                "gravitino.client.session.forwardUser", "true",
+                "gravitino.iceberg.rest-catalog.security", security)),
+        provider,
+        delegate,
+        Map.of());
+  }
+
+  private CatalogConnectorContext context(
+      GravitinoConfig config,
+      String provider,
+      Connector delegate,
+      Map<String, String> catalogProperties) {
     CatalogConnectorContext context = mock(CatalogConnectorContext.class);
     GravitinoCatalog catalog = mock(GravitinoCatalog.class);
     when(catalog.geNameIdentifier()).thenReturn(NameIdentifier.of("demo", "iceberg_demo"));
     when(catalog.getProvider()).thenReturn(provider);
+    when(catalog.getProperties()).thenReturn(catalogProperties);
     GravitinoMetalake metalake = mock(GravitinoMetalake.class);
     Catalog live = mock(Catalog.class);
     SupportsSchemas schemas = mock(SupportsSchemas.class);
@@ -119,14 +200,7 @@ class TestGravitinoConnectorPassthrough {
     when(context.getCatalog()).thenReturn(catalog);
     when(context.getMetalake()).thenReturn(metalake);
     when(context.getInternalConnector()).thenReturn(delegate);
-    when(context.getConfig())
-        .thenReturn(
-            new GravitinoConfig(
-                Map.of(
-                    "gravitino.metalake", "demo",
-                    "gravitino.client.authType", "oauth2",
-                    "gravitino.client.session.forwardUser", "true",
-                    "gravitino.iceberg.rest-catalog.security", security)));
+    when(context.getConfig()).thenReturn(config);
     return context;
   }
 }

@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -54,6 +55,7 @@ class TestDeferredConnectorMetadata {
     metadata.cleanupQuery(session);
     assertEquals(0, calls.get());
     assertThrows(IllegalStateException.class, () -> metadata.listSchemaNames(session));
+    assertEquals(0, calls.get());
   }
 
   @Test
@@ -79,6 +81,86 @@ class TestDeferredConnectorMetadata {
     order.verify(nativeMetadata).beginQuery(session);
     order.verify(nativeMetadata, times(2)).listSchemaNames(session);
     order.verify(nativeMetadata).cleanupQuery(session);
+  }
+
+  @Test
+  void initializedMetadataSupportsTwoQueryLifecycles() {
+    ConnectorMetadata nativeMetadata = mock(ConnectorMetadata.class);
+    ConnectorSession first = mock(ConnectorSession.class);
+    ConnectorSession second = mock(ConnectorSession.class);
+    AtomicInteger calls = new AtomicInteger();
+    ConnectorMetadata metadata =
+        DeferredConnectorMetadata.create(
+            first,
+            currentSession -> {
+              calls.incrementAndGet();
+              return nativeMetadata;
+            });
+    metadata.beginQuery(first);
+    metadata.listSchemaNames(first);
+    metadata.cleanupQuery(first);
+    assertThrows(IllegalStateException.class, () -> metadata.listSchemaNames(second));
+    metadata.beginQuery(second);
+    metadata.listSchemaNames(second);
+    metadata.cleanupQuery(second);
+    assertEquals(1, calls.get());
+    var order = inOrder(nativeMetadata);
+    order.verify(nativeMetadata).beginQuery(first);
+    order.verify(nativeMetadata).listSchemaNames(first);
+    order.verify(nativeMetadata).cleanupQuery(first);
+    order.verify(nativeMetadata).beginQuery(second);
+    order.verify(nativeMetadata).listSchemaNames(second);
+    order.verify(nativeMetadata).cleanupQuery(second);
+    order.verifyNoMoreInteractions();
+  }
+
+  @Test
+  void managementQueryCanBeFollowedByDeferredDataQuery() {
+    ConnectorSession management = mock(ConnectorSession.class);
+    ConnectorSession user = mock(ConnectorSession.class);
+    ConnectorMetadata nativeMetadata = mock(ConnectorMetadata.class);
+    AtomicInteger calls = new AtomicInteger();
+    ConnectorMetadata metadata =
+        DeferredConnectorMetadata.create(
+            management,
+            currentSession -> {
+              calls.incrementAndGet();
+              assertSame(user, currentSession);
+              return nativeMetadata;
+            });
+    metadata.beginQuery(management);
+    metadata.cleanupQuery(management);
+    assertThrows(IllegalStateException.class, () -> metadata.listSchemaNames(user));
+    assertEquals(0, calls.get());
+    metadata.beginQuery(user);
+    assertEquals(0, calls.get());
+    metadata.listSchemaNames(user);
+    metadata.cleanupQuery(user);
+    assertEquals(1, calls.get());
+    var order = inOrder(nativeMetadata);
+    order.verify(nativeMetadata).beginQuery(user);
+    order.verify(nativeMetadata).listSchemaNames(user);
+    order.verify(nativeMetadata).cleanupQuery(user);
+    order.verifyNoMoreInteractions();
+  }
+
+  @Test
+  void failedBeginQueryStillCleansUpNativeMetadata() {
+    ConnectorSession session = mock(ConnectorSession.class);
+    ConnectorMetadata nativeMetadata = mock(ConnectorMetadata.class);
+    IllegalStateException failure = new IllegalStateException("Query initialization failed");
+    doThrow(failure).when(nativeMetadata).beginQuery(session);
+    ConnectorMetadata metadata =
+        DeferredConnectorMetadata.create(session, currentSession -> nativeMetadata);
+    metadata.beginQuery(session);
+    assertSame(
+        failure,
+        assertThrows(IllegalStateException.class, () -> metadata.listSchemaNames(session)));
+    metadata.cleanupQuery(session);
+    var order = inOrder(nativeMetadata);
+    order.verify(nativeMetadata).beginQuery(session);
+    order.verify(nativeMetadata).cleanupQuery(session);
+    order.verifyNoMoreInteractions();
   }
 
   @Test
