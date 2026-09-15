@@ -249,7 +249,7 @@ paths:
       tags:
         - policy
       summary: Associate policies with metadata object
-      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
+      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, MODEL, VIEW, FUNCTION
       operationId: associatePoliciesForObject
       requestBody:
         content:
@@ -390,7 +390,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL" ]
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "VIEW", "FUNCTION" ]
         properties:
           type: object
           description: A map of string-to-string properties for the policy content.
@@ -497,6 +497,8 @@ components:
             - "FILESET"
             - "TOPIC"
             - "MODEL"
+            - "VIEW"
+            - "FUNCTION"
             - "COLUMN"
 
     PolicyCreateRequestBase:

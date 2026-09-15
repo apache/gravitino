@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -29,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -132,19 +134,13 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+  /** Returns SQL that soft-deletes every active metadata-object relation for a policy ID. */
+  public String softDeletePolicyMetadataObjectRelsByPolicyId(@Param("policyId") Long policyId) {
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " pe JOIN "
-        + PolicyMetaMapper.POLICY_META_TABLE_NAME
-        + " pm ON pe.policy_id = pm.policy_id JOIN "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm ON pm.metalake_id = mm.metalake_id"
-        + " SET pe.deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE mm.metalake_name = #{metalakeName} AND pm.policy_name = #{policyName}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
   public String softDeletePolicyMetadataObjectRelsByMetalakeId(
@@ -193,6 +189,12 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE catalog_id = #{catalogId}))"
+        + "   OR (metadata_object_type = 'VIEW' AND metadata_object_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}))"
+        + "   OR (metadata_object_type = 'FUNCTION' AND metadata_object_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}))"
         + " )";
   }
 
@@ -232,6 +234,20 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "))"
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'VIEW' AND metadata_object_id IN (SELECT view_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'FUNCTION' AND metadata_object_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
         + " WHERE schema_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
         + "#{schemaId}"

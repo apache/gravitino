@@ -200,6 +200,32 @@ public class SecretManager implements Closeable {
   }
 
   /**
+   * Validates write-through secret bindings and their URNs without writing secret material.
+   *
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (empty is valid; must not be null)
+   */
+  public void validateSecretBindingUrns(
+      String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
+    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    if (secretBindings.isEmpty()) {
+      return;
+    }
+    validateSecretBindings(secretBindings);
+
+    for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
+      String key = entry.getKey();
+      String providerName = entry.getValue().provider();
+      // Ensure the provider is registered before building the URN.
+      registry.getProvider(providerName);
+      validateUrnEndsWithPropertyKey(
+          buildWriteThroughUrn(entityType, entityId, key, providerName), key);
+    }
+  }
+
+  /**
    * Builds write-through URNs from {@code secretBindings} without writing secret material.
    *
    * <p>Callers typically pass the returned URNs to {@link #writeSecrets} via {@link
@@ -214,27 +240,16 @@ public class SecretManager implements Closeable {
    */
   public List<SecretUrn> buildSecretBindingUrns(
       String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
-    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    validateSecretBindingUrns(entityType, entityId, secretBindings);
     if (secretBindings.isEmpty()) {
       return List.of();
     }
-    validateSecretBindings(secretBindings);
 
     List<SecretUrn> urns = new ArrayList<>(secretBindings.size());
     for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
       String key = entry.getKey();
       String providerName = entry.getValue().provider();
-      // Ensure the provider is registered before building the URN.
-      registry.getProvider(providerName);
-      Map<String, String> attributes =
-          ImmutableMap.of(
-              ATTR_ENTITY_TYPE, entityType,
-              ATTR_ENTITY_ID, String.valueOf(entityId),
-              ATTR_PROPERTY_KEY, key);
-      SecretUrn urn = SecretUrn.buildWriteThrough(providerName, attributes);
-      validateUrnEndsWithPropertyKey(urn, key);
-      urns.add(urn);
+      urns.add(buildWriteThroughUrn(entityType, entityId, key, providerName));
     }
     return List.copyOf(urns);
   }
@@ -539,6 +554,16 @@ public class SecretManager implements Closeable {
       secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
     }
     return List.copyOf(secretMaterials);
+  }
+
+  private static SecretUrn buildWriteThroughUrn(
+      String entityType, long entityId, String propertyKey, String providerName) {
+    Map<String, String> attributes =
+        ImmutableMap.of(
+            ATTR_ENTITY_TYPE, entityType,
+            ATTR_ENTITY_ID, String.valueOf(entityId),
+            ATTR_PROPERTY_KEY, propertyKey);
+    return SecretUrn.buildWriteThrough(providerName, attributes);
   }
 
   private static void validateUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {

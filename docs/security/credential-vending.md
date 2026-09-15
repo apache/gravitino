@@ -403,7 +403,7 @@ There is no role to assume. The identity is the service account in `gcs-service-
 |----------------------------|------------------------------------------|-------------------------------------|----------|
 | `gcs-service-account-file` | The location of the GCS credential file. | GCS Application default credential. | No       |
 
-For the IRC, ensure that the credential file is accessible by that server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
+`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg `GCSFileIO` on the server (Gravitino injects `gcs.oauth2.token` at catalog load because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 
 ## Requesting Vended Credentials
 
@@ -480,7 +480,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response. Retrieve secret-manager-backed properties (including those keys when stored as secret URNs) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, and `jdbc-password` are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext). Retrieve secret-manager-backed properties and sensitive-named inline values via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. That API does **not** recover properties that are only declared `hidden` in metadata when their names do not look sensitive; those stay as `******` after merging with `properties()`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

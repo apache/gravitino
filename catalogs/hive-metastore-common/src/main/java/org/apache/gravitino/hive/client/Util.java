@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -53,7 +54,7 @@ public class Util {
       properties.forEach((k, v) -> config.set(k.toString(), v.toString()));
       resolveMetastoreUriHosts(config);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create configuration", e);
+      throw ExceptionMessages.wrap("Failed to create configuration", e);
     }
   }
 

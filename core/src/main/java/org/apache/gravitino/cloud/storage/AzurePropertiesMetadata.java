@@ -37,12 +37,20 @@ public class AzurePropertiesMetadata {
                   "Azure storage account name",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
               stringOptionalPropertyEntry(
                   AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
                   "Azure storage account key",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+                  "Azure Active Directory client secret",
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))

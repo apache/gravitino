@@ -65,7 +65,9 @@ public class PolicyManager implements PolicyDispatcher {
           MetadataObject.Type.TABLE,
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TOPIC,
-          MetadataObject.Type.MODEL);
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.FUNCTION);
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
@@ -527,11 +529,13 @@ public class PolicyManager implements PolicyDispatcher {
         if (policyType != Policy.BuiltInType.CUSTOM) {
           // cannot change the supported object types for built-in policies
           Preconditions.checkArgument(
-              Sets.difference(
+              Sets.symmetricDifference(
                       policyEntity.content().supportedObjectTypes(),
                       updateContent.getContent().supportedObjectTypes())
                   .isEmpty(),
-              "Policy content type mismatch: expected %s but got %s");
+              "Policy content type mismatch: expected %s but got %s",
+              policyEntity.content().supportedObjectTypes(),
+              updateContent.getContent().supportedObjectTypes());
         }
 
         newContent = updateContent.getContent();

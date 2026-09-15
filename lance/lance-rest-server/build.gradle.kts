@@ -103,6 +103,7 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.lance)
 
   lanceSparkBundleVersions.forEach { version ->
@@ -156,6 +157,7 @@ tasks {
       into(lanceSparkBundleDirFor(version))
     }
   }
+
   val primaryPrepareLanceSparkBundle =
     named(lanceSparkPrepareTaskName(primaryLanceSparkBundleVersion))
 
@@ -192,6 +194,7 @@ tasks {
 
     val primaryBundleDir = lanceSparkBundleDirFor(primaryLanceSparkBundleVersion)
     doFirst {
+      systemProperty("lance.test.runtimeClasspath", sourceSets["main"].runtimeClasspath.asPath)
       val bundleJar =
         primaryBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
           ?: throw GradleException(

@@ -70,7 +70,7 @@ public abstract class TableFailureEvent extends FailureEvent {
 
   /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return customInfo;
   }
 }

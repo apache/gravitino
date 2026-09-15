@@ -18,20 +18,25 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.HostAddress;
 import io.trino.spi.connector.ConnectorContext;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -83,6 +88,11 @@ public class TestGravitinoConnectorFactoryStart {
     @Override
     protected boolean isCoordinator(ConnectorContext connectorContext) {
       return true;
+    }
+
+    @Override
+    protected HostAddress getCurrentNodeAddress(ConnectorContext connectorContext) {
+      return HostAddress.fromParts("127.0.0.1", 1);
     }
   }
 
@@ -144,16 +154,55 @@ public class TestGravitinoConnectorFactoryStart {
   }
 
   @Test
-  public void testStartIsAttemptedOnlyOnce() {
+  public void testFailedStartCanRecover() {
     CoordinatorFactory factory = newFactory();
 
     Map<String, String> brokenConfig = staticConfig();
     brokenConfig.put("catalog.config-dir", "/not/exists/catalog");
     assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
 
-    // Everything that makes start() fail is a configuration error, so the next create() must not
-    // try again: a second init() would open another connection and abandon the first one.
-    assertNotNull(factory.create("gravitino", brokenConfig, mockContext()));
+    // The startup did not complete, so the next create() must not skip it and hand out a
+    // connector whose load loop never started.
+    assertFalse(factory.isCatalogConnectorManagerStartTriggered());
+
+    // The failure is a configuration error, so it is the fixed configuration that recovers it.
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
+  }
+
+  @Test
+  public void testFailedStartKeepsTheConnectorsADynamicCatalogAlreadyCreated() {
+    CoordinatorFactory factory = newFactory();
+
+    // The coordinator restarted and Trino loaded a Gravitino-created catalog first, which builds
+    // and publishes the shared manager.
+    assertThrows(Exception.class, () -> factory.create("catalog", dynamicConfig(), mockContext()));
+    CatalogConnectorManager manager = factory.getCatalogConnectorManager();
+    assertNotNull(manager);
+
+    Map<String, String> brokenConfig = staticConfig();
+    brokenConfig.put("catalog.config-dir", "/not/exists/catalog");
+    assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
+
+    // The manager is shared with the dynamic catalogs that are already installed in Trino, so a
+    // failed startup must not take it, its Gravitino client or its executor down with it.
+    assertSame(manager, factory.getCatalogConnectorManager());
+    assertFalse(factory.isCatalogConnectorManagerStartTriggered());
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
+    assertSame(manager, factory.getCatalogConnectorManager());
+  }
+
+  @Test
+  public void testStaticConnectorPinsSplitsToTheCoordinator() {
+    CoordinatorFactory factory = newFactory();
+
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
+
+    // The registration state the system tables report lives only on the coordinator, so its
+    // splits must be pinned to the address CoordinatorFactory reports for this node.
+    assertEquals(
+        HostAddress.fromParts("127.0.0.1", 1),
+        GravitinoSystemConnector.Split.getCurrentCoordinatorAddress());
   }
 
   @Test

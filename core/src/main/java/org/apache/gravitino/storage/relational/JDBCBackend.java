@@ -367,7 +367,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    if (!BaseEntityCache.isCacheable(entityType)) {
+    if (!shouldRecordEntityDrop(entityType)) {
       return deleteEntity(ident, entityType, cascade);
     }
 
@@ -1119,6 +1119,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 entityType.name(),
                 EntityChangeLogNameIdentifierCodec.encode(ident),
                 operateType));
+  }
+
+  private static boolean shouldRecordEntityDrop(Entity.EntityType entityType) {
+    // Functions bypass the Entity Store cache, but their drops must still invalidate JCasbin's
+    // name-to-ID cache on peer nodes.
+    return BaseEntityCache.isCacheable(entityType) || entityType == Entity.EntityType.FUNCTION;
   }
 
   /** Start JDBC database if necessary. For example, start the H2 database if the backend is H2. */

@@ -29,6 +29,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -39,7 +40,11 @@ public class TestHealthOperations {
   }
 
   private HealthOperations newOps(EntityStore store, long probeTimeoutMs) {
-    return new HealthOperations() {
+    return newOps(store, probeTimeoutMs, new ServerHealth());
+  }
+
+  private HealthOperations newOps(EntityStore store, long probeTimeoutMs, ServerHealth health) {
+    return new HealthOperations(health) {
       @Override
       EntityStore getEntityStore() {
         return store;
@@ -145,5 +150,75 @@ public class TestHealthOperations {
   public void testValidateThrowsWhenStatusIsNull() {
     HealthResponse response = new HealthResponse();
     assertThrows(IllegalArgumentException.class, response::validate);
+  }
+  /** All probes stay down after OOM, even if the entity store would answer successfully. */
+  @Test
+  public void testAllEndpointsStayDownAfterOutOfMemory() {
+    ServerHealth health = new ServerHealth();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    HealthOperations ops = newOps(store, 2000L, health);
+    health.recordFailure(new OutOfMemoryError("Metaspace"));
+    for (Response response : new Response[] {ops.live(), ops.ready(), ops.health()}) {
+      try (Response ignored = response) {
+        assertEquals(503, response.getStatus());
+        HealthResponse body = (HealthResponse) response.getEntity();
+        assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
+        assertEquals("jvm", body.getChecks().get(0).getName());
+        assertEquals(
+            "OutOfMemoryError; restart required",
+            body.getChecks().get(0).getDetails().get("reason"));
+      }
+    }
+    Mockito.verifyNoInteractions(store);
+  }
+
+  /** A captured executor OOM must poison liveness too, and must not recover on the next probe. */
+  @Test
+  public void testProbeOutOfMemoryIsSticky() throws IOException {
+    ServerHealth health = new ServerHealth();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    Mockito.when(store.exists(Mockito.any(), Mockito.any()))
+        .thenThrow(new OutOfMemoryError("Java heap space"))
+        .thenReturn(false);
+    HealthOperations ops = newOps(store, 2000L, health);
+    try (Response first = ops.ready();
+        Response live = ops.live();
+        Response next = ops.ready()) {
+      assertEquals(503, first.getStatus());
+      assertEquals(503, live.getStatus());
+      assertEquals(503, next.getStatus());
+    }
+    Mockito.verify(store).exists(Mockito.any(), Mockito.any());
+  }
+
+  /** OOM from a timed-out probe must still be recorded when the abandoned task finishes. */
+  @Test
+  public void testOutOfMemoryAfterProbeTimeout() throws IOException {
+    ServerHealth health = new ServerHealth();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    CountDownLatch release = new CountDownLatch(1);
+    Mockito.when(store.exists(Mockito.any(), Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              release.await();
+              throw new OutOfMemoryError("Metaspace");
+            });
+    try {
+      try (Response response = newOps(store, 100L, health).ready()) {
+        assertEquals(503, response.getStatus());
+        HealthResponse body = (HealthResponse) response.getEntity();
+        assertEquals("timeout", body.getChecks().get(0).getDetails().get("reason"));
+      }
+    } finally {
+      release.countDown();
+    }
+    // If the first worker has not recorded the OOM yet, this probe queues behind it.
+    HealthOperations ops = newOps(store, 2000L, health);
+    try (Response ready = ops.ready();
+        Response live = ops.live()) {
+      assertEquals(503, ready.getStatus());
+      assertEquals(503, live.getStatus());
+      assertTrue(health.hasOutOfMemoryError());
+    }
   }
 }
