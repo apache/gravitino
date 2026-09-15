@@ -104,10 +104,14 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
   /**
    * Appends a trailing slash to the given path unless it already ends with one.
    *
+   * <p>Package-private rather than private so that {@link GenericCatalogOperations} can apply the
+   * very same normalization when comparing a provisioned location against the one the created table
+   * reports. Sharing the method is what keeps the two from drifting apart.
+   *
    * @param path the path to normalize
    * @return the path, ending with a slash
    */
-  private static String ensureTrailingSlash(String path) {
+  static String ensureTrailingSlash(String path) {
     return path.endsWith(SLASH) ? path : path + SLASH;
   }
 }

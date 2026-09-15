@@ -143,12 +143,19 @@ A purge is the opposite request. `LanceTableOperations.purgeTable` deletes the e
 its `dropTable` leaves alone, so by the time the callback would run the data is gone and the reason
 to skip has gone with it; the location is handed back.
 
-The callback is therefore reached in exactly three situations -- a dropped managed table, a purged
-managed table, and a purged external one -- and in all three the data under the location has already
-been deleted by the table format. There is deliberately no flag distinguishing them on the context,
-because an implementation has the same job in all three: hand the location back. The catalog makes
-that distinction rather than passing it on, because the catalog is where the knowledge lives about
-which formats leave data in place.
+The callback is therefore reached in exactly four situations: a dropped managed table, a purged
+managed table, a purged external one, and a creation whose provisioned location the table format
+did not use. There is deliberately no flag distinguishing them, because the invariant they share is
+about the location rather than the table: **nothing anyone needs is under the location named in the
+context**. In the first three the table format has already deleted the data under it; in the fourth
+nothing was ever written there.
+
+In that fourth case the table still exists -- it is the one call that does not mean the table went
+away. That is safe for an implementation that does what the callback asks, which is to release the
+location named in the context, and unsafe only for one that instead deletes everything it has booked
+against the table identity. The catalog makes the drop-versus-purge and external distinctions rather
+than passing them on, because the catalog is where the knowledge lives about which formats leave data
+in place.
 
 Even so, `external` is only an approximation of the rule this callback wants, which is "hand back
 only what was handed out". An external table created *without* a location does get one provisioned,
@@ -163,22 +170,23 @@ reconciliation, and why it must tolerate a location it does not recognize.
 it the two paths remove the same things -- but Lance overrides both, and its purge deletes data its
 drop does not. A provider must not assume the two are interchangeable.
 
-##### A location the table format did not use is leaked
+##### A location the table format did not use is handed back
 
 A format may decline the location it was given and still report success. Lance's `EXIST_OK`
 creation mode returns the table that already exists, at the location it already had, and a client
-retrying a create is the ordinary way to reach that. The location provisioned for that call is
-leaked: the table is stored pointing at the location the format chose, so the later drop hands back
-that one and the provisioned one is never mentioned again.
+retrying a create is the ordinary way to reach that. Without handing the provisioned location back,
+every retried create would leak one allocation.
 
-Nothing is reported and nothing is handed back. The table here is alive, so a provider that books
-allocations against `(schema, table)` would read a reclaim keyed by that identity as an instruction
-to delete the storage of a table that exists -- and there is no callback that would let it tell the
-two apart. Reclaiming the stray allocation is the provider's own job, through the reconciliation it
-needs regardless: the same sweep that catches renames, a `location` property edited through
-`alterTable`, a format-internal drop, and a crash between the removal and the unprovision call. A
-provider that books by table identity also meets this case directly, since a retried create arrives
-as a second provisioning request for a table it already has an allocation for.
+The catalog detects it by comparing the location it handed the format with the one the created
+table reports, and calls `unprovisionTableLocation` with the **provisioned** location in the
+context -- not the one the table ended up at, which belongs to a live table. This is the only path
+on which that callback fires for a table that still exists.
+
+The comparison ignores a trailing slash, since that is the one rewrite the catalog performs itself.
+A format that rewrites the location further -- collapsing a duplicated separator, or normalizing a
+URI scheme -- looks from here like a format that declined it, so a provider whose paths may come
+back rewritten should verify before reclaiming. A provider that throws is logged at WARN and the
+creation still succeeds, since it already has.
 
 **Known limitations.** Five of them, and they all point the same way: a provider that manages real
 storage needs its own reconciliation against the catalog, and cannot treat these callbacks as a
@@ -198,10 +206,10 @@ complete record of the locations it handed out.
   the metadata write then fails. Everything the catalog can check on its own -- the table format is
   given, the format is supported -- is checked before the provider is consulted, so the cases that
   remain are the ones only the table format can detect.
-- A creation the table format serves from a table that already exists leaks the location
-  provisioned for that call, as described above. It is neither reported nor handed back, because
-  the table is alive and the catalog cannot ask for one location back without naming a table that
-  exists.
+- The catalog tells a provisioned location apart from the one the created table reports by string
+  comparison, ignoring a trailing slash. A format that rewrites the location further looks from
+  here like one that declined it, so a provider whose paths may come back rewritten should verify
+  before reclaiming.
 - A table format that drops a table through its own internals rather than through the catalog does
   not trigger the unprovision callback. Lance's `OVERWRITE` creation mode does this: it drops the
   existing table and creates a new one, so the old location is never handed back. This is the same

@@ -296,6 +296,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Table createdTable =
         tableOps.createTable(
             ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
+    unprovisionLocationIfUnused(ident, schema, newProperties, tableLocation, createdTable);
     // Cache the table format for future use.
     tableFormatCache.put(ident, format);
     return createdTable;
@@ -523,6 +524,83 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     }
 
     return ops;
+  }
+
+  /**
+   * Hands back a location that was provisioned for this creation and that the created table does
+   * not point at.
+   *
+   * <p>A format may decline the location it was given and still report success. Lance's {@code
+   * EXIST_OK} creation mode returns the table that already exists, at the location it already had,
+   * and a client retrying a create is the ordinary way to reach that path. Without this the
+   * provisioned location would leak, once per retried create.
+   *
+   * <p>This is the one path on which {@link
+   * TableLocationProvider#unprovisionTableLocation(TableLocationContext)} is called for a table
+   * that still exists. That is safe for what the callback is documented to do -- release the
+   * location named in the context -- because nothing was ever written to a location the created
+   * table does not point at. It is not safe for an implementation that deletes everything it has
+   * booked against the table identity instead, which the contract already tells it not to do.
+   *
+   * <p>The context carries the provisioned location, not the one the table ended up at, so a
+   * provider reads the location to release exactly where it reads it on a drop.
+   *
+   * <p>The two locations are compared with a trailing slash added to both, since that is the one
+   * rewrite this catalog performs itself. A format that rewrites the location further -- collapsing
+   * a duplicated separator, or normalizing a URI scheme -- is indistinguishable from here from a
+   * format that declined it, which the contract warns providers about.
+   *
+   * @param ident the identifier of the table that was created
+   * @param schema the schema the table was created in
+   * @param properties the properties the format was given, carrying the provisioned location
+   * @param provisionedLocation the location the provider handed out
+   * @param createdTable the table the format returned, which may be null
+   */
+  private void unprovisionLocationIfUnused(
+      NameIdentifier ident,
+      Schema schema,
+      Map<String, String> properties,
+      String provisionedLocation,
+      Table createdTable) {
+    // Neither built-in delegator returns null, but a third-party one that did would otherwise fail
+    // a creation that has already succeeded, and only on this path: the same delegator would serve
+    // a request that carried its own location without complaint.
+    if (createdTable == null) {
+      return;
+    }
+
+    Map<String, String> createdProperties = createdTable.properties();
+    String storedLocation =
+        createdProperties == null ? null : createdProperties.get(Table.PROPERTY_LOCATION);
+
+    // Only a location that is visibly different is handed back. A format reporting no location at
+    // all may still be using the one it was given, and leaking it is the safer reading of that.
+    if (StringUtils.isBlank(storedLocation)
+        || DefaultTableLocationProvider.ensureTrailingSlash(provisionedLocation)
+            .equals(DefaultTableLocationProvider.ensureTrailingSlash(storedLocation))) {
+      return;
+    }
+
+    TableLocationProvider provider = tableLocationProvider;
+    try {
+      provider.unprovisionTableLocation(
+          TableLocationContext.builder()
+              .withTableIdentifier(ident)
+              .withTableProperties(properties)
+              .withSchema(schema)
+              .withCatalogProperties(catalogProperties)
+              .build());
+    } catch (Exception e) {
+      LOG.warn(
+          "Table {} was created at '{}' rather than at the provisioned location '{}', and table "
+              + "location provider '{}' failed to hand that location back. The storage may be "
+              + "leaked and needs to be reclaimed manually.",
+          ident,
+          storedLocation,
+          provisionedLocation,
+          provider.name(),
+          e);
+    }
   }
 
   /**
