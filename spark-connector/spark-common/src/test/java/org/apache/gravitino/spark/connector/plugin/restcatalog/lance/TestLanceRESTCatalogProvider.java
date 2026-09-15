@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,16 +59,15 @@ public class TestLanceRESTCatalogProvider {
   @Test
   void testListsAllCatalogPages() {
     AtomicInteger requests = new AtomicInteger();
+    List<String> queries = new CopyOnWriteArrayList<>();
     server.createContext(
         "/lance/v1/namespace/$/list",
         exchange -> {
           int request = requests.getAndIncrement();
-          String query = exchange.getRequestURI().getQuery();
+          queries.add(String.valueOf(exchange.getRequestURI().getQuery()));
           if (request == 0) {
-            assertFalse(query.contains("page_token"));
             respond(exchange, 200, "{\"namespaces\":[\"catalog_b\"],\"page_token\":\"next\"}");
           } else {
-            assertTrue(query.contains("page_token=next"));
             respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
           }
         });
@@ -78,14 +78,18 @@ public class TestLanceRESTCatalogProvider {
 
     assertEquals(2, requests.get());
     assertEquals(Arrays.asList("catalog_b", "catalog_a"), catalogs);
+    assertEquals(2, queries.size());
+    assertFalse(queries.get(0).contains("page_token"));
+    assertTrue(queries.get(1).contains("page_token=next"));
   }
 
   @Test
   void testUsesConfiguredNamespaceDelimiter() {
+    List<String> rawQueries = new CopyOnWriteArrayList<>();
     server.createContext(
         "/lance/v1/namespace/$/list",
         exchange -> {
-          assertTrue(exchange.getRequestURI().getRawQuery().contains("delimiter=%23"));
+          rawQueries.add(String.valueOf(exchange.getRequestURI().getRawQuery()));
           respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
         });
     server.start();
@@ -98,6 +102,38 @@ public class TestLanceRESTCatalogProvider {
                     LanceRESTCatalogProvider.NAMESPACE_DELIMITER_PROPERTY, "#"));
 
     assertEquals(Collections.singletonList("catalog_a"), catalogs);
+    assertEquals(1, rawQueries.size());
+    assertTrue(rawQueries.get(0).contains("delimiter=%23"));
+  }
+
+  @Test
+  void testErrorResponseReportsStatusAndBody() {
+    server.createContext(
+        "/lance/v1/namespace/$/list",
+        exchange -> respond(exchange, 404, "{\"error\":\"namespace not found\"}"));
+    server.start();
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () -> new LanceRESTCatalogProvider().listCatalogs(serverUri, Collections.emptyMap()));
+
+    assertTrue(exception.getMessage().contains("HTTP 404"));
+    assertTrue(exception.getMessage().contains("namespace not found"));
+  }
+
+  @Test
+  void testEmptyErrorResponseStillReportsStatus() {
+    server.createContext("/lance/v1/namespace/$/list", exchange -> respond(exchange, 401, ""));
+    server.start();
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () -> new LanceRESTCatalogProvider().listCatalogs(serverUri, Collections.emptyMap()));
+
+    assertTrue(exception.getMessage().contains("HTTP 401"));
+    assertTrue(exception.getMessage().contains(serverUri));
   }
 
   @Test

@@ -79,7 +79,13 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
             "Lance REST server returned repeated page token: %s",
             pageToken);
       } while (pageToken != null);
-    } catch (ApiException | IOException e) {
+    } catch (ApiException e) {
+      throw new IllegalStateException(
+          String.format(
+              "Failed to list catalogs from Lance REST server %s: HTTP %d, %s",
+              uri, e.getCode(), describeResponse(e)),
+          e);
+    } catch (IOException e) {
       throw new IllegalStateException("Failed to list catalogs from Lance REST server " + uri, e);
     }
 
@@ -99,6 +105,21 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
   @Override
   public String[] sparkExtensions() {
     return new String[] {SPARK_EXTENSIONS};
+  }
+
+  /**
+   * The Lance client uses the raw response body as the exception message, which is empty for most
+   * error responses, so fall back to the reason phrase and finally to an explicit placeholder
+   * instead of reporting a bare {@code ApiException}.
+   */
+  private static String describeResponse(ApiException e) {
+    if (StringUtils.isNotBlank(e.getResponseBody())) {
+      return e.getResponseBody();
+    }
+    if (StringUtils.isNotBlank(e.getMessage())) {
+      return e.getMessage();
+    }
+    return "no response body";
   }
 
   private static String normalizeUri(String uri) {

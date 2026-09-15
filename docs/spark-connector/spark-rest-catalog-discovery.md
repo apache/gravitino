@@ -98,6 +98,8 @@ owned by user configuration.
 ## Limitations
 
 - Each format supports one REST server URI per Spark session.
+- Discovery is a startup dependency with no fallback. If the REST server is unreachable while the
+  driver starts, the plugin fails and the whole Spark session fails to start.
 - Automatic Lance discovery does not support authenticated REST listing. Catalog properties are
   applied to generated Spark catalogs but are not used to authenticate the discovery request.
 - Discovery runs only during driver startup; restart the Spark session to observe catalog additions

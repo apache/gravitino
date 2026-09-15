@@ -24,7 +24,6 @@ import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.removeDup
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,6 +61,10 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   private static final String CATALOG_PROPERTIES_INFIX = "REST.catalogProperties.";
   private static final Pattern PROVIDER_URI_PATTERN =
       Pattern.compile("^spark\\.sql\\.gravitino\\.([A-Za-z][A-Za-z0-9]*)REST\\.uri$");
+  // Matches keys that look like a discovery URI but are spelled differently, so a typo such as
+  // `spark.sql.gravitino.lanceRest.uri` is reported instead of silently disabling discovery.
+  private static final Pattern SIMILAR_URI_PATTERN =
+      Pattern.compile("^spark\\.sql\\.gravitino\\..*rest\\.uri$", Pattern.CASE_INSENSITIVE);
   private static final CatalogRegistrationPolicy DEFAULT_POLICY = (format, catalogName) -> true;
 
   GravitinoLakehouseRESTDiscoveryDriverPlugin() {}
@@ -83,6 +86,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
     if (activeFormats.isEmpty()) {
+      warnNoActiveFormat(userConf);
       return;
     }
 
@@ -99,12 +103,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
-          List<String> discoveredCatalogs =
-              provider.listCatalogs(uri, Collections.unmodifiableMap(globalProperties));
-          Preconditions.checkState(
-              discoveredCatalogs != null,
-              "Lakehouse REST catalog provider %s returned a null catalog list",
-              format);
+          List<String> discoveredCatalogs = listCatalogs(provider, format, uri, globalProperties);
+          if (discoveredCatalogs.isEmpty()) {
+            LOG.warn("Discovered no {} REST catalog from {}.", format, uri);
+          } else {
+            LOG.info("Discovered {} REST catalogs {} from {}.", format, discoveredCatalogs, uri);
+          }
 
           for (String catalogName : discoveredCatalogs) {
             addRegistration(
@@ -165,6 +169,57 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     return activeFormats;
   }
 
+  @VisibleForTesting
+  static List<String> similarUriKeys(SparkConf userConf) {
+    List<String> similarKeys = new ArrayList<>();
+    for (Tuple2<String, String> entry : userConf.getAll()) {
+      if (SIMILAR_URI_PATTERN.matcher(entry._1).matches()
+          && !PROVIDER_URI_PATTERN.matcher(entry._1).matches()) {
+        similarKeys.add(entry._1);
+      }
+    }
+    return similarKeys;
+  }
+
+  private static void warnNoActiveFormat(SparkConf userConf) {
+    List<String> similarKeys = similarUriKeys(userConf);
+    if (similarKeys.isEmpty()) {
+      LOG.warn(
+          "{} is configured but no {}<format>{} is set, no lakehouse REST catalog is discovered.",
+          GravitinoLakehouseRESTDiscoveryPlugin.class.getName(),
+          GRAVITINO_PREFIX,
+          URI_SUFFIX);
+    } else {
+      LOG.warn(
+          "{} is configured but no {}<format>{} is set, no lakehouse REST catalog is discovered. "
+              + "Keys that look misspelled: {}",
+          GravitinoLakehouseRESTDiscoveryPlugin.class.getName(),
+          GRAVITINO_PREFIX,
+          URI_SUFFIX,
+          similarKeys);
+    }
+  }
+
+  private static List<String> listCatalogs(
+      LakehouseRESTCatalogProvider provider,
+      String format,
+      String uri,
+      Map<String, String> globalProperties) {
+    List<String> discoveredCatalogs;
+    try {
+      discoveredCatalogs =
+          provider.listCatalogs(uri, Collections.unmodifiableMap(globalProperties));
+    } catch (RuntimeException | LinkageError e) {
+      throw new IllegalStateException(
+          String.format("Failed to list %s REST catalogs from %s", format, uri), e);
+    }
+    Preconditions.checkState(
+        discoveredCatalogs != null,
+        "Lakehouse REST catalog provider %s returned a null catalog list",
+        format);
+    return discoveredCatalogs;
+  }
+
   private static CatalogRegistrationPolicy loadRegistrationPolicy(
       SparkConf userConf, ClassLoader classLoader) {
     if (!userConf.contains(REGISTRATION_POLICY_CONFIG)) {
@@ -184,13 +239,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           policyClassName,
           CatalogRegistrationPolicy.class.getName());
       return CatalogRegistrationPolicy.class.cast(policyClass.getConstructor().newInstance());
-    } catch (ClassNotFoundException
-        | NoSuchMethodException
-        | InstantiationException
-        | IllegalAccessException
-        | InvocationTargetException e) {
+    } catch (ReflectiveOperationException | LinkageError e) {
       throw new IllegalArgumentException(
-          "Failed to instantiate catalog registration policy " + policyClassName, e);
+          String.format(
+              "Failed to instantiate catalog registration policy %s configured by %s",
+              policyClassName, REGISTRATION_POLICY_CONFIG),
+          e);
     }
   }
 
@@ -284,6 +338,11 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
       return;
     }
     if (!policy.shouldRegister(format, discoveredCatalogName)) {
+      LOG.info(
+          "Skip auto-registering {} catalog {} because catalog registration policy {} rejected it.",
+          format,
+          discoveredCatalogName,
+          policy.getClass().getName());
       return;
     }
 

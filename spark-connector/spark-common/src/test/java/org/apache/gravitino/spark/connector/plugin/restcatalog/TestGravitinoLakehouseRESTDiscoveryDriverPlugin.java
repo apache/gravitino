@@ -211,6 +211,187 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     assertTrue(exception.getMessage().contains(LakehouseRESTCatalogProvider.class.getName()));
   }
 
+  @Test
+  void testMisspelledUriKeysAreReported() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set("spark.plugins", DISCOVERY_PLUGIN)
+            .set("spark.sql.gravitino.lanceRest.uri", "rest-uri")
+            .set("spark.sql.gravitino.REST.uri", "rest-uri")
+            .set("spark.sql.gravitino.uri", "http://127.0.0.1:8090")
+            .set("spark.sql.gravitino.lanceREST.catalogProperties.namespaceDelimiter", "#");
+
+    List<String> similarKeys =
+        GravitinoLakehouseRESTDiscoveryDriverPlugin.similarUriKeys(sparkConf);
+
+    assertEquals(2, similarKeys.size());
+    assertTrue(similarKeys.contains("spark.sql.gravitino.lanceRest.uri"));
+    assertTrue(similarKeys.contains("spark.sql.gravitino.REST.uri"));
+  }
+
+  @Test
+  void testMatchingUriKeyIsNotReportedAsMisspelled() {
+    assertTrue(
+        GravitinoLakehouseRESTDiscoveryDriverPlugin.similarUriKeys(
+                new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri"))
+            .isEmpty());
+  }
+
+  @Test
+  void testMissingCatalogClassFails() {
+    SparkConf sparkConf = baseConf();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                driver()
+                    .initialize(
+                        sparkConf, providerClasses("fake", MissingCatalogClassProvider.class)));
+
+    assertTrue(exception.getMessage().contains("Required runtime class"));
+    assertTrue(exception.getMessage().contains(MissingCatalogClassProvider.CATALOG_CLASS));
+    assertTrue(exception.getCause() instanceof ClassNotFoundException);
+    assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a"));
+  }
+
+  @Test
+  void testMissingSparkExtensionClassFails() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                driver()
+                    .initialize(
+                        baseConf(), providerClasses("fake", MissingExtensionProvider.class)));
+
+    assertTrue(exception.getMessage().contains("Required runtime class"));
+    assertTrue(exception.getMessage().contains(MissingExtensionProvider.EXTENSION_CLASS));
+  }
+
+  @Test
+  void testBlankCatalogClassFails() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                driver()
+                    .initialize(
+                        baseConf(), providerClasses("fake", BlankCatalogClassProvider.class)));
+
+    assertTrue(exception.getMessage().contains("returned a blank runtime class"));
+  }
+
+  @Test
+  void testNullSparkExtensionsFails() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                driver()
+                    .initialize(baseConf(), providerClasses("fake", NullExtensionsProvider.class)));
+
+    assertTrue(exception.getMessage().contains("returned null Spark extensions"));
+  }
+
+  @Test
+  void testProviderListingFailureReportsFormatAndUri() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                driver()
+                    .initialize(baseConf(), providerClasses("fake", FailingListProvider.class)));
+
+    assertTrue(exception.getMessage().contains("Failed to list fake REST catalogs from rest-uri"));
+    assertTrue(exception.getCause().getMessage().contains("listing is unavailable"));
+  }
+
+  @Test
+  void testBlankPolicyClassNameFails() {
+    SparkConf sparkConf =
+        baseConf().set(GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG, " ");
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
+
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG
+                    + " must not be blank"));
+  }
+
+  @Test
+  void testMissingPolicyClassFails() {
+    SparkConf sparkConf =
+        baseConf()
+            .set(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
+                "example.MissingCatalogRegistrationPolicy");
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
+
+    assertTrue(exception.getMessage().contains("Failed to instantiate"));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG));
+    assertTrue(exception.getCause() instanceof ClassNotFoundException);
+  }
+
+  @Test
+  void testPolicyClassMustImplementPolicyInterface() {
+    SparkConf sparkConf =
+        baseConf()
+            .set(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
+                String.class.getName());
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
+
+    assertTrue(exception.getMessage().contains("does not implement"));
+    assertTrue(exception.getMessage().contains(CatalogRegistrationPolicy.class.getName()));
+  }
+
+  @Test
+  void testPolicyWithoutNoArgConstructorFails() {
+    SparkConf sparkConf =
+        baseConf()
+            .set(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
+                NoArgConstructorMissingPolicy.class.getName());
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
+
+    assertTrue(exception.getMessage().contains("Failed to instantiate"));
+    assertTrue(exception.getCause() instanceof NoSuchMethodException);
+  }
+
+  @Test
+  void testPolicyReturningUserOwnedNameFails() {
+    SparkConf sparkConf =
+        baseConf()
+            .set(CATALOG_PREFIX + "renamed_b", "example.UserCatalog")
+            .set(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
+                RenamePolicy.class.getName());
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                driver()
+                    .initialize(sparkConf, providerClasses("fake", MultipleCatalogProvider.class)));
+
+    assertTrue(exception.getMessage().contains("which is configured by the user"));
+    assertEquals("example.UserCatalog", sparkConf.get(CATALOG_PREFIX + "renamed_b"));
+  }
+
   private static SparkConf baseConf() {
     return new SparkConf(false).set("spark.plugins", DISCOVERY_PLUGIN).set(URI_CONFIG, "rest-uri");
   }
@@ -371,6 +552,81 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     @Override
     public String registeredCatalogName(String format, String catalogName) {
       return "invalid-name";
+    }
+  }
+
+  /** Policy that cannot be instantiated reflectively. */
+  public static class NoArgConstructorMissingPolicy implements CatalogRegistrationPolicy {
+
+    /**
+     * Creates the policy.
+     *
+     * @param unused an argument that prevents reflective instantiation.
+     */
+    public NoArgConstructorMissingPolicy(String unused) {}
+
+    @Override
+    public boolean shouldRegister(String format, String catalogName) {
+      return true;
+    }
+  }
+
+  static class MissingCatalogClassProvider extends FakeProvider {
+
+    static final String CATALOG_CLASS = "example.MissingNamespaceSparkCatalog";
+
+    /** Creates the provider that advertises an absent catalog class. */
+    public MissingCatalogClassProvider() {}
+
+    @Override
+    public String catalogClassName() {
+      return CATALOG_CLASS;
+    }
+  }
+
+  static class BlankCatalogClassProvider extends FakeProvider {
+
+    /** Creates the provider that advertises a blank catalog class. */
+    public BlankCatalogClassProvider() {}
+
+    @Override
+    public String catalogClassName() {
+      return " ";
+    }
+  }
+
+  static class MissingExtensionProvider extends FakeProvider {
+
+    static final String EXTENSION_CLASS = "example.MissingSparkSessionExtensions";
+
+    /** Creates the provider that advertises an absent Spark extension. */
+    public MissingExtensionProvider() {}
+
+    @Override
+    public String[] sparkExtensions() {
+      return new String[] {EXTENSION_CLASS};
+    }
+  }
+
+  static class NullExtensionsProvider extends FakeProvider {
+
+    /** Creates the provider that returns null Spark extensions. */
+    public NullExtensionsProvider() {}
+
+    @Override
+    public String[] sparkExtensions() {
+      return null;
+    }
+  }
+
+  static class FailingListProvider extends FakeProvider {
+
+    /** Creates the provider whose catalog listing fails. */
+    public FailingListProvider() {}
+
+    @Override
+    public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
+      throw new IllegalStateException("listing is unavailable");
     }
   }
 }
