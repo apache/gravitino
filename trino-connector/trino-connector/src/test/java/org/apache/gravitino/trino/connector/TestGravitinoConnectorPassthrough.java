@@ -43,6 +43,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergCatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Test;
 
@@ -201,6 +202,10 @@ class TestGravitinoConnectorPassthrough {
     when(context.getMetalake()).thenReturn(metalake);
     when(context.getInternalConnector()).thenReturn(delegate);
     when(context.getConfig()).thenReturn(config);
+    Map<String, String> internalConnectorConfig =
+        new IcebergCatalogPropertyConverter()
+            .buildIcebergRestProperties(catalog, config, "http://localhost:9001/iceberg");
+    when(context.getInternalConnectorConfig()).thenReturn(internalConnectorConfig);
     return context;
   }
 }
