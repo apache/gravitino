@@ -161,6 +161,33 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
+  void testInvalidDiscoveredNameIsSkippedUnderDefaultPolicy() {
+    SparkConf sparkConf = baseConf();
+
+    driver().initialize(sparkConf, providerClasses("fake", InvalidNameProvider.class));
+
+    assertFalse(sparkConf.contains(CATALOG_PREFIX + "my-catalog"));
+    assertEquals(String.class.getName(), sparkConf.get(CATALOG_PREFIX + "catalog_a"));
+    assertEquals("catalog_a", sparkConf.get(CATALOG_PREFIX + "catalog_a.parent"));
+    assertEquals(
+        Runnable.class.getName(), sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+  }
+
+  @Test
+  void testBlankPolicyOutputFails() {
+    SparkConf sparkConf =
+        baseConf()
+            .set(
+                GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
+                BlankNamePolicy.class.getName());
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
+
+    assertTrue(exception.getMessage().contains("returned a blank catalog name"));
+  }
+
+  @Test
   void testConfiguredFormatWithoutProviderFails() {
     SparkConf sparkConf = baseConf();
 
@@ -616,6 +643,34 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     @Override
     public String[] sparkExtensions() {
       return null;
+    }
+  }
+
+  static class InvalidNameProvider extends FakeProvider {
+
+    /** Creates the provider that advertises a name Spark cannot reference unquoted. */
+    public InvalidNameProvider() {}
+
+    @Override
+    public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
+      return Arrays.asList("my-catalog", "catalog_a");
+    }
+  }
+
+  /** Policy used to produce a blank registration name. */
+  public static class BlankNamePolicy implements CatalogRegistrationPolicy {
+
+    /** Creates the policy. */
+    public BlankNamePolicy() {}
+
+    @Override
+    public boolean shouldRegister(String format, String catalogName) {
+      return true;
+    }
+
+    @Override
+    public String registeredCatalogName(String format, String catalogName) {
+      return " ";
     }
   }
 

@@ -92,8 +92,13 @@ spark.sql.gravitino.REST.registrationPolicy=com.example.MyCatalogRegistrationPol
 
 The policy receives the format token (`lance`) and the discovered catalog name. A renamed Spark
 catalog still uses the discovered name as its `parent`, so REST routing remains server-authoritative.
-Spark startup fails if a policy returns an invalid identifier, a duplicate name, or a name already
-owned by user configuration.
+Spark startup fails if a policy returns a blank name, an invalid identifier, a duplicate name, or a
+name already owned by user configuration.
+
+Gravitino accepts catalog names that Spark cannot reference unquoted, such as names containing a
+hyphen. Without a configured policy, such a catalog is logged at WARN and skipped rather than
+failing Spark startup, so one unusable name does not prevent the session from starting. Configure a
+policy to rename it to an identifier Spark accepts.
 
 ## Limitations
 

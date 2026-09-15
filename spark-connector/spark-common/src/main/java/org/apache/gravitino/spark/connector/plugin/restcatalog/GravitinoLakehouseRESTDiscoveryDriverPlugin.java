@@ -42,6 +42,8 @@ import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser$;
+import org.apache.spark.sql.catalyst.parser.ParseException;
+import org.apache.spark.sql.catalyst.parser.ParserInterface;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -347,7 +349,24 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     }
 
     String registeredCatalogName = policy.registeredCatalogName(format, discoveredCatalogName);
-    validateCatalogName(registeredCatalogName);
+    // A blank name can only come from a policy: a blank discovered name already failed above.
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(registeredCatalogName),
+        "Catalog registration policy returned a blank catalog name");
+    if (!isValidCatalogName(registeredCatalogName)) {
+      // A user-configured policy chose this name, so failing fast points at code the user owns. The
+      // default policy passes through what the REST server advertised, where one name Spark cannot
+      // reference must not abort the whole Spark session.
+      Preconditions.checkArgument(
+          isDefaultPolicy(policy),
+          "Catalog registration policy returned invalid Spark identifier: %s",
+          registeredCatalogName);
+      LOG.warn(
+          "Skip auto-registering {} catalog {} because it is not a valid Spark identifier.",
+          format,
+          discoveredCatalogName);
+      return;
+    }
     Preconditions.checkArgument(
         !userConf.contains(SPARK_CATALOG_PREFIX + registeredCatalogName),
         "Catalog registration policy returned name %s, which is configured by the user",
@@ -387,20 +406,28 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
             mergedProperties));
   }
 
-  private static void validateCatalogName(String catalogName) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogName),
-        "Catalog registration policy returned a blank catalog name");
-    try {
-      Seq<String> parts = CatalystSqlParser$.MODULE$.parseMultipartIdentifier(catalogName);
-      Preconditions.checkArgument(
-          parts.size() == 1 && catalogName.equals(parts.apply(0)),
-          "Catalog registration policy returned invalid Spark identifier: %s",
-          catalogName);
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Catalog registration policy returned invalid Spark identifier: " + catalogName, e);
+  /**
+   * Returns whether Spark can reference {@code catalogName} unquoted. Gravitino accepts catalog
+   * names that Spark's parser rejects, such as names containing a hyphen, so the answer is a value
+   * rather than an exception: the caller decides whether that is a failure or a skip.
+   */
+  private static boolean isValidCatalogName(String catalogName) {
+    if (StringUtils.isBlank(catalogName)) {
+      return false;
     }
+    // Called through ParserInterface, the type that declares `throws ParseException`, so the catch
+    // can name that exception instead of swallowing every RuntimeException the parser may raise.
+    ParserInterface parser = CatalystSqlParser$.MODULE$;
+    try {
+      Seq<String> parts = parser.parseMultipartIdentifier(catalogName);
+      return parts.size() == 1 && catalogName.equals(parts.apply(0));
+    } catch (ParseException e) {
+      return false;
+    }
+  }
+
+  private static boolean isDefaultPolicy(CatalogRegistrationPolicy policy) {
+    return policy == DEFAULT_POLICY;
   }
 
   private static void applyRegistrations(
