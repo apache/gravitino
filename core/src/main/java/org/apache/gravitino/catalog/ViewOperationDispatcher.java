@@ -54,6 +54,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -281,7 +282,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                           id,
                           ViewEntity.class,
                           VIEW,
-                          viewEntity -> applyChangesToEntity(viewEntity, alteredView, changes)),
+                          requireEntityId(
+                              viewId,
+                              viewEntity ->
+                                  applyChangesToEntity(viewEntity, alteredView, changes))),
                   "UPDATE",
                   viewId);
 
@@ -320,13 +324,16 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+          // Read the registration before the external call, so the store delete below can only
+          // remove the row this drop started with and never one re-created under the same name.
+          EntityVersion observed = isManagedView ? null : observeRegistration(ident, VIEW);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
                   c -> c.doWithViewOps(v -> v.dropView(ident)),
                   RuntimeException.class);
 
-          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
           if (isManagedView) {
             return droppedFromCatalog;
           }
@@ -336,13 +343,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
-            try {
-              store.delete(ident, VIEW);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
+            deleteObservedRegistration(ident, VIEW, false, observed);
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.

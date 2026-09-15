@@ -53,6 +53,7 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -239,6 +240,25 @@ public class RelationalEntityStore
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType)
+      throws IOException {
+    // Always read through: a cached entity does not carry the store version, and a stale cache
+    // entry must never be the basis of a version check.
+    return backend.getVersion(ident, entityType);
+  }
+
+  @Override
+  public boolean delete(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
+      throws IOException {
+    try {
+      return backend.delete(ident, entityType, cascade, expected);
     } finally {
       cache.invalidate(ident, entityType);
     }

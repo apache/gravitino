@@ -22,7 +22,11 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -44,6 +48,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -245,6 +250,102 @@ public abstract class OperationDispatcher {
   }
 
   /**
+   * Wraps an updater so the store rejects the update, before writing anything, when the row under
+   * the name is not the entity the external catalog reported.
+   *
+   * <p>The updater runs inside the store's update, after the current row is read and before the
+   * version-checked write. Throwing here therefore aborts the transaction with nothing written,
+   * which is what a post-write id comparison cannot do.
+   *
+   * @param expectedId the id read from the external catalog
+   * @param updater the update to apply when the ids match
+   * @param <E> the entity type
+   * @return the guarded updater
+   */
+  protected static <E extends Entity & HasIdentifier> Function<E, E> requireEntityId(
+      long expectedId, Function<E, E> updater) {
+    return entity -> {
+      if (entity.id() != expectedId) {
+        throw new EntityIdMismatchException(entity.id(), expectedId);
+      }
+      return updater.apply(entity);
+    };
+  }
+
+  /**
+   * Reads the id and store version of a registration before an external-catalog call, so a later
+   * store write can be fenced on it.
+   *
+   * @param ident the entity identifier
+   * @param type the entity type
+   * @return the observed id and version, or null when nothing is registered under the name or the
+   *     store cannot read versions
+   */
+  @Nullable
+  protected EntityVersion observeRegistration(NameIdentifier ident, Entity.EntityType type) {
+    try {
+      return store.getVersion(ident, type);
+    } catch (NoSuchEntityException | UnsupportedOperationException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read the registration of " + ident, e);
+    }
+  }
+
+  /**
+   * Deletes the registration observed before an external-catalog call, and only that one.
+   *
+   * <p>A registration that changed in between belongs to a newer incarnation of the entity, or to a
+   * concurrent writer; it is left alone and the conflict is reported, so a reconcile pass can
+   * decide what to do with it. Deleting it by name would remove a live entity's row and every
+   * attachment on it.
+   *
+   * @param ident the entity identifier
+   * @param type the entity type
+   * @param cascade whether to delete the children as well
+   * @param observed the id and version read before the external call, or null when there was no
+   *     registration to delete
+   * @return true if the observed registration was deleted
+   * @throws OptimisticLockException if the registration under the name is not the observed one
+   */
+  protected boolean deleteObservedRegistration(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      boolean cascade,
+      @Nullable EntityVersion observed) {
+    if (observed == null) {
+      LOG.warn(
+          "No {} registration was found for {} before the external drop; leaving the store alone",
+          type.name().toLowerCase(Locale.ROOT),
+          ident);
+      return false;
+    }
+    try {
+      try {
+        return store.delete(ident, type, cascade, observed);
+      } catch (UnsupportedOperationException e) {
+        return store.delete(ident, type, cascade);
+      }
+    } catch (OptimisticLockException e) {
+      // The row under the name is not the one this drop started with: a newer incarnation, or a
+      // concurrent write. It stays in the store and the caller learns that the registration was
+      // not cleaned up; a reconcile pass, not this drop, decides what happens to the row.
+      LOG.warn(
+          "The {} registration of {} changed while the external drop ran (expected {}); it is "
+              + "kept instead of being deleted under the new incarnation",
+          type.name().toLowerCase(Locale.ROOT),
+          ident,
+          observed);
+      throw e;
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The {} to be dropped does not exist in the store: {}", type, ident, e);
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
    * Runs a store operation as a best-effort side effect of the request.
    *
    * <p>Every failure is logged and reported as a null result, because the external catalog is the
@@ -256,6 +357,10 @@ public abstract class OperationDispatcher {
     R ret = null;
     try {
       ret = fn.apply(ident);
+    } catch (EntityIdMismatchException e) {
+      // Case 4: the row under the name is not the entity the external catalog reported. The
+      // updater refused before anything was written.
+      LOG.error(FormattedErrorMessages.ENTITY_UNMATCHED, ident, e.actualId, e.expectedId);
     } catch (OptimisticLockException e) {
       // Only external entities reach this point, so swallowing the conflict is safe: alterTable,
       // alterSchema and alterView return before calling this helper when the entity is managed,
@@ -284,6 +389,18 @@ public abstract class OperationDispatcher {
     }
 
     return ret;
+  }
+
+  /** Thrown by {@link #requireEntityId} when the stored row is not the expected entity. */
+  private static final class EntityIdMismatchException extends RuntimeException {
+    private final long actualId;
+    private final long expectedId;
+
+    private EntityIdMismatchException(long actualId, long expectedId) {
+      super("Entity id " + actualId + " does not match the expected id " + expectedId);
+      this.actualId = actualId;
+      this.expectedId = expectedId;
+    }
   }
 
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {

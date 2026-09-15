@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -97,6 +98,35 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(schema, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+  }
+
+  @TestTemplate
+  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    Namespace schemaNs = NamespaceUtil.ofSchema(metalakeName, catalogName);
+    SchemaMetaService service = SchemaMetaService.getInstance();
+
+    SchemaEntity first =
+        createSchemaEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNs, "s", AUDIT_INFO);
+    backend.insert(first, false);
+    EntityVersion observed = service.getSchemaVersion(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.id());
+
+    Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.SCHEMA, false));
+    SchemaEntity second =
+        createSchemaEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNs, "s", AUDIT_INFO);
+    backend.insert(second, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteSchema(first.nameIdentifier(), true, observed));
+    Assertions.assertEquals(
+        second.id(), service.getSchemaByIdentifier(second.nameIdentifier()).id());
+
+    EntityVersion current = service.getSchemaVersion(second.nameIdentifier());
+    Assertions.assertTrue(service.deleteSchema(second.nameIdentifier(), true, current));
+    Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate

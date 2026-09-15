@@ -29,6 +29,8 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -222,6 +224,63 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the delete operation fails
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
+
+  /**
+   * Reads the identity and store version of an entity so a later write can be fenced on it.
+   *
+   * <p>Read it before an external-catalog call and pass it to {@link #delete(NameIdentifier,
+   * EntityType, EntityVersion)} afterwards, so the store write only touches the registration the
+   * operation started with.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity
+   * @return the entity's id and store version
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the read fails
+   */
+  default EntityVersion getVersion(NameIdentifier ident, EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    throw new UnsupportedOperationException("This store cannot read entity versions");
+  }
+
+  /**
+   * Deletes an entity only if it is still the one described by {@code expected}.
+   *
+   * <p>The row under {@code ident} must carry the same id and store version as {@code expected}.
+   * When it does not, another operation re-created or changed the entity in between and this delete
+   * must not remove it.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity to be deleted
+   * @param expected the id and version read before the operation started
+   * @return true if the entity was deleted
+   * @throws NoSuchEntityException if no entity exists under {@code ident}
+   * @throws OptimisticLockException if the entity under {@code ident} is not the expected one
+   * @throws IOException if the delete operation fails
+   */
+  default boolean delete(NameIdentifier ident, EntityType entityType, EntityVersion expected)
+      throws NoSuchEntityException, OptimisticLockException, IOException {
+    return delete(ident, entityType, false, expected);
+  }
+
+  /**
+   * Deletes an entity, and optionally its children, only if it is still the one described by {@code
+   * expected}.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity to be deleted
+   * @param cascade support cascade delete or not
+   * @param expected the id and version read before the operation started
+   * @return true if the entity was deleted
+   * @throws NoSuchEntityException if no entity exists under {@code ident}
+   * @throws OptimisticLockException if the entity under {@code ident} is not the expected one
+   * @throws IOException if the delete operation fails
+   */
+  default boolean delete(
+      NameIdentifier ident, EntityType entityType, boolean cascade, EntityVersion expected)
+      throws NoSuchEntityException, OptimisticLockException, IOException {
+    throw new UnsupportedOperationException("This store cannot delete with a version check");
+  }
 
   /**
    * The only post-delete action an implementation that cannot run it before commit accepts.

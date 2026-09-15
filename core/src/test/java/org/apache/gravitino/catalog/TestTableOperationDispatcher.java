@@ -74,6 +74,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.EntityVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -307,6 +308,100 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         "schemaDispatcherSupplier returned null. "
             + "SchemaDispatcher must be available for table operations.",
         exception.getMessage());
+  }
+
+  @Test
+  public void testDropTableLeavesRegistrationRecreatedDuringTheDropAlone() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropAba");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity registered = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Simulate the race: the drop observed an older incarnation of t before its external drop,
+    // and by the time it reaches the store another node has re-created t under a new id.
+    reset(entityStore);
+    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .when(entityStore)
+        .getVersion(tableIdent, TABLE);
+
+    // The drop reports the conflict instead of deleting whatever is under the name now.
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+
+    // The external table is gone, but the newer registration was not deleted under it.
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+  }
+
+  @Test
+  public void testDropTableDeletesTheObservedRegistration() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropObserved");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  @Test
+  public void testAlterTableDoesNotUpdateARegistrationWithAnotherId() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaAlterMismatch");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity registered = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Replace the registration under the name with one that belongs to another incarnation.
+    TableEntity other =
+        TableEntity.builder()
+            .withId(registered.id() + 1)
+            .withName(registered.name())
+            .withNamespace(registered.namespace())
+            .withColumns(registered.columns())
+            .withAuditInfo(registered.auditInfo())
+            .build();
+    entityStore.delete(tableIdent, TABLE);
+    entityStore.put(other, false);
+
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k2", "v2"));
+    Assertions.assertEquals("v2", altered.properties().get("k2"));
+
+    // The external alter went through, but the mismatched registration was left untouched.
+    TableEntity after = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(other.id(), after.id());
+    Assertions.assertEquals(
+        registered.auditInfo().lastModifier(), after.auditInfo().lastModifier());
   }
 
   @Test

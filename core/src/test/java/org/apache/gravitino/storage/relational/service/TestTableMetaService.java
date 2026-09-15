@@ -61,6 +61,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -305,6 +306,45 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals("replacement_column", stored.columns().get(0).name());
     Assertions.assertEquals(
         beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion());
+  }
+
+  @TestTemplate
+  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    Namespace tableNs = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    TableMetaService service = TableMetaService.getInstance();
+
+    TableEntity first =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "t", AUDIT_INFO);
+    backend.insert(first, false);
+    EntityVersion observed = service.getTableVersion(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.id());
+
+    // The observed table is dropped and re-created under the same name by someone else.
+    Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.TABLE, false));
+    TableEntity second =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "t", AUDIT_INFO);
+    backend.insert(second, false);
+
+    // A delete fenced on the old observation must not touch the new incarnation.
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteTable(first.nameIdentifier(), observed));
+    Assertions.assertEquals(
+        second.id(), service.getTableByIdentifier(second.nameIdentifier()).id());
+
+    // A stale version of the same incarnation is refused as well.
+    EntityVersion current = service.getTableVersion(second.nameIdentifier());
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.deleteTable(
+                second.nameIdentifier(), EntityVersion.of(current.id(), current.version() + 1)));
+
+    // The matching observation deletes.
+    Assertions.assertTrue(service.deleteTable(second.nameIdentifier(), current));
+    Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   @TestTemplate

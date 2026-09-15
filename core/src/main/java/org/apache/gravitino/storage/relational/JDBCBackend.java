@@ -69,6 +69,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -98,6 +99,7 @@ import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -367,8 +369,63 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    return deleteRecordingChange(ident, entityType, () -> deleteEntity(ident, entityType, cascade));
+  }
+
+  @Override
+  public EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType) {
+    switch (entityType) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().getSchemaVersion(ident);
+      case TABLE:
+        return TableMetaService.getInstance().getTableVersion(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().getTopicVersion(ident);
+      case VIEW:
+        return ViewMetaService.getInstance().getViewVersion(ident);
+      case FUNCTION:
+        return FunctionMetaService.getInstance().getFunctionVersion(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for version read", entityType);
+    }
+  }
+
+  @Override
+  public boolean delete(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
+      throws IOException {
+    return deleteRecordingChange(
+        ident,
+        entityType,
+        () -> {
+          switch (entityType) {
+            case SCHEMA:
+              return SchemaMetaService.getInstance().deleteSchema(ident, cascade, expected);
+            case TABLE:
+              return TableMetaService.getInstance().deleteTable(ident, expected);
+            case TOPIC:
+              return TopicMetaService.getInstance().deleteTopic(ident, expected);
+            case VIEW:
+              return ViewMetaService.getInstance().deleteView(ident, expected);
+            case FUNCTION:
+              return FunctionMetaService.getInstance().deleteFunction(ident, expected);
+            default:
+              throw new UnsupportedEntityTypeException(
+                  "Unsupported entity type: %s for version-checked delete", entityType);
+          }
+        });
+  }
+
+  /**
+   * Runs a delete and, when the entity type is replicated to other nodes, records the drop in the
+   * entity change log inside the same transaction.
+   */
+  private boolean deleteRecordingChange(
+      NameIdentifier ident, Entity.EntityType entityType, Executable<Boolean, IOException> delete)
+      throws IOException {
     if (!shouldRecordEntityDrop(entityType)) {
-      return deleteEntity(ident, entityType, cascade);
+      return delete.execute();
     }
 
     boolean transactionOwner = !SessionUtils.isInTransaction();
@@ -377,7 +434,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
     boolean committed = false;
     try {
-      boolean deleted = deleteEntity(ident, entityType, cascade);
+      boolean deleted = delete.execute();
       if (deleted) {
         insertEntityChange(ident, entityType, OperateType.DROP);
       }
