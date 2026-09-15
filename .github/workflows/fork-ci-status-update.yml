@@ -29,6 +29,7 @@ permissions:
 jobs:
   update:
     name: Update fork CI checks
+    if: github.repository == 'apache/gravitino'
     runs-on: ubuntu-slim
     steps:
       - name: Synchronize fork CI checks

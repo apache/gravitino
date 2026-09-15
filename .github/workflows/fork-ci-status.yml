@@ -28,6 +28,7 @@ permissions:
 jobs:
   notify:
     name: Notify fork CI
+    if: github.repository == 'apache/gravitino'
     runs-on: ubuntu-slim
     steps:
       - name: Create fork CI check
