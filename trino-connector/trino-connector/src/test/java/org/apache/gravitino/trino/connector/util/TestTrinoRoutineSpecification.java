@@ -20,13 +20,12 @@ package org.apache.gravitino.trino.connector.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
 import io.trino.sql.parser.SqlParser;
-import io.trino.sql.tree.FunctionSpecification;
-import io.trino.sql.tree.ReturnStatement;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionParam;
@@ -62,8 +61,12 @@ public class TestTrinoRoutineSpecification {
           "-- comment\nRETURN x + 1",
           "  /* a */ -- b\n /* c */ RETURN x + 1"
         }) {
-      FunctionSpecification parsed = parse(build("f", body, param("x", Types.IntegerType.get())));
-      assertEquals(ReturnStatement.class, parsed.getStatement().getClass(), body);
+      String spec = build("f", body, param("x", Types.IntegerType.get()));
+      parse(spec);
+      assertTrue(
+          spec.endsWith(
+              " SECURITY INVOKER " + TrinoRoutineSpecification.stripLeadingComments(body)),
+          spec);
     }
   }
 
@@ -156,8 +159,8 @@ public class TestTrinoRoutineSpecification {
     assertEquals("Function f has a definition without a return type", e.getMessage());
   }
 
-  private static FunctionSpecification parse(String spec) {
-    return PARSER.createFunctionSpecification(spec);
+  private static void parse(String spec) {
+    PARSER.createFunctionSpecification(spec);
   }
 
   private static String build(String name, String body, FunctionParam... params) {
