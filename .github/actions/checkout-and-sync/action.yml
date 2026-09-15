@@ -39,7 +39,6 @@ runs:
       id: base
       shell: bash
       env:
-        DISABLE_FORK_CI: ${{ vars.DISABLE_FORK_CI }}
         EVENT_BASE_REF: ${{ github.base_ref }}
         GH_TOKEN: ${{ github.token }}
         HEAD_OWNER: ${{ github.repository_owner }}
@@ -48,14 +47,6 @@ runs:
         HEAD_SHA: ${{ github.sha }}
       run: |
         set -euo pipefail
-
-        # Downstream mirrors can disable inherited fork behavior without
-        # changing each reusable workflow.
-        if [[ "${DISABLE_FORK_CI}" == "true" ]]; then
-          echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
-          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
-          exit 0
-        fi
 
         if [[ "${GITHUB_REPOSITORY}" == "apache/gravitino" && \
           ("${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/heads/branch-*) ]]; then
