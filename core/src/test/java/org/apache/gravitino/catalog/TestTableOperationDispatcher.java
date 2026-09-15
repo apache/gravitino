@@ -50,6 +50,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -78,6 +79,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
   static SchemaOperationDispatcher schemaOperationDispatcher;
@@ -171,7 +174,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(ident1.isPresent());
 
     // Test when the entity store failed to put the table entity
-    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    doThrow(new IOException()).when(entityStore).put(any(), any(EntityWriteIntent.class));
     NameIdentifier tableIdent2 = NameIdentifier.of(tableNs, "table2");
     Table table2 =
         tableOperationDispatcher.createTable(
@@ -260,14 +263,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
-    doReturn(tableEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
-    Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent1);
-    // Succeed to import the topic entity
-    reset(entityStore);
-    TableEntity tableImportedEntity = entityStore.get(tableIdent1, TABLE, TableEntity.class);
-    Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
+    entityStore.put(tableEntity, true);
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> tableOperationDispatcher.loadTable(tableIdent1));
+    // Import must not replace the identity or audit information owned by another entity.
+    TableEntity retained = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    Assertions.assertEquals(tableEntity.id(), retained.id());
+    Assertions.assertEquals("gravitino", retained.auditInfo().creator());
   }
 
   @Test
@@ -363,7 +365,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .get(any(), eq(Entity.EntityType.TABLE), any());
     doThrow(new EntityAlreadyExistsException("mock conflict"))
         .when(entityStore)
-        .put(any(), anyBoolean());
+        .put(any(), any(EntityWriteIntent.class));
 
     Table loadedTable =
         Assertions.assertDoesNotThrow(() -> tableOperationDispatcher.loadTable(tableIdent));
@@ -424,7 +426,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .get(any(), eq(Entity.EntityType.TABLE), any());
     doThrow(new EntityAlreadyExistsException("mock conflict"))
         .when(entityStore)
-        .put(any(), anyBoolean());
+        .put(any(), any(EntityWriteIntent.class));
 
     UnsupportedOperationException exception =
         Assertions.assertThrows(

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -38,6 +39,8 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
+import org.apache.gravitino.EntityWriteSnapshot;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -170,6 +173,7 @@ public class RelationalEntityStore
   }
 
   @Override
+  @Deprecated
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
@@ -180,6 +184,70 @@ public class RelationalEntityStore
       cache.invalidate(e.nameIdentifier(), e.type());
     } else {
       cache.put(e);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E put(E entity, EntityWriteIntent intent)
+      throws IOException {
+    Objects.requireNonNull(intent, "intent must not be null");
+    if (intent == EntityWriteIntent.RECONCILE) {
+      throw new IllegalArgumentException("RECONCILE requires an observed ID and storage version");
+    }
+    try {
+      backend.insert(entity, false);
+      return entity;
+    } catch (EntityAlreadyExistsException conflict) {
+      if (intent == EntityWriteIntent.CREATE) {
+        throw conflict;
+      }
+      E existing;
+      try {
+        // Never decide identity from a stale per-node cache after a database conflict.
+        existing = backend.get(entity.nameIdentifier(), entity.type());
+      } catch (NoSuchEntityException missing) {
+        throw conflict;
+      }
+      if (intent == EntityWriteIntent.IMPORT && !existing.id().equals(entity.id())) {
+        throw conflict;
+      }
+      return existing;
+    } finally {
+      cache.invalidate(entity.nameIdentifier(), entity.type());
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E put(
+      E entity, EntityWriteIntent intent, EntityWriteSnapshot<E> observed) throws IOException {
+    if (intent != EntityWriteIntent.RECONCILE) {
+      throw new IllegalArgumentException("An observed snapshot is only valid for RECONCILE");
+    }
+    Objects.requireNonNull(observed, "observed snapshot must not be null");
+    try {
+      return backend.reconcile(entity, observed);
+    } finally {
+      cache.invalidate(entity.nameIdentifier(), entity.type());
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> EntityWriteSnapshot<E> getWriteSnapshot(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> clazz) throws IOException {
+    return backend.getWriteSnapshot(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E put(
+      E entity, EntityWriteIntent intent, Consumer<E> postInsertAction) throws IOException {
+    if (intent != EntityWriteIntent.CREATE) {
+      throw new IllegalArgumentException("Post-insert actions require CREATE");
+    }
+    Objects.requireNonNull(postInsertAction, "postInsertAction must not be null");
+    try {
+      return backend.create(entity, postInsertAction);
+    } finally {
+      cache.invalidate(entity.nameIdentifier(), entity.type());
     }
   }
 

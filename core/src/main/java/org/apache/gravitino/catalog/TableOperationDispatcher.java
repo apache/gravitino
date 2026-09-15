@@ -28,6 +28,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,9 +39,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
+import org.apache.gravitino.EntityWriteSnapshot;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -152,6 +156,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    // Observe the registration before reading the external catalog. A DB version captured after
+    // that read would allow an older external snapshot to overwrite a newer synchronization.
+    EntityWriteSnapshot<TableEntity> observed = null;
+    try {
+      observed = store.getWriteSnapshot(ident, TABLE, TableEntity.class);
+    } catch (NoSuchEntityException e) {
+      // First import has no existing registration to reconcile.
+    } catch (IOException | UnsupportedOperationException e) {
+      LOG.warn("Cannot capture a write snapshot for {}; skipping column reconciliation", ident, e);
+    }
     EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
@@ -182,7 +196,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    TableEntity updatedEntity =
+        updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable, observed);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
@@ -526,12 +541,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
-      LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
+      // Preserve the external ID, but let IMPORT reject an ID or name already owned elsewhere.
+      LOG.info(
+          "Importing table {} with external ID {}; existing ownership is preserved",
+          identifier,
           stringId);
       uid = stringId.id();
     } else {
@@ -557,7 +570,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
+      tableEntity = store.put(tableEntity, EntityWriteIntent.IMPORT);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
@@ -704,7 +717,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
 
     try {
-      store.put(tableEntity, true /* overwrite */);
+      store.put(tableEntity, EntityWriteIntent.CREATE);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
@@ -886,51 +899,51 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   private TableEntity updateColumnsIfNecessaryWhenLoad(
-      NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
+      NameIdentifier tableIdent,
+      EntityCombinedTable combinedTable,
+      @Nullable EntityWriteSnapshot<TableEntity> observed) {
+    if (observed == null || combinedTable.tableFromGravitino() == null) {
+      return combinedTable.tableFromGravitino();
+    }
+    if (observed.id() != combinedTable.tableFromGravitino().id()) {
+      return combinedTable.tableFromGravitino();
+    }
+    TableEntity entity = observed.entity();
     Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
-        updateColumnsIfNecessary(
-            combinedTable.tableFromCatalog(), combinedTable.tableFromGravitino());
-
-    // No need to update the columns
+        updateColumnsIfNecessary(combinedTable.tableFromCatalog(), entity);
     if (!columnsUpdateResult.getLeft()) {
       return combinedTable.tableFromGravitino();
     }
 
-    // Update the columns in the Gravitino store
+    TableEntity replacement =
+        TableEntity.builder()
+            .withId(entity.id())
+            .withName(entity.name())
+            .withNamespace(entity.namespace())
+            .withComment(entity.comment())
+            .withProperties(entity.properties())
+            .withColumns(columnsUpdateResult.getRight())
+            .withPartitioning(entity.partitioning())
+            .withDistribution(entity.distribution())
+            .withSortOrders(entity.sortOrders())
+            .withIndexes(entity.indexes())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(entity.auditInfo().creator())
+                    .withCreateTime(entity.auditInfo().createTime())
+                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withLastModifiedTime(Instant.now())
+                    .build())
+            .build();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,
         LockType.WRITE,
         () ->
             operateOnEntity(
                 tableIdent,
-                id ->
-                    store.update(
-                        id,
-                        TableEntity.class,
-                        TABLE,
-                        entity ->
-                            TableEntity.builder()
-                                .withId(entity.id())
-                                .withName(entity.name())
-                                .withNamespace(entity.namespace())
-                                .withComment(entity.comment())
-                                .withProperties(entity.properties())
-                                .withColumns(columnsUpdateResult.getRight())
-                                .withPartitioning(entity.partitioning())
-                                .withDistribution(entity.distribution())
-                                .withSortOrders(entity.sortOrders())
-                                .withIndexes(entity.indexes())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(entity.auditInfo().creator())
-                                        .withCreateTime(entity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build()),
-                "UPDATE",
-                combinedTable.tableFromGravitino().id()));
+                ignored -> store.put(replacement, EntityWriteIntent.RECONCILE, observed),
+                "RECONCILE",
+                observed.id()));
   }
 
   private static class TableCatalogResult {

@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
@@ -285,7 +286,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            store.put(metalake, false /* overwritten */);
+            store.put(metalake, EntityWriteIntent.CREATE);
             return metalake;
           } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
             LOG.warn("Metalake {} already exists", ident, e);

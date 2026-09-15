@@ -92,6 +92,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestAccessControlManager {
 
   private static AccessControlManager accessControlManager;

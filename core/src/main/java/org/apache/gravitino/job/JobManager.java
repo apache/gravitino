@@ -50,6 +50,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutor;
@@ -226,7 +227,7 @@ public class JobManager implements JobOperationDispatcher {
         LockType.WRITE,
         () -> {
           try {
-            entityStore.put(jobTemplateEntity, false /* overwrite */);
+            entityStore.put(jobTemplateEntity, EntityWriteIntent.CREATE);
             return null;
           } catch (EntityAlreadyExistsException e) {
             throw new JobTemplateAlreadyExistsException(
@@ -507,7 +508,7 @@ public class JobManager implements JobOperationDispatcher {
             .build();
 
     try {
-      entityStore.put(jobEntity, false /* overwrite */);
+      entityStore.put(jobEntity, EntityWriteIntent.CREATE);
     } catch (NoSuchEntityException e) {
       LOG.error(
           "Job {} was submitted as execution {} but could not be registered because its template "

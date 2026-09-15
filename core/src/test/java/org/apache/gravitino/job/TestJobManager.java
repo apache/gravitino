@@ -19,7 +19,6 @@
 package org.apache.gravitino.job;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -59,6 +58,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -183,7 +183,7 @@ public class TestJobManager {
   public void testRegisterJobTemplateReportsConcurrentMetalakeDeletion() throws IOException {
     JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
     NoSuchEntityException missing = new NoSuchEntityException("Metalake was deleted");
-    doThrow(missing).when(entityStore).put(template, false);
+    doThrow(missing).when(entityStore).put(template, EntityWriteIntent.CREATE);
 
     NoSuchMetalakeException failure =
         Assertions.assertThrows(
@@ -202,7 +202,7 @@ public class TestJobManager {
       String executionId = "submitted_" + parent.name();
       when(jobExecutor.submitJob(any())).thenReturn(executionId);
       NoSuchEntityException missing = new NoSuchEntityException("Parent was deleted: %s", parent);
-      doThrow(missing).when(entityStore).put(any(JobEntity.class), eq(false));
+      doThrow(missing).when(entityStore).put(any(JobEntity.class), eq(EntityWriteIntent.CREATE));
 
       NoSuchJobTemplateException failure =
           Assertions.assertThrows(
@@ -211,7 +211,7 @@ public class TestJobManager {
       Assertions.assertSame(missing, failure.getCause());
       verify(jobExecutor, times(1)).submitJob(any());
       verify(jobExecutor, never()).cancelJob(any());
-      verify(entityStore, times(1)).put(any(JobEntity.class), eq(false));
+      verify(entityStore, times(1)).put(any(JobEntity.class), eq(EntityWriteIntent.CREATE));
     }
   }
 
@@ -296,7 +296,7 @@ public class TestJobManager {
 
     JobTemplateEntity shellJobTemplate =
         newShellJobTemplateEntity("shell_job", "A shell job template");
-    doNothing().when(entityStore).put(shellJobTemplate, false);
+    doReturn(shellJobTemplate).when(entityStore).put(shellJobTemplate, EntityWriteIntent.CREATE);
 
     // Register a new job template
     Assertions.assertDoesNotThrow(() -> jobManager.registerJobTemplate(metalake, shellJobTemplate));
@@ -304,7 +304,7 @@ public class TestJobManager {
     // Throw exception if job template already exists
     doThrow(new EntityAlreadyExistsException("Job template already exists"))
         .when(entityStore)
-        .put(shellJobTemplate, false /* overwrite */);
+        .put(shellJobTemplate, EntityWriteIntent.CREATE);
 
     Exception e =
         Assertions.assertThrows(
@@ -339,7 +339,7 @@ public class TestJobManager {
     // Throw exception if entity store fails
     doThrow(new IOException("Entity store error"))
         .when(entityStore)
-        .put(shellJobTemplate, false /* overwrite */);
+        .put(shellJobTemplate, EntityWriteIntent.CREATE);
 
     Assertions.assertThrows(
         RuntimeException.class, () -> jobManager.registerJobTemplate(metalake, shellJobTemplate));
@@ -631,7 +631,7 @@ public class TestJobManager {
     String jobExecutionId = "job_execution_id_for_test";
     when(jobExecutor.submitJob(any())).thenReturn(jobExecutionId);
 
-    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+    doReturn(null).when(entityStore).put(any(JobEntity.class), any(EntityWriteIntent.class));
 
     JobEntity jobEntity = jobManager.runJob(metalake, "shell_job", Collections.emptyMap());
 
@@ -659,7 +659,7 @@ public class TestJobManager {
     // Test when entity store fails
     doThrow(new IOException("Entity store error"))
         .when(entityStore)
-        .put(any(JobEntity.class), anyBoolean());
+        .put(any(JobEntity.class), any(EntityWriteIntent.class));
 
     Assertions.assertThrows(
         RuntimeException.class,
@@ -691,7 +691,7 @@ public class TestJobManager {
     Assertions.assertSame(rejection, e);
 
     // No job entity is registered and the staging directory of the rejected job is removed.
-    verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
+    verify(entityStore, never()).put(any(JobEntity.class), any(EntityWriteIntent.class));
     File templateStagingDir =
         new File(testStagingDir, metalake + File.separator + shellJobTemplate.name());
     String[] jobStagingDirs = templateStagingDir.list();
@@ -726,7 +726,7 @@ public class TestJobManager {
         .thenReturn(jobTemplateEntity);
 
     when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
-    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+    doReturn(null).when(entityStore).put(any(JobEntity.class), any(EntityWriteIntent.class));
 
     JobEntity jobEntity =
         jobManager.runJob(
@@ -760,7 +760,7 @@ public class TestJobManager {
     JobTemplateEntity shellJobTemplate =
         newShellJobTemplateEntity("shell_job", "A shell job template");
     when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
-    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+    doReturn(null).when(entityStore).put(any(JobEntity.class), any(EntityWriteIntent.class));
 
     // Use a fixed job ID so that both runs resolve to the same staging directory.
     IdGenerator fixedIdGenerator = Mockito.mock(IdGenerator.class);

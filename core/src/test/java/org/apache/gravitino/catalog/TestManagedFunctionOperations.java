@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
@@ -897,17 +898,18 @@ public class TestManagedFunctionOperations {
     doAnswer(
             invocation -> {
               FunctionEntity entity = invocation.getArgument(0);
-              boolean overwrite = invocation.getArgument(1);
+              EntityWriteIntent intent = invocation.getArgument(1);
+              Assertions.assertEquals(EntityWriteIntent.CREATE, intent);
               NameIdentifier ident = entity.nameIdentifier();
 
-              if (!overwrite && entityMap.containsKey(ident)) {
+              if (entityMap.containsKey(ident)) {
                 throw new EntityAlreadyExistsException("Entity %s already exists", ident);
               }
               entityMap.put(ident, entity);
               return null;
             })
         .when(mockStore)
-        .put(any(FunctionEntity.class), any(Boolean.class));
+        .put(any(FunctionEntity.class), any(EntityWriteIntent.class));
 
     // Mock get operation
     when(mockStore.get(

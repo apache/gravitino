@@ -77,6 +77,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -921,7 +922,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           boolean entityStored = false;
           try {
             try {
-              store.put(e, false /* overwrite */);
+              store.put(e, EntityWriteIntent.CREATE);
             } catch (NoSuchEntityException e1) {
               // The relational store locks and rechecks the parent metalake while inserting the
               // catalog. A concurrent drop or rename can therefore make the metalake disappear

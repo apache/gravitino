@@ -51,6 +51,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestCatalogNormalizeDispatcher {
   private static CatalogNormalizeDispatcher catalogNormalizeDispatcher;
   private static CatalogManager catalogManager;

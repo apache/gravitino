@@ -60,6 +60,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestMetalakeManager {
 
   private static MetalakeManager metalakeManager;

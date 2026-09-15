@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
@@ -145,7 +146,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(model, false /* overwrite */);
+      store.put(model, EntityWriteIntent.CREATE);
     } catch (IOException e) {
       throw ExceptionMessages.wrap("Failed to register model " + ident, e);
     } catch (EntityAlreadyExistsException e) {
@@ -253,7 +254,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(modelVersion, false /* overwrite */);
+      store.put(modelVersion, EntityWriteIntent.CREATE);
     } catch (IOException e) {
       throw ExceptionMessages.wrap("Failed to link model version " + ident, e);
     } catch (EntityAlreadyExistsException e) {

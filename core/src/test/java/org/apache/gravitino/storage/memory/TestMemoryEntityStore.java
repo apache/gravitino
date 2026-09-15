@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -37,6 +38,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
+import org.apache.gravitino.EntityWriteSnapshot;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
@@ -46,6 +49,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -63,11 +67,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestMemoryEntityStore {
 
   public static class InMemoryEntityStore implements EntityStore {
 
     private final Map<NameIdentifier, Entity> entityMap;
+    private final Map<NameIdentifier, Long> versions = Maps.newHashMap();
     private final Lock lock;
 
     public InMemoryEntityStore() {
@@ -99,19 +106,57 @@ public class TestMemoryEntityStore {
     @Override
     public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
         throws IOException, EntityAlreadyExistsException {
-      NameIdentifier ident = e.nameIdentifier();
-      if (overwritten) {
-        entityMap.put(ident, e);
-      } else {
-        executeInTransaction(
-            () -> {
-              if (exists(e.nameIdentifier(), e.type())) {
-                throw new EntityAlreadyExistsException("Entity %s already exists", ident);
-              }
-              entityMap.put(ident, e);
-              return null;
-            });
-      }
+      executeInTransaction(
+          () -> {
+            NameIdentifier ident = e.nameIdentifier();
+            if (!overwritten && exists(ident, e.type())) {
+              throw new EntityAlreadyExistsException("Entity %s already exists", ident);
+            }
+            entityMap.put(ident, e);
+            versions.merge(ident, 1L, Long::sum);
+            return null;
+          });
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> EntityWriteSnapshot<E> getWriteSnapshot(
+        NameIdentifier ident, EntityType type, Class<E> clazz) throws IOException {
+      return executeInTransaction(
+          () -> new EntityWriteSnapshot<>(get(ident, type, clazz), versions.get(ident)));
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> E put(
+        E entity, EntityWriteIntent intent, EntityWriteSnapshot<E> observed) throws IOException {
+      return executeInTransaction(
+          () -> {
+            if (intent != EntityWriteIntent.RECONCILE) {
+              throw new IllegalArgumentException("Expected RECONCILE");
+            }
+            observed.validateReplacement(entity);
+            Entity current = entityMap.get(observed.identifier());
+            if (!(current instanceof HasIdentifier)
+                || ((HasIdentifier) current).id() != observed.id()
+                || versions.get(observed.identifier()) != observed.version()) {
+              throw new OptimisticLockException("Stale write snapshot");
+            }
+            put(entity, true);
+            return entity;
+          });
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> E put(
+        E entity, EntityWriteIntent intent, Consumer<E> action) throws IOException {
+      return executeInTransaction(
+          () -> {
+            if (intent != EntityWriteIntent.CREATE) {
+              throw new IllegalArgumentException("Expected CREATE");
+            }
+            put(entity, false);
+            action.accept(entity);
+            return entity;
+          });
     }
 
     @Override
@@ -132,6 +177,7 @@ public class TestMemoryEntityStore {
               delete(ident, entityType);
             }
             entityMap.put(newIdent, newE);
+            versions.merge(newIdent, 1L, Long::sum);
             return newE;
           });
     }
@@ -179,6 +225,7 @@ public class TestMemoryEntityStore {
         throws E, IOException {
       lock.lock();
       Map<NameIdentifier, Entity> snapshot = createSnapshot();
+      Map<NameIdentifier, Long> versionSnapshot = Maps.newHashMap(versions);
       try {
         return executable.execute();
       } catch (Exception e) {
@@ -186,6 +233,8 @@ public class TestMemoryEntityStore {
           // restore the entityMap in case of failed transactions
           entityMap.clear();
           entityMap.putAll(snapshot);
+          versions.clear();
+          versions.putAll(versionSnapshot);
         }
         throw e;
       } finally {

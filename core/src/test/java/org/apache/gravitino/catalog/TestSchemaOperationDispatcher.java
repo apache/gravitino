@@ -42,6 +42,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -66,6 +67,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
   static SchemaOperationDispatcher dispatcher;
@@ -129,7 +132,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(ident1.isPresent());
 
     // Test when the entity store failed to put the schema entity
-    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    doThrow(new IOException()).when(entityStore).put(any(), any(EntityWriteIntent.class));
     NameIdentifier schemaIdent2 = NameIdentifier.of(ns, "schema2");
     Schema schema2 = dispatcher.createSchema(schemaIdent2, "comment", props);
 
@@ -197,7 +200,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     SchemaEntity unmatchedEntity =
         SchemaEntity.builder()
             .withId(1L)
-            .withName("schema21")
+            .withName(schemaIdent.name())
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
                 AuditInfo.builder()
@@ -205,17 +208,12 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-    doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.SCHEMA), any());
-    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
-    // Succeed to import the schema entity
-    reset(entityStore);
-    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals("test", schemaEntity.auditInfo().creator());
-    Assertions.assertEquals(schema.name(), loadedSchema3.name());
-    Assertions.assertEquals(schema.comment(), loadedSchema3.comment());
-    testProperties(props, loadedSchema3.properties());
-    // Audit info is gotten from catalog, not from the entity store
-    Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
+    entityStore.put(unmatchedEntity, true);
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
+    SchemaEntity retained = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals(unmatchedEntity.id(), retained.id());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, retained.auditInfo().creator());
   }
 
   @Test
@@ -247,7 +245,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         .get(any(), eq(Entity.EntityType.SCHEMA), any());
     doThrow(new EntityAlreadyExistsException("mock conflict"))
         .when(entityStore)
-        .put(any(), anyBoolean());
+        .put(any(), any(EntityWriteIntent.class));
 
     Schema loadedSchema = Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
     Assertions.assertEquals(schemaIdent.name(), loadedSchema.name());
@@ -282,7 +280,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         .get(any(), eq(Entity.EntityType.SCHEMA), any());
     doThrow(new EntityAlreadyExistsException("mock conflict"))
         .when(entityStore)
-        .put(any(), anyBoolean());
+        .put(any(), any(EntityWriteIntent.class));
 
     UnsupportedOperationException exception =
         Assertions.assertThrows(

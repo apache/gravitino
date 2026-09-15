@@ -69,7 +69,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -553,30 +555,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                     + ", location name: "
                     + entry.getKey());
           }
-
-          if (!fs.exists(formalizePath)) {
-            if (!fs.mkdirs(formalizePath)) {
-              throw new RuntimeException(
-                  "Failed to create fileset "
-                      + ident
-                      + " location "
-                      + formalizePath
-                      + " with location name "
-                      + entry.getKey());
-            }
-
-            LOG.info(
-                "Created fileset {} location {} with location name {}",
-                ident,
-                formalizePath,
-                entry.getKey());
-          } else {
-            LOG.info(
-                "Fileset {} manages the existing location {} with location name {}",
-                ident,
-                formalizePath,
-                entry.getKey());
-          }
         }
 
       } catch (IOException ioe) {
@@ -612,7 +590,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(filesetEntity, true /* overwrite */);
+      // The unique-key insert decides the winner before either request can create directories.
+      // Run mkdirs before commit so a filesystem failure rolls the metadata insert back, just as
+      // dropFileset keeps its metadata decision and storage callback in one transaction.
+      store.put(
+          filesetEntity,
+          EntityWriteIntent.CREATE,
+          created -> {
+            if (!disableFSOps) {
+              createFilesetStorage(ident, created);
+            }
+          });
+    } catch (EntityAlreadyExistsException conflict) {
+      throw new FilesetAlreadyExistsException(conflict, "Fileset %s already exists", ident);
+    } catch (UncheckedIOException ioe) {
+      throw ExceptionMessages.wrap("Failed to create fileset " + ident, ioe.getCause());
     } catch (NoSuchEntityException exception) {
       // The schema can disappear after the check near the start of this method. The relational
       // store detects that race while taking the parent-schema lock; translate its storage-level
@@ -1103,6 +1095,35 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
+    }
+  }
+
+  private void createFilesetStorage(NameIdentifier ident, FilesetEntity entity) {
+    for (Map.Entry<String, String> entry : entity.storageLocations().entrySet()) {
+      Path location = new Path(entry.getValue());
+      try {
+        Map<String, String> fsConf =
+            mergeUpLevelConfigurations(ident, entity.properties(), location);
+        FileSystem fs = getFileSystemWithCache(location, fsConf);
+        if (fs.exists(location)) {
+          if (!fs.getFileStatus(location).isDirectory()) {
+            throw new IOException("Fileset location cannot be a file: " + location);
+          }
+          continue;
+        }
+        if (!fs.mkdirs(location)) {
+          throw new IOException("Failed to create fileset location " + location);
+        }
+        LOG.info(
+            "Created fileset {} location {} with location name {}",
+            ident,
+            location,
+            entry.getKey());
+      } catch (IOException ioe) {
+        // Do not recursively remove a path here: an existing/shared directory may belong to
+        // another entity, and successful mkdirs at earlier locations cannot be rolled back safely.
+        throw new UncheckedIOException(ioe);
+      }
     }
   }
 

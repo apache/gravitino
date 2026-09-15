@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -627,7 +628,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
             .build();
 
     try {
-      store.put(defaultSchema, true /* overwrite */);
+      store.put(defaultSchema, EntityWriteIntent.CREATE_IF_ABSENT);
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to create default schema for Kafka catalog", ioe);
     }

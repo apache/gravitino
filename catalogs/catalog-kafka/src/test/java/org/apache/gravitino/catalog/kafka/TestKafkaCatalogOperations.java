@@ -88,6 +88,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
 
   private static final String STORE_PATH = "/tmp/gravitino_test_entityStore_" + genRandomString();

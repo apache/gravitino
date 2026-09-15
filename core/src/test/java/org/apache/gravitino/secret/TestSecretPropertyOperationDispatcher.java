@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Test;
  * Exercises {@link SecretPropertyOperationDispatcher#getSecrets} for each entity-type loader,
  * including the metalake / table / topic / view / model branches that were previously untested.
  */
+@SuppressWarnings("deprecation")
 public class TestSecretPropertyOperationDispatcher extends TestOperationDispatcher {
 
   private static final String SCHEMA = "secret_schema";

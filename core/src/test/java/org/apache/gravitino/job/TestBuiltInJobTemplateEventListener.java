@@ -68,6 +68,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestBuiltInJobTemplateEventListener {
 
   private BuiltInJobTemplateEventListener listener;

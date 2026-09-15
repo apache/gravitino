@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -78,7 +79,7 @@ class RoleManager {
                     .build())
             .build();
     try {
-      store.put(roleEntity, false /* overwritten */);
+      store.put(roleEntity, EntityWriteIntent.CREATE);
 
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,

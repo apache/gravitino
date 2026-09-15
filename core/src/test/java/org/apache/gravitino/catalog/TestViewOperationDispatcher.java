@@ -70,6 +70,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestViewOperationDispatcher extends TestOperationDispatcher {
   static ViewOperationDispatcher viewOperationDispatcher;
   static SchemaOperationDispatcher schemaOperationDispatcher;

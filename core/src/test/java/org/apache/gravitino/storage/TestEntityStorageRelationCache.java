@@ -75,6 +75,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 @Tag("gravitino-docker-test")
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest

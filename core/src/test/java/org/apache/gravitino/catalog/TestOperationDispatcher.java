@@ -67,6 +67,8 @@ import org.junit.jupiter.api.function.Executable;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+// Retain coverage of the legacy write API during its deprecation period.
+@SuppressWarnings("deprecation")
 public abstract class TestOperationDispatcher {
 
   protected static EntityStore entityStore;

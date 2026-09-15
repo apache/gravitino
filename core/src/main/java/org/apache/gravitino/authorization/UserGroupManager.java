@@ -27,6 +27,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.EntityWriteIntent;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -78,7 +79,7 @@ class UserGroupManager {
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-      store.put(userEntity, false /* overwritten */);
+      store.put(userEntity, EntityWriteIntent.CREATE);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
@@ -152,7 +153,7 @@ class UserGroupManager {
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-      store.put(groupEntity, false /* overwritten */);
+      store.put(groupEntity, EntityWriteIntent.CREATE);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Group {} in the metalake {} already exists", group, metalake, e);
