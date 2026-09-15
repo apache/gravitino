@@ -27,9 +27,49 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.spark.sql.RowFactory;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteDataFilesJob {
+
+  /** Verifies that legacy three-column results retain all available statistics. */
+  @Test
+  public void testFormatThreeColumnResult() {
+    assertEquals(
+        String.format(
+            "Rewrite Data Files Results:%n"
+                + "  Rewritten data files: 2%n"
+                + "  Added data files: 1%n"
+                + "  Rewritten bytes: 4294967296%n"),
+        IcebergRewriteDataFilesJob.formatResult(RowFactory.create(2, 1, 4294967296L)));
+  }
+
+  /** Verifies that four-column results include the failed file count. */
+  @Test
+  public void testFormatFourColumnResult() {
+    assertEquals(
+        String.format(
+            "Rewrite Data Files Results:%n"
+                + "  Rewritten data files: 2%n"
+                + "  Added data files: 1%n"
+                + "  Rewritten bytes: 1024%n"
+                + "  Failed data files: 3%n"),
+        IcebergRewriteDataFilesJob.formatResult(RowFactory.create(2, 1, 1024L, 3)));
+  }
+
+  /** Verifies that five-column results include the removed delete file count. */
+  @Test
+  public void testFormatFiveColumnResult() {
+    assertEquals(
+        String.format(
+            "Rewrite Data Files Results:%n"
+                + "  Rewritten data files: 2%n"
+                + "  Added data files: 1%n"
+                + "  Rewritten bytes: 1024%n"
+                + "  Failed data files: 3%n"
+                + "  Removed delete files: 4%n"),
+        IcebergRewriteDataFilesJob.formatResult(RowFactory.create(2, 1, 1024L, 3, 4)));
+  }
 
   @Test
   public void testJobTemplateHasCorrectName() {
