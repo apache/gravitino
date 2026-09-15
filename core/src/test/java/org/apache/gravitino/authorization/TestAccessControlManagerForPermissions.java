@@ -198,6 +198,27 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
+  public void testRoleDisappearingDuringGrantIsReportedAsIllegalRole() throws IOException {
+    EntityStore failingStore = Mockito.mock(EntityStore.class);
+    RoleManager roleManager = Mockito.mock(RoleManager.class);
+    Mockito.when(roleManager.getRole(METALAKE, roleEntity.name())).thenReturn(roleEntity);
+    NoSuchRoleException missing = new NoSuchRoleException("Role was deleted during grant");
+    Mockito.doThrow(missing).when(failingStore).update(any(), any(), any(), any());
+    PermissionManager manager = new PermissionManager(failingStore, roleManager);
+
+    IllegalRoleException userFailure =
+        Assertions.assertThrows(
+            IllegalRoleException.class,
+            () -> manager.grantRolesToUser(METALAKE, List.of(roleEntity.name()), USER));
+    Assertions.assertSame(missing, userFailure.getCause());
+    IllegalRoleException groupFailure =
+        Assertions.assertThrows(
+            IllegalRoleException.class,
+            () -> manager.grantRolesToGroup(METALAKE, List.of(roleEntity.name()), GROUP));
+    Assertions.assertSame(missing, groupFailure.getCause());
+  }
+
+  @Test
   public void testGrantRoleToUser() {
     reset(authorizationPlugin);
     String notExist = "not-exist";

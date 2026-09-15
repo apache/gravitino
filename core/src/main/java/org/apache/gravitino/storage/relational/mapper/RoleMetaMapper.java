@@ -47,6 +47,10 @@ public interface RoleMetaMapper {
   RolePO selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
 
+  /** Returns an active role by ID and holds a shared lock for the current transaction. */
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "selectRoleMetaByIdForShare")
+  RolePO selectRoleMetaByIdForShare(@Param("roleId") Long roleId);
+
   /** Returns and locks an active role by ID for the current transaction. */
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "selectRoleMetaByIdForUpdate")
   RolePO selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId);
