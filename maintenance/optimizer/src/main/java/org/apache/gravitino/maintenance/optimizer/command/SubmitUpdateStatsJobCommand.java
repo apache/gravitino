@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 
@@ -90,7 +91,13 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
+            buildJobConfig(
+                tableTarget,
+                updateMode,
+                updaterOptions,
+                sparkConfigs,
+                submitterConfigs,
+                context.optimizerEnv().config());
         context
             .output()
             .printf(
@@ -107,7 +114,13 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       int submitted = 0;
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
+            buildJobConfig(
+                tableTarget,
+                updateMode,
+                updaterOptions,
+                sparkConfigs,
+                submitterConfigs,
+                context.optimizerEnv().config());
         JobHandle jobHandle = client.runJob(JOB_TEMPLATE_NAME, jobConfig);
         submitted++;
         context
@@ -129,7 +142,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       String updateMode,
       Map<String, String> updaterOptions,
       Map<String, String> sparkConfigs,
-      Map<String, String> submitterConfigs) {
+      Map<String, String> submitterConfigs,
+      OptimizerConfig optimizerConfig) {
     Map<String, String> jobConfig = new LinkedHashMap<>();
     jobConfig.put("catalog_name", tableTarget.catalogName);
     jobConfig.putAll(
@@ -138,6 +152,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     jobConfig.put("update_mode", updateMode);
     jobConfig.put("updater_options", toCanonicalJson(updaterOptions));
     jobConfig.put("spark_conf", toCanonicalJson(sparkConfigs));
+    GravitinoAuthSettings.copyToJobConf(jobConfig, optimizerConfig);
     return jobConfig;
   }
 
