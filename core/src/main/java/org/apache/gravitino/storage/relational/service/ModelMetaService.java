@@ -349,6 +349,14 @@ public class ModelMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Hold the parent schema row until the transaction ends, so the model cannot be
+            // updated below a schema that is being dropped.
+            SchemaMetaService.getInstance()
+                .lockSchemaForEntityWrite(
+                    newEntity.nameIdentifier(),
+                    oldModelPO.getSchemaId(),
+                    oldModelPO.getCatalogId(),
+                    oldModelPO.getMetalakeId());
             // This is the first write in the transaction. It succeeds only if the model still has
             // the concurrency version read above, so an older request cannot overwrite a newer
             // model or add an incorrect change-log entry.

@@ -166,10 +166,39 @@ public class ViewMetaService {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Same lock strategy as updateTable — prevents cascade-delete race.
             if (isSchemaChanged) {
+              Long sourceSchemaId = oldViewPO.getSchemaId();
+              Long destSchemaId = newSchemaId;
+              // Lock the smaller schemaId first to avoid deadlocks
+              if (sourceSchemaId.compareTo(destSchemaId) <= 0) {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId());
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), destSchemaId, newCatalogId, newMetalakeId);
+              } else {
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), destSchemaId, newCatalogId, newMetalakeId);
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        sourceSchemaId,
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId());
+              }
+            } else {
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
-                      newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId);
+                      newEntity.nameIdentifier(),
+                      oldViewPO.getSchemaId(),
+                      oldViewPO.getCatalogId(),
+                      oldViewPO.getMetalakeId());
             }
           },
           () -> {
