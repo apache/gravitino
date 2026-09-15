@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector.catalog;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -93,9 +94,16 @@ public class GravitinoCatalogManager {
                     sparkConf.getLong(
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC,
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT)))
-            // An evicted client still owns an HTTP connection pool, so it must be closed.
+            // An evicted client still owns an HTTP connection pool, so it must be closed. Explicit
+            // removal comes only from close(), which closes on the caller's thread; closing here as
+            // well would close the client a second time from the common pool, after close() has
+            // already returned.
             .<GravitinoIdentity, GravitinoClient>removalListener(
-                (identity, client, cause) -> closeClient(identity, client))
+                (identity, client, cause) -> {
+                  if (cause != RemovalCause.EXPLICIT) {
+                    closeClient(identity, client);
+                  }
+                })
             .build();
     this.gravitinoCatalogs =
         Caffeine.newBuilder()
@@ -143,7 +151,8 @@ public class GravitinoCatalogManager {
   public void close() {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
-    // Caffeine dispatches the removal listener asynchronously, so shutdown closes explicitly.
+    // Close on this thread so no client outlives close(); the removal listener leaves the
+    // invalidation below alone.
     clients.asMap().forEach(GravitinoCatalogManager::closeClient);
     clients.invalidateAll();
     gravitinoCatalogs.invalidateAll();
