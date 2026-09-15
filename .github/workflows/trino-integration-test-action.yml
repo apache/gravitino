@@ -64,9 +64,17 @@ jobs:
           # Disable the Trino cascading query integration test, because the connector jars are private now.
           #trino-connector/integration-test/trino-test-tools/run_test.sh
 
+      # The SQL-file harness above does not execute the JUnit ITs under
+      # trino-connector/integration-test, so run them explicitly. This runs in embedded mode;
+      # ITs that require the deploy distribution (TrinoTlsOAuthCredentialVendingIT) are skipped.
+      - name: Trino JUnit Integration Test
+        id: junitIntegrationTest
+        run: |
+          ./gradlew :trino-connector:integration-test:test -PskipDockerTests=false -PskipWeb=true
+
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && (steps.integrationTest.outcome == 'failure' || steps.junitIntegrationTest.outcome == 'failure')) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: trino-connector-integrate-test-reports-${{ inputs.java-version }}
           path: |

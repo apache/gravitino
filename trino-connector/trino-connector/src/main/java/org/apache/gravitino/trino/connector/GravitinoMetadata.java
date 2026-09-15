@@ -85,11 +85,13 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.function.SQLImpl;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.TrinoRoutineSpecification;
 
 /**
  * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
@@ -880,9 +882,14 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
    * Converts a Gravitino function to a collection of Trino LanguageFunction instances. Only SQL
    * implementations with TRINO runtime are included. Each definition with a Trino SQL
    * implementation produces one LanguageFunction. The signature token is generated from the
-   * function name and parameter types.
+   * function name and parameter types, and the stored SQL body is expanded into a complete Trino
+   * function specification.
    */
   private Collection<LanguageFunction> toLanguageFunctions(Function function) {
+    // Trino language functions are scalar SQL routines
+    if (function.functionType() != FunctionType.SCALAR) {
+      return List.of();
+    }
     List<LanguageFunction> result = new ArrayList<>();
     for (FunctionDefinition definition : function.definitions()) {
       for (FunctionImpl impl : definition.impls()) {
@@ -892,9 +899,13 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         String sql = ((SQLImpl) impl).sql();
         try {
           String signatureToken = buildSignatureToken(function.name(), definition.parameters());
-          result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
+          String specification =
+              TrinoRoutineSpecification.build(
+                  function, definition, sql, metadataAdapter.getDataTypeTransformer());
+          result.add(
+              new LanguageFunction(signatureToken, specification, List.of(), Optional.empty()));
         } catch (TrinoException e) {
-          LOG.warn(e, "Failed to build signature token for function %s", function.name());
+          LOG.warn(e, "Failed to build language function for %s", function.name());
         }
       }
     }
