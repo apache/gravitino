@@ -67,6 +67,9 @@ import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 public class GravitinoConnector implements Connector {
 
   private static final Logger LOG = Logger.get(GravitinoConnector.class);
+  private static final String ICEBERG_PROVIDER = "lakehouse-iceberg";
+  private static final String TRINO_ICEBERG_REST_SECURITY = "iceberg.rest-catalog.security";
+  private static final String OAUTH2_PASSTHROUGH = "OAUTH2_PASSTHROUGH";
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
@@ -131,13 +134,12 @@ public class GravitinoConnector implements Connector {
    */
   protected ConnectorMetadata getInternalMetadata(
       ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
-    if ("lakehouse-iceberg".equals(catalogConnectorContext.getCatalog().getProvider())
-        && "OAUTH2_PASSTHROUGH"
-            .equalsIgnoreCase(
-                catalogConnectorContext
-                    .getConfig()
-                    .getIcebergRestCatalogConfig()
-                    .get("iceberg.rest-catalog.security"))) {
+    if (ICEBERG_PROVIDER.equals(catalogConnectorContext.getCatalog().getProvider())
+        && OAUTH2_PASSTHROUGH.equalsIgnoreCase(
+            catalogConnectorContext
+                .getConfig()
+                .getIcebergRestCatalogConfig()
+                .get(TRINO_ICEBERG_REST_SECURITY))) {
       return DeferredConnectorMetadata.create(
           session,
           currentSession ->
