@@ -70,13 +70,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
-import org.apache.gravitino.json.JsonUtils;
->>>>>>> 8d2c01bd1 ([#13146] fix(core): Track local jobs only by their owning executor in multi-node deployments (#13147))
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -906,8 +900,6 @@ public class TestJobManager {
     Assertions.assertEquals(0L, result.finishedAt());
   }
 
-<<<<<<< HEAD
-=======
   @Test
   public void testPullJobStatusSkipsJobOwnedByAnotherExecutor() throws IOException {
     // The jobs are run by the job executor on another server, so this server must neither query
@@ -1126,7 +1118,6 @@ public class TestJobManager {
         JobHandle.Status.FAILED, captureUpdatedJobEntity(queuedJob, queuedJob).status());
     JobEntity expiredStartedJob = captureUpdatedJobEntity(startedJob, startedJob);
     Assertions.assertEquals(JobHandle.Status.FAILED, expiredStartedJob.status());
-    Assertions.assertEquals(startedJob.startedAt(), expiredStartedJob.startedAt());
     // The expire time is used as the finished time, so the job is kept for another retention time.
     Assertions.assertTrue(expiredStartedJob.finishedAt() >= beforeCleanUp);
     Assertions.assertEquals(
@@ -1205,39 +1196,6 @@ public class TestJobManager {
         JobHandle.Status.FAILED, captureUpdatedJobEntity(otherJob, otherJob).status());
   }
 
-  /** Conflicts preserve files without stopping this cleanup batch or its next scheduled run. */
-  @Test
-  public void testCleanUpStagingDirsContinuesAfterOccConflict() throws IOException {
-    JobEntity conflicted = expiredJob();
-    JobEntity other = expiredJob();
-    mockedMetalake
-        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
-        .thenReturn(ImmutableList.of(metalake));
-    when(jobManager.listJobs(metalake, Optional.empty()))
-        .thenReturn(ImmutableList.of(conflicted, other), ImmutableList.of(conflicted));
-    NameIdentifier conflictedIdent = NameIdentifierUtil.ofJob(metalake, conflicted.name());
-    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
-    when(entityStore.delete(conflictedIdent, Entity.EntityType.JOB))
-        .thenThrow(new OptimisticLockException("job changed"))
-        .thenReturn(true);
-    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File conflictedDir = new File(testStagingDir, metalake + "/shell_job/" + conflicted.name());
-    File otherDir = new File(testStagingDir, metalake + "/shell_job/" + other.name());
-    Assertions.assertTrue(conflictedDir.mkdirs());
-    Assertions.assertTrue(otherDir.mkdirs());
-    File artifact = new File(conflictedDir, "artifact");
-    Assertions.assertTrue(artifact.createNewFile());
-
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-    Assertions.assertTrue(artifact.isFile());
-    Assertions.assertFalse(otherDir.exists());
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-    Assertions.assertFalse(conflictedDir.exists());
-    verify(entityStore, times(2)).delete(conflictedIdent, Entity.EntityType.JOB);
-    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
-  }
-
->>>>>>> 8d2c01bd1 ([#13146] fix(core): Track local jobs only by their owning executor in multi-node deployments (#13147))
   @Test
   public void testCleanUpStagingDirs() throws IOException, InterruptedException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.STARTED);
@@ -1572,7 +1530,6 @@ public class TestJobManager {
         .withNamespace(NamespaceUtil.ofJob(metalake))
         .withJobTemplateName("shell_job")
         .withStatus(status)
-        .withStartedAt(0L)
         .withFinishedAt(0L)
         .withAuditInfo(
             AuditInfo.builder()

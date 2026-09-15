@@ -535,7 +535,6 @@ public class JobIT extends BaseIT {
     Awaitility.await()
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.FAILED);
-    Assertions.assertNotNull(metalake.getJob(job.name()).finishedAt());
   }
 
   private JobEntity insertOtherServerJob(
@@ -550,7 +549,6 @@ public class JobIT extends BaseIT {
             .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(createTime).build())
-            .withStartedAt(status == JobHandle.Status.QUEUED ? 0L : createTime.toEpochMilli())
             .withFinishedAt(0L)
             .build();
     GravitinoEnv.getInstance().entityStore().put(job, false /* overwrite */);

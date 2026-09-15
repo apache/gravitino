@@ -47,8 +47,10 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -78,6 +80,24 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   private JobManager nodeB;
 
   private EntityStore entityStore;
+
+  private Object originalConfig;
+
+  private Object originalLockManager;
+
+  @BeforeAll
+  public void saveGravitinoEnv() throws IllegalAccessException {
+    // The backend extension and this test replace the global config and lock manager, restore them
+    // afterwards so that other tests running in the same JVM are not affected.
+    originalConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    originalLockManager = FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
+  }
+
+  @AfterAll
+  public void restoreGravitinoEnv() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", originalConfig, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", originalLockManager, true);
+  }
 
   @BeforeEach
   public void setUpNodes() throws Exception {
@@ -237,9 +257,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
                                 ? null
                                 : job.auditInfo().lastModifiedTime().minusMillis(offsetInMs))
                         .build())
-                .withStartedAt(job.startedAt())
                 .withFinishedAt(job.finishedAt() > 0 ? job.finishedAt() - offsetInMs : 0L)
-                .withRuntimeJobTemplate(job.runtimeJobTemplate())
                 .build());
   }
 

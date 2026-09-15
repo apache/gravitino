@@ -614,93 +614,11 @@ public class JobManager implements JobOperationDispatcher {
 
       activeJobs.forEach(
           job -> {
-<<<<<<< HEAD
-            JobHandle.Status newStatus = job.status();
-            try {
-              newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
-            } catch (NoSuchJobException e) {
-              // If the job is not found in the external job executor, we assume the job is
-              // FAILED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
-              if (job.status() == JobHandle.Status.CANCELLING) {
-                newStatus = JobHandle.Status.CANCELLED;
-              } else {
-                newStatus = JobHandle.Status.FAILED;
-              }
-              LOG.warn(
-                  "Job {} with execution id {} under metalake {} is not found in the "
-                      + "external job executor, marking it as {}. This could be due to the job "
-                      + "being deleted by the external job executor. Please check the external job "
-                      + "executor to know more details.",
-                  job.name(),
-                  job.jobExecutionId(),
-                  metalake,
-                  newStatus);
-            } catch (Exception e) {
-              LOG.error(
-                  "Failed to get job status for job {} by execution id {}",
-                  job.name(),
-                  job.jobExecutionId(),
-                  e);
-            }
-
-            if (newStatus != job.status()) {
-              // Update the job entity with new status. entityStore.update() re-fetches the
-              // latest entity itself right before applying the updater, so the transition below
-              // is derived from latestJobEntity - the state as of right before the write - rather
-              // than the possibly-stale `job` snapshot taken by listJobs() above. A concurrent
-              // writer (e.g. cancelJob(), or another poll run) may have already moved the job to
-              // a terminal state, into CANCELLING, or recorded a real finishedAt in the gap
-              // between that snapshot and this point; the updater must not regress any of that
-              // using the stale snapshot's view of the world.
-              JobHandle.Status finalNewStatus = newStatus;
-              JobEntity updated;
-              try {
-                updated =
-                    TreeLockUtils.doWithTreeLock(
-                        NameIdentifierUtil.ofJob(metalake, job.name()),
-                        LockType.WRITE,
-                        () -> {
-                          try {
-                            return entityStore.update(
-                                NameIdentifierUtil.ofJob(metalake, job.name()),
-                                JobEntity.class,
-                                Entity.EntityType.JOB,
-                                latestJobEntity ->
-                                    toUpdatedStatusJobEntity(latestJobEntity, finalNewStatus));
-                          } catch (IOException e) {
-                            throw new RuntimeException(
-                                String.format(
-                                    "Failed to update job entity %s to status %s",
-                                    job.name(), finalNewStatus),
-                                e);
-                          }
-                        });
-              } catch (NoSuchEntityException e) {
-                // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
-                // in the gap between the listJobs() snapshot above and this update. Skip it rather
-                // than letting the exception escape this scheduled task, which would silently
-                // cancel all future status-pull runs (ScheduledExecutorService semantics).
-                LOG.warn(
-                    "Job {} under metalake {} no longer exists, skipping status update to {}. "
-                        + "This could be due to the job being deleted concurrently.",
-                    job.name(),
-                    metalake,
-                    finalNewStatus);
-                return;
-              }
-
-              LOG.info(
-                  "Updated the job {} with execution id {} status to {}",
-                  job.name(),
-                  job.jobExecutionId(),
-                  updated.status());
-=======
             // Only the job executor instance owning the job can query its status. The jobs
             // owned by other servers are skipped, and the jobs left behind by a server that has
             // exited are settled by cleanUpStagingDirs() once they expire.
             if (jobExecutor.ownsJob(job.jobExecutionId())) {
               pullAndUpdateOwnedJobStatus(metalake, job);
->>>>>>> 8d2c01bd1 ([#13146] fix(core): Track local jobs only by their owning executor in multi-node deployments (#13147))
             }
           });
     }
@@ -756,21 +674,6 @@ public class JobManager implements JobOperationDispatcher {
     List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
 
     for (String metalake : metalakes) {
-<<<<<<< HEAD
-      List<JobEntity> finishedJobs =
-          listJobs(metalake, Optional.empty()).stream()
-              .filter(
-                  job ->
-                      job.status() == JobHandle.Status.CANCELLED
-                          || job.status() == JobHandle.Status.SUCCEEDED
-                          || job.status() == JobHandle.Status.FAILED)
-              .filter(
-                  job ->
-                      job.finishedAt() > 0
-                          && job.finishedAt() + jobStagingDirKeepTimeInMs
-                              < System.currentTimeMillis())
-              .toList();
-=======
       long now = System.currentTimeMillis();
       List<JobEntity> expiredJobs = new ArrayList<>();
       for (JobEntity job : listJobs(metalake, Optional.empty())) {
@@ -790,7 +693,6 @@ public class JobManager implements JobOperationDispatcher {
           }
         }
       }
->>>>>>> 8d2c01bd1 ([#13146] fix(core): Track local jobs only by their owning executor in multi-node deployments (#13147))
 
       expiredJobs.forEach(
           job -> {
@@ -1141,7 +1043,7 @@ public class JobManager implements JobOperationDispatcher {
       // is derived from latestJobEntity - the state as of right before the write - rather
       // than the possibly-stale `job` snapshot taken by listJobs() above. A concurrent
       // writer (e.g. cancelJob(), or another poll run) may have already moved the job to
-      // a terminal state, into CANCELLING, or recorded a real startedAt/finishedAt in the
+      // a terminal state, into CANCELLING, or recorded a real finishedAt in the
       // gap between that snapshot and this point; the updater must not regress any of
       // that using the stale snapshot's view of the world.
       JobHandle.Status finalNewStatus = newStatus;
@@ -1188,14 +1090,6 @@ public class JobManager implements JobOperationDispatcher {
                       String.format("Failed to update job entity %s", job.name()), e);
                 }
               }));
-    } catch (OptimisticLockException e) {
-      // A later poll re-reads both executor state and metadata. Never stop the scheduled
-      // task or replay external submission/cancellation because a metadata CAS lost.
-      LOG.info(
-          "Job {} under metalake {} changed concurrently; deferring status update",
-          job.name(),
-          metalake);
-      return Optional.empty();
     } catch (NoSuchEntityException e) {
       // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
       // in the gap between the listJobs() snapshot above and this update. Skip it rather
