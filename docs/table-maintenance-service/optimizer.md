@@ -21,7 +21,7 @@ The CLI binary, its configuration file, and its configuration keys carry the old
 
 Confirm your environment matches this list before starting an evaluation against the built-ins. Anything outside it needs a custom extension, which is covered in the [Extension Guide](./optimizer-extension-guide.md).
 
-- Compaction is the only built-in strategy. There is no built-in snapshot expiration, orphan file cleanup, or sort and cluster maintenance.
+- Compaction is the only built-in strategy. Snapshot expiration and orphan file cleanup are available as directly submitted built-in jobs, but do not yet have built-in scheduling strategies. Sort and cluster maintenance also require custom strategies.
 - Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
 - The service is driven through the CLI workflow rather than running on a schedule of its own.
 
@@ -57,6 +57,20 @@ Three identifiers look interchangeable and are not.
 
 `--strategy-name` takes the **policy name**, despite what it is called. Passing either of the other two reports no matching identifiers rather than naming the mistake.
 
+## Direct Orphan File Cleanup
+
+Submit `builtin-iceberg-remove-orphan-files` through the jobs REST API to reclaim
+unreferenced files. Start with `dry_run: "true"` and review the candidate paths
+in the job logs before allowing deletion. The default cutoff is three days ago;
+explicit cutoffs must be at least 24 hours old, including for dry runs. A custom
+scan location must remain within the target table's storage location.
+
+This is a directly submitted job, not a new scheduling strategy. See
+[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for the
+submission example and [Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration)
+for the per-job options. Authenticated deployments use the same `gravitino_auth_*`
+job settings as the other built-in Iceberg jobs.
+
 ## Walkthrough
 
 This takes one Iceberg table through the whole workflow: create it, fill it with small files, attach a compaction policy, collect statistics, and let the service decide to compact it. It runs against a local Spark and takes about fifteen minutes.
@@ -67,6 +81,17 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 
 - A running Gravitino server with a metalake. The examples use `test`.
 - Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
+  `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
+  Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
+  stay under your control. A stock Spark distribution is not enough. Put a matching
+  `iceberg-spark-runtime-*` JAR on the job classpath — for example with `spark.jars` in
+  `spark_conf`, or by installing it into your Spark environment. Pick the artifact that matches
+  your Spark, Scala, and Iceberg versions. The jobs module is built and tested against Spark 3.5.x
+  and Iceberg 1.11.0 (for example
+  `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
+  Spark starts with an error naming the missing Iceberg classes. See
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.

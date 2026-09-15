@@ -95,4 +95,18 @@ public class TestGravitinoJobSubmitter {
     Assertions.assertEquals("db.table", merged.get("table"));
     Assertions.assertEquals("map('k','v')", merged.get("options"));
   }
+
+  @Test
+  void buildJobConfigCopiesOptimizerAuthIntoJobConf() {
+    OptimizerConfig config =
+        new OptimizerConfig(
+            Map.of(
+                OptimizerConfig.AUTH_TYPE, "basic",
+                OptimizerConfig.AUTH_USERNAME, "admin",
+                OptimizerConfig.AUTH_PASSWORD, "secret"));
+    Map<String, String> merged = GravitinoJobSubmitter.buildJobConfig(config, null, null);
+    Assertions.assertEquals("basic", merged.get("gravitino_auth_type"));
+    Assertions.assertEquals("admin", merged.get("gravitino_auth_username"));
+    Assertions.assertEquals("secret", merged.get("gravitino_auth_password"));
+  }
 }

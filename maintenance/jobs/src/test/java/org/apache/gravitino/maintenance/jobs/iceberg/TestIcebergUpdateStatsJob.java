@@ -64,6 +64,15 @@ public class TestIcebergUpdateStatsJob {
   }
 
   @Test
+  public void testJobTemplateDeclaresAuthEnvironments() {
+    IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
+    Map<String, String> environments = job.jobTemplate().environments();
+    assertEquals("{{gravitino_auth_type}}", environments.get("GRAVITINO_AUTH_TYPE"));
+    assertEquals("{{gravitino_auth_username}}", environments.get("GRAVITINO_AUTH_USERNAME"));
+    assertEquals("{{gravitino_auth_password}}", environments.get("GRAVITINO_AUTH_PASSWORD"));
+  }
+
+  @Test
   public void testJobTemplateHasSparkConfigs() {
     IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
@@ -148,20 +157,43 @@ public class TestIcebergUpdateStatsJob {
   public void testParseJsonOptions() {
     Map<String, String> parsed =
         IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
-            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
+            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}", "updater-options");
     assertEquals("b", parsed.get("a"));
     assertEquals("1", parsed.get("x"));
     assertEquals("true", parsed.get("flag"));
     assertEquals("", parsed.get("nil"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
+
+    IllegalArgumentException invalidJson =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}", "updater-options"));
+    assertTrue(invalidJson.getMessage().contains("--updater-options"));
+
+    IllegalArgumentException nested =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
+                    "{\"nested\":{\"a\":1}}", "updater-options"));
+    assertTrue(nested.getMessage().contains("--updater-options"));
+
+    IllegalArgumentException array =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
+                    "{\"array\":[1,2,3]}", "spark-conf"));
+    assertTrue(array.getMessage().contains("--spark-conf"));
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsUsesSparkConfFlagName() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergUpdateStatsAndMetricsJob.parseCustomSparkConfigs("{not_json}"));
+    assertTrue(ex.getMessage().contains("--spark-conf"));
   }
 
   @Test
@@ -178,6 +210,21 @@ public class TestIcebergUpdateStatsJob {
     assertEquals(
         "jdbc:mysql://localhost:3306/metrics",
         optimizerProperties.get("gravitino.optimizer.jdbcMetrics.jdbcUrl"));
+  }
+
+  @Test
+  public void testBuildOptimizerPropertiesCopiesAuthAliases() {
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "ml");
+    options.put("auth_type", "basic");
+    options.put("username", "admin");
+    options.put("password", "secret");
+    Map<String, String> optimizerProperties =
+        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+    assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
+    assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
+    assertEquals("secret", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
   }
 
   @Test

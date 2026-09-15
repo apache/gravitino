@@ -92,6 +92,14 @@ public class TestIcebergExpireSnapshotsJob {
   }
 
   @Test
+  public void testJobTemplateDeclaresAuthEnvironments() {
+    IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
+    Map<String, String> environments = job.jobTemplate().environments();
+    assertEquals("{{gravitino_auth_type}}", environments.get("GRAVITINO_AUTH_TYPE"));
+    assertEquals("{{gravitino_auth_password}}", environments.get("GRAVITINO_AUTH_PASSWORD"));
+  }
+
+  @Test
   public void testJobTemplateHasSparkConfigs() {
     IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
     SparkJobTemplate template = job.jobTemplate();
@@ -311,8 +319,8 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testEscapeSqlString() {
     // Test basic escaping of single quotes
-    assertEquals("O''Brien", IcebergJobUtils.escapeSqlString("O'Brien"));
-    assertEquals("test''with''quotes", IcebergJobUtils.escapeSqlString("test'with'quotes"));
+    assertEquals("O\\'Brien", IcebergJobUtils.escapeSqlString("O'Brien"));
+    assertEquals("test\\'with\\'quotes", IcebergJobUtils.escapeSqlString("test'with'quotes"));
 
     // Test strings without quotes remain unchanged
     assertEquals("normal_string", IcebergJobUtils.escapeSqlString("normal_string"));
@@ -342,8 +350,8 @@ public class TestIcebergExpireSnapshotsJob {
         IcebergExpireSnapshotsJob.buildProcedureCall(
             "iceberg_catalog", maliciousTable, null, null, false);
 
-    // Verify single quotes are escaped (becomes '')
-    assertTrue(sql.contains("db.table'' OR ''1''=''1"));
+    // Verify single quotes use Spark SQL backslash escaping
+    assertTrue(sql.contains("db.table\\' OR \\'1\\'=\\'1"));
     assertFalse(sql.contains("' OR '1'='1"));
 
     // Test SQL injection attempt in older-than
@@ -352,7 +360,7 @@ public class TestIcebergExpireSnapshotsJob {
         IcebergExpireSnapshotsJob.buildProcedureCall(
             "iceberg_catalog", "db.table", maliciousOlderThan, null, false);
 
-    assertTrue(sql.contains("2024-01-01'' OR ''1''=''1"));
+    assertTrue(sql.contains("2024-01-01\\' OR \\'1\\'=\\'1"));
 
     // Test SQL injection attempt in catalog name
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
@@ -373,8 +381,8 @@ public class TestIcebergExpireSnapshotsJob {
     // Catalog name should be quoted as an identifier
     assertTrue(sql.contains("`cat'alog`"));
     // All single quotes in string literals should be escaped
-    assertTrue(sql.contains("db''.table"));
-    assertTrue(sql.contains("2024-01-01'' DROP TABLE"));
+    assertTrue(sql.contains("db\\'.table"));
+    assertTrue(sql.contains("2024-01-01\\' DROP TABLE"));
   }
 
   // Tests for validateRetainLast
@@ -471,7 +479,7 @@ public class TestIcebergExpireSnapshotsJob {
       IcebergJobUtils.parseCustomSparkConfigs("{invalid json}");
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
+      assertTrue(e.getMessage().contains("Option --spark-conf"));
     }
   }
 }

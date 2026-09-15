@@ -9,11 +9,11 @@ license: "This software is licensed under the Apache License version 2."
 
 Three layers of configuration apply, and they are set in different places for different lifetimes. Server configuration governs how jobs run at all, CLI configuration governs how the commands reach Gravitino, and `jobConf` governs a single job submission.
 
-| Layer               | Where it lives                  | Lifetime            |
-|---------------------|----------------------------------|---------------------|
-| Server              | `gravitino.conf`                 | Until server restart |
-| CLI                 | `conf/gravitino-optimizer.conf`  | Per command          |
-| Job submission      | `jobConf` in the request body    | One job run          |
+| Layer          | Where it lives                  | Lifetime             |
+| -------------- | ------------------------------- | -------------------- |
+| Server         | `gravitino.conf`                | Until server restart |
+| CLI            | `conf/gravitino-optimizer.conf` | Per command          |
+| Job submission | `jobConf` in the request body   | One job run          |
 
 ## Server Configuration
 
@@ -53,6 +53,19 @@ gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
+When the Gravitino server has authentication enabled, the CLI and built-in Iceberg jobs must send credentials. Set the optimizer client authenticator, and pass the same values into job template environment placeholders:
+
+```properties
+gravitino.optimizer.auth.type = basic
+gravitino.optimizer.auth.username = admin
+gravitino.optimizer.auth.password = YourSecureGravitinoPassword
+gravitino.optimizer.jobSubmitterConfig.gravitino_auth_type = basic
+gravitino.optimizer.jobSubmitterConfig.gravitino_auth_username = admin
+gravitino.optimizer.jobSubmitterConfig.gravitino_auth_password = YourSecureGravitinoPassword
+```
+
+`auth.type` may be `none` (default), `simple`, `basic`, or `oauth`. For OAuth2 client-credentials, set `gravitino.optimizer.auth.oauth.serverUri`, `path`, `credential`, and `scope` (`serverUri` + `path` become Iceberg REST `oauth2-server-uri`). A pre-issued token can be set with `gravitino.optimizer.auth.oauth.token` instead; that token is **not refreshed**, so prefer client-credentials for long-running jobs. The `jobSubmitterConfig.gravitino_auth_*` keys fill `GRAVITINO_AUTH_*` environment variables on the Spark process. Unresolved `{{gravitino_auth_*}}` placeholders are omitted from the job environment so unauthenticated deployments keep working. `builtin-iceberg-update-stats` can also put `auth_type`, `username`, and `password` in `updater_options`.
+
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
 ## Job Submission Configuration
@@ -64,7 +77,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "catalog_name": "rest_catalog",
   "table_identifier": "db.t1",
   "update_mode": "all",
-  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\"}",
+  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
   "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",
@@ -73,11 +86,20 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "spark_driver_memory": "1g",
   "catalog_type": "rest",
   "catalog_uri": "http://localhost:9001/iceberg",
-  "warehouse_location": ""
+  "warehouse_location": "",
+  "gravitino_auth_type": "basic",
+  "gravitino_auth_username": "admin",
+  "gravitino_auth_password": "YourSecureGravitinoPassword"
 }
 ```
 
 `updater_options` and `spark_conf` are JSON strings inside a JSON object, so their quotes are escaped. That nesting is the most common source of malformed submissions.
+
+Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
+ship that JAR or fill template `jars`, so include it yourself — for example
+`"spark.jars":"/path/to/iceberg-spark-runtime-....jar"` inside `spark_conf`. Match the artifact to
+your Spark, Scala, and Iceberg versions. Details are under
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
 `warehouse_location` may be empty for local filesystem testing. Set it to the warehouse URI for HDFS or cloud object storage.
 
@@ -104,3 +126,29 @@ Four things are worth confirming before assuming a configuration problem is a co
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
+
+
+## Orphan File Cleanup Job Configuration
+
+Submit `builtin-iceberg-remove-orphan-files` with the same Spark, catalog, and
+optional authentication settings described above. Its job-specific `jobConf`
+keys are:
+
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+
+Keep the three-day default unless your workload needs a longer retention window.
+The 24-hour minimum also applies to dry runs; passing the current timestamp is
+not supported. Credentials can be supplied through the `gravitino_auth_*` keys;
+the template passes these as `GRAVITINO_AUTH_*` environment variables, and the
+job applies them to the Iceberg REST catalog before creating Spark.
+
+See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
+complete submission example. Orphan cleanup has no built-in scheduling policy
+in this release.

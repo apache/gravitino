@@ -244,8 +244,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
           IcebergRewriteDataFilesJob.buildProcedureCall(
               catalogName, maliciousTable, null, null, null, null);
 
-      // Verify the SQL is escaped (single quotes become double quotes)
-      assertTrue(sql.contains("db_test.special_table'' OR ''1''=''1"));
+      // Verify the SQL uses Spark backslash escaping
+      assertTrue(sql.contains("db_test.special_table\\' OR \\'1\\'=\\'1"));
 
       // The SQL should fail with table not found (not execute malicious code)
       // because the escaped table name doesn't exist
@@ -276,7 +276,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
             catalogName, "db.test_table", null, null, maliciousWhere, null);
 
     // Verify escaping occurred
-    assertTrue(sql.contains("id > 0'' OR ''1''=''1"));
+    assertTrue(sql.contains("id > 0\\' OR \\'1\\'=\\'1"));
 
     // The SQL should fail because the WHERE clause is invalid (not execute malicious code)
     try {
@@ -314,8 +314,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
           IcebergRewriteDataFilesJob.buildProcedureCall(
               catalogName, "db_special.data_table", null, null, whereClause, null);
 
-      // Verify double quotes are further escaped (becomes 4 single quotes)
-      assertTrue(sql.contains("description = ''O''''Brien''"));
+      // Verify each quote in the input predicate is escaped
+      assertTrue(sql.contains("description = \\'O\\'\\'Brien\\'"));
 
       // Execute - this should work or fail gracefully without injection
       try {

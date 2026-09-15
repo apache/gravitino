@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -47,6 +46,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";
   private static final String STRATEGY_SORT = "sort";
+  private static final String OPTION_OPTIONS = "options";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -57,6 +57,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         .withClassName(IcebergRewriteDataFilesJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(buildSparkConfigs())
+        .withEnvironments(GravitinoAuthSettings.jobTemplateEnvironments())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -143,6 +144,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     // Build Spark session with custom configs if provided
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Data Files");
+    IcebergJobUtils.applyIcebergRestAuth(sparkBuilder, catalogName, null);
 
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
@@ -160,6 +162,13 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    try {
+      IcebergJobUtils.requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
+    }
 
     try {
       // Build the procedure call SQL
@@ -357,47 +366,16 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   }
 
   /**
-   * Parse options from JSON string using Jackson for robust parsing.
+   * Parse rewrite options from a flat JSON map.
    *
    * <p>Expected format: {"key1": "value1", "key2": "value2"}
    *
-   * <p>This method uses Jackson ObjectMapper to properly handle:
-   *
-   * <ul>
-   *   <li>Escaped quotes in values
-   *   <li>Colons and commas in values
-   *   <li>Complex JSON structures
-   *   <li>Various data types (strings, numbers, booleans)
-   * </ul>
-   *
    * @param optionsJson JSON string
    * @return map of option keys to values
+   * @throws IllegalArgumentException if JSON is invalid or not a flat map
    */
   static Map<String, String> parseOptionsJson(String optionsJson) {
-    Map<String, String> options = new HashMap<>();
-    if (optionsJson == null || optionsJson.isEmpty()) {
-      return options;
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      // Parse JSON into a Map<String, Object> to handle various value types
-      Map<String, Object> parsedMap =
-          mapper.readValue(optionsJson, new TypeReference<Map<String, Object>>() {});
-
-      // Convert all values to strings
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        // Convert value to string - handles strings, numbers, booleans, etc.
-        options.put(key, value == null ? "" : value.toString());
-      }
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse options JSON: " + optionsJson + ". Error: " + e.getMessage(), e);
-    }
-
-    return options;
+    return new HashMap<>(IcebergSparkConfigUtils.parseFlatJsonMap(optionsJson, OPTION_OPTIONS));
   }
 
   /**
