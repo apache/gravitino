@@ -25,19 +25,24 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Method;
 import ognl.OgnlException;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.junit.jupiter.api.Test;
 
 public class TestTagPolicyAuthorizationExpression {
 
   @Test
-  public void testApplyTagImpliesViewUnlessViewIsExplicitlyDenied() throws OgnlException {
+  public void testLoadTagWithViewOrApplyPrivilege() throws OgnlException {
     MockAuthorizationExpressionEvaluator evaluator =
         new MockAuthorizationExpressionEvaluator(LOAD_TAG_AUTHORIZATION_EXPRESSION);
 
     assertTrue(evaluator.getResult(ImmutableSet.of("TAG::VIEW_TAG")));
     assertTrue(evaluator.getResult(ImmutableSet.of("TAG::APPLY_TAG")));
-    assertFalse(evaluator.getResult(ImmutableSet.of("TAG::APPLY_TAG", "TAG::DENY_VIEW_TAG")));
+    assertFalse(evaluator.getResult(ImmutableSet.of("TAG::VIEW_TAG", "TAG::DENY_VIEW_TAG")));
+    assertFalse(evaluator.getResult(ImmutableSet.of("TAG::APPLY_TAG", "TAG::DENY_APPLY_TAG")));
+    assertTrue(evaluator.getResult(ImmutableSet.of("TAG::APPLY_TAG", "TAG::DENY_VIEW_TAG")));
     assertTrue(evaluator.getResult(ImmutableSet.of("TAG::VIEW_TAG", "TAG::DENY_APPLY_TAG")));
   }
 
@@ -51,15 +56,41 @@ public class TestTagPolicyAuthorizationExpression {
   }
 
   @Test
-  public void testApplyPolicyImpliesViewUnlessViewIsExplicitlyDenied() throws OgnlException {
+  public void testLoadPolicyWithViewOrApplyPrivilege() throws OgnlException {
     MockAuthorizationExpressionEvaluator evaluator =
         new MockAuthorizationExpressionEvaluator(LOAD_POLICY_AUTHORIZATION_EXPRESSION);
 
     assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::VIEW_POLICY")));
     assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY")));
     assertFalse(
+        evaluator.getResult(ImmutableSet.of("POLICY::VIEW_POLICY", "POLICY::DENY_VIEW_POLICY")));
+    assertFalse(
+        evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY", "POLICY::DENY_APPLY_POLICY")));
+    assertTrue(
         evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY", "POLICY::DENY_VIEW_POLICY")));
     assertTrue(
         evaluator.getResult(ImmutableSet.of("POLICY::VIEW_POLICY", "POLICY::DENY_APPLY_POLICY")));
+  }
+
+  @Test
+  public void testGetMetadataObjectPolicyWithViewOrApplyPrivilege()
+      throws ReflectiveOperationException, OgnlException {
+    Method method =
+        MetadataObjectPolicyOperations.class.getDeclaredMethod(
+            "getPolicyForObject", String.class, String.class, String.class, String.class);
+    assertFalse(method.isAnnotationPresent(Deprecated.class));
+
+    AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
+    MockAuthorizationExpressionEvaluator evaluator =
+        new MockAuthorizationExpressionEvaluator(
+            annotation.expression().replace("CAN_ACCESS_METADATA", "CATALOG::OWNER"));
+
+    assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::VIEW_POLICY", "CATALOG::OWNER")));
+    assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY", "CATALOG::OWNER")));
+    assertFalse(
+        evaluator.getResult(
+            ImmutableSet.of(
+                "POLICY::APPLY_POLICY", "POLICY::DENY_APPLY_POLICY", "CATALOG::OWNER")));
+    assertFalse(evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY")));
   }
 }

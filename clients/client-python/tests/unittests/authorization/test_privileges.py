@@ -113,6 +113,10 @@ class TestPrivileges(unittest.TestCase):
             Privileges.deny("CREATE_MODEL_VERSION").name(),
         )
 
+    def test_view_privilege_bit_values_match_java_api(self) -> None:
+        self.assertEqual(1 << 34, Privilege.Name.VIEW_TAG.low_bits)
+        self.assertEqual(1 << 35, Privilege.Name.VIEW_POLICY.low_bits)
+
     def test_create_catalog_binding(self) -> None:
         allow_privilege = CreateCatalog.allow()
         for obj_type in MetadataObject.Type:

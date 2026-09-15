@@ -141,20 +141,17 @@ public class TestAuthorizationExpressionConverter {
   }
 
   @Test
-  public void testViewTagIncludesApplyCompatibilityAndViewDeny() {
+  public void testReplaceAnyPrivilegeForAnyViewTag() {
     String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_TAG");
-    Assertions.assertTrue(replaced.contains("ANY(VIEW_TAG, METALAKE, TAG)"));
-    Assertions.assertTrue(replaced.contains("ANY(APPLY_TAG, METALAKE, TAG)"));
-    Assertions.assertTrue(replaced.contains("ANY(DENY_APPLY_TAG, METALAKE, TAG)"));
-    Assertions.assertTrue(replaced.contains("ANY(DENY_VIEW_TAG, METALAKE, TAG)"));
+    Assertions.assertEquals(
+        "((ANY(VIEW_TAG, METALAKE, TAG)) && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))", replaced);
   }
 
   @Test
-  public void testViewPolicyIncludesApplyCompatibilityAndViewDeny() {
+  public void testReplaceAnyPrivilegeForAnyViewPolicy() {
     String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_POLICY");
-    Assertions.assertTrue(replaced.contains("ANY(VIEW_POLICY, METALAKE, POLICY)"));
-    Assertions.assertTrue(replaced.contains("ANY(APPLY_POLICY, METALAKE, POLICY)"));
-    Assertions.assertTrue(replaced.contains("ANY(DENY_APPLY_POLICY, METALAKE, POLICY)"));
-    Assertions.assertTrue(replaced.contains("ANY(DENY_VIEW_POLICY, METALAKE, POLICY)"));
+    Assertions.assertEquals(
+        "((ANY(VIEW_POLICY, METALAKE, POLICY)) && !(ANY(DENY_VIEW_POLICY, METALAKE, POLICY)))",
+        replaced);
   }
 }

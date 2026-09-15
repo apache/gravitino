@@ -353,12 +353,11 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_VIEW_TAG",
-            "(((ANY(VIEW_TAG, METALAKE, TAG)) || ANY_APPLY_TAG)"
-                + " && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))");
+            "((ANY(VIEW_TAG, METALAKE, TAG))" + " && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))");
     expression =
         expression.replaceAll(
             "ANY_VIEW_POLICY",
-            "(((ANY(VIEW_POLICY, METALAKE, POLICY)) || ANY_APPLY_POLICY)"
+            "((ANY(VIEW_POLICY, METALAKE, POLICY))"
                 + " && !(ANY(DENY_VIEW_POLICY, METALAKE, POLICY)))");
     expression =
         expression.replaceAll(

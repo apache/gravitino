@@ -322,14 +322,14 @@ public class AuthorizationExpressionConstants {
       "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
 
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
-      "METALAKE::OWNER || TAG::OWNER || ANY_VIEW_TAG";
+      "METALAKE::OWNER || TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG";
 
   public static final String APPLY_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 
   public static final String LOAD_POLICY_AUTHORIZATION_EXPRESSION =
       """
-          METALAKE::OWNER || POLICY::OWNER || ANY_VIEW_POLICY
+          METALAKE::OWNER || POLICY::OWNER || ANY_VIEW_POLICY || ANY_APPLY_POLICY
           """;
 
   /**

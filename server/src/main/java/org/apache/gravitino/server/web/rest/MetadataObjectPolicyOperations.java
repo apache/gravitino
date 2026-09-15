@@ -78,7 +78,6 @@ public class MetadataObjectPolicyOperations {
     this.policyDispatcher = policyDispatcher;
   }
 
-  @Deprecated
   @GET
   @Path("{policy}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -86,7 +85,7 @@ public class MetadataObjectPolicyOperations {
   @ResponseMetered(name = "get-object-policy", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
+          "METALAKE::OWNER || ((POLICY::OWNER || ANY_VIEW_POLICY || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
   public Response getPolicyForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
