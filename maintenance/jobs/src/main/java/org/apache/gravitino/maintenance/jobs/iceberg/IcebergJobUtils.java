@@ -20,8 +20,15 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -30,6 +37,12 @@ import java.util.Map;
  * IcebergRewriteDataFilesJob} and {@link IcebergExpireSnapshotsJob}.
  */
 public final class IcebergJobUtils {
+
+  private static final Set<String> RESERVED_SPARK_CONFIG_KEYS =
+      Collections.unmodifiableSet(
+          new HashSet<>(Arrays.asList("spark.master", "spark.sql.extensions", "spark.app.name")));
+  private static final Set<String> RESERVED_SPARK_CONFIG_PREFIXES =
+      Collections.singleton("spark.sql.catalog.");
 
   private IcebergJobUtils() {}
 
@@ -100,27 +113,29 @@ public final class IcebergJobUtils {
   /**
    * Parse custom Spark configurations from JSON string.
    *
+   * <p>Keys managed by the job template (such as {@code spark.sql.extensions} or catalog configs)
+   * are rejected to prevent overriding required Spark settings.
+   *
    * @param sparkConfJson JSON string containing Spark configurations
    * @return map of Spark configuration keys to values
-   * @throws IllegalArgumentException if JSON parsing fails
+   * @throws IllegalArgumentException if JSON parsing fails or a reserved config key is used
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
     if (sparkConfJson == null || sparkConfJson.isEmpty()) {
       return new HashMap<>();
     }
 
+    Map<String, String> configs = new HashMap<>();
     try {
       ObjectMapper mapper = new ObjectMapper();
       Map<String, Object> parsedMap =
           mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
 
-      Map<String, String> configs = new HashMap<>();
       for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
         String key = entry.getKey();
         Object value = entry.getValue();
         configs.put(key, value == null ? "" : value.toString());
       }
-      return configs;
     } catch (Exception e) {
       throw new IllegalArgumentException(
           "Failed to parse Spark configurations JSON: "
@@ -129,5 +144,80 @@ public final class IcebergJobUtils {
               + e.getMessage(),
           e);
     }
+
+    for (String key : configs.keySet()) {
+      if (isReservedSparkConfigKey(key)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Cannot override reserved Spark config key: %s. "
+                    + "These keys are managed by the Iceberg job template.",
+                key));
+      }
+    }
+
+    return configs;
+  }
+
+  /**
+   * Validate that a table identifier is in {@code schema.table} format, i.e. exactly two non-empty
+   * segments separated by a single dot.
+   *
+   * @param tableIdentifier the table identifier to validate
+   * @throws IllegalArgumentException if the identifier is not in {@code schema.table} format
+   */
+  public static void validateTableIdentifier(String tableIdentifier) {
+    if (tableIdentifier == null) {
+      throw new IllegalArgumentException(
+          "Invalid table identifier: null. Expected format: <schema>.<table>");
+    }
+
+    String[] parts = tableIdentifier.split("\\.", -1);
+    if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+      throw new IllegalArgumentException(
+          "Invalid table identifier '" + tableIdentifier + "'. Expected format: <schema>.<table>");
+    }
+  }
+
+  /**
+   * Validate that a timestamp string is parseable, accepting either JDBC timestamp format ({@code
+   * yyyy-MM-dd HH:mm:ss[.f...]}) or ISO local date time format.
+   *
+   * <p>Null or empty values are accepted since the timestamp is an optional parameter.
+   *
+   * @param timestamp the timestamp string to validate
+   * @throws IllegalArgumentException if the timestamp cannot be parsed
+   */
+  public static void validateTimestamp(String timestamp) {
+    if (timestamp == null || timestamp.isEmpty()) {
+      return; // Optional parameter
+    }
+
+    try {
+      Timestamp.valueOf(timestamp);
+      return;
+    } catch (IllegalArgumentException e) {
+      // Not in JDBC timestamp format, try ISO local date time below
+    }
+
+    try {
+      LocalDateTime.parse(timestamp);
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(
+          "Invalid timestamp '"
+              + timestamp
+              + "'. Expected format: 'yyyy-MM-dd HH:mm:ss' or ISO local date time");
+    }
+  }
+
+  private static boolean isReservedSparkConfigKey(String key) {
+    if (RESERVED_SPARK_CONFIG_KEYS.contains(key)) {
+      return true;
+    }
+    for (String prefix : RESERVED_SPARK_CONFIG_PREFIXES) {
+      if (key.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
