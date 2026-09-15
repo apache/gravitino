@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.spark.sql.SparkSession;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -30,8 +31,16 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
  */
 public final class IcebergJobUtils {
 
+  /** Shared CLI flag name (without leading dashes) for Iceberg catalog. */
+  public static final String OPTION_CATALOG = "catalog";
+
+  /** Shared CLI flag name (without leading dashes) for table identifier. */
+  public static final String OPTION_TABLE = "table";
+
+  /** Shared CLI flag name (without leading dashes) for custom Spark configs JSON. */
+  public static final String OPTION_SPARK_CONF = "spark-conf";
+
   private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
-  private static final String OPTION_SPARK_CONF = "spark-conf";
 
   private IcebergJobUtils() {}
 
@@ -41,7 +50,8 @@ public final class IcebergJobUtils {
    * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
    * but Spark only warns when those classes are missing and continues without Iceberg support. Call
    * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
-   * visible) and fail the job when the runtime is absent.
+   * visible) and fail the job when the runtime is absent. Job {@code main} methods should call
+   * {@link #requireIcebergSparkRuntimeOrExit(SparkSession)} instead.
    *
    * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
    */
@@ -51,33 +61,19 @@ public final class IcebergJobUtils {
     requireClass(ICEBERG_SPARK_CATALOG, "Iceberg Spark catalog");
   }
 
-  /** Visible for unit tests that assert the missing-class error message. */
-  static void requireClassForTest(String className, String description) {
-    requireClass(className, description);
-  }
-
-  private static void requireClass(String className, String description) {
-    ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
-    ClassLoader fallbackLoader = IcebergJobUtils.class.getClassLoader();
+  /**
+   * Ensures the Iceberg Spark runtime is on the classpath, or prints the error, stops {@code
+   * spark}, and exits the process.
+   *
+   * @param spark Spark session created for this job; stopped if the runtime check fails
+   */
+  public static void requireIcebergSparkRuntimeOrExit(SparkSession spark) {
     try {
-      Class.forName(className, true, contextLoader != null ? contextLoader : fallbackLoader);
-    } catch (ClassNotFoundException | LinkageError first) {
-      if (contextLoader != null && contextLoader != fallbackLoader) {
-        try {
-          Class.forName(className, true, fallbackLoader);
-          return;
-        } catch (ClassNotFoundException | LinkageError ignored) {
-          // Fall through to the user-facing error.
-        }
-      }
-      throw new IllegalStateException(
-          String.format(
-              "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
-                  + "classpath (for example via spark.jars in spark_conf, or installed into the "
-                  + "Spark environment). A stock Spark distribution does not include it. Match "
-                  + "the artifact to your Spark, Scala, and Iceberg versions.",
-              description, className),
-          first);
+      requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
     }
   }
 
@@ -155,5 +151,37 @@ public final class IcebergJobUtils {
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
     return new HashMap<>(
         IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
+  }
+
+  /** Visible for unit tests that assert the missing-class error message. */
+  static void requireClassForTest(String className, String description) {
+    requireClass(className, description);
+  }
+
+  private static void requireClass(String className, String description) {
+    ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+    ClassLoader fallbackLoader = IcebergJobUtils.class.getClassLoader();
+    try {
+      // initialize=false: only verify the class is loadable; avoid running <clinit> here and
+      // misreporting init-time LinkageError as a missing iceberg-spark-runtime jar.
+      Class.forName(className, false, contextLoader != null ? contextLoader : fallbackLoader);
+    } catch (ClassNotFoundException | LinkageError first) {
+      if (contextLoader != null && contextLoader != fallbackLoader) {
+        try {
+          Class.forName(className, false, fallbackLoader);
+          return;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+          // Fall through to the user-facing error.
+        }
+      }
+      throw new IllegalStateException(
+          String.format(
+              "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
+                  + "classpath (for example via spark.jars in spark_conf, or installed into the "
+                  + "Spark environment). A stock Spark distribution does not include it. Match "
+                  + "the artifact to your Spark, Scala, and Iceberg versions.",
+              description, className),
+          first);
+    }
   }
 }
