@@ -147,14 +147,18 @@ public class TestGravitinoCatalogManager {
 
     manager.close();
 
-    assertEquals(3, clientFactory.closedCount());
-    // Caffeine dispatches removal listeners on the common pool, so a listener that also closed the
-    // client would land here rather than inside close(). Draining the pool makes that visible.
+    // Exact already here: no client the shutdown drain saw may outlive close().
+    assertEquals(
+        List.of(1, 1, 1),
+        clientFactory.closeCounts(),
+        "Shutdown must close each cached client on the calling thread");
+    // Caffeine dispatches removal listeners on the common pool, so a second close would land after
+    // close() returned. Draining the pool makes that visible instead of leaving it to timing.
     ForkJoinPool.commonPool().awaitQuiescence(30, TimeUnit.SECONDS);
     assertEquals(
         List.of(1, 1, 1),
         clientFactory.closeCounts(),
-        "Shutdown must close each cached client exactly once");
+        "No cached client may be closed a second time");
   }
 
   @Test
