@@ -398,7 +398,9 @@ subprojects {
   // though the rest of :spark-connector (3.x) stays on Java 8.
   val jdk17OnlyProjectPaths = setOf(
     ":spark-connector:spark-4.0",
-    ":spark-connector:spark-runtime-4.0"
+    ":spark-connector:spark-runtime-4.0",
+    ":spark-connector:spark-4.1",
+    ":spark-connector:spark-runtime-4.1"
   )
 
   fun compatibleWithJDK8(project: Project): Boolean {
