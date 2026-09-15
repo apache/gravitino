@@ -29,7 +29,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Removes the catalogs and schemas the caller may not see from a Lance listing. */
+/** Removes the catalogs, schemas, and tables the caller may not see from a Lance listing. */
 public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
 
   private final String metalakeName;
@@ -59,6 +59,15 @@ public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
         Entity.EntityType.SCHEMA,
         AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
         name -> NameIdentifierUtil.ofSchema(metalakeName, catalogName, name));
+  }
+
+  @Override
+  public List<String> filterTables(String catalogName, String schemaName, List<String> tableNames) {
+    return filter(
+        tableNames,
+        Entity.EntityType.TABLE,
+        AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+        name -> NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, name));
   }
 
   private List<String> filter(

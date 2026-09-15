@@ -51,9 +51,11 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -80,6 +82,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
@@ -87,6 +90,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
@@ -764,6 +768,32 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateRolePOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    RoleEntity role =
+        RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build();
+    RolePO initialRolePO =
+        POConverters.initializeRolePOWithVersion(role, RolePO.builder().withMetalakeId(1L));
+    RolePO rolePO =
+        RolePO.builder()
+            .withRoleId(initialRolePO.getRoleId())
+            .withRoleName(initialRolePO.getRoleName())
+            .withMetalakeId(initialRolePO.getMetalakeId())
+            .withProperties(initialRolePO.getProperties())
+            .withAuditInfo(initialRolePO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialRolePO.getDeletedAt())
+            .build();
+
+    RolePO updatedRolePO = POConverters.updateRolePOWithVersion(rolePO, role);
+
+    assertEquals(8, updatedRolePO.getCurrentVersion());
+    assertEquals(8, updatedRolePO.getLastVersion());
+  }
+
+  @Test
   public void testUpdateFilesetPOVersion() throws JsonProcessingException {
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
@@ -844,6 +874,31 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateGroupPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    GroupEntity group =
+        GroupEntity.builder().withId(2L).withName("group").withAuditInfo(auditInfo).build();
+    GroupPO initialGroupPO =
+        POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+    GroupPO groupPO =
+        GroupPO.builder()
+            .withGroupId(initialGroupPO.getGroupId())
+            .withGroupName(initialGroupPO.getGroupName())
+            .withMetalakeId(initialGroupPO.getMetalakeId())
+            .withAuditInfo(initialGroupPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialGroupPO.getDeletedAt())
+            .build();
+
+    GroupPO updatedGroupPO = POConverters.updateGroupPOWithVersion(groupPO, group);
+
+    assertEquals(8, updatedGroupPO.getCurrentVersion());
+    assertEquals(8, updatedGroupPO.getLastVersion());
+  }
+
+  @Test
   public void testUpdateUserPOVersionUsesCurrentVersion() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
@@ -856,8 +911,6 @@ public class TestPOConverters {
             .withUserId(initialUserPO.getUserId())
             .withUserName(initialUserPO.getUserName())
             .withMetalakeId(initialUserPO.getMetalakeId())
-            .withExternalId(initialUserPO.getExternalId())
-            .withEnabled(initialUserPO.getEnabled())
             .withAuditInfo(initialUserPO.getAuditInfo())
             .withCurrentVersion(7L)
             .withLastVersion(3L)

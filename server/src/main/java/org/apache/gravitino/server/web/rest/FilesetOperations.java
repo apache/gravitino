@@ -146,7 +146,16 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
-    String filesetName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received create fileset request with null request body");
+      return ExceptionHandlers.handleFilesetException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String filesetName = request.getName();
     LOG.info(
         "Received create fileset request: {}.{}.{}.{}", metalake, catalog, schema, filesetName);
     try {
@@ -289,6 +298,14 @@ public class FilesetOperations {
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       FilesetUpdatesRequest request) {
     LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+    if (request == null) {
+      return ExceptionHandlers.handleFilesetException(
+          OperationType.ALTER,
+          fileset,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

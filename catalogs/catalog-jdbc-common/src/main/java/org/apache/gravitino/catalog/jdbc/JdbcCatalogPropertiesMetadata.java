@@ -78,7 +78,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             stringPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),

@@ -26,6 +26,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
+import io.trino.spi.HostAddress;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
@@ -59,10 +60,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
-  @SuppressWarnings("UnusedVariable")
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
-
   private CatalogConnectorManager catalogConnectorManager;
+
   private boolean catalogConnectorManagerStartTriggered = false;
 
   private GravitinoAdminClient client;
@@ -134,7 +133,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           // failed client initialization leaves a shared manager with a null Gravitino client,
           // causing later connector creation attempts to fail with a misleading NPE.
           catalogConnectorManager = newCatalogConnectorManager;
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         }
 
         // The `trino.jdbc.*` settings that CatalogRegister needs to connect back to the
@@ -146,16 +144,23 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         if (!catalogConnectorManagerStartTriggered
             && !config.isDynamicConnector()
             && isCoordinator(trinoConnectorContext)) {
-          // Triggered before start() on purpose: everything that makes it fail is a
-          // configuration error, and retrying on the next create() would only open another
-          // connection.
           catalogConnectorManagerStartTriggered = true;
           // Only the configuration is re-applied here: rebuilding the Gravitino client would leak
           // the one a dynamic connector may have already built.
           catalogConnectorManager.updateConfig(config);
+          // Only the coordinator runs the load loop, so it is the only node holding the
+          // registration state the system tables report. Pin their splits to it.
+          GravitinoSystemConnector.Split.setCoordinatorAddress(
+              getCurrentNodeAddress(trinoConnectorContext));
           catalogConnectorManager.start();
         }
       } catch (Exception e) {
+        // Clearing the flag is what stops a later create() from skipping the startup and
+        // handing out a connector whose load loop never started, and it lets a corrected
+        // configuration recover. The manager is deliberately kept: it is shared, and a dynamic
+        // connector created before the static one may already be running against it. start()
+        // releases what it allocated before failing.
+        catalogConnectorManagerStartTriggered = false;
         String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
         LOG.error(e, message);
         throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
@@ -179,9 +184,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
+      // Built per entry catalog, like the stored procedures: both are scoped to this catalog's
+      // metalake even though the underlying manager is shared.
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return createSystemConnector(gravitinoStoredProcedureFactory);
+      GravitinoSystemTableFactory systemTableFactory =
+          new GravitinoSystemTableFactory(catalogConnectorManager, metalake);
+      return createSystemConnector(gravitinoStoredProcedureFactory, systemTableFactory);
     }
   }
 
@@ -201,8 +210,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   protected GravitinoSystemConnector createSystemConnector(
-      GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector(storedProcedureFactory);
+      GravitinoStoredProcedureFactory storedProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    return new GravitinoSystemConnector(storedProcedureFactory, systemTableFactory);
   }
 
   protected String getTrinoCatalogName(String metalakeName, String catalogName) {
@@ -289,6 +299,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   @SuppressWarnings("deprecation")
   protected boolean isCoordinator(ConnectorContext connectorContext) {
     return connectorContext.getNodeManager().getCurrentNode().isCoordinator();
+  }
+
+  /**
+   * Retrieves the address of the Trino node this connector is running on.
+   *
+   * @param connectorContext the Trino connector context
+   * @return the host and port of the current node
+   */
+  @SuppressWarnings("deprecation")
+  protected HostAddress getCurrentNodeAddress(ConnectorContext connectorContext) {
+    return connectorContext.getNodeManager().getCurrentNode().getHostAndPort();
   }
 
   private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {

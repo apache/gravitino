@@ -103,11 +103,16 @@ public interface PolicyMetadataObjectRelMapper {
       @Param("metadataObjectType") String metadataObjectType,
       @Param("policyIds") List<Long> policyIds);
 
+  /**
+   * Soft-deletes all active metadata-object relations for a policy.
+   *
+   * @param policyId The policy ID.
+   * @return The number of affected rows.
+   */
   @UpdateProvider(
       type = PolicyMetadataObjectRelSQLProviderFactory.class,
-      method = "softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName")
-  Integer softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
+      method = "softDeletePolicyMetadataObjectRelsByPolicyId")
+  Integer softDeletePolicyMetadataObjectRelsByPolicyId(@Param("policyId") Long policyId);
 
   @UpdateProvider(
       type = PolicyMetadataObjectRelSQLProviderFactory.class,

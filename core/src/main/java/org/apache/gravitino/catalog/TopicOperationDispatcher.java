@@ -212,7 +212,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::topicPropertiesMetadata,
                       alteredTopic.properties()));
@@ -330,14 +330,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       if (topicEntity == null) {
         return EntityCombinedTopic.of(topic)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
             .withImported(false);
       }
 
       return EntityCombinedTopic.of(topic, topicEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
           .withImported(true);
     }
@@ -351,7 +351,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
         .withImported(topicEntity != null);
   }
@@ -402,13 +402,13 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
     }
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
   }
 }

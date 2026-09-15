@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,8 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionsByModelId(Long modelId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
@@ -39,7 +41,8 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -48,7 +51,8 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "<script>"
         + "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -61,7 +65,8 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -69,7 +74,8 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

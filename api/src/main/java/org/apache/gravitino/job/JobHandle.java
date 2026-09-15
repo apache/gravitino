@@ -104,4 +104,18 @@ public interface JobHandle {
     throw new UnsupportedOperationException(
         "finishedAt() is not implemented by " + getClass().getName() + "; override this method");
   }
+
+  /**
+   * Get the resolved job template that was actually submitted for execution, with placeholders
+   * replaced and referenced files downloaded.
+   *
+   * @return the runtime job template, or null for jobs run before this field was introduced
+   */
+  @Nullable
+  default JobTemplate runtimeJobTemplate() {
+    throw new UnsupportedOperationException(
+        "runtimeJobTemplate() is not implemented by "
+            + getClass().getName()
+            + "; override this method");
+  }
 }

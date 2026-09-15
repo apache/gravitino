@@ -24,16 +24,29 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SparkJdbcTypeConverter extends SparkTypeConverter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(SparkJdbcTypeConverter.class);
+
   @Override
   public DataType toSparkType(Type gravitinoType) {
-    // if spark version lower than 3.4.4, using VarCharType will throw an exception: Unsupported
-    // type varchar.
     if (gravitinoType instanceof Types.VarCharType) {
+      // Spark's JDBC dialects reject VarcharType, so widen it to StringType.
+      return DataTypes.StringType;
+    } else if (gravitinoType instanceof Types.ExternalType) {
+      // An external type carries a source type that Gravitino cannot represent, such as an
+      // unconstrained PostgreSQL numeric. Reading it as a string keeps an unmapped type from
+      // failing the type conversion of the whole table.
+      LOG.warn(
+          "Reading type {} as a string, Gravitino cannot represent it",
+          ((Types.ExternalType) gravitinoType).catalogString());
       return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.TimestampType) {
+      // Both timestamp flavors map to TimestampType, never TimestampNTZType: the MySQL dialect only
+      // pushes TimestampType literals down correctly, and NTZ literals produce invalid SQL.
       return DataTypes.TimestampType;
     } else {
       return super.toSparkType(gravitinoType);

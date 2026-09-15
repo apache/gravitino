@@ -35,6 +35,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,8 @@ public class ContainerSuite implements Closeable {
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
   private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.0/28";
   private static final String NETWORK_NAME = "gravitino-ci-network";
+  private static final int CLICKHOUSE_CLUSTER_SIZE = 3;
+  private static final String CLICKHOUSE_CLUSTER_HOST_PREFIX = "gravitino-ci-clickhouse-cluster-";
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
@@ -85,11 +88,12 @@ public class ContainerSuite implements Closeable {
   private static volatile OceanBaseContainer oceanBaseContainer;
   private static volatile ClickHouseContainer clickHouseContainer;
   private static volatile ClickHouseContainer clickHouseClusterContainer;
+  private static volatile List<ClickHouseContainer> clickHouseClusterContainers = List.of();
   private static volatile ZooKeeperContainer zooKeeperContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
-  private static volatile MinIOContainer minIOContainer;
+  private static volatile RustFSContainer rustFSContainer;
 
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
@@ -585,30 +589,35 @@ public class ContainerSuite implements Closeable {
 
   public void startClickHouseClusterContainer(
       TestDatabaseName testDatabaseName, String remoteServersTemplatePath) {
-    if (clickHouseClusterContainer == null) {
+    if (clickHouseClusterContainers.isEmpty()) {
       synchronized (ContainerSuite.class) {
-        if (clickHouseClusterContainer == null) {
+        if (clickHouseClusterContainers.isEmpty()) {
           initIfNecessary();
           startZooKeeperContainer();
           String zkHost = zooKeeperContainer.getContainerIpAddress();
           String resolvedConfigPath = prepareRemoteServersConfig(remoteServersTemplatePath, zkHost);
-          ClickHouseContainer.Builder clickHouseBuilder =
-              ClickHouseContainer.builder()
-                  .withHostName("gravitino-ci-clickhouse-cluster")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
-                          .build())
-                  .withRemoteServersConfig(resolvedConfigPath)
-                  .withExposePorts(
-                      ImmutableSet.of(
-                          ClickHouseContainer.CLICKHOUSE_PORT,
-                          ClickHouseContainer.CLICKHOUSE_NATIVE_PORT))
-                  .withNetwork(network);
+          List<ClickHouseContainer> containers = new ArrayList<>(CLICKHOUSE_CLUSTER_SIZE);
+          for (int node = 1; node <= CLICKHOUSE_CLUSTER_SIZE; node++) {
+            ClickHouseContainer.Builder clickHouseBuilder =
+                ClickHouseContainer.builder()
+                    .withHostName(CLICKHOUSE_CLUSTER_HOST_PREFIX + node)
+                    .withEnvVars(
+                        ImmutableMap.<String, String>builder()
+                            .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
+                            .build())
+                    .withRemoteServersConfig(resolvedConfigPath)
+                    .withExposePorts(
+                        ImmutableSet.of(
+                            ClickHouseContainer.CLICKHOUSE_PORT,
+                            ClickHouseContainer.CLICKHOUSE_NATIVE_PORT))
+                    .withNetwork(network);
 
-          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
-          container.start();
-          clickHouseClusterContainer = container;
+            ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+            container.start();
+            containers.add(container);
+          }
+          clickHouseClusterContainers = List.copyOf(containers);
+          clickHouseClusterContainer = clickHouseClusterContainers.get(0);
         }
       }
     }
@@ -671,6 +680,16 @@ public class ContainerSuite implements Closeable {
     return clickHouseClusterContainer;
   }
 
+  /**
+   * Returns every ClickHouse node in the repository-managed cluster fixture.
+   *
+   * @return an immutable list whose first element is also returned by {@link
+   *     #getClickHouseClusterContainer()}
+   */
+  public List<ClickHouseContainer> getClickHouseClusterContainers() {
+    return clickHouseClusterContainers;
+  }
+
   public ZooKeeperContainer getZooKeeperContainer() {
     return zooKeeperContainer;
   }
@@ -679,27 +698,33 @@ public class ContainerSuite implements Closeable {
     return gravitinoLocalStackContainer;
   }
 
-  public void startMinIOContainer() {
+  /** Starts the shared RustFS object store for S3 credential-vending tests. */
+  public void startRustFSContainer() {
     ITUtils.cleanDisk();
-    if (minIOContainer == null) {
+    if (rustFSContainer == null) {
       synchronized (ContainerSuite.class) {
-        if (minIOContainer == null) {
-          MinIOContainer.Builder builder = MinIOContainer.builder().withNetwork(network);
-          MinIOContainer container = closer.register(builder.build());
+        if (rustFSContainer == null) {
+          RustFSContainer.Builder builder = RustFSContainer.builder().withNetwork(network);
+          RustFSContainer container = closer.register(builder.build());
           try {
             container.start();
           } catch (Exception e) {
-            LOG.error("Failed to start MinIO container", e);
-            throw new RuntimeException("Failed to start MinIO container", e);
+            LOG.error("Failed to start RustFS container", e);
+            throw new RuntimeException("Failed to start RustFS container", e);
           }
-          minIOContainer = container;
+          rustFSContainer = container;
         }
       }
     }
   }
 
-  public MinIOContainer getMinIOContainer() {
-    return minIOContainer;
+  /**
+   * Returns the shared RustFS fixture after {@link #startRustFSContainer()}.
+   *
+   * @return the RustFS fixture
+   */
+  public RustFSContainer getRustFSContainer() {
+    return rustFSContainer;
   }
 
   public HiveContainer getHiveContainerWithS3() {

@@ -38,9 +38,12 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -96,7 +99,16 @@ public class TestIdpUserGroupManager {
   public void testAddUser() throws IOException {
     IdpUser user = manager.addUser("testAdd", VALID_PASSWORD);
     Assertions.assertEquals("testAdd", user.name());
+    Assertions.assertTrue(user.enabled());
     Assertions.assertTrue(user.groupNames().isEmpty());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, user.auditInfo().creator());
+    Assertions.assertNotNull(user.auditInfo().createTime());
+    Assertions.assertNull(user.auditInfo().lastModifier());
+
+    IdpUser disabled = manager.addUser("testAddDisabled", VALID_PASSWORD, false);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertFalse(manager.getUser("testAddDisabled").enabled());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, disabled.auditInfo().creator());
 
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
@@ -108,6 +120,8 @@ public class TestIdpUserGroupManager {
 
     IdpUser user = manager.getUser("testGet");
     Assertions.assertEquals("testGet", user.name());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, user.auditInfo().creator());
+    Assertions.assertNotNull(user.auditInfo().createTime());
 
     Throwable exception =
         Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("not-exist"));
@@ -127,10 +141,63 @@ public class TestIdpUserGroupManager {
     manager.addUser("testChangePassword", VALID_PASSWORD);
 
     Assertions.assertTrue(manager.changePassword("testChangePassword", NEW_VALID_PASSWORD));
-    Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
+    IdpUser updated = manager.getUser("testChangePassword");
+    Assertions.assertEquals("testChangePassword", updated.name());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, updated.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, updated.auditInfo().lastModifier());
+    Assertions.assertNotNull(updated.auditInfo().lastModifiedTime());
 
     Assertions.assertThrows(
         NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
+  }
+
+  @Test
+  public void testUpdateEnabled() throws IOException {
+    manager.addUser("testEnabled", VALID_PASSWORD);
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", false));
+    IdpUser disabled = manager.getUser("testEnabled");
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, disabled.auditInfo().lastModifier());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifiedTime());
+    Assertions.assertThrows(
+        UnauthorizedException.class, () -> manager.authenticate("testEnabled", VALID_PASSWORD));
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", true));
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        NotFoundException.class, () -> manager.updateEnabled("not-exist", false));
+  }
+
+  @Test
+  public void testCannotDisableServiceAdmin() throws IOException {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
+    manager.addUser("svcAdminDisable", VALID_PASSWORD);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
+    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
+    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+  }
+
+  @Test
+  public void testCannotAddDisabledServiceAdmin() {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminCreateDisabled");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.addUser("svcAdminCreateDisabled", VALID_PASSWORD, false));
+    Assertions.assertEquals(
+        "Cannot disable service admin svcAdminCreateDisabled", exception.getMessage());
   }
 
   @Test
@@ -139,6 +206,9 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testAddGroup", group.name());
     Assertions.assertEquals("", group.comment());
     Assertions.assertTrue(group.usernames().isEmpty());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, group.auditInfo().creator());
+    Assertions.assertNotNull(group.auditInfo().createTime());
+    Assertions.assertNull(group.auditInfo().lastModifier());
 
     IdpGroup commented = manager.addGroup("testAddGroupComment", "on-call rotation");
     Assertions.assertEquals("on-call rotation", commented.comment());
@@ -204,7 +274,7 @@ public class TestIdpUserGroupManager {
     manager.changeGroupMembership("testRemoveGroup", Lists.newArrayList("groupMember"), null);
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> manager.removeGroup("testRemoveGroup", false));
+        NonEmptyEntityException.class, () -> manager.removeGroup("testRemoveGroup", false));
 
     manager.changeGroupMembership("testRemoveGroup", null, Lists.newArrayList("groupMember"));
     Assertions.assertTrue(manager.removeGroup("testRemoveGroup", false));

@@ -412,15 +412,14 @@ public class ModelMetaService {
    * data. This allows any later cleanup failure to restore the model row as well.
    */
   void deleteModelWithVersion(NameIdentifier ident, ModelPO observedModelPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class,
-            mapper ->
-                mapper.softDeleteModelMetaByIdAndVersion(
-                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw modelWriteFailure(ident, observedModelPO);
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                ModelMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteModelMetaByIdAndVersion(
+                        observedModelPO.getModelId(), observedModelPO.getCurrentVersion())),
+        () -> modelWriteFailure(ident, observedModelPO));
   }
 
   /**
@@ -475,21 +474,20 @@ public class ModelMetaService {
    * deleted, renamed, or moved, the requested model no longer exists.
    */
   private RuntimeException modelWriteFailure(NameIdentifier ident, ModelPO observedModelPO) {
-    ModelPO currentModelPO =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class,
-            mapper -> mapper.selectModelMetaByModelIdForUpdate(observedModelPO.getModelId()));
-    if (currentModelPO == null
-        || !Objects.equals(currentModelPO.getModelName(), observedModelPO.getModelName())
-        || !Objects.equals(currentModelPO.getSchemaId(), observedModelPO.getSchemaId())
-        || !Objects.equals(currentModelPO.getCatalogId(), observedModelPO.getCatalogId())
-        || !Objects.equals(currentModelPO.getMetalakeId(), observedModelPO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-          ident.toString());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, ident);
+    return OccWriteSupport.writeFailure(
+        ident,
+        Entity.EntityType.MODEL,
+        ident.toString(),
+        () ->
+            SessionUtils.getWithoutCommit(
+                ModelMetaMapper.class,
+                mapper -> mapper.selectModelMetaByModelIdForUpdate(observedModelPO.getModelId())),
+        null,
+        current ->
+            Objects.equals(current.getModelName(), observedModelPO.getModelName())
+                && Objects.equals(current.getSchemaId(), observedModelPO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedModelPO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedModelPO.getMetalakeId()));
   }
 
   private void deleteModelDependents(ModelPO modelPO) {

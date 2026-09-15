@@ -63,6 +63,15 @@ github:
     - danhuawang
     - lasdf1234
     - nevzheng
+  # Copilot Code Review ruleset on the default branch (main).
+  # https://github.com/apache/infrastructure-asfyaml#copilot-code-review
+  # enabled:        true creates the ruleset; false or deleting this block removes it
+  # review_drafts:  false skips drafts; first auto-review when the PR is marked ready
+  # review_on_push: false does not re-review on later pushes; add Copilot by hand
+  copilot_code_review:
+    enabled: true
+    review_drafts: false
+    review_on_push: false
 
 notifications:
   commits: commits@gravitino.apache.org

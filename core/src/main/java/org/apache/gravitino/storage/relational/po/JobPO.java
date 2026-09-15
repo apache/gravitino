@@ -47,6 +47,7 @@ public class JobPO {
   private String jobRunStatus;
   private Long jobStartedAt;
   private Long jobFinishedAt;
+  private String runtimeJobTemplate;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -65,6 +66,7 @@ public class JobPO {
       String jobRunStatus,
       Long jobStartedAt,
       Long jobFinishedAt,
+      String runtimeJobTemplate,
       String auditInfo,
       Long currentVersion,
       Long lastVersion,
@@ -79,6 +81,8 @@ public class JobPO {
         StringUtils.isNotBlank(jobRunStatus), "jobRunStatus cannot be blank");
     Preconditions.checkArgument(jobStartedAt != null, "jobStartedAt cannot be null");
     Preconditions.checkArgument(jobFinishedAt != null, "jobFinishedAt cannot be null");
+    // runtimeJobTemplate is legitimately nullable: rows created before this field was introduced
+    // have no resolved template to backfill.
     Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "auditInfo cannot be blank");
     Preconditions.checkArgument(currentVersion != null, "currentVersion cannot be null");
     Preconditions.checkArgument(lastVersion != null, "lastVersion cannot be null");
@@ -91,6 +95,7 @@ public class JobPO {
     this.jobRunStatus = jobRunStatus;
     this.jobStartedAt = jobStartedAt;
     this.jobFinishedAt = jobFinishedAt;
+    this.runtimeJobTemplate = runtimeJobTemplate;
     this.auditInfo = auditInfo;
     this.currentVersion = currentVersion;
     this.lastVersion = lastVersion;
@@ -116,6 +121,7 @@ public class JobPO {
           .withJobRunStatus(jobEntity.status().name())
           .withJobStartedAt(jobEntity.startedAt())
           .withJobFinishedAt(jobEntity.finishedAt())
+          .withRuntimeJobTemplate(jobEntity.runtimeJobTemplate())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(jobEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -128,9 +134,13 @@ public class JobPO {
 
   /**
    * Builds the {@link JobPO} to persist for an update, carrying forward the identity fields ({@code
-   * jobRunId}, {@code jobTemplateName}) from the old PO since a job's template is immutable, and
-   * bumping the version counters. This does not perform any optimistic-concurrency check; the
-   * caller is responsible for any such guarantee.
+   * jobRunId}, {@code jobTemplateName}) from the old PO since a job's template is immutable once
+   * the job is created, and bumping the version counters. Unlike those identity fields, {@code
+   * runtimeJobTemplate} is taken from {@code newJobEntity} rather than carried forward from the old
+   * PO - this layer stores whatever the caller passes, it does not enforce that the resolved
+   * runtime template never changes. That invariant is the caller's responsibility (see {@code
+   * JobManager}'s updater functions, which always carry the existing value forward). This does not
+   * perform any optimistic-concurrency check; the caller is responsible for any such guarantee.
    *
    * @param oldJobPO the existing {@link JobPO} being updated
    * @param newJobEntity the {@link JobEntity} with the updated status/timestamps/audit info
@@ -149,6 +159,7 @@ public class JobPO {
           .withJobRunStatus(newJobEntity.status().name())
           .withJobStartedAt(newJobEntity.startedAt())
           .withJobFinishedAt(newJobEntity.finishedAt())
+          .withRuntimeJobTemplate(newJobEntity.runtimeJobTemplate())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newJobEntity.auditInfo()))
           .withCurrentVersion(currentVersion)
           .withLastVersion(lastVersion)
@@ -170,6 +181,7 @@ public class JobPO {
           .withAuditInfo(JsonUtils.anyFieldMapper().readValue(jobPO.auditInfo, AuditInfo.class))
           .withStartedAt(jobPO.jobStartedAt())
           .withFinishedAt(jobPO.jobFinishedAt())
+          .withRuntimeJobTemplate(jobPO.runtimeJobTemplate())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize job PO", e);

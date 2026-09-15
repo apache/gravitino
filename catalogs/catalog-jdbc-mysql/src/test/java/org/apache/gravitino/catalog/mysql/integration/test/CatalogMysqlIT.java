@@ -714,6 +714,10 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
             + "  binary_col binary,\n"
+            + "  binary_col_16 binary(16),\n"
+            + "  varbinary_col varbinary(100),\n"
+            + "  enum_col enum('a','b','c'),\n"
+            + "  set_col set('x','y','z'),\n"
             + "  blob_col blob,\n"
             + "  bit_col_8 bit(8),\n"
             + "  bit_col bit\n"
@@ -797,8 +801,20 @@ public class CatalogMysqlIT extends BaseIT {
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
           break;
+        case "binary_col_16":
+          Assertions.assertEquals(Types.ExternalType.of("binary(16)"), column.dataType());
+          break;
+        case "varbinary_col":
+          Assertions.assertEquals(Types.ExternalType.of("varbinary(100)"), column.dataType());
+          break;
+        case "enum_col":
+          Assertions.assertEquals(Types.ExternalType.of("enum('a','b','c')"), column.dataType());
+          break;
+        case "set_col":
+          Assertions.assertEquals(Types.ExternalType.of("set('x','y','z')"), column.dataType());
+          break;
         case "bit_col_8":
-          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          Assertions.assertEquals(Types.ExternalType.of("bit(8)"), column.dataType());
           break;
         case "bit_col":
           Assertions.assertEquals(Types.BooleanType.get(), column.dataType());

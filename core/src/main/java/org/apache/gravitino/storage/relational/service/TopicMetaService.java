@@ -345,19 +345,17 @@ public class TopicMetaService {
    */
   void deleteTopicWithVersion(NameIdentifier identifier, TopicPO observedTopicPO) {
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          // Check the root version before touching relationships. If this snapshot is stale,
-          // throwing here stops the transaction before any dependent row can be deleted.
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  TopicMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteTopicMetasByTopicId(
-                          observedTopicPO.getTopicId(), observedTopicPO.getCurrentVersion()));
-          if (deleted == 0) {
-            throw topicWriteFailure(identifier, observedTopicPO);
-          }
-        },
+        // Check the root version before touching relationships. If this snapshot is stale,
+        // throwing here stops the transaction before any dependent row can be deleted.
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        TopicMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteTopicMetasByTopicId(
+                                observedTopicPO.getTopicId(), observedTopicPO.getCurrentVersion())),
+                () -> topicWriteFailure(identifier, observedTopicPO)),
         () -> deleteTopicDependents(observedTopicPO.getTopicId()));
   }
 
@@ -391,20 +389,18 @@ public class TopicMetaService {
     // A zero-row CAS means either the same topic has a newer version, or the topic disappeared
     // from the name the caller used. The stable-ID lock waits for an in-flight writer to finish so
     // the result is classified from committed identity data.
-    TopicPO currentTopicPO =
-        SessionUtils.getWithoutCommit(
-            TopicMetaMapper.class,
-            mapper -> mapper.selectTopicMetaByIdForUpdate(observedTopicPO.getTopicId()));
-    if (currentTopicPO == null
-        || !Objects.equals(currentTopicPO.getTopicName(), observedTopicPO.getTopicName())
-        || !Objects.equals(currentTopicPO.getSchemaId(), observedTopicPO.getSchemaId())
-        || !Objects.equals(currentTopicPO.getCatalogId(), observedTopicPO.getCatalogId())
-        || !Objects.equals(currentTopicPO.getMetalakeId(), observedTopicPO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TOPIC.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.TOPIC,
+        () ->
+            SessionUtils.getWithoutCommit(
+                TopicMetaMapper.class,
+                mapper -> mapper.selectTopicMetaByIdForUpdate(observedTopicPO.getTopicId())),
+        null,
+        current ->
+            Objects.equals(current.getTopicName(), observedTopicPO.getTopicName())
+                && Objects.equals(current.getSchemaId(), observedTopicPO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedTopicPO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedTopicPO.getMetalakeId()));
   }
 }

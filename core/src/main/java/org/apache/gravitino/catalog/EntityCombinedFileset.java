@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -33,8 +34,10 @@ public final class EntityCombinedFileset implements Fileset {
 
   private final FilesetEntity filesetEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedFileset(Fileset fileset, FilesetEntity filesetEntity) {
     this.fileset = fileset;
@@ -57,8 +60,10 @@ public final class EntityCombinedFileset implements Fileset {
     return new EntityCombinedFileset(fileset, null);
   }
 
-  public EntityCombinedFileset withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties != null ? hiddenProperties : Collections.emptySet();
+  public EntityCombinedFileset withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -84,7 +89,8 @@ public final class EntityCombinedFileset implements Fileset {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(fileset.properties(), hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(
+        fileset.properties(), keysToMask, keysToOmit);
   }
 
   @Override

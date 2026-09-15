@@ -35,7 +35,10 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TableNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.Column;
@@ -58,8 +61,7 @@ public class TestTableHookDispatcher {
   @Test
   public void testDropAuthorizationPrivilege() {
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    TableHookDispatcher hook =
-        new TableHookDispatcher(dispatcher, () -> null, Mockito.mock(CatalogManager.class));
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
     List<String> locations = ImmutableList.of("/test");
     Mockito.when(dispatcher.dropTable(ident)).thenReturn(true);
@@ -82,17 +84,18 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableSetsOwnerWithNormalizedIdentifier() throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     Table createdTable = Mockito.mock(Table.class);
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdTable);
-    TableHookDispatcher hook =
-        new TableHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+    TableDispatcher hook =
+        new TableNormalizeDispatcher(
+            new TableHookDispatcher(dispatcher, () -> ownerDispatcher), catalogManager);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "SCHEMA_NORM", "MY_TABLE");
 
     assertSame(
@@ -121,7 +124,7 @@ public class TestTableHookDispatcher {
     Table createdTable = Mockito.mock(Table.class);
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdTable);
-    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null, catalogManager);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
 
     assertSame(
         createdTable,
@@ -148,11 +151,10 @@ public class TestTableHookDispatcher {
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Mockito.mock(Table.class));
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
-    TableHookDispatcher hook =
-        new TableHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> ownerDispatcher);
 
     RuntimeException thrown =
         assertThrows(
@@ -174,8 +176,7 @@ public class TestTableHookDispatcher {
   @Test
   public void testRenameAuthorizationPrivilege() {
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    TableHookDispatcher hook =
-        new TableHookDispatcher(dispatcher, () -> null, Mockito.mock(CatalogManager.class));
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
     Table alteredTable = Mockito.mock(Table.class);
     TableChange setChange = TableChange.setProperty("key", "value");

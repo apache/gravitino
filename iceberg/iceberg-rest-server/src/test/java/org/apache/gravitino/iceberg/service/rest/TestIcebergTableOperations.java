@@ -542,6 +542,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doLoadTableWithSnapshots(Namespace ns, String name, String snapshots) {
+    return doLoadTableWithSnapshots(ns, name, snapshots, false);
+  }
+
+  private Response doLoadTableWithSnapshots(
+      Namespace ns, String name, String snapshots, boolean credentialVending) {
     String path =
         IcebergRestTestUtil.NAMESPACE_PATH
             + "/"
@@ -549,7 +554,12 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             + "/tables/"
             + name;
     Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);
-    return getIcebergClientBuilder(path, Optional.of(queryParams)).get();
+    Invocation.Builder builder = getIcebergClientBuilder(path, Optional.of(queryParams));
+    if (credentialVending) {
+      builder =
+          builder.header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials");
+    }
+    return builder.get();
   }
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
@@ -1081,6 +1091,73 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         refs.keySet(),
         refsTableResponse.tableMetadata().refs().keySet(),
         "Refs should be preserved in filtered response");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsRefsKeepsCredentials(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    String tableName = "snapshots_refs_creds";
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(tableSchema)
+            .withLocation("s3://bucket/" + tableName)
+            .setProperties(
+                ImmutableMap.of(
+                    CatalogWrapperForTest.GENERATE_PLAN_TASKS_DATA_PROP, Boolean.TRUE.toString()))
+            .build();
+    Response createResponse =
+        getTableClientBuilder(namespace, Optional.empty())
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.OK.getStatusCode(), createResponse.getStatus());
+
+    Response refsResponse = doLoadTableWithSnapshots(namespace, tableName, "refs", true);
+    Assertions.assertEquals(Status.OK.getStatusCode(), refsResponse.getStatus());
+    LoadTableResponse refsTableResponse = refsResponse.readEntity(LoadTableResponse.class);
+
+    Assertions.assertTrue(
+        refsTableResponse.tableMetadata().snapshots().size() >= 1,
+        "Filtered response should keep at least the current ref snapshot");
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        refsTableResponse.config().get(Credential.CREDENTIAL_TYPE),
+        "snapshots=refs must keep vended credentials after filtering");
+    Assertions.assertFalse(
+        refsTableResponse.credentials().isEmpty(),
+        "snapshots=refs must keep storage-credentials after filtering");
+  }
+
+  @Test
+  void testFilterSnapshotsByRefsKeepsCredentials() {
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            tableSchema,
+            org.apache.iceberg.PartitionSpec.unpartitioned(),
+            "s3://bucket/db/tbl",
+            ImmutableMap.of());
+    org.apache.iceberg.rest.credentials.Credential credential =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.session-token",
+                "token",
+                "client.refresh-credentials-endpoint",
+                "v1/c/ns/t/credentials"));
+    LoadTableResponse original =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+            .addCredential(credential)
+            .build();
+
+    LoadTableResponse filtered = IcebergTableOperations.filterSnapshotsByRefs(original);
+
+    Assertions.assertEquals(1, filtered.credentials().size());
+    Assertions.assertEquals(
+        "token", filtered.credentials().get(0).config().get("s3.session-token"));
+    Assertions.assertEquals("org.apache.iceberg.aws.s3.S3FileIO", filtered.config().get("io-impl"));
   }
 
   @ParameterizedTest

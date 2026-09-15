@@ -62,6 +62,13 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
           Long.class,
           "The time when the job finished execution, using the storage layer's "
               + "\"not finished\" sentinel (<= 0) when the job has not finished execution yet.");
+  public static final Field RUNTIME_JOB_TEMPLATE =
+      Field.optional(
+          "runtime_job_template",
+          String.class,
+          "The resolved job template that was actually submitted for execution, serialized as "
+              + "JSON, with placeholders replaced and referenced files downloaded. Null for jobs "
+              + "run before this field was introduced.");
 
   private Long id;
   private String jobExecutionId;
@@ -71,6 +78,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   private AuditInfo auditInfo;
   private Long startedAt;
   private Long finishedAt;
+  private String runtimeJobTemplate;
 
   private JobEntity() {}
 
@@ -84,6 +92,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(STARTED_AT, startedAt);
     fields.put(FINISHED_AT, finishedAt);
+    fields.put(RUNTIME_JOB_TEMPLATE, runtimeJobTemplate);
     return Collections.unmodifiableMap(fields);
   }
 
@@ -148,6 +157,18 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     return (finishedAt == null || finishedAt <= 0) ? null : Instant.ofEpochMilli(finishedAt);
   }
 
+  /**
+   * Returns the resolved job template that was actually submitted for execution, serialized as JSON
+   * (placeholders replaced, referenced files downloaded).
+   *
+   * @return the serialized runtime job template, or {@code null} for jobs run before this field was
+   *     introduced
+   */
+  @Nullable
+  public String runtimeJobTemplate() {
+    return runtimeJobTemplate;
+  }
+
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
@@ -175,13 +196,22 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(startedAt, that.startedAt)
-        && Objects.equals(finishedAt, that.finishedAt);
+        && Objects.equals(finishedAt, that.finishedAt)
+        && Objects.equals(runtimeJobTemplate, that.runtimeJobTemplate);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        id, jobExecutionId, namespace, status, jobTemplateName, auditInfo, startedAt, finishedAt);
+        id,
+        jobExecutionId,
+        namespace,
+        status,
+        jobTemplateName,
+        auditInfo,
+        startedAt,
+        finishedAt,
+        runtimeJobTemplate);
   }
 
   public static Builder builder() {
@@ -232,6 +262,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withFinishedAt(Long finishedAt) {
       jobEntity.finishedAt = finishedAt;
+      return this;
+    }
+
+    public Builder withRuntimeJobTemplate(String runtimeJobTemplate) {
+      jobEntity.runtimeJobTemplate = runtimeJobTemplate;
       return this;
     }
 
