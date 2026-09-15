@@ -207,7 +207,7 @@ docker run -d --name lance-rest-service -p 9101:9101 \
   apache/gravitino-lance-rest:latest
 ```
 
-Access the service at `http://localhost:9101`.
+Access the service at `http://localhost:9101/lance`.
 
 **Environment Variables:**
 
