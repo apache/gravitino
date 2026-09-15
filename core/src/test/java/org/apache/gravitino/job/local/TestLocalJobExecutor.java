@@ -27,12 +27,15 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -131,6 +134,67 @@ public class TestLocalJobExecutor {
     Assertions.assertTrue(output.contains("in common script"));
 
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, jobExecutor.getJobStatus(jobId));
+  }
+
+  @Test
+  public void testJobOwnership() throws IOException {
+    LocalJobExecutor executor = (LocalJobExecutor) jobExecutor;
+    Assertions.assertTrue(executor.isJobStateNodeLocal());
+    Assertions.assertTrue(executor.executorId().matches("[0-9a-f]{8}"));
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(
+            jobTemplateEntity,
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
+            workingDir);
+    String jobId = executor.submitJob(template);
+    Assertions.assertTrue(
+        jobId.matches("local-job-" + executor.executorId() + "-[0-9a-f-]{36}"), jobId);
+    Assertions.assertTrue(executor.ownsJob(jobId));
+
+    // Jobs submitted before the executor id was introduced aren't owned by any executor.
+    Assertions.assertFalse(executor.ownsJob("local-job-" + UUID.randomUUID()));
+    Assertions.assertFalse(executor.ownsJob(null));
+
+    LocalJobExecutor anotherExecutor = new LocalJobExecutor();
+    try {
+      anotherExecutor.initialize(Collections.emptyMap());
+      Assertions.assertNotEquals(executor.executorId(), anotherExecutor.executorId());
+      Assertions.assertFalse(anotherExecutor.ownsJob(jobId));
+      Assertions.assertThrows(NoSuchJobException.class, () -> anotherExecutor.getJobStatus(jobId));
+    } finally {
+      anotherExecutor.close();
+    }
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+  }
+
+  @Test
+  public void testRunJobsConcurrentlyUpToMaxRunningJobs() throws IOException {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    try {
+      executor.initialize(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "2"));
+      String jobId1 = executor.submitJob(newSleepJobTemplate("sleep-1"));
+      String jobId2 = executor.submitJob(newSleepJobTemplate("sleep-2"));
+      String jobId3 = executor.submitJob(newSleepJobTemplate("sleep-3"));
+
+      // Up to maxRunningJobs jobs run at the same time, the others wait in the queue.
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(
+              () ->
+                  executor.getJobStatus(jobId1) == JobHandle.Status.STARTED
+                      && executor.getJobStatus(jobId2) == JobHandle.Status.STARTED);
+      Awaitility.await()
+          .during(1, TimeUnit.SECONDS)
+          .atMost(2, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId3) == JobHandle.Status.QUEUED);
+    } finally {
+      // Closing the executor kills the running jobs.
+      executor.close();
+    }
   }
 
   @Test
@@ -288,5 +352,24 @@ public class TestLocalJobExecutor {
     field.setAccessible(true);
     long actualValue = (long) field.get(exec);
     Assertions.assertEquals(11L, actualValue);
+  }
+
+  private JobTemplate newSleepJobTemplate(String name) throws IOException {
+    // The job runs in the directory of its executable, so give each job its own directory.
+    File jobDir = new File(workingDir, name);
+    Assertions.assertTrue(jobDir.mkdirs());
+    File script = new File(jobDir, "sleep.sh");
+    // Exec the sleep, so that killing the job process also stops the sleep.
+    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep 600\n");
+    Assertions.assertTrue(script.setExecutable(true));
+
+    return ShellJobTemplate.builder()
+        .withName(name)
+        .withExecutable(script.getAbsolutePath())
+        .withArguments(Collections.emptyList())
+        .withEnvironments(Collections.emptyMap())
+        .withCustomFields(Collections.emptyMap())
+        .withScripts(Collections.emptyList())
+        .build();
   }
 }

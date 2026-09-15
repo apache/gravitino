@@ -21,29 +21,39 @@ package org.apache.gravitino.client.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +61,16 @@ import org.junit.jupiter.api.Test;
 public class JobIT extends BaseIT {
 
   private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("job_it_metalake");
+
+  private static final long STATUS_PULL_INTERVAL_IN_MS = 3000L;
+
+  // Finished jobs, and active jobs not updated, for this long are cleaned up. The cleanup runs
+  // every tenth of it.
+  private static final long JOB_KEEP_TIME_IN_MS = 60_000L;
+
+  // A job execution id that no job executor instance of this server owns, as if the job was
+  // submitted by the local job executor of another Gravitino server sharing the metadata store.
+  private static final String OTHER_SERVER_EXECUTION_ID_PREFIX = "local-job-otherserver-";
 
   private File testStagingDir;
   private File testSparkHome;
@@ -83,7 +103,9 @@ public class JobIT extends BaseIT {
             "gravitino.job.stagingDir",
             testStagingDir.getAbsolutePath(),
             "gravitino.job.statusPullIntervalInMs",
-            "3000",
+            String.valueOf(STATUS_PULL_INTERVAL_IN_MS),
+            "gravitino.job.stagingDirKeepTimeInMs",
+            String.valueOf(JOB_KEEP_TIME_IN_MS),
             "gravitino.jobExecutor.local.sparkHome",
             testSparkHome.getAbsolutePath());
     registerCustomConfigs(configs);
@@ -456,6 +478,83 @@ public class JobIT extends BaseIT {
     // Test cancel a non-existent job
     Assertions.assertThrows(
         NoSuchJobException.class, () -> metalake.cancelJob("non_existent_job_id"));
+  }
+
+  @Test
+  public void testJobOwnedByAnotherServerIsNotFailed() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_other_server_job").build();
+    metalake.registerJobTemplate(template);
+
+    // Another server's job can't be found in this server's job executor, but this server must not
+    // mark it as FAILED when pulling job statuses.
+    JobEntity job = insertOtherServerJob(template.name(), JobHandle.Status.STARTED, Instant.now());
+    Awaitility.await()
+        .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.STARTED);
+  }
+
+  @Test
+  public void testCancelJobOwnedByAnotherServer() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_other_server_cancel").build();
+    metalake.registerJobTemplate(template);
+    JobEntity job = insertOtherServerJob(template.name(), JobHandle.Status.STARTED, Instant.now());
+
+    // This server can't cancel another server's job, so it marks the job as CANCELLING for its
+    // owner to cancel, instead of failing the request.
+    JobHandle cancellingJob = metalake.cancelJob(job.name());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, cancellingJob.jobStatus());
+    Awaitility.await()
+        .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLING);
+  }
+
+  @Test
+  public void testStaleActiveJobIsMarkedFailed() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_stale_job").build();
+    metalake.registerJobTemplate(template);
+
+    // The job was left behind by a server that exited long ago, so nobody updates it anymore.
+    JobEntity job =
+        insertOtherServerJob(
+            template.name(), JobHandle.Status.STARTED, Instant.now().minus(Duration.ofDays(30)));
+    Assertions.assertEquals(JobHandle.Status.STARTED, metalake.getJob(job.name()).jobStatus());
+
+    // The cleanup marks the job as FAILED, as it has not been updated for longer than the keep
+    // time. The failed job is kept for another keep time before being removed.
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.FAILED);
+    Assertions.assertNotNull(metalake.getJob(job.name()).finishedAt());
+  }
+
+  private JobEntity insertOtherServerJob(
+      String templateName, JobHandle.Status status, Instant createTime) throws IOException {
+    long jobId = GravitinoEnv.getInstance().idGenerator().nextId();
+    JobEntity job =
+        JobEntity.builder()
+            .withId(jobId)
+            .withJobExecutionId(OTHER_SERVER_EXECUTION_ID_PREFIX + UUID.randomUUID())
+            .withJobTemplateName(templateName)
+            .withStatus(status)
+            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(createTime).build())
+            .withStartedAt(status == JobHandle.Status.QUEUED ? 0L : createTime.toEpochMilli())
+            .withFinishedAt(0L)
+            .build();
+    GravitinoEnv.getInstance().entityStore().put(job, false /* overwrite */);
+    return job;
   }
 
   private String generateTestEntryScript() {
