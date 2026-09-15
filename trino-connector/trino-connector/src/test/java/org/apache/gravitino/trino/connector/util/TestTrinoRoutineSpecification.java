@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
+import io.trino.sql.SqlFormatter;
 import io.trino.sql.parser.SqlParser;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
@@ -88,6 +89,16 @@ public class TestTrinoRoutineSpecification {
             + " RETURN returned + 1",
         spec);
     parse(spec);
+  }
+
+  @Test
+  public void testParameterNamedLikeKeywordShadowsTheKeyword() {
+    for (String name : new String[] {"return", "begin", "function", "RETURN"}) {
+      String spec = build("f", name + " + 1", param(name, Types.IntegerType.get()));
+      parse(spec);
+      assertTrue(spec.endsWith(" SECURITY INVOKER RETURN " + name + " + 1"), spec);
+      assertEquals("RETURN (" + name + " + 1)", formatStatement(spec), spec);
+    }
   }
 
   @Test
@@ -161,6 +172,13 @@ public class TestTrinoRoutineSpecification {
 
   private static void parse(String spec) {
     PARSER.createFunctionSpecification(spec);
+  }
+
+  // Renders the routine body as Trino understands it, so a test can assert that a parameter
+  // reference survived instead of being swallowed by a keyword.
+  private static String formatStatement(String spec) {
+    String formatted = SqlFormatter.formatSql(PARSER.createFunctionSpecification(spec));
+    return formatted.substring(formatted.indexOf("RETURN ")).trim();
   }
 
   private static String build(String name, String body, FunctionParam... params) {

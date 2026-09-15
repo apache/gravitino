@@ -21,6 +21,8 @@ package org.apache.gravitino.trino.connector.util;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.Type;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
@@ -33,9 +35,11 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
  * <pre>FUNCTION name(params) RETURNS type [NOT] DETERMINISTIC SECURITY INVOKER body</pre>
  *
  * <p>The stored body is either a bare expression, which is wrapped in a {@code RETURN} statement,
- * or a control statement ({@code RETURN ...} / {@code BEGIN ... END}) that is used as-is. {@code
- * SECURITY INVOKER} is always declared because the function has no owner identity for Trino's
- * {@code SECURITY DEFINER} default.
+ * or a control statement ({@code RETURN ...} / {@code BEGIN ... END}) that is used as-is. The form
+ * is decided by the first token of the body; since {@code return}, {@code begin} and {@code
+ * function} are also valid identifiers, a parameter with one of these names shadows the keyword and
+ * the body is treated as an expression. {@code SECURITY INVOKER} is always declared because the
+ * function has no owner identity for Trino's {@code SECURITY DEFINER} default.
  *
  * <p>Identifiers are always quoted. Trino resolves routine and parameter names case-insensitively
  * regardless of quoting, so this is equivalent to plain identifiers while also covering reserved
@@ -65,8 +69,12 @@ public final class TrinoRoutineSpecification {
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
           "Function " + function.name() + " has a definition without a return type");
     }
+    Set<String> parameterNames =
+        Arrays.stream(definition.parameters())
+            .map(param -> param.name().toLowerCase(Locale.ENGLISH))
+            .collect(Collectors.toSet());
     String body = stripLeadingComments(sql);
-    if (startsWithKeyword(body, "FUNCTION")) {
+    if (startsWithKeyword(body, "FUNCTION", parameterNames)) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
           "The SQL body of function "
@@ -84,7 +92,8 @@ public final class TrinoRoutineSpecification {
                         + formatType(typeTransformer.getTrinoType(param.dataType())))
             .collect(Collectors.joining(", ", "(", ")"));
     String statement =
-        startsWithKeyword(body, "RETURN") || startsWithKeyword(body, "BEGIN")
+        startsWithKeyword(body, "RETURN", parameterNames)
+                || startsWithKeyword(body, "BEGIN", parameterNames)
             ? body
             : "RETURN " + body;
     return "FUNCTION "
@@ -122,9 +131,10 @@ public final class TrinoRoutineSpecification {
     }
   }
 
-  private static boolean startsWithKeyword(String sql, String keyword) {
+  private static boolean startsWithKeyword(String sql, String keyword, Set<String> parameterNames) {
     return sql.regionMatches(true, 0, keyword, 0, keyword.length())
-        && (sql.length() == keyword.length() || !isIdentifierChar(sql.charAt(keyword.length())));
+        && (sql.length() == keyword.length() || !isIdentifierChar(sql.charAt(keyword.length())))
+        && !parameterNames.contains(keyword.toLowerCase(Locale.ENGLISH));
   }
 
   private static boolean isIdentifierChar(char c) {
