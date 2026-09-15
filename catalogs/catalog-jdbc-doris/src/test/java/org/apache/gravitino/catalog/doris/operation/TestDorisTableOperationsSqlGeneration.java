@@ -453,6 +453,13 @@ public class TestDorisTableOperationsSqlGeneration {
         DorisTableOperations.mapDorisIndexType("BLOOMFILTER", "idx_name"));
     Assertions.assertEquals(
         Index.IndexType.VECTOR, DorisTableOperations.mapDorisIndexType("ANN", "idx_name"));
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> DorisTableOperations.mapDorisIndexType("NGRAM_BF", "idx_ngram"));
+    Assertions.assertEquals(
+        "Doris index 'idx_ngram' uses unsupported native index type 'NGRAM_BF'",
+        exception.getMessage());
     // Unknown type should fall back to INVERTED
     Assertions.assertEquals(
         Index.IndexType.INVERTED,
@@ -522,10 +529,9 @@ public class TestDorisTableOperationsSqlGeneration {
     Mockito.when(metaData.getColumnName(4)).thenReturn("Properties");
     Mockito.when(metaData.getColumnName(5)).thenReturn("Comment");
     Mockito.when(resultSet.next()).thenReturn(true, true, true, false);
-    Mockito.when(resultSet.getString("Key_name"))
-        .thenReturn("idx_first", "idx_ngram", "idx_second");
-    Mockito.when(resultSet.getString("Column_name")).thenReturn("text_a", "text_ngram", "text_b");
-    Mockito.when(resultSet.getString("Index_type")).thenReturn("INVERTED", "NGRAM_BF", "INVERTED");
+    Mockito.when(resultSet.getString("Key_name")).thenReturn("idx_first", "idx_ann", "idx_second");
+    Mockito.when(resultSet.getString("Column_name")).thenReturn("text_a", "text_ann", "text_b");
+    Mockito.when(resultSet.getString("Index_type")).thenReturn("INVERTED", "ANN", "INVERTED");
     Mockito.when(resultSet.getString("Properties"))
         .thenReturn("(\"parser\" = \"english\")", "(\"support_phrase\" = \"true\")");
 
