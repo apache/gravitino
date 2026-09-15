@@ -60,6 +60,7 @@ import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
@@ -139,14 +140,14 @@ public class GravitinoServer extends ResourceConfig {
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
 
     // initialize Jersey REST API resources.
-    initializeRestApi();
+    initializeRestApi(jettyServerConfig);
   }
 
   public ServerConfig serverConfig() {
     return serverConfig;
   }
 
-  private void initializeRestApi() {
+  private void initializeRestApi(JettyServerConfig jettyServerConfig) {
     HashSet<String> restApiPackagesSet = new HashSet<>();
     restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
     restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
@@ -188,13 +189,15 @@ public class GravitinoServer extends ResourceConfig {
           }
         });
     register(JsonProcessingExceptionMapper.class);
+    register(new OutOfMemoryErrorListener());
     register(ErrorExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
     register(ParamExceptionMapper.class);
     register(NotFoundExceptionMapper.class);
     register(WebApplicationExceptionMapper.class);
-    register(ObjectMapperProvider.class).register(JacksonFeature.class);
+    register(new ObjectMapperProvider(jettyServerConfig.isIncludeErrorStackTrace()))
+        .register(JacksonFeature.class);
     property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 
     if (!enableAuthorization) {
@@ -225,7 +228,8 @@ public class GravitinoServer extends ResourceConfig {
     server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), API_ANY_PATH);
     server.addFilter(
         new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), API_ANY_PATH);
-    server.addFilter(new VersioningFilter(), API_ANY_PATH);
+    server.addFilter(
+        new VersioningFilter(jettyServerConfig.isIncludeErrorStackTrace()), API_ANY_PATH);
 
     // GH-12760: servlets mounted outside API_ANY_PATH used to receive none of the filters below
     // (no request-context tracking, no audit-on-failure, no custom filters), with nothing in the

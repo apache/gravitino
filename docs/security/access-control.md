@@ -254,6 +254,11 @@ return only the entries the caller is entitled to see, which for a metalake owne
 | Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
 
+Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
+`CREATE_CATALOG`. Testing an existing catalog with its stored configuration takes `USE_CATALOG`, the
+same as loading it. Testing an existing catalog with proposed changes that are not saved takes
+ownership, the same as altering it, because the caller chooses what the server connects to.
+
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) or vend credentials (`getCredentials`)

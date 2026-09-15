@@ -36,6 +36,14 @@ public class TestIcebergCatalogPropertiesMetadata {
   }
 
   @Test
+  void testJdbcUserIsVisibleAndPasswordIsHidden() {
+    Assertions.assertFalse(
+        metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER));
+    Assertions.assertTrue(
+        metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
+  }
+
+  @Test
   void testTableMetadataCacheImplDefaultValue() {
     Assertions.assertEquals(
         LocalTableMetadataCache.class.getName(),

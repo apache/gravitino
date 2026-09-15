@@ -1736,18 +1736,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String[][] fields;
           try {
             indexType = getClickHouseIndexType(type);
-            fields = parseIndexFields(expression);
-          } catch (IllegalArgumentException e) {
+          } catch (IllegalArgumentException ignored) {
             LOG.warn(
-                "Skip unsupported data skipping index {} for {}.{} with type {} "
-                    + "(parameter metadata={}) and expression {}",
+                "Skip unsupported data skipping index {} for {}.{} with unsupported type {}",
                 name,
                 databaseName,
                 tableName,
-                type,
-                parameterSource,
-                expression,
-                e);
+                type);
+            continue;
+          }
+          try {
+            fields = parseIndexFields(expression);
+          } catch (IllegalArgumentException ignored) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with type {} because its "
+                    + "expression cannot be represented as index field names",
+                name,
+                databaseName,
+                tableName,
+                type);
             continue;
           }
           if (ArrayUtils.isEmpty(fields)) {

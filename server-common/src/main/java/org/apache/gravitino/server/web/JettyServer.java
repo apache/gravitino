@@ -116,7 +116,7 @@ public class JettyServer {
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
-    errorHandler.setShowStacks(true);
+    errorHandler.setShowStacks(serverConfig.isIncludeErrorStackTrace());
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
@@ -178,6 +178,9 @@ public class JettyServer {
       initializeBasicServletContextHandler();
       webUiEnabled = false;
     }
+
+    // Install before authentication, custom filters, and servlet mappings on every service.
+    addFilter(new OutOfMemoryErrorFilter(), "/*");
 
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     // Metrics System could be null in UT.
@@ -484,6 +487,7 @@ public class JettyServer {
                     thread.setName(getName() + "-" + thread.getId());
                     thread.setUncaughtExceptionHandler(
                         (t, throwable) -> {
+                          ServerHealth.getInstance().recordFailure(throwable);
                           LOG.error("{} uncaught exception:", t.getName(), throwable);
                         });
                     // JettyServer maybe used by Gravitino server and Iceberg REST server with
@@ -534,14 +538,18 @@ public class JettyServer {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(createAuthenticationFilter(), pathSpec);
+    addFilter(createAuthenticationFilter(serverConfig.isIncludeErrorStackTrace()), pathSpec);
   }
 
   /**
    * Creates the authentication filter for this server. Subclasses can override this to provide a
    * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
+   *
+   * @param includeErrorStackTrace whether the filter's error responses may include server-side
+   *     stack traces; implementations must not include them when this is {@code false}
+   * @return the authentication filter
    */
-  protected Filter createAuthenticationFilter() {
-    return new AuthenticationFilter();
+  protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
+    return new AuthenticationFilter(includeErrorStackTrace);
   }
 }

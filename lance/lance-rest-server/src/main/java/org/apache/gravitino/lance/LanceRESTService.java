@@ -48,6 +48,7 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -79,6 +80,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
+    LanceExceptionMapper.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
 
     server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
@@ -110,6 +112,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     resourceConfig.register(JacksonFeature.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
     resourceConfig.register(LanceExceptionMapper.class);
+    resourceConfig.register(new OutOfMemoryErrorListener());
     resourceConfig.register(
         new AbstractBinder() {
           @Override

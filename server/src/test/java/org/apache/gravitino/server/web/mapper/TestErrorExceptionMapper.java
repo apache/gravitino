@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.mapper;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +36,9 @@ public class TestErrorExceptionMapper {
           new NoClassDefFoundError("catalog class"), new AssertionError("assertion")
         }) {
       error.initCause(new IllegalStateException("root cause"));
-      try (Response response = new ErrorExceptionMapper().toResponse(error)) {
+      ServerHealth health = new ServerHealth();
+      try (Response response = new ErrorExceptionMapper(health).toResponse(error)) {
+        Assertions.assertEquals(error instanceof OutOfMemoryError, health.hasOutOfMemoryError());
         Assertions.assertEquals(500, response.getStatus());
         Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
         ErrorResponse entity = (ErrorResponse) response.getEntity();

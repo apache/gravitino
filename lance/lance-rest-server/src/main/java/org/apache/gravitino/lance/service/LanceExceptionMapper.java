@@ -23,8 +23,12 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.lance.namespace.errors.ConcurrentModificationException;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
@@ -46,7 +50,33 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
+  // Set once at service startup. Only Lance REST reads this flag, and its classes are packaged
+  // outside the main server's classpath, so each service loads its own copy.
+  private static volatile boolean includeErrorStackTrace =
+      JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
+
+  /**
+   * Sets whether error details built by {@link #errorDetail(Throwable)} include the exception's
+   * stack trace. Called once when the service starts.
+   *
+   * @param include whether to include stack traces
+   */
+  public static void setIncludeErrorStackTrace(boolean include) {
+    includeErrorStackTrace = include;
+  }
+
+  /**
+   * Returns the error detail for a Lance error response.
+   *
+   * @param ex the failure to describe
+   * @return the stack trace of {@code ex}, or an empty string when stack traces are disabled
+   */
+  public static String errorDetail(Throwable ex) {
+    return includeErrorStackTrace ? getStackTrace(ex) : "";
+  }
+
   public static Response toRESTResponse(String instance, Throwable ex) {
+    ServerHealth.getInstance().recordFailure(ex);
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex
@@ -66,25 +96,31 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   }
 
   private static LanceNamespaceException toLanceNamespaceException(String instance, Throwable ex) {
-    if (ex instanceof NoSuchTableException) {
-      return new TableNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
+    if (ex instanceof ForbiddenException) {
+      return new PermissionDeniedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof UnauthorizedException) {
+      return new UnauthenticatedException(ex.getMessage(), "", instance);
+
+    } else if (ex instanceof NoSuchTableException) {
+      return new TableNotFoundException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof NotFoundException) {
-      return new NamespaceNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
+      return new NamespaceNotFoundException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof IllegalArgumentException) {
-      return new InvalidInputException(ex.getMessage(), getStackTrace(ex), instance);
+      return new InvalidInputException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof org.apache.gravitino.exceptions.TableAlreadyExistsException) {
-      return new TableAlreadyExistsException(ex.getMessage(), getStackTrace(ex), instance);
+      return new TableAlreadyExistsException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof UnsupportedOperationException) {
       return new org.lance.namespace.errors.UnsupportedOperationException(
-          ex.getMessage(), getStackTrace(ex), instance);
+          ex.getMessage(), errorDetail(ex), instance);
 
     } else {
       LOG.warn("Lance REST server unexpected exception:", ex);
-      return new InternalException(ex.getMessage(), getStackTrace(ex), instance);
+      return new InternalException("Internal server error", "", instance);
     }
   }
 
