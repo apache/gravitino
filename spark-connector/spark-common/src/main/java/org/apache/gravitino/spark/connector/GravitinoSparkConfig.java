@@ -20,10 +20,12 @@
 package org.apache.gravitino.spark.connector;
 
 import org.apache.gravitino.auth.AuthProperties;
+import org.apache.spark.sql.SparkSession;
 
 public class GravitinoSparkConfig {
 
   private static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
+  public static final String GRAVITINO_ENABLED = GRAVITINO_PREFIX + "enabled";
   public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
@@ -93,6 +95,16 @@ public class GravitinoSparkConfig {
 
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";
+
+  /**
+   * Returns whether Gravitino Spark connector behavior is enabled for the Spark application.
+   *
+   * @param spark the Spark session
+   * @return true if Gravitino Spark connector behavior is enabled
+   */
+  public static boolean isGravitinoEnabled(SparkSession spark) {
+    return spark.sparkContext().conf().getBoolean(GRAVITINO_ENABLED, true);
+  }
 
   private GravitinoSparkConfig() {}
 }

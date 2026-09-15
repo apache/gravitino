@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.authorization;
 
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.spark.sql.SparkSessionExtensions;
 import org.apache.spark.sql.catalyst.FunctionIdentifier;
 import org.apache.spark.sql.catalyst.TableIdentifier;
@@ -26,6 +27,7 @@ import org.apache.spark.sql.catalyst.expressions.Expression;
 import org.apache.spark.sql.catalyst.parser.ParseException;
 import org.apache.spark.sql.catalyst.parser.ParserInterface;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
+import org.apache.spark.sql.catalyst.rules.Rule;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructType;
 import scala.Function1;
@@ -46,9 +48,24 @@ public class GravitinoAuthorizationSparkSessionExtensions
   public Void apply(SparkSessionExtensions extensions) {
     // Post-hoc resolution runs after every relation is resolved but before checkAnalysis, so all
     // denied tables are reported together rather than failing on the first resolution error.
-    extensions.injectPostHocResolutionRule(session -> new RequiredPrivilegesCheck());
-    extensions.injectParser((session, parser) -> new AuthorizationParser(parser));
+    extensions.injectPostHocResolutionRule(
+        session ->
+            GravitinoSparkConfig.isGravitinoEnabled(session)
+                ? new RequiredPrivilegesCheck()
+                : new NoOpRule());
+    extensions.injectParser(
+        (session, parser) ->
+            GravitinoSparkConfig.isGravitinoEnabled(session)
+                ? new AuthorizationParser(parser)
+                : parser);
     return null;
+  }
+
+  private static class NoOpRule extends Rule<LogicalPlan> {
+    @Override
+    public LogicalPlan apply(LogicalPlan plan) {
+      return plan;
+    }
   }
 
   private static class AuthorizationParser implements ParserInterface {
