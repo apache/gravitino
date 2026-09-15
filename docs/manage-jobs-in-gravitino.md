@@ -47,6 +47,10 @@ are filled in when a job runs.
 `executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
 HTTP, HTTPS, FTP, and FTPS URLs.
 
+Job artifacts share one staging directory. Different source files must have distinct filenames
+across the executable, scripts, Spark jars, files, and archives. Gravitino rejects conflicting
+filenames before staging any artifacts. Repeated references to the same source are allowed.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
