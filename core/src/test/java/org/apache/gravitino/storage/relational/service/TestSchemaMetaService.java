@@ -141,19 +141,17 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    List<SchemaChildWrite> childWrites = schemaChildWrites();
-
-    for (int index = 0; index < childWrites.size(); index++) {
+    for (SchemaChildCase childCase : schemaChildCases()) {
       SchemaEntity schema =
           createSchemaEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               NamespaceUtil.ofSchema(metalakeName, catalogName),
-              "schema_for_entity_lock_" + index,
+              "schema_for_entity_lock_" + childCase.type.name().toLowerCase(Locale.ROOT),
               AUDIT_INFO);
       backend.insert(schema, false);
       Namespace childNamespace = Namespace.of(metalakeName, catalogName, schema.name());
-      SchemaChildWrite childWrite = childWrites.get(index);
-      assertSchemaChildActionWaitsForConcurrentDelete(schema, () -> childWrite.run(childNamespace));
+      assertSchemaChildActionWaitsForConcurrentDelete(
+          schema, () -> childCase.write.run(childNamespace));
     }
   }
 
@@ -162,24 +160,22 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    List<SchemaChildWrite> childWrites = schemaChildWrites();
-    List<Entity.EntityType> childTypes = schemaChildTypes();
-    for (int index = 0; index < childWrites.size(); index++) {
+    for (SchemaChildCase childCase : schemaChildCases()) {
       SchemaEntity schema =
           createSchemaEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               NamespaceUtil.ofSchema(metalakeName, catalogName),
-              "schema_for_entity_update_lock_" + index,
+              "schema_for_entity_update_lock_" + childCase.type.name().toLowerCase(Locale.ROOT),
               AUDIT_INFO);
       backend.insert(schema, false);
       Namespace childNamespace = Namespace.of(metalakeName, catalogName, schema.name());
-      childWrites.get(index).run(childNamespace);
+      childCase.write.run(childNamespace);
 
-      Entity.EntityType childType = childTypes.get(index);
       NameIdentifier childIdentifier =
-          NameIdentifier.of(childNamespace, "child_" + childType.name().toLowerCase(Locale.ROOT));
+          NameIdentifier.of(
+              childNamespace, "child_" + childCase.type.name().toLowerCase(Locale.ROOT));
       assertSchemaChildActionWaitsForConcurrentDelete(
-          schema, () -> backend.update(childIdentifier, childType, entity -> entity));
+          schema, () -> backend.update(childIdentifier, childCase.type, entity -> entity));
     }
   }
 
@@ -188,18 +184,17 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    List<SchemaChildWrite> childWrites = schemaChildWrites();
-    for (int index = 0; index < childWrites.size(); index++) {
+    for (SchemaChildCase childCase : schemaChildCases()) {
       SchemaEntity schema =
           createSchemaEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               NamespaceUtil.ofSchema(metalakeName, catalogName),
-              "schema_for_child_exists_" + index,
+              "schema_for_child_exists_" + childCase.type.name().toLowerCase(Locale.ROOT),
               AUDIT_INFO);
       backend.insert(schema, false);
 
       Assertions.assertNull(selectActiveSchemaChild(schema.id()));
-      childWrites.get(index).run(Namespace.of(metalakeName, catalogName, schema.name()));
+      childCase.write.run(Namespace.of(metalakeName, catalogName, schema.name()));
       Assertions.assertEquals(1, selectActiveSchemaChild(schema.id()));
 
       // Each UNION branch must protect the public non-cascade delete path, not merely return a
@@ -1231,53 +1226,61 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         SchemaMetaMapper.class, mapper -> mapper.selectActiveChildBySchemaId(schemaId));
   }
 
-  private List<SchemaChildWrite> schemaChildWrites() {
+  private List<SchemaChildCase> schemaChildCases() {
     return Arrays.asList(
-        namespace ->
-            backend.insert(
-                createTableEntity(
-                    RandomIdGenerator.INSTANCE.nextId(), namespace, "child_table", AUDIT_INFO),
-                false),
-        namespace ->
-            backend.insert(
-                createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "child_view"),
-                false),
-        namespace ->
-            backend.insert(
-                createFilesetEntity(
-                    RandomIdGenerator.INSTANCE.nextId(), namespace, "child_fileset", AUDIT_INFO),
-                false),
-        namespace ->
-            backend.insert(
-                createFunctionEntity(
-                    RandomIdGenerator.INSTANCE.nextId(), namespace, "child_function", AUDIT_INFO),
-                false),
-        namespace ->
-            backend.insert(
-                createModelEntity(
-                    RandomIdGenerator.INSTANCE.nextId(),
-                    namespace,
-                    "child_model",
-                    "model comment",
-                    0,
-                    Collections.emptyMap(),
-                    AUDIT_INFO),
-                false),
-        namespace ->
-            backend.insert(
-                createTopicEntity(
-                    RandomIdGenerator.INSTANCE.nextId(), namespace, "child_topic", AUDIT_INFO),
-                false));
-  }
-
-  private List<Entity.EntityType> schemaChildTypes() {
-    return Arrays.asList(
-        Entity.EntityType.TABLE,
-        Entity.EntityType.VIEW,
-        Entity.EntityType.FILESET,
-        Entity.EntityType.FUNCTION,
-        Entity.EntityType.MODEL,
-        Entity.EntityType.TOPIC);
+        new SchemaChildCase(
+            Entity.EntityType.TABLE,
+            namespace ->
+                backend.insert(
+                    createTableEntity(
+                        RandomIdGenerator.INSTANCE.nextId(), namespace, "child_table", AUDIT_INFO),
+                    false)),
+        new SchemaChildCase(
+            Entity.EntityType.VIEW,
+            namespace ->
+                backend.insert(
+                    createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "child_view"),
+                    false)),
+        new SchemaChildCase(
+            Entity.EntityType.FILESET,
+            namespace ->
+                backend.insert(
+                    createFilesetEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_fileset",
+                        AUDIT_INFO),
+                    false)),
+        new SchemaChildCase(
+            Entity.EntityType.FUNCTION,
+            namespace ->
+                backend.insert(
+                    createFunctionEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_function",
+                        AUDIT_INFO),
+                    false)),
+        new SchemaChildCase(
+            Entity.EntityType.MODEL,
+            namespace ->
+                backend.insert(
+                    createModelEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_model",
+                        "model comment",
+                        0,
+                        Collections.emptyMap(),
+                        AUDIT_INFO),
+                    false)),
+        new SchemaChildCase(
+            Entity.EntityType.TOPIC,
+            namespace ->
+                backend.insert(
+                    createTopicEntity(
+                        RandomIdGenerator.INSTANCE.nextId(), namespace, "child_topic", AUDIT_INFO),
+                    false)));
   }
 
   @FunctionalInterface
@@ -1288,5 +1291,15 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   @FunctionalInterface
   private interface SchemaChildWrite {
     void run(Namespace namespace) throws Exception;
+  }
+
+  private static class SchemaChildCase {
+    private final Entity.EntityType type;
+    private final SchemaChildWrite write;
+
+    private SchemaChildCase(Entity.EntityType type, SchemaChildWrite write) {
+      this.type = type;
+      this.write = write;
+    }
   }
 }
