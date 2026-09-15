@@ -19,6 +19,7 @@
 package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,6 +79,24 @@ public class TestTableHookDispatcher {
           () ->
               AuthorizationUtils.authorizationPluginRemovePrivileges(
                   ident, Entity.EntityType.TABLE, locations));
+    }
+  }
+
+  @Test
+  public void testDropDoesNotRemoveAuthorizationPrivilegeWhenTableDoesNotExist() {
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
+    Mockito.when(dispatcher.dropTable(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authorizationUtils =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertFalse(hook.dropTable(ident));
+      authorizationUtils.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TABLE, null),
+          Mockito.never());
     }
   }
 

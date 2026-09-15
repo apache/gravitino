@@ -238,6 +238,23 @@ public class TestSchemaHookDispatcher {
     }
   }
 
+  @Test
+  public void testDropSchemaDoesNotRemovePrivilegesWhenSchemaDoesNotExist() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      boolean dropped = hookDispatcher.dropSchema(ident, false);
+
+      Assertions.assertFalse(dropped);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.SCHEMA, null),
+          Mockito.never());
+    }
+  }
+
   @SuppressWarnings("unchecked")
   private List<MetadataObject> captureOwnedObjects() {
     ArgumentCaptor<List<MetadataObject>> captor = ArgumentCaptor.forClass(List.class);
