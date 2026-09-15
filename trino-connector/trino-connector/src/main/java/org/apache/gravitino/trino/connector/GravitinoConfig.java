@@ -830,7 +830,8 @@ public class GravitinoConfig {
     String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
     Map<String, String> restCatalogConfig = new HashMap<>();
 
-    if ("oauth2".equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))) {
+    if ("oauth2".equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))
+        && "OAUTH2".equalsIgnoreCase(config.getOrDefault(prefix + "security", "OAUTH2"))) {
       restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "OAUTH2");
       putIfNotBlank(
           restCatalogConfig,

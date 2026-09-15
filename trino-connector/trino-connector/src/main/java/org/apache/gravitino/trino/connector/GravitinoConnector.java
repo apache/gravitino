@@ -111,15 +111,41 @@ public class GravitinoConnector implements Connector {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
 
-    Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
-        internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
+        getInternalMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     CatalogConnectorMetadata metadata =
         forwardUser ? resolveSessionMetadata(session) : connectorMetadata;
     return createGravitinoMetadata(
         metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  }
+
+  /**
+   * Defers native REST authentication until a data operation needs it. Catalog registration uses a
+   * password-authenticated management session without a delegated user token.
+   *
+   * @param session the authenticated query session
+   * @param transactionHandle the native transaction handle
+   * @return metadata that preserves user authentication at first data access
+   */
+  protected ConnectorMetadata getInternalMetadata(
+      ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
+    if ("lakehouse-iceberg".equals(catalogConnectorContext.getCatalog().getProvider())
+        && "OAUTH2_PASSTHROUGH"
+            .equalsIgnoreCase(
+                catalogConnectorContext
+                    .getConfig()
+                    .getIcebergRestCatalogConfig()
+                    .get("iceberg.rest-catalog.security"))) {
+      return DeferredConnectorMetadata.create(
+          session,
+          currentSession ->
+              catalogConnectorContext
+                  .getInternalConnector()
+                  .getMetadata(currentSession, transactionHandle));
+    }
+    return catalogConnectorContext.getInternalConnector().getMetadata(session, transactionHandle);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(

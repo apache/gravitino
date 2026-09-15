@@ -389,6 +389,31 @@ public class TestGravitinoConfig {
         restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
   }
 
+  /** Verifies non-OAuth2 REST modes do not inherit Gravitino service credentials. */
+  @Test
+  public void testIcebergRestPassthroughDoesNotInheritServiceCredentials() {
+    for (String security : new String[] {"OAUTH2_PASSTHROUGH", "NONE"}) {
+      GravitinoConfig config =
+          new GravitinoConfig(
+              ImmutableMap.<String, String>builder()
+                  .put("gravitino.metalake", "test")
+                  .put("gravitino.client.authType", "oauth2")
+                  .put("gravitino.client.oauth2.serverUri", "https://idp.example.com")
+                  .put("gravitino.client.oauth2.path", "token")
+                  .put("gravitino.client.oauth2.credential", "service:secret")
+                  .put("gravitino.client.oauth2.scope", "openid")
+                  .put("gravitino.iceberg.rest-catalog.security", security)
+                  .put("gravitino.iceberg.rest-catalog.session", "NONE")
+                  .build());
+      assertEquals(
+          ImmutableMap.of(
+              "iceberg.rest-catalog.security", security, "iceberg.rest-catalog.session", "NONE"),
+          config.getIcebergRestCatalogConfig());
+      assertEquals(
+          "service:secret", config.getClientConfig().get("gravitino.client.oauth2.credential"));
+    }
+  }
+
   @Test
   public void testIcebergRestOAuthOverridesGravitinoClientOAuthByField() {
     GravitinoConfig config =
