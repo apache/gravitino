@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -112,6 +113,49 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TABLE", "TOPIC"})
+  public void testFilterRejectsDottedExternalObjectName(Entity.EntityType entityType) {
+    NameIdentifier[] identifiers = {
+      NameIdentifier.of("testMetalake", "testCatalog", "testSchema", "object.with.dot")
+    };
+
+    IllegalNameIdentifierException exception =
+        Assertions.assertThrows(
+            IllegalNameIdentifierException.class,
+            () ->
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", "", entityType, identifiers));
+
+    Assertions.assertEquals(
+        "The "
+            + entityType
+            + " name 'object.with.dot' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testFilterPreservesDottedExternalObjectNameWithoutAuthorization() {
+    Config config = gravitinoEnv.config();
+    when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(false);
+    NameIdentifier[] identifiers = {
+      NameIdentifier.of("testMetalake", "testCatalog", "testSchema", "object.with.dot")
+    };
+
+    try {
+      NameIdentifier[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake", "", Entity.EntityType.TABLE, identifiers);
+
+      Assertions.assertSame(identifiers, filtered);
+    } finally {
+      when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
     }
   }
 

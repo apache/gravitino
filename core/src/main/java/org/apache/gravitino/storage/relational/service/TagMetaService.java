@@ -124,7 +124,18 @@ public class TagMetaService {
           () -> lockMetalakeForTagCreate(metalakePO),
           () -> insertTagWithoutCommit(tagEntity, tagPO, overwritten));
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagEntity.toString());
+      try {
+        ExceptionUtils.checkSQLException(
+            e, Entity.EntityType.TAG, tagEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwritten) {
+          // A missing-row locking read does not fence a concurrent insert at READ_COMMITTED.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.TAG, tagEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
       throw e;
     }
   }
@@ -744,6 +755,14 @@ public class TagMetaService {
 
     TagPO existingTagPO = findAndLockTagForOverwrite(initializedTagPO);
     if (existingTagPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              TagMetaMapper.class,
+              mapper -> mapper.countDeletedTagMetasById(initializedTagPO.getTagId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The tag ID %s is reserved by a deleted tag; use a new ID",
+            initializedTagPO.getTagId());
+      }
       insertNewTagWithoutCommit(initializedTagPO);
       return;
     }
@@ -759,25 +778,18 @@ public class TagMetaService {
   }
 
   private TagPO findAndLockTagForOverwrite(TagPO initializedTagPO) {
-    TagPO sameNameTagPO =
-        SessionUtils.getWithoutCommit(
-            TagMetaMapper.class,
-            mapper ->
-                mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
-                    initializedTagPO.getMetalakeId(), initializedTagPO.getTagName()));
-    if (sameNameTagPO != null) {
-      return sameNameTagPO;
-    }
-
-    TagPO sameIdTagPO =
-        SessionUtils.getWithoutCommit(
-            TagMetaMapper.class,
-            mapper -> mapper.selectTagByTagIdForUpdate(initializedTagPO.getTagId()));
-    if (sameIdTagPO == null
-        || !Objects.equals(sameIdTagPO.getMetalakeId(), initializedTagPO.getMetalakeId())) {
-      return null;
-    }
-    return sameIdTagPO;
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper ->
+                    mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+                        initializedTagPO.getMetalakeId(), initializedTagPO.getTagName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper -> mapper.selectTagByTagIdForUpdate(initializedTagPO.getTagId())),
+        current -> Objects.equals(current.getMetalakeId(), initializedTagPO.getMetalakeId()));
   }
 
   private void updateTagRootWithVersion(NameIdentifier identifier, TagPO oldTagPO, TagPO newTagPO) {

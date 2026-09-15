@@ -55,6 +55,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.TestFilesetOperationDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -122,7 +123,9 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
-      FilesetHookDispatcher localHook = new FilesetHookDispatcher(mockFilesetDispatcher);
+      FilesetDispatcher localHook =
+          new FilesetNormalizeDispatcher(
+              new FilesetHookDispatcher(mockFilesetDispatcher), mockCatalogManager);
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_FILESET");
       localHook.createMultipleLocationFileset(
           ident,

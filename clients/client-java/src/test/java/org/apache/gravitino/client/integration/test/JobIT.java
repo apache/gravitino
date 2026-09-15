@@ -39,6 +39,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +53,7 @@ public class JobIT extends BaseIT {
   private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("job_it_metalake");
 
   private File testStagingDir;
+  private File testSparkHome;
   private String testEntryScriptPath;
   private String testLibScriptPath;
   private ShellJobTemplate.Builder builder;
@@ -61,6 +63,9 @@ public class JobIT extends BaseIT {
   @Override
   public void startIntegrationTest() throws Exception {
     testStagingDir = Files.createTempDirectory("test_staging_dir").toFile();
+    // A Spark home without bin/spark-submit, so Spark jobs cannot be launched. The configuration
+    // takes precedence over the SPARK_HOME environment variable, keeping the test deterministic.
+    testSparkHome = Files.createTempDirectory("test_spark_home").toFile();
     testEntryScriptPath = generateTestEntryScript();
     testLibScriptPath = generateTestLibScript();
 
@@ -78,7 +83,9 @@ public class JobIT extends BaseIT {
             "gravitino.job.stagingDir",
             testStagingDir.getAbsolutePath(),
             "gravitino.job.statusPullIntervalInMs",
-            "3000");
+            "3000",
+            "gravitino.jobExecutor.local.sparkHome",
+            testSparkHome.getAbsolutePath());
     registerCustomConfigs(configs);
     super.startIntegrationTest();
   }
@@ -86,6 +93,7 @@ public class JobIT extends BaseIT {
   @AfterAll
   public void tearDown() throws Exception {
     FileUtils.deleteDirectory(testStagingDir);
+    FileUtils.deleteDirectory(testSparkHome);
   }
 
   @BeforeEach
@@ -338,6 +346,49 @@ public class JobIT extends BaseIT {
           Assertions.assertNotNull(job.queuedAt());
           Assertions.assertNotNull(job.finishedAt());
         });
+  }
+
+  @Test
+  public void testRunSparkJobRejectedWhenSparkIsNotAvailable() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("test_run_spark_without_spark_submit")
+            .withComment("Test spark job template")
+            .withExecutable(testEntryScriptPath)
+            .withClassName("org.apache.gravitino.test.SparkJob")
+            .build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    // The run request is rejected with the reason instead of being queued and failing later.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metalake.runJob(template.name(), Collections.emptyMap()));
+    Assertions.assertTrue(
+        e.getMessage()
+            .contains(
+                "spark-submit is not found or not executable: "
+                    + testSparkHome.getAbsolutePath()
+                    + "/bin/spark-submit"),
+        e.getMessage());
+
+    // No job is created, and the staging directory of the rejected job is removed.
+    Assertions.assertTrue(metalake.listJobs(template.name()).isEmpty());
+    String[] jobStagingDirs =
+        new File(testStagingDir, METALAKE_NAME + File.separator + template.name()).list();
+    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+
+    // Shell jobs are not affected by the missing Spark installation.
+    JobTemplate shellTemplate = builder.withName("test_run_shell_without_spark_submit").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(shellTemplate));
+    JobHandle jobHandle =
+        metalake.runJob(
+            shellTemplate.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+    Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> metalake.getJob(jobHandle.jobId()).jobStatus() == JobHandle.Status.SUCCEEDED);
   }
 
   @Test

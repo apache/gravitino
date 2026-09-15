@@ -20,9 +20,6 @@ package org.apache.gravitino.utils;
 
 import java.io.Closeable;
 import java.net.URLClassLoader;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
@@ -182,8 +179,7 @@ public class ClassLoaderPool implements Closeable {
    * Performs final cleanup when a ClassLoader's reference count reaches zero. This includes:
    *
    * <ol>
-   *   <li>Deregistering all JDBC drivers loaded by the ClassLoader
-   *   <li>Cleaning up ClassLoader resources (ThreadLocals, Hadoop FileSystem, etc.)
+   *   <li>Cleaning up ClassLoader resources (JDBC drivers, ThreadLocals, Hadoop FileSystem, etc.)
    *   <li>Closing the ClassLoader itself
    * </ol>
    */
@@ -198,9 +194,8 @@ public class ClassLoaderPool implements Closeable {
   }
 
   /**
-   * Performs full resource cleanup for an {@link IsolatedClassLoader}: deregisters JDBC drivers,
-   * cleans up ClassLoader-scoped resources (ThreadLocals, Hadoop FileSystem, etc.), and closes the
-   * ClassLoader.
+   * Performs full resource cleanup for an {@link IsolatedClassLoader}: cleans up ClassLoader-scoped
+   * resources (JDBC drivers, ThreadLocals, Hadoop FileSystem, etc.) and closes the ClassLoader.
    *
    * @param classLoader The IsolatedClassLoader to clean up.
    */
@@ -208,34 +203,14 @@ public class ClassLoaderPool implements Closeable {
     try {
       URLClassLoader internalCl = classLoader.getInternalClassLoader();
       if (internalCl != null) {
-        deregisterAllDrivers(internalCl);
+        // closeClassLoaderResource deregisters the loader's JDBC drivers as well. It has to: from
+        // here DriverManager filters its drivers by the caller's class loader, so the catalog's
+        // drivers are neither visible nor removable outside their own loader.
         ClassLoaderResourceCleanerUtils.closeClassLoaderResource(internalCl);
       }
     } catch (Exception e) {
       LOG.warn("Error during ClassLoader resource cleanup", e);
     }
     classLoader.close();
-  }
-
-  /**
-   * Deregisters all JDBC drivers that were loaded by the given ClassLoader.
-   *
-   * @param classLoader The ClassLoader whose drivers should be deregistered.
-   */
-  private static void deregisterAllDrivers(ClassLoader classLoader) {
-    // DriverManager.getDrivers() returns a snapshot in JDK 9+, so iterating while
-    // calling deregisterDriver() is safe.
-    Enumeration<Driver> drivers = DriverManager.getDrivers();
-    while (drivers.hasMoreElements()) {
-      Driver driver = drivers.nextElement();
-      if (driver.getClass().getClassLoader() == classLoader) {
-        try {
-          DriverManager.deregisterDriver(driver);
-          LOG.info("Deregistered JDBC driver {} for ClassLoader.", driver);
-        } catch (Exception e) {
-          LOG.warn("Failed to deregister JDBC driver {}", driver, e);
-        }
-      }
-    }
   }
 }

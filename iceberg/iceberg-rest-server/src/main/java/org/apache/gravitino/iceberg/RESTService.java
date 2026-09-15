@@ -61,6 +61,7 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
 import org.glassfish.hk2.api.InterceptionService;
@@ -105,6 +106,7 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
+    config.register(new OutOfMemoryErrorListener());
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
@@ -150,38 +152,35 @@ public class RESTService implements GravitinoAuxiliaryService {
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
 
-    // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
+    // Table: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
-    IcebergTableOperationDispatcher icebergTableEventDispatcher =
-        new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
-      icebergTableEventDispatcher =
-          new IcebergTableHookDispatcher(icebergTableEventDispatcher, namespaceOperationDispatcher);
+      icebergTableOperationDispatcher =
+          new IcebergTableHookDispatcher(
+              icebergTableOperationDispatcher, namespaceOperationDispatcher);
     }
-    IcebergTableOperationDispatcher icebergTableDispatcher = icebergTableEventDispatcher;
+    IcebergTableOperationDispatcher icebergTableDispatcher =
+        new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
 
-    // View: HookDispatcher -> EventDispatcher -> OperationExecutor
+    // View: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
-    IcebergViewOperationDispatcher icebergViewEventDispatcher =
-        new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
-      icebergViewEventDispatcher =
+      icebergViewOperationDispatcher =
           new IcebergViewHookDispatcher(
-              icebergViewEventDispatcher, namespaceOperationDispatcher, metalakeName);
+              icebergViewOperationDispatcher, namespaceOperationDispatcher, metalakeName);
     }
-    IcebergViewOperationDispatcher icebergViewDispatcher = icebergViewEventDispatcher;
+    IcebergViewOperationDispatcher icebergViewDispatcher =
+        new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
 
-    // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
-    IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
-        new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
+    // Namespace: EventDispatcher -> HookDispatcher -> OperationExecutor
     if (authorizationContext.isAuthorizationEnabled()) {
-      icebergNamespaceEventDispatcher =
-          new IcebergNamespaceHookDispatcher(icebergNamespaceEventDispatcher);
+      namespaceOperationDispatcher =
+          new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher);
     }
     IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
-        icebergNamespaceEventDispatcher;
+        new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
 
     config.register(
         new AbstractBinder() {

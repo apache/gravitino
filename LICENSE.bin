@@ -303,6 +303,8 @@
    Apache Hadoop Yarn Client
    Apache Hive
    Apache HTrace
+   Google HTTP Client
+   Google HTTP Client GSON
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg

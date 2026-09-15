@@ -39,7 +39,9 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
@@ -252,6 +254,30 @@ public class TestRoleEvent {
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, otherRoleName), deleteRoleEvent.identifier());
     Assertions.assertEquals(otherRoleName, deleteRoleEvent.roleName());
+  }
+
+  @Test
+  void testBulkDeleteRoleEventWithNotExistIdentifier() {
+    dummyEventListener.clear();
+
+    dispatcher.deleteRoles(METALAKE, ImmutableList.of(roleName, otherRoleName));
+
+    List<Event> events = dummyEventListener.getPostEvents();
+    Assertions.assertEquals(2, events.size());
+
+    Assertions.assertEquals(DeleteRoleEvent.class, events.get(0).getClass());
+    DeleteRoleEvent deleteRoleEvent = (DeleteRoleEvent) events.get(0);
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), deleteRoleEvent.identifier());
+    Assertions.assertEquals(roleName, deleteRoleEvent.roleName());
+    Assertions.assertTrue(deleteRoleEvent.isExists());
+
+    Assertions.assertEquals(DeleteRoleEvent.class, events.get(1).getClass());
+    DeleteRoleEvent deleteMissingRoleEvent = (DeleteRoleEvent) events.get(1);
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, otherRoleName), deleteMissingRoleEvent.identifier());
+    Assertions.assertEquals(otherRoleName, deleteMissingRoleEvent.roleName());
+    Assertions.assertFalse(deleteMissingRoleEvent.isExists());
   }
 
   @Test
@@ -566,6 +592,14 @@ public class TestRoleEvent {
     when(dispatcher.createRole(METALAKE, roleName, properties, securableObjects)).thenReturn(role);
     when(dispatcher.deleteRole(METALAKE, roleName)).thenReturn(true);
     when(dispatcher.deleteRole(METALAKE, otherRoleName)).thenReturn(false);
+    when(dispatcher.deleteRoles(METALAKE, ImmutableList.of(roleName, otherRoleName)))
+        .thenReturn(
+            ImmutableList.of(
+                BulkItemResult.success(0, roleName),
+                BulkItemResult.failure(
+                    1,
+                    otherRoleName,
+                    new NoSuchRoleException("Role does not exist: %s", otherRoleName))));
     when(dispatcher.getRole(METALAKE, roleName)).thenReturn(role);
     when(dispatcher.grantRolesToGroup(
             METALAKE, ImmutableList.of(roleName, otherRoleName), groupName))

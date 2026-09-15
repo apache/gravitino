@@ -223,6 +223,7 @@ public class IdpGroupMetaService {
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withUserId(userId)
         .withGroupId(groupId)
+        .withAuditInfo(IdpPOConverters.newCreateAuditInfoJson())
         .withCurrentVersion(1L)
         .withLastVersion(0L)
         .withDeletedAt(0L)

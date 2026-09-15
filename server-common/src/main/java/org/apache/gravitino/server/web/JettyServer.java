@@ -179,6 +179,9 @@ public class JettyServer {
       webUiEnabled = false;
     }
 
+    // Install before authentication, custom filters, and servlet mappings on every service.
+    addFilter(new OutOfMemoryErrorFilter(), "/*");
+
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
@@ -484,6 +487,7 @@ public class JettyServer {
                     thread.setName(getName() + "-" + thread.getId());
                     thread.setUncaughtExceptionHandler(
                         (t, throwable) -> {
+                          ServerHealth.getInstance().recordFailure(throwable);
                           LOG.error("{} uncaught exception:", t.getName(), throwable);
                         });
                     // JettyServer maybe used by Gravitino server and Iceberg REST server with

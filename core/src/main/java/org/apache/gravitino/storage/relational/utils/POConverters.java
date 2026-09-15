@@ -64,7 +64,6 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -761,64 +760,56 @@ public class POConverters {
     }
   }
 
-  public static boolean checkPolicyVersionNeedUpdate(
-      PolicyVersionPO oldPolicyVersionPO, PolicyEntity newPolicy) {
-    if (!StringUtils.equals(oldPolicyVersionPO.getPolicyComment(), newPolicy.comment())
-        || oldPolicyVersionPO.isEnabled() != newPolicy.enabled()) {
-      return true;
-    }
-
+  /**
+   * Builds the next complete policy metadata and content snapshot.
+   *
+   * <p>The row keeps the ID it already has: {@code oldPolicyPO} is the row being replaced, and its
+   * ID is what the version snapshots and every relation row point at. An alter cannot change the
+   * ID, because {@code PolicyMetaService.updatePolicy} rejects an updater that returns a different
+   * one; an overwrite of a name held by another row deliberately updates that row rather than
+   * inserting a second one under the same name, so the ID the caller supplied is dropped.
+   *
+   * @param oldPolicyPO The policy row observed by the caller.
+   * @param newPolicy The policy values to persist.
+   * @return The policy row and version snapshot at the next monotonic version.
+   */
+  public static PolicyPO updatePolicyPOWithVersion(PolicyPO oldPolicyPO, PolicyEntity newPolicy) {
     try {
-      PolicyContent oldContent =
-          JsonUtils.anyFieldMapper()
-              .readValue(oldPolicyVersionPO.getContent(), newPolicy.policyType().contentClass());
-      if (oldContent == null) {
-        return newPolicy.content() != null;
-      }
-      return !oldContent.equals(newPolicy.content());
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to deserialize json object:", e);
-    }
-  }
-
-  public static PolicyPO updatePolicyPOWithVersion(
-      PolicyPO oldPolicyPO, PolicyEntity newPolicy, boolean needUpdateVersion) {
-    try {
-      Long lastVersion = oldPolicyPO.getLastVersion();
-      Long currentVersion;
-      PolicyVersionPO newPolicyVersionPO;
-      // Will set the version to the last version + 1
-      if (needUpdateVersion) {
-        lastVersion++;
-        currentVersion = lastVersion;
-        newPolicyVersionPO =
-            PolicyVersionPO.builder()
-                .withMetalakeId(oldPolicyPO.getMetalakeId())
-                .withPolicyId(newPolicy.id())
-                .withVersion(currentVersion)
-                .withPolicyComment(newPolicy.comment())
-                .withEnabled(newPolicy.enabled())
-                .withContent(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()))
-                .withDeletedAt(DEFAULT_DELETED_AT)
-                .build();
-      } else {
-        currentVersion = oldPolicyPO.getCurrentVersion();
-        newPolicyVersionPO = oldPolicyPO.getPolicyVersionPO();
-      }
-      return PolicyPO.builder()
-          .withPolicyId(newPolicy.id())
-          .withPolicyName(newPolicy.name())
-          .withPolicyType(newPolicy.policyType().policyType())
-          .withMetalakeId(oldPolicyPO.getMetalakeId())
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
-          .withCurrentVersion(currentVersion)
-          .withLastVersion(lastVersion)
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .withPolicyVersionPO(newPolicyVersionPO)
-          .build();
+      return buildNextPolicyPOVersion(
+          oldPolicyPO,
+          newPolicy.name(),
+          newPolicy.policyType().policyType(),
+          JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()),
+          newPolicy.comment(),
+          newPolicy.enabled(),
+          JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()));
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Builds the next policy version from values that were serialized before acquiring a row lock.
+   *
+   * <p>This overload is used by overwrite: the initialized replacement already contains the
+   * serialized audit and content values, so advancing the locked row does not repeat CPU-bound JSON
+   * serialization while other writers wait for the lock.
+   *
+   * @param oldPolicyPO The locked policy row being replaced.
+   * @param replacementPolicyPO The initialized replacement values.
+   * @return The policy row and version snapshot at the next monotonic version.
+   */
+  public static PolicyPO updatePolicyPOWithVersion(
+      PolicyPO oldPolicyPO, PolicyPO replacementPolicyPO) {
+    PolicyVersionPO replacementVersionPO = replacementPolicyPO.getPolicyVersionPO();
+    return buildNextPolicyPOVersion(
+        oldPolicyPO,
+        replacementPolicyPO.getPolicyName(),
+        replacementPolicyPO.getPolicyType(),
+        replacementPolicyPO.getAuditInfo(),
+        replacementVersionPO.getPolicyComment(),
+        replacementVersionPO.isEnabled(),
+        replacementVersionPO.getContent());
   }
 
   /**
@@ -1817,6 +1808,38 @@ public class POConverters {
                     .withDeletedAt(DEFAULT_DELETED_AT)
                     .build())
         .collect(Collectors.toList());
+  }
+
+  private static PolicyPO buildNextPolicyPOVersion(
+      PolicyPO oldPolicyPO,
+      String policyName,
+      String policyType,
+      String auditInfo,
+      String policyComment,
+      boolean enabled,
+      String content) {
+    Long nextVersion = Math.max(oldPolicyPO.getCurrentVersion(), oldPolicyPO.getLastVersion()) + 1;
+    PolicyVersionPO newPolicyVersionPO =
+        PolicyVersionPO.builder()
+            .withMetalakeId(oldPolicyPO.getMetalakeId())
+            .withPolicyId(oldPolicyPO.getPolicyId())
+            .withVersion(nextVersion)
+            .withPolicyComment(policyComment)
+            .withEnabled(enabled)
+            .withContent(content)
+            .withDeletedAt(DEFAULT_DELETED_AT)
+            .build();
+    return PolicyPO.builder()
+        .withPolicyId(oldPolicyPO.getPolicyId())
+        .withPolicyName(policyName)
+        .withPolicyType(policyType)
+        .withMetalakeId(oldPolicyPO.getMetalakeId())
+        .withAuditInfo(auditInfo)
+        .withCurrentVersion(nextVersion)
+        .withLastVersion(nextVersion)
+        .withDeletedAt(DEFAULT_DELETED_AT)
+        .withPolicyVersionPO(newPolicyVersionPO)
+        .build();
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {

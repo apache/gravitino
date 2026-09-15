@@ -93,6 +93,120 @@ public class TestTagMetaService extends TestJDBCBackend {
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
+  /** Verifies a deleted ID is rejected permanently instead of producing a retryable conflict. */
+  @TestTemplate
+  public void testOverwriteRejectsDeletedTagId() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("deleted_tag_id")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService service = TagMetaService.getInstance();
+    service.insertTag(tag, false);
+    assertTrue(service.deleteTag(tag.nameIdentifier()));
+    EntityAlreadyExistsException failure =
+        Assertions.assertThrows(
+            EntityAlreadyExistsException.class, () -> service.insertTag(tag, true));
+    assertTrue(failure.getMessage().contains("use a new ID"));
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> service.getTagByIdentifier(tag.nameIdentifier()));
+    TagEntity replacement =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(tag.name())
+            .withNamespace(tag.namespace())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    service.insertTag(replacement, true);
+    assertEquals(replacement.id(), service.getTagByIdentifier(tag.nameIdentifier()).id());
+  }
+
+  /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */
+  @TestTemplate
+  public void testConcurrentOverwriteOfMissingTag() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity first =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_first_overwrite")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagEntity second =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(first.name())
+            .withNamespace(first.namespace())
+            .withComment("second overwrite")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService service = TagMetaService.getInstance();
+    CountDownLatch firstWritten = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> firstResult =
+        executor.submit(
+            () -> {
+              SessionUtils.beginTransaction();
+              try {
+                service.insertTag(first, true);
+                firstWritten.countDown();
+                await(allowCommit);
+                SessionUtils.commitTransaction();
+                return null;
+              } catch (Throwable failure) {
+                SessionUtils.rollbackTransaction();
+                return failure;
+              }
+            });
+    try {
+      assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                secondStarted.countDown();
+                try {
+                  service.insertTag(second, true);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      assertTrue(secondStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> secondResult.get(500, TimeUnit.MILLISECONDS));
+      allowCommit.countDown();
+      Assertions.assertNull(firstResult.get(30, TimeUnit.SECONDS));
+      Throwable failure = secondResult.get(30, TimeUnit.SECONDS);
+      if (failure != null) {
+        assertTrue(
+            failure instanceof OptimisticLockException, () -> "Unexpected failure: " + failure);
+        assertEquals(first.id(), service.getTagByIdentifier(first.nameIdentifier()).id());
+        Assertions.assertNull(
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class, mapper -> mapper.selectTagByTagId(second.id())));
+        service.insertTag(second, true);
+      }
+      TagEntity stored = service.getTagByIdentifier(first.nameIdentifier());
+      assertEquals(first.id(), stored.id());
+      assertEquals("second overwrite", stored.comment());
+      TagPO storedPO =
+          SessionUtils.getWithoutCommit(
+              TagMetaMapper.class, mapper -> mapper.selectTagByTagId(first.id()));
+      assertEquals(2L, storedPO.getCurrentVersion().longValue());
+      Assertions.assertNull(
+          SessionUtils.getWithoutCommit(
+              TagMetaMapper.class, mapper -> mapper.selectTagByTagId(second.id())));
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
