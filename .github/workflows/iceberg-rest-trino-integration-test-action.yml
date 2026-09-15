@@ -21,6 +21,7 @@ jobs:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/checkout-and-sync
 
       # Installs the primary JDK plus JDK 24 and registers JDK 24 with the Gradle
       # toolchain, which the trino-iceberg-rest module requires.

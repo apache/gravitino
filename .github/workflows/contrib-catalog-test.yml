@@ -1,14 +1,11 @@
 name: Contrib Catalog Test
 
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-contrib-catalog-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -18,11 +15,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/checkout-and-sync
+        id: checkout
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/workflows/contrib-catalog-test.yml
@@ -39,9 +40,9 @@ jobs:
       - name: Detect changed catalogs-contrib modules
         id: contrib
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          if [ "${{ steps.checkout.outputs.synced }}" = "true" ]; then
+            BASE_SHA="${{ steps.checkout.outputs.base-sha }}"
+            HEAD_SHA="$(git rev-parse HEAD)"
           else
             BASE_SHA="${{ github.event.before }}"
             HEAD_SHA="${{ github.sha }}"
@@ -75,6 +76,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/checkout-and-sync
 
       - uses: actions/setup-java@v4
         with:
