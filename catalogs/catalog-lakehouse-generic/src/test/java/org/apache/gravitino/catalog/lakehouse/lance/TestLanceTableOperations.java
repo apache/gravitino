@@ -125,6 +125,98 @@ public class TestLanceTableOperations {
                 new Index[0]));
   }
 
+  /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */
+  @Test
+  public void testExistOkRejectsNonLanceTable() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("delta-exist-ok").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            LANCE_CREATION_MODE,
+            "EXIST_OK",
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies both overwrite paths reject a non-Lance entity before mutation. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOverwriteRejectsNonLanceTableBeforeMutation(boolean register) throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location =
+        tempDir.resolve(register ? "delta-register-overwrite" : "delta-overwrite").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    if (register) {
+      properties.put(LANCE_TABLE_REGISTER, "true");
+    }
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the purge guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testPurgeTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-purge").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.purgeTable(ident));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the drop guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testDropTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-drop").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.dropTable(ident));
+    verify(store, never()).delete(any(), any());
+  }
+
   @Test
   public void testLoadDeclaredTableSchemaFromLocation() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
@@ -1114,6 +1206,19 @@ public class TestLanceTableOperations {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
+  }
+
+  private static TableEntity nonLanceTableEntity(NameIdentifier ident, String location) {
+    return tableEntity(
+        ident,
+        List.of(),
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_TABLE_FORMAT,
+            "delta",
+            Table.PROPERTY_EXTERNAL,
+            "true"));
   }
 
   private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)

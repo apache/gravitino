@@ -57,6 +57,31 @@ The following table outlines the tested compatibility between Gravitino versions
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
+## Format boundary
+
+The Lance REST service is a Lance table namespace, even when its metadata backend is a
+format-agnostic Generic Catalog. The REST table operations therefore validate the stored
+`format` property before returning Lance metadata or applying a table mutation.
+
+When an identifier is occupied by a known non-Lance table, direct Lance table operations fail
+with HTTP `400` and an `INVALID_INPUT` error. `TableExists` presents that entry as absent and
+returns the normal table-not-found response. The underlying Generic Catalog metadata and storage
+location remain unchanged.
+
+The same boundary applies to create requests that target an existing entity through the Lance
+delegator:
+
+| Request mode | Existing non-Lance entity |
+| --- | --- |
+| `CREATE` | `409` conflict, as for any existing table name |
+| `EXIST_OK` | `400 INVALID_INPUT` |
+| `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
+| Register `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
+
+The validation is performed after the normal authorization checks. It does not convert existing
+Generic Catalog unknown-format loading errors or change the Generic Catalog's format-agnostic
+`ListTables` behavior.
+
 ### Reproducing the matrix locally
 
 Both connectors ship with a multi-version integration test driver so the
