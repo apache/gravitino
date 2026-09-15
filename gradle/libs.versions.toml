@@ -67,6 +67,8 @@ commons-beanutils = "1.11.0"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
+jedis = "6.0.0"
+kryo = "5.6.2"
 iceberg = '1.11.0'
 # Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
@@ -266,6 +268,8 @@ commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.
 commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
+jedis = { group = "redis.clients", name = "jedis", version.ref = "jedis" }
+kryo = { group = "com.esotericsoftware", name = "kryo", version.ref = "kryo" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-beanutils = { group = "commons-beanutils", name = "commons-beanutils", version.ref = "commons-beanutils" }

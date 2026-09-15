@@ -545,6 +545,83 @@ public class Configs {
           .checkValue(value -> value > 0, "Lock segments must be positive.")
           .createWithDefault(16);
 
+  // Redis shared entity cache, used when gravitino.cache.implementation is "redis"
+  public static final ConfigEntry<String> CACHE_REDIS_ADDRESS =
+      new ConfigBuilder("gravitino.cache.redis.address")
+          .doc(
+              "Comma-separated list of Redis 'host:port' addresses. Required when "
+                  + "gravitino.cache.implementation is 'redis'. A standalone deployment lists "
+                  + "exactly one address; a Redis Cluster deployment lists one or more seed nodes "
+                  + "and sets gravitino.cache.redis.cluster to true.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Boolean> CACHE_REDIS_CLUSTER =
+      new ConfigBuilder("gravitino.cache.redis.cluster")
+          .doc("Whether gravitino.cache.redis.address points at a Redis Cluster.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<String> CACHE_REDIS_NAMESPACE =
+      new ConfigBuilder("gravitino.cache.redis.namespace")
+          .doc(
+              "Prefix of every key the Redis entity cache writes, so several Gravitino clusters "
+                  + "can share one Redis deployment. Must not contain '{' or '}', which are "
+                  + "reserved for Redis Cluster hash tags.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  StringUtils.isNotBlank(value) && !value.contains("{") && !value.contains("}"),
+              "The Redis cache namespace must not be blank and must not contain '{' or '}'.")
+          .createWithDefault("gravitino");
+
+  public static final ConfigEntry<Long> CACHE_REDIS_FENCE_TTL_MS =
+      new ConfigBuilder("gravitino.cache.redis.fenceTtlMs")
+          .doc(
+              "Lifetime in milliseconds of the version fence the Redis entity cache keeps for an "
+                  + "invalidated key. It must outlive gravitino.cache.expireTimeInMs so that a "
+                  + "slow read that began before an invalidation cannot refill the key after the "
+                  + "value expired. 0 means twice gravitino.cache.expireTimeInMs.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(0L);
+
+  public static final ConfigEntry<String> CACHE_REDIS_SERIALIZER =
+      new ConfigBuilder("gravitino.cache.redis.serializer")
+          .doc("Serialization format for cached entities. Only 'kryo' is supported.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue("kryo"::equals, "Only the 'kryo' serializer is supported.")
+          .createWithDefault("kryo");
+
+  public static final ConfigEntry<Integer> CACHE_REDIS_TIMEOUT_MS =
+      new ConfigBuilder("gravitino.cache.redis.timeoutMs")
+          .doc(
+              "Connection and command timeout in milliseconds for the Redis entity cache. A read "
+                  + "or write that exceeds it is treated as a cache miss.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<String> CACHE_REDIS_USERNAME =
+      new ConfigBuilder("gravitino.cache.redis.username")
+          .doc("Optional Redis ACL user name for the Redis entity cache.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> CACHE_REDIS_PASSWORD =
+      new ConfigBuilder("gravitino.cache.redis.password")
+          .doc("Optional Redis password for the Redis entity cache.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
           .doc("Directory for managing staging files when running jobs.")
