@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -44,7 +45,7 @@ final class ClickHouseTableSqlUtils {
 
   private ClickHouseTableSqlUtils() {}
 
-  static Transform[] parsePartitioning(String partitionKey) {
+  static Transform[] parsePartitioning(@Nullable String partitionKey) {
     if (StringUtils.isBlank(partitionKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -61,7 +62,13 @@ final class ClickHouseTableSqlUtils {
       if (StringUtils.isBlank(expression)) {
         continue;
       }
-      transforms.add(parsePartitionExpression(expression, partitionKey));
+      Transform transform = parsePartitionExpression(expression);
+      if (transform == null) {
+        // A single unsupported native expression means the whole partition key cannot be
+        // represented as structured transforms.
+        return Transforms.EMPTY_TRANSFORM;
+      }
+      transforms.add(transform);
     }
 
     return transforms.toArray(new Transform[0]);
@@ -178,49 +185,30 @@ final class ClickHouseTableSqlUtils {
     return normalizeIndexExpression(current);
   }
 
-  private static Transform parsePartitionExpression(
-      String expression, String originalPartitionKey) {
+  @Nullable
+  private static Transform parsePartitionExpression(String expression) {
     String trimmedExpression = StringUtils.trim(expression);
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
       String identifier = normalizeIdentifier(toYearMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.year(identifier);
+      return isStrictIdentifier(identifier) ? Transforms.year(identifier) : null;
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
       String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.month(identifier);
+      return isStrictIdentifier(identifier) ? Transforms.month(identifier) : null;
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
       String identifier = normalizeIdentifier(toDateMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.day(identifier);
-    }
-
-    if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
-      throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYear, toYYYYMM, toDate partition expressions, but got: "
-              + trimmedExpression);
+      return isStrictIdentifier(identifier) ? Transforms.day(identifier) : null;
     }
 
     String identifier = normalizeIdentifier(trimmedExpression);
-    Preconditions.checkArgument(
-        isStrictIdentifier(identifier),
-        "Only simple identifier is supported for partition expression, but got: "
-            + originalPartitionKey);
-    return Transforms.identity(identifier);
+    return isStrictIdentifier(identifier) ? Transforms.identity(identifier) : null;
   }
 
   private static String normalizePartitionKey(String partitionKey) {

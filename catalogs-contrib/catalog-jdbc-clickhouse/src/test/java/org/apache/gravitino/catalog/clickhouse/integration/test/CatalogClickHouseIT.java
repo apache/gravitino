@@ -515,6 +515,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertEquals(Transforms.NAME_OF_MONTH, partitioning[0].name());
     Assertions.assertArrayEquals(
         new String[] {"event_time"}, ((NamedReference) partitioning[0].arguments()[0]).fieldName());
+    Assertions.assertEquals(
+        "toYYYYMM(event_time)", loaded.properties().get(TableConstants.PARTITION_KEY));
 
     Index[] indexes = loaded.index();
     Assertions.assertTrue(
@@ -588,6 +590,49 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertFalse(
         StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "idx_lower"),
         "Recreated table must not contain a fabricated replacement index: " + recreatedCreateSql);
+  }
+
+  @Test
+  void testLoadTableWithNativePartitionExpression() {
+    // A valid MergeTree table whose PARTITION BY uses a native expression outside the structured
+    // identity/year/month/day subset must still be loadable. partitioning() stays empty, and the
+    // canonical native expression is exposed through the read-only partition-key property.
+    String name = GravitinoITUtils.genRandomName("native_partition_expr");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64,\n"
+                + "  `sm4_cipher_msg` String\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY cityHash64(toString(sm4_cipher_msg)) %% 7\n"
+                + "ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(0, loaded.partitioning().length);
+    Assertions.assertEquals(
+        "cityHash64(toString(sm4_cipher_msg)) % 7",
+        loaded.properties().get(TableConstants.PARTITION_KEY));
+  }
+
+  @Test
+  void testLoadTableWithoutPartition() {
+    // An unpartitioned table exposes an empty partition-key property so the key is always present,
+    // and partitioning() stays empty.
+    String name = GravitinoITUtils.genRandomName("no_partition");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(0, loaded.partitioning().length);
+    Assertions.assertEquals("", loaded.properties().get(TableConstants.PARTITION_KEY));
   }
 
   @Test
