@@ -63,6 +63,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,8 +103,20 @@ public abstract class JdbcTableOperations implements TableOperation {
     if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       return;
     }
-    String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
+    String defaultValue = renderDefaultValue(column.dataType(), column.defaultValue());
     sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
+  }
+
+  /**
+   * Renders a column default value for DDL. Subclasses override it when the rendering depends on
+   * the column type.
+   *
+   * @param type the column type.
+   * @param defaultValue the default value, never {@link Column#DEFAULT_VALUE_NOT_SET}.
+   * @return the default value as it appears after the DEFAULT keyword.
+   */
+  protected String renderDefaultValue(Type type, Expression defaultValue) {
+    return columnDefaultValueConverter.fromGravitino(defaultValue);
   }
 
   @Override
