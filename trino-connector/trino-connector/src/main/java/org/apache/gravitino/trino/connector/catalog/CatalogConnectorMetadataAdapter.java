@@ -18,12 +18,18 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import com.google.common.base.Preconditions;
 import io.airlift.log.Logger;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
+import io.trino.spi.connector.ConnectorViewDefinition;
+import io.trino.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.TypeManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,10 +38,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.json.JsonCodec;
 
 /**
  * This interface is used to handle different parts of catalog metadata from different catalog
@@ -44,6 +53,14 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 public class CatalogConnectorMetadataAdapter {
 
   private static final Logger LOG = Logger.get(CatalogConnectorMetadataAdapter.class);
+
+  /**
+   * Reserved, namespaced Gravitino view property used to round-trip a Trino native view's {@code
+   * SECURITY DEFINER} owner through {@code createView}/{@code getViewDefinition}; it is stripped
+   * from and never settable via caller-supplied {@code viewProperties} ({@code WITH (...)}) so it
+   * cannot be spoofed. Its absence means the view is {@code SECURITY INVOKER}.
+   */
+  private static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
 
   /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
@@ -145,6 +162,123 @@ public class CatalogConnectorMetadataAdapter {
     }
 
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  /**
+   * Transform Gravitino view metadata to Trino ConnectorViewDefinition. The view's {@code SECURITY
+   * DEFINER} owner, if any, is read back from the {@link #RESERVED_VIEW_OWNER_PROPERTY} reserved
+   * property (set by {@link #createView}); its absence means the view is {@code SECURITY INVOKER},
+   * matching Trino's own invariant that {@code runAsInvoker} and a present owner are mutually
+   * exclusive.
+   *
+   * <p>{@link ConnectorViewDefinition} requires a catalog to be present whenever a schema is
+   * present. Some catalogs (e.g. Iceberg) can store a default schema without a default catalog; in
+   * single-metalake mode the current Trino catalog is used as a fallback, since the schema is
+   * implicitly relative to it. In multi-metalake mode the bare Gravitino catalog name is not the
+   * name Trino actually resolves catalogs by, so this fallback cannot be applied and the view is
+   * rejected instead of being exposed with a wrong or unresolvable catalog.
+   *
+   * @param view the Gravitino view
+   * @param catalogName the name of the Trino catalog this view belongs to
+   * @param singleMetalakeMode whether the connector is running in single-metalake mode
+   * @return the Trino ConnectorViewDefinition
+   */
+  public ConnectorViewDefinition getViewDefinition(
+      GravitinoView view, String catalogName, boolean singleMetalakeMode) {
+    Preconditions.checkArgument(
+        view.getSql() != null,
+        "View %s.%s has no Trino dialect SQL representation",
+        view.getSchemaName(),
+        view.getName());
+    List<ViewColumn> columns =
+        view.getColumns().stream()
+            .map(
+                column ->
+                    new ViewColumn(
+                        column.getName(),
+                        dataTypeTransformer.getTrinoType(column.getType()).getTypeId(),
+                        Optional.ofNullable(column.getComment())))
+            .collect(Collectors.toList());
+
+    String defaultCatalog = view.getDefaultCatalog();
+    if (defaultCatalog == null && view.getDefaultSchema() != null) {
+      if (!singleMetalakeMode) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+            String.format(
+                "View %s.%s has a default schema without a default catalog, which is not "
+                    + "supported in multi-metalake mode",
+                view.getSchemaName(), view.getName()));
+      }
+      defaultCatalog = catalogName;
+    }
+
+    String ownerProperty = view.getProperties().get(RESERVED_VIEW_OWNER_PROPERTY);
+    return new ConnectorViewDefinition(
+        view.getSql(),
+        Optional.ofNullable(defaultCatalog),
+        Optional.ofNullable(view.getDefaultSchema()),
+        columns,
+        Optional.ofNullable(view.getComment()),
+        Optional.ofNullable(ownerProperty),
+        ownerProperty == null,
+        List.of());
+  }
+
+  /**
+   * Transform Trino ConnectorViewDefinition to Gravitino view metadata. The {@code viewProperties}
+   * are merged as-is into the resulting view's generic properties; the caller cannot set {@link
+   * #RESERVED_VIEW_OWNER_PROPERTY} directly through them since it is reserved to round-trip the
+   * definition's own owner/{@code runAsInvoker}.
+   *
+   * <p>Gravitino views have no field to persist the view's {@code path} (the catalogs/schemas used
+   * to resolve unqualified function names, set via {@code SET PATH}), so a definition with a
+   * non-empty path is rejected rather than silently discarding it; loading a view therefore always
+   * returns an empty path, which is safe because no view with a non-empty path is ever stored.
+   *
+   * @param viewName the schema-qualified view name
+   * @param definition the Trino ConnectorViewDefinition
+   * @param viewProperties the Trino view properties
+   * @return the Gravitino view metadata
+   */
+  public GravitinoView createView(
+      SchemaTableName viewName,
+      ConnectorViewDefinition definition,
+      Map<String, Object> viewProperties) {
+    if (!definition.getPath().isEmpty()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "View " + viewName + " has a non-empty path (SET PATH), which Gravitino cannot persist");
+    }
+    TypeManager typeManager = JsonCodec.getTypeManager(getClass().getClassLoader());
+    List<GravitinoColumn> columns = new ArrayList<>();
+    List<ViewColumn> viewColumns = definition.getColumns();
+    for (int i = 0; i < viewColumns.size(); i++) {
+      ViewColumn column = viewColumns.get(i);
+      Type trinoType = typeManager.getType(column.getType());
+      columns.add(
+          new GravitinoColumn(
+              column.getName(),
+              dataTypeTransformer.getGravitinoType(trinoType),
+              i,
+              column.getComment().orElse(null),
+              true,
+              false,
+              Map.of()));
+    }
+
+    Map<String, String> properties = new HashMap<>(toGravitinoTableProperties(viewProperties));
+    properties.remove(RESERVED_VIEW_OWNER_PROPERTY);
+    definition.getOwner().ifPresent(owner -> properties.put(RESERVED_VIEW_OWNER_PROPERTY, owner));
+    return new GravitinoView(
+        viewName.getSchemaName(),
+        viewName.getTableName(),
+        columns,
+        definition.getComment().orElse(null),
+        properties,
+        definition.getOriginalSql(),
+        definition.getCatalog().orElse(null),
+        definition.getSchema().orElse(null));
   }
 
   /**

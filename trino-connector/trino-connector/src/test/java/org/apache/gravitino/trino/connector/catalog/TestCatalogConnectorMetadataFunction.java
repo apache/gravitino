@@ -41,6 +41,7 @@ import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.junit.jupiter.api.Test;
 
 public class TestCatalogConnectorMetadataFunction {
@@ -120,7 +121,8 @@ public class TestCatalogConnectorMetadataFunction {
       when(catalog.asFunctionCatalog())
           .thenThrow(new UnsupportedOperationException("Not supported"));
     }
-    return new CatalogConnectorMetadata(metalake, NameIdentifier.of("metalake", "test_catalog"));
+    return new CatalogConnectorMetadata(
+        metalake, NameIdentifier.of("metalake", "test_catalog"), mock(GravitinoConfig.class));
   }
 
   private CatalogConnectorMetadata createMetadataWithMockFunctionCatalog(
@@ -132,7 +134,8 @@ public class TestCatalogConnectorMetadataFunction {
     when(catalog.asSchemas()).thenReturn(mock(SupportsSchemas.class));
     when(catalog.asTableCatalog()).thenReturn(mock(TableCatalog.class));
     when(catalog.asFunctionCatalog()).thenReturn(functionCatalog);
-    return new CatalogConnectorMetadata(metalake, NameIdentifier.of("metalake", "test_catalog"));
+    return new CatalogConnectorMetadata(
+        metalake, NameIdentifier.of("metalake", "test_catalog"), mock(GravitinoConfig.class));
   }
 
   private Function createMockFunction(String name) {
