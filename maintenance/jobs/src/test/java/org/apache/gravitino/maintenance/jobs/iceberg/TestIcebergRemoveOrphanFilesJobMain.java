@@ -18,17 +18,25 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -68,5 +76,53 @@ class TestIcebergRemoveOrphanFilesJobMain {
           "--catalog", "cli", "--table", "db.cli", "--spark-conf", json, "--dry-run", "false"
         });
     assertFalse(Files.exists(orphan));
+  }
+
+  @Test
+  void testCliFailureExitAndUsage() throws Exception {
+    String output = runFailure(false, new String[] {"--catalog", "cli"});
+    assertTrue(output.contains("Usage: IcebergRemoveOrphanFilesJob"), output);
+    assertTrue(output.contains("--table is required"), output);
+  }
+
+  @Test
+  void testMissingRuntimeHasActionableError() throws Exception {
+    String output =
+        runFailure(
+            true,
+            new String[] {
+              "--catalog",
+              "cli",
+              "--table",
+              "db.cli",
+              "--spark-conf",
+              "{\"spark.master\":\"local[1]\",\"spark.ui.enabled\":\"false\"}"
+            });
+    assertTrue(output.contains("iceberg-spark-runtime"), output);
+  }
+
+  private String runFailure(boolean omitIcebergRuntime, String[] args) throws Exception {
+    String classpath =
+        Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+            .filter(entry -> !omitIcebergRuntime || !entry.contains("iceberg-spark-runtime"))
+            .collect(Collectors.joining(File.pathSeparator));
+    List<String> command = new ArrayList<>();
+    command.add(new File(System.getProperty("java.home"), "bin/java").toString());
+    command.add("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED");
+    command.add("-cp");
+    command.add(classpath);
+    command.add(IcebergRemoveOrphanFilesJob.class.getName());
+    command.addAll(Arrays.asList(args));
+    Path log = Files.createTempFile(tempDir, "cli-", ".log");
+    Process process =
+        new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+    try {
+      assertTrue(process.waitFor(45, TimeUnit.SECONDS), "CLI did not exit");
+      String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+      assertEquals(1, process.exitValue(), output);
+      return output;
+    } finally {
+      process.destroyForcibly();
+    }
   }
 }

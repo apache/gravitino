@@ -511,7 +511,7 @@ public class TestIcebergRewriteDataFilesJob {
     // Single quotes in the WHERE clause should be escaped
     assertTrue(
         sql.contains(
-            "where => 'year = 2024 AND month >= 1 AND month <= 12 AND status = ''active'''"));
+            "where => 'year = 2024 AND month >= 1 AND month <= 12 AND status = \\'active\\''"));
   }
 
   @Test
@@ -530,9 +530,9 @@ public class TestIcebergRewriteDataFilesJob {
   @Test
   public void testEscapeSqlString() {
     // Test basic escaping of single quotes
-    assertEquals("O''Brien", IcebergRewriteDataFilesJob.escapeSqlString("O'Brien"));
+    assertEquals("O\\'Brien", IcebergRewriteDataFilesJob.escapeSqlString("O'Brien"));
     assertEquals(
-        "test''with''quotes", IcebergRewriteDataFilesJob.escapeSqlString("test'with'quotes"));
+        "test\\'with\\'quotes", IcebergRewriteDataFilesJob.escapeSqlString("test'with'quotes"));
 
     // Test strings without quotes remain unchanged
     assertEquals("normal_string", IcebergRewriteDataFilesJob.escapeSqlString("normal_string"));
@@ -563,8 +563,8 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_catalog", maliciousTable, null, null, null, null);
 
-    // Verify single quotes are escaped (becomes '')
-    assertTrue(sql.contains("db.table'' OR ''1''=''1"));
+    // Verify single quotes use Spark SQL backslash escaping
+    assertTrue(sql.contains("db.table\\' OR \\'1\\'=\\'1"));
     assertFalse(sql.contains("' OR '1'='1"));
 
     // Test SQL injection attempt in where clause
@@ -573,7 +573,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_catalog", "db.table", null, null, maliciousWhere, null);
 
-    assertTrue(sql.contains("year = 2024'' OR ''1''=''1"));
+    assertTrue(sql.contains("year = 2024\\' OR \\'1\\'=\\'1"));
 
     // Test SQL injection attempt in catalog name
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
@@ -594,12 +594,12 @@ public class TestIcebergRewriteDataFilesJob {
     // Catalog name should be quoted as an identifier
     assertTrue(sql.contains("`cat'alog`"));
     // All single quotes in string literals should be escaped
-    assertTrue(sql.contains("db''.table"));
-    assertTrue(sql.contains("sort''"));
-    assertTrue(sql.contains("id'' DESC"));
-    assertTrue(sql.contains("year'' = 2024"));
-    assertTrue(sql.contains("key''"));
-    assertTrue(sql.contains("val''ue"));
+    assertTrue(sql.contains("db\\'.table"));
+    assertTrue(sql.contains("sort\\'"));
+    assertTrue(sql.contains("id\\' DESC"));
+    assertTrue(sql.contains("year\\' = 2024"));
+    assertTrue(sql.contains("key\\'"));
+    assertTrue(sql.contains("val\\'ue"));
   }
 
   // Tests for strategy validation

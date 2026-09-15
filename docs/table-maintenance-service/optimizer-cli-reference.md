@@ -17,33 +17,33 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 ## Command Quick Reference
 
-| Command (`--type`) | Required options | Optional options | Purpose |
-| --- | --- | --- | --- |
-| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit` | Recommend and optionally submit jobs |
-| `update-statistics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and persist statistics |
-| `append-metrics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and append metrics |
-| `monitor-metrics` | `--identifiers`, `--action-time` | `--range-seconds`, `--partition-path` | Evaluate rules with before/after metrics |
-| `list-table-metrics` | `--identifiers` | `--partition-path` | Query stored table or partition metrics |
-| `list-job-metrics` | `--identifiers` | None | Query stored job metrics |
-| `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
+| Command (`--type`)        | Required options                   | Optional options                                                  | Purpose                                                 |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| `submit-strategy-jobs`    | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit`                                            | Recommend and optionally submit jobs                    |
+| `update-statistics`       | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and persist statistics                        |
+| `append-metrics`          | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and append metrics                            |
+| `monitor-metrics`         | `--identifiers`, `--action-time`   | `--range-seconds`, `--partition-path`                             | Evaluate rules with before/after metrics                |
+| `list-table-metrics`      | `--identifiers`                    | `--partition-path`                                                | Query stored table or partition metrics                 |
+| `list-job-metrics`        | `--identifiers`                    | None                                                              | Query stored job metrics                                |
+| `submit-update-stats-job` | `--identifiers`                    | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
 
 ## Option Field Meanings
 
-| Option | Meaning | Used by |
-| --- | --- | --- |
-| `--identifiers` | Comma-separated identifiers. Table format supports `catalog.schema.table` (or `schema.table` when default catalog is configured). | Most commands |
-| `--strategy-name` | Policy name to evaluate, for example `iceberg_compaction_default`. | `submit-strategy-jobs` |
-| `--dry-run` | Preview mode. Prints recommendations or job configs without submitting jobs. | `submit-strategy-jobs`, `submit-update-stats-job` |
-| `--limit` | Maximum number of strategy jobs to process. Must be `> 0`. | `submit-strategy-jobs` |
-| `--calculator-name` | Statistics/metrics calculator implementation name (for example `local-stats-calculator`). | `update-statistics`, `append-metrics` |
-| `--statistics-payload` | Inline JSON Lines content as input. Mutually exclusive with `--file-path`. | `update-statistics`, `append-metrics` |
-| `--file-path` | Path to JSON Lines input file. Mutually exclusive with `--statistics-payload`. | `update-statistics`, `append-metrics` |
-| `--action-time` | Action timestamp in epoch seconds used as evaluation anchor. | `monitor-metrics` |
-| `--range-seconds` | Time window (seconds) for monitor evaluation. Default is `86400` (24h). | `monitor-metrics` |
-| `--partition-path` | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier. | `monitor-metrics`, `list-table-metrics` |
-| `--update-mode` | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default). | `submit-update-stats-job` |
-| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
-| `--spark-conf` | Flat JSON map of Spark and Iceberg catalog configs used by the job. | `submit-update-stats-job` |
+| Option                 | Meaning                                                                                                                           | Used by                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `--identifiers`        | Comma-separated identifiers. Table format supports `catalog.schema.table` (or `schema.table` when default catalog is configured). | Most commands                                     |
+| `--strategy-name`      | Policy name to evaluate, for example `iceberg_compaction_default`.                                                                | `submit-strategy-jobs`                            |
+| `--dry-run`            | Preview mode. Prints recommendations or job configs without submitting jobs.                                                      | `submit-strategy-jobs`, `submit-update-stats-job` |
+| `--limit`              | Maximum number of strategy jobs to process. Must be `> 0`.                                                                        | `submit-strategy-jobs`                            |
+| `--calculator-name`    | Statistics/metrics calculator implementation name (for example `local-stats-calculator`).                                         | `update-statistics`, `append-metrics`             |
+| `--statistics-payload` | Inline JSON Lines content as input. Mutually exclusive with `--file-path`.                                                        | `update-statistics`, `append-metrics`             |
+| `--file-path`          | Path to JSON Lines input file. Mutually exclusive with `--statistics-payload`.                                                    | `update-statistics`, `append-metrics`             |
+| `--action-time`        | Action timestamp in epoch seconds used as evaluation anchor.                                                                      | `monitor-metrics`                                 |
+| `--range-seconds`      | Time window (seconds) for monitor evaluation. Default is `86400` (24h).                                                           | `monitor-metrics`                                 |
+| `--partition-path`     | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier.                                | `monitor-metrics`, `list-table-metrics`           |
+| `--update-mode`        | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default).                                                | `submit-update-stats-job`                         |
+| `--updater-options`    | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`.                                 | `submit-update-stats-job`                         |
+| `--spark-conf`         | Flat JSON map of Spark and Iceberg catalog configs used by the job.                                                               | `submit-update-stats-job`                         |
 
 Global option:
 
@@ -234,14 +234,14 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Three job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, and then expires the snapshot history that compaction just created.
+Four job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, and removes old orphan files.
 
-| Job template                          | What it does                             |
-|---------------------------------------|-------------------------------------------|
-| `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
-| `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
-| `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
-| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
+| Job template                          | What it does                            |
+| ------------------------------------- | --------------------------------------- |
+| `builtin-iceberg-update-stats`        | Collects file statistics and metrics    |
+| `builtin-iceberg-rewrite-data-files`  | Compacts small data files               |
+| `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata           |
+| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -275,25 +275,25 @@ For the policy that drives it, including threshold tuning, see [Iceberg Compacti
 
 The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 
-| Property    | Value                                                                       |
-|-------------|-----------------------------------------------------------------------------|
-| Name        | `builtin-iceberg-expire-snapshots`                                          |
-| Type        | Spark                                                                       |
-| Version     | `v1`                                                                        |
-| Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob`   |
+| Property   | Value                                                                     |
+| ---------- | ------------------------------------------------------------------------- |
+| Name       | `builtin-iceberg-expire-snapshots`                                        |
+| Type       | Spark                                                                     |
+| Version    | `v1`                                                                      |
+| Main class | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob` |
 
 ## Parameters
 
 `catalog_name` and `table_identifier` are required. The rest are optional.
 
-| Key              | Description                                                          | Default                     |
-|------------------|-----------------------------------------------------------------------|-----------------------------|
-| `catalog_name`   | Iceberg catalog name as registered in Spark                          | Required                    |
-| `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
-| `older_than`     | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp     | Five days ago               |
-| `retain_last`    | Minimum number of recent snapshots to keep regardless of age         | `1`                         |
-| `stream_results` | Streams intermediate delete results when present                     | Disabled                    |
-| `spark_conf`     | JSON map of Spark configuration                                      | None                        |
+| Key                | Description                                                      | Default       |
+| ------------------ | ---------------------------------------------------------------- | ------------- |
+| `catalog_name`     | Iceberg catalog name as registered in Spark                      | Required      |
+| `table_identifier` | Fully qualified table name, such as `db.sample`                  | Required      |
+| `older_than`       | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp | Five days ago |
+| `retain_last`      | Minimum number of recent snapshots to keep regardless of age     | `1`           |
+| `stream_results`   | Streams intermediate delete results when present                 | Disabled      |
+| `spark_conf`       | JSON map of Spark configuration                                  | None          |
 
 `older_than` and `retain_last` work together, and `retain_last` wins. Setting `older_than` to yesterday with `retain_last` at `5` keeps five snapshots even if all five are older than yesterday.
 
@@ -366,14 +366,14 @@ procedure. It removes files in the scan location that are no longer referenced
 by table metadata. This job is available for direct submission; policy-driven
 scheduling is a separate feature.
 
-| Key                | Description                                                   | Default        |
-| ------------------ | ------------------------------------------------------------- | -------------- |
-| `catalog_name`     | Iceberg catalog registered in Spark                           | Required       |
-| `table_identifier` | Table identifier within that catalog, such as `db.sample`     | Required       |
-| `older_than`       | Cutoff timestamp, interpreted in the Spark session time zone  | Three days ago |
-| `location`         | Scan only this directory within the table's storage location  | Table location |
-| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes | `false`        |
-| `spark_conf`       | JSON map of custom Spark configuration                        | None           |
+| Key                | Description                                                                                    | Default                          |
+| ------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                            | Required                         |
+| `table_identifier` | Table identifier within that catalog, such as `db.sample`                                      | Required                         |
+| `older_than`       | Cutoff timestamp in the Spark session time zone; explicit values must be at least 24 hours old | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                                   | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                                  | `false`                          |
+| `spark_conf`       | JSON map of custom Spark configuration                                                         | None                             |
 
 The template uses the same Spark and catalog connection settings as the other
 Iceberg jobs. For example, submit a preview using:

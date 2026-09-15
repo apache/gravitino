@@ -25,11 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.junit.jupiter.api.Test;
 
 class TestIcebergRemoveOrphanFilesJob {
   @Test
   void testTemplateRegistration() {
+    assertEquals(
+        GravitinoAuthSettings.jobTemplateEnvironments(),
+        new IcebergRemoveOrphanFilesJob().jobTemplate().environments());
     assertTrue(
         new BuiltInJobTemplateProvider()
             .jobTemplates().stream()

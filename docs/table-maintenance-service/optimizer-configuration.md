@@ -9,11 +9,11 @@ license: "This software is licensed under the Apache License version 2."
 
 Three layers of configuration apply, and they are set in different places for different lifetimes. Server configuration governs how jobs run at all, CLI configuration governs how the commands reach Gravitino, and `jobConf` governs a single job submission.
 
-| Layer               | Where it lives                  | Lifetime            |
-|---------------------|----------------------------------|---------------------|
-| Server              | `gravitino.conf`                 | Until server restart |
-| CLI                 | `conf/gravitino-optimizer.conf`  | Per command          |
-| Job submission      | `jobConf` in the request body    | One job run          |
+| Layer          | Where it lives                  | Lifetime             |
+| -------------- | ------------------------------- | -------------------- |
+| Server         | `gravitino.conf`                | Until server restart |
+| CLI            | `conf/gravitino-optimizer.conf` | Per command          |
+| Job submission | `jobConf` in the request body   | One job run          |
 
 ## Server Configuration
 
@@ -126,3 +126,29 @@ Four things are worth confirming before assuming a configuration problem is a co
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
+
+
+## Orphan File Cleanup Job Configuration
+
+Submit `builtin-iceberg-remove-orphan-files` with the same Spark, catalog, and
+optional authentication settings described above. Its job-specific `jobConf`
+keys are:
+
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+
+Keep the three-day default unless your workload needs a longer retention window.
+The 24-hour minimum also applies to dry runs; passing the current timestamp is
+not supported. Credentials can be supplied through the `gravitino_auth_*` keys;
+the template passes these as `GRAVITINO_AUTH_*` environment variables, and the
+job applies them to the Iceberg REST catalog before creating Spark.
+
+See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
+complete submission example. Orphan cleanup has no built-in scheduling policy
+in this release.

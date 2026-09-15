@@ -143,11 +143,20 @@ class TestIcebergRemoveOrphanFilesJobWithSpark {
     } finally {
       spark.conf().set("spark.sql.parser.escapedStringLiterals", "false");
     }
-    assertThrows(
-        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.main(new String[] {}));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergRemoveOrphanFilesJob.main(new String[] {"--catalog", "test_catalog"}));
+    assertEquals(1, IcebergRemoveOrphanFilesJob.run(new String[] {}));
+    assertEquals(1, IcebergRemoveOrphanFilesJob.run(new String[] {"--catalog", "test_catalog"}));
+    assertEquals(
+        1,
+        IcebergRemoveOrphanFilesJob.run(
+            new String[] {
+              "--catalog", "test_catalog", "--table", "db.invalid", "--dry-run", "yes"
+            }));
+    assertEquals(
+        1,
+        IcebergRemoveOrphanFilesJob.run(
+            new String[] {
+              "--catalog", "test_catalog", "--table", "db.invalid", "--spark-conf", "{bad}"
+            }));
   }
 
   @Test

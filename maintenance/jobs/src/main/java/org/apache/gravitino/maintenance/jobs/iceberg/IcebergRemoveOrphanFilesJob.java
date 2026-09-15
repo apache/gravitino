@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -71,6 +72,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
                 "--spark-conf",
                 "{{spark_conf}}"))
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
+        .withEnvironments(GravitinoAuthSettings.jobTemplateEnvironments())
         .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
         .build();
   }
@@ -84,19 +86,43 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
    * retention interval is preserved. A custom location must be within the table.
    *
    * @param args named command-line arguments
-   * @throws IOException if a location cannot be validated
-   * @throws AnalysisException if the table identifier is invalid or the table does not exist
    */
-  public static void main(String[] args) throws IOException, AnalysisException {
+  public static void main(String[] args) {
+    int exitCode = run(args);
+    if (exitCode != 0) {
+      System.exit(exitCode);
+    }
+  }
+
+  static int run(String[] args) {
     Map<String, String> options = IcebergJobUtils.parseArguments(args);
-    requireOption(options, "catalog");
-    requireOption(options, "table");
-    parseDryRun(options.get("dry-run"));
     SparkSession.Builder builder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Remove Orphan Files");
-    IcebergJobUtils.parseCustomSparkConfigs(options.get("spark-conf")).forEach(builder::config);
-    try (SparkSession spark = builder.getOrCreate()) {
+    try {
+      String catalogName = requireOption(options, "catalog");
+      requireOption(options, "table");
+      parseDryRun(options.get("dry-run"));
+      IcebergJobUtils.applyIcebergRestAuth(builder, catalogName, null);
+      IcebergJobUtils.parseCustomSparkConfigs(options.get("spark-conf")).forEach(builder::config);
+    } catch (IllegalArgumentException e) {
+      LOG.error("Invalid remove orphan files job arguments: {}", e.getMessage());
+      printUsage();
+      return 1;
+    }
+
+    SparkSession spark = null;
+    try {
+      spark = builder.getOrCreate();
+      IcebergJobUtils.requireIcebergSparkRuntime();
       execute(spark, options);
+      return 0;
+    } catch (IOException | AnalysisException | RuntimeException e) {
+      LOG.error("Error executing remove orphan files job", e);
+      return 1;
+    } finally {
+      if (spark != null) {
+        spark.stop();
+      }
     }
   }
 
@@ -151,12 +177,20 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
         new StringBuilder("CALL ")
             .append(IcebergJobUtils.escapeSqlIdentifier(catalog))
             .append(".system.remove_orphan_files(table => ")
-            .append(stringLiteral(table));
+            .append("'")
+            .append(IcebergJobUtils.escapeSqlString(table))
+            .append("'");
     if (olderThan != null && !olderThan.isEmpty()) {
-      sql.append(", older_than => TIMESTAMP ").append(stringLiteral(olderThan));
+      sql.append(", older_than => TIMESTAMP ")
+          .append("'")
+          .append(IcebergJobUtils.escapeSqlString(olderThan))
+          .append("'");
     }
     if (location != null && !location.isEmpty()) {
-      sql.append(", location => ").append(stringLiteral(location));
+      sql.append(", location => ")
+          .append("'")
+          .append(IcebergJobUtils.escapeSqlString(location))
+          .append("'");
     }
     return sql.append(", dry_run => ").append(dryRun).append(")").toString();
   }
@@ -182,6 +216,13 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
                 || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
         "location must be within the table's storage location: %s",
         tableLocation);
+  }
+
+  private static void printUsage() {
+    LOG.error(
+        "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
+            + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
+            + "[--dry-run true|false] [--spark-conf <json>]");
   }
 
   private static URI normalizeLocation(String value) {
@@ -243,9 +284,5 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     String value = options.get(key);
     Preconditions.checkArgument(value != null && !value.trim().isEmpty(), "--%s is required", key);
     return value;
-  }
-
-  private static String stringLiteral(String value) {
-    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
   }
 }

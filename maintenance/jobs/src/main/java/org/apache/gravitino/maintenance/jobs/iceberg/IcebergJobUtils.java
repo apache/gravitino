@@ -85,7 +85,9 @@ public final class IcebergJobUtils {
   }
 
   /**
-   * Escape single quotes in SQL string literals by replacing ' with ''.
+   * Escape backslashes and single quotes for Spark SQL string literals.
+   *
+   * <p>Uses Spark's default backslash escaping (escapedStringLiterals=false).
    *
    * @param value the string value to escape
    * @return escaped string safe for use in SQL string literals
@@ -94,7 +96,7 @@ public final class IcebergJobUtils {
     if (value == null) {
       return null;
     }
-    return value.replace("'", "''");
+    return value.replace("\\", "\\\\").replace("'", "\\'");
   }
 
   /**
