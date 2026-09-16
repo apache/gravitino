@@ -56,6 +56,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +106,15 @@ public class MetadataObjectPolicyOperations {
             Optional<PolicyEntity> policyEntity = getPolicyForObject(metalake, object, policyName);
             Optional<PolicyDTO> policyDTO =
                 policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(false)));
+
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
+              if (policyEntity.isPresent()) {
+                break;
+              }
+              policyEntity = getPolicyForObject(metalake, parentObject, policyName);
+              policyDTO = policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(true)));
+            }
 
             if (!policyDTO.isPresent()) {
               LOG.warn(
