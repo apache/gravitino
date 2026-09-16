@@ -1288,14 +1288,6 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   private String randomModelName() {
     return "model_" + UUID.randomUUID().toString().replace("-", "");
   }
-<<<<<<< HEAD
-=======
-
-  private static void assertPropertiesContain(
-      Map<String, String> expectedUserProps, Map<String, String> actual) {
-    expectedUserProps.forEach((k, v) -> Assertions.assertEquals(v, actual.get(k)));
-    Assertions.assertFalse(actual.containsKey(ID_KEY));
-  }
 
   @Test
   public void testRegisterModelRunsConcurrentlyWithRegisterModelOfAnotherModel() throws Exception {
@@ -1362,5 +1354,4 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     return modelOperationDispatcher.registerModel(
         ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
->>>>>>> 2928e0f0f ([#13206] improvement(core): lock the entity node instead of the schema when creating tables, topics, views and models (#13207))
 }
