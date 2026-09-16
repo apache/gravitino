@@ -198,7 +198,7 @@ whether any access rule is satisfied. That requires three things:
 2. the `system_access_control` policies bound to those tags;
 3. for each, whether any of `applicable_roles` is among the caller's expanded roles.
 
-Access rules only allow — `content` carries no condition field — so neither option below lets a tag
+Access rules only allow — `content` has a role condition but no deny effect — so a tag cannot
 restrict or deny. An RBAC `DENY` is unaffected; see [Allow and deny](#allow-and-deny).
 
 The question is *where* steps 1 and 2 happen.
@@ -257,6 +257,71 @@ and for nothing, since the leaf's effective tags already subsume every ancestor'
 once for the object under decision, not once per level of the RBAC walk.
 
 The cost lands on the request path, and is set out in [Cost](#cost).
+
+### Decision flow
+
+The following flow describes an ordinary tag-conferrable privilege check. Existing ownership
+branches and the enclosing authorization expression remain responsible for the complete endpoint
+decision, including RBAC-only traversal checks.
+
+```mermaid
+flowchart TD
+  A[Privilege check] --> B{Tag access enabled?}
+  B -->|No| C[Existing RBAC decision]
+  B -->|Yes| D{RBAC allows without an applicable deny?}
+  D -->|Yes| E[Privilege satisfied]
+  D -->|No| F[Resolve effective tags and enabled access policies once per object]
+  F --> G{Selector, privilege and active role match?}
+  G -->|No| H[Privilege not satisfied]
+  G -->|Yes| I{Explicit RBAC deny applies?}
+  I -->|No| E
+  I -->|Yes| J[Privilege not satisfied; record suppressed tag allow]
+```
+
+This combines both sources of authority without requiring both to run on every request. Tags
+cannot revoke an RBAC allow, so skipping them after a successful RBAC decision preserves the
+result. An RBAC miss is not an explicit deny: it gives tags an opportunity to grant access. An
+explicit deny remains effective even when a tag matches. This fast path depends on v1 being
+allow-only; adding restrictive tag policies would require revisiting it.
+
+### Independently testable evaluation
+
+M3 separates the evaluation into three components with explicit inputs:
+
+- **Resolution:** load tag assignments and policy bindings through an injectable reader, and
+  resolve nearest-wins inheritance. Point checks and list preloads produce the same resolved
+  representation. Tests can supply an in-memory hierarchy and bindings without a catalog or
+  database.
+- **Matching:** a deterministic evaluator takes the requested privilege, active role set and
+  resolved tags and enabled policies. It returns a match or no match, with the matching tag and
+  policy identifiers. It performs no storage reads, role expansion or cache mutation and has no
+  dependency on REST or jCasbin.
+- **Composition:** the authorization adapter combines the match with the existing RBAC allow,
+  deny and traversal checks. It also records decision provenance. Storage failures are errors,
+  not empty policy sets or successful matches; an evaluation error cannot grant tag-derived
+  access.
+
+The matching result is internal evidence, not a new public authorization decision or API. Keeping
+it separate lets tests assert both the decision and its explanation without starting the server.
+
+M3 is complete only with unit tests for the resolver, matcher and composition adapter, plus
+integration tests through the authorization-expression and list-filtering paths. Cover:
+
+- multiple privileges and any matching active role; no match for inactive roles or
+  `ActiveRoles.none()`;
+- same-name nearest-wins overrides, different-name inheritance, `ALL_VALUES` and value-sensitive
+  selectors, disabled policies and absent bindings;
+- RBAC allow, RBAC miss, explicit deny with a matching tag, missing traversal privileges, and the
+  feature disabled; a skipped tag path must perform no tag-resolution reads;
+- resolution failures, attribution of a suppressed tag allow, and identical point/list decisions
+  for the same caller, object and privilege;
+- one resolution per object per request despite repeated privilege checks, including an ancestor
+  value overridden at the target; the RBAC ancestor walk must not restore the overridden value.
+
+M4 adds multi-node revocation and freshness tests. M5 adds query-count tests and list benchmarks
+across candidate counts, hierarchy depths and tag counts. Record the RBAC-only baseline and
+feature-enabled latency and query counts so later changes to the model can be checked against
+both correctness and cost.
 
 ### Rejected: expand tag rows when roles load
 
@@ -612,6 +677,17 @@ request too, so it changes no outcome — it only makes the conflict visible, an
 which names the tag and policy whose allow the deny suppressed, does that without adding a third
 decision state.
 
+The proposed conflict reporting is an internal diagnostic accompanying the existing denial,
+not a new client-visible error type. It identifies the object, privilege, matching tag and policy,
+and the explicit RBAC deny that suppressed the allow. A plain RBAC miss is not a conflict.
+Detailed policy information stays in authorized server diagnostics rather than being exposed to
+an unauthorized caller. The composition tests must verify this attribution even when normal
+expression short-circuiting would otherwise skip the matching tag rule.
+
+This addresses the request to fail closed and make the competing rules identifiable. Whether a
+distinct client-visible conflict error is also required remains a reviewer decision; the proposed
+v1 behavior retains the existing denial response.
+
 This relies on tag-conferrable privileges being reached through `ANY_*` macros; a bare
 `TYPE::PRIVILEGE` has no deny conjunct. M3 carries a test to keep it that way.
 
@@ -651,6 +727,13 @@ on an object, the other who may wield a tag that confers it. Neither adds a new 
 scoping needs no new mechanism, because grant authority can already be given on a catalog or a
 schema.
 
+The earlier alternative of extending `ApplyTag.canBindTo` to `CATALOG` and `SCHEMA` is deferred
+beyond v1. It is not a prerequisite for M2: the explicit tag grant answers *which tag*, while
+existing `MANAGE_GRANTS` or ownership on the object or an ancestor answers *where*. A later
+extension would need to define how tag-scoped and object-scoped `APPLY_TAG` grants compose, and
+how existing grants retain their meaning, before scheduling its implementation. No new IAM role
+or privilege is introduced by the current proposal.
+
 ---
 
 ## Implementation milestones
@@ -662,7 +745,7 @@ resolves differently, the milestones marked against it change shape.
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1 — model and storage            | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist.                                                                                                                                                                      |
 | M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
-| M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression.                                                                                                                                                 | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
+| M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). The component boundaries and test acceptance criteria in [Independently testable evaluation](#independently-testable-evaluation) land here too. Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
 | M4 — freshness                    | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way.                                                                                                                             |
 | M5 — affordable list filtering    | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3.                                                                                                                                                                                                                         |
 | M6 — lifecycle and documentation  | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour.                                                                                                                                                                                                                      |
