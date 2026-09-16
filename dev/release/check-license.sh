@@ -22,10 +22,10 @@
 # prints the referencing line and any candidate locations found elsewhere in the tree,
 # so the reference can be corrected.
 #
-# A reference is only checked when its first path segment is an existing directory in
-# the project root. That keeps URLs, Java package names and paths internal to a bundled
-# jar such as META-INF/NOTICE out of scope, since none of those name a file that is
-# expected to exist here.
+# Explicit ./ references are always checked. Unprefixed paths are checked when their
+# first segment is an existing project directory. URLs are ignored, as are unprefixed
+# external paths such as META-INF/NOTICE. This is a source-reference sanity check, not
+# a complete license audit; use ./ for references whose top-level directory may be missing.
 #
 # The LICENSE.bin and NOTICE.bin variants are deliberately not checked: their paths
 # describe the layout of the binary package assembled by build.gradle.kts rather than
@@ -51,17 +51,19 @@ check_document() {
   fi
 
   local line_number=0
-  local line token candidates
+  local line token candidates candidate
   # the '|| [ -n "$line" ]' guard keeps the last line when the file has no trailing newline
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
 
-    for token in $(echo "$line" | grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+'); do
+    while IFS= read -r token; do
+      # A period terminating a sentence is not part of a file reference.
+      token=${token%.}
+      if [[ "$token" != ./* ]] && [ ! -d "${token%%/*}" ]; then
+        continue
+      fi
       token=${token#./}
-
-      # only consider references rooted at a directory that exists here
-      [ -d "${token%%/*}" ] || continue
-      [ -e "$token" ] && continue
+      [ -f "$token" ] && continue
 
       FAILED=1
       echo -e "${RED}[NOT FOUND]${RESET} $document:$line_number --> $token"
@@ -76,7 +78,9 @@ check_document() {
           echo "      $candidate"
         done <<< "$candidates"
       fi
-    done
+    done < <(printf '%s\n' "$line" |
+      sed -E 's@[[:alpha:]][[:alnum:]+.-]*://[^[:space:]<>]+@@g' |
+      grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+')
   done < "$document"
 }
 
