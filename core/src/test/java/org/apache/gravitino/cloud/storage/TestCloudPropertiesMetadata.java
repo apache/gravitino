@@ -39,7 +39,8 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(S3Properties.GRAVITINO_S3_REGION));
     assertTrue(metadata.containsKey(S3Properties.GRAVITINO_S3_ROLE_ARN));
     assertFalse(metadata.get(S3Properties.GRAVITINO_S3_ENDPOINT).isHidden());
-    assertTrue(metadata.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID).isHidden());
+    assertFalse(metadata.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID).isHidden());
+    assertTrue(metadata.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY).isHidden());
   }
 
   @Test

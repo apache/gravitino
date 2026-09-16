@@ -34,9 +34,9 @@ public class TestPaimonCatalogPropertiesMetadata {
   @Test
   void testSensitivePropertiesAreHidden() {
     assertTrue(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
-    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
     // REST bearer token and DLF credentials share the same hidden requirement
