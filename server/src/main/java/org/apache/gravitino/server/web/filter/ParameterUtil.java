@@ -28,6 +28,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
@@ -82,8 +83,13 @@ public class ParameterUtil {
     if (fullName.isPresent() && metadataObjectType.isPresent()) {
       String metalake = entities.get(Entity.EntityType.METALAKE);
       if (metalake != null) {
-        MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
+        String rawType = metadataObjectType.get();
+        MetadataObject.Type type;
+        try {
+          type = MetadataObject.Type.valueOf(rawType.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+          throw new IllegalMetadataObjectException(e, "Invalid metadata object type: %s", rawType);
+        }
         NameIdentifier nameIdentifier =
             MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(

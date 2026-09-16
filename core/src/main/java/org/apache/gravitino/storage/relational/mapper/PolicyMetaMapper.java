@@ -24,6 +24,7 @@ import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
@@ -44,45 +45,30 @@ public interface PolicyMetaMapper {
           + " WHERE policy_id = #{policyId} AND deleted_at > 0")
   int countDeletedPolicyMetasById(@Param("policyId") Long policyId);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at"),
-    @Result(property = "policyVersionPO.id", column = "id"),
-    @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
-    @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
-    @Result(property = "policyVersionPO.version", column = "version"),
-    @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
-    @Result(property = "policyVersionPO.enabled", column = "enabled"),
-    @Result(property = "policyVersionPO.content", column = "content"),
-    @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
-  })
+  @Results(
+      id = "policyPOResultMap",
+      value = {
+        @Result(property = "policyId", column = "policy_id"),
+        @Result(property = "policyName", column = "policy_name"),
+        @Result(property = "policyType", column = "policy_type"),
+        @Result(property = "metalakeId", column = "metalake_id"),
+        @Result(property = "auditInfo", column = "audit_info"),
+        @Result(property = "currentVersion", column = "current_version"),
+        @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "deletedAt", column = "deleted_at"),
+        @Result(property = "policyVersionPO.id", column = "id"),
+        @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
+        @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
+        @Result(property = "policyVersionPO.version", column = "version"),
+        @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
+        @Result(property = "policyVersionPO.enabled", column = "enabled"),
+        @Result(property = "policyVersionPO.content", column = "content"),
+        @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
+      })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listPolicyPOsByMetalake")
   List<PolicyPO> listPolicyPOsByMetalake(@Param("metalakeName") String metalakeName);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at"),
-    @Result(property = "policyVersionPO.id", column = "id"),
-    @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
-    @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
-    @Result(property = "policyVersionPO.version", column = "version"),
-    @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
-    @Result(property = "policyVersionPO.enabled", column = "enabled"),
-    @Result(property = "policyVersionPO.content", column = "content"),
-    @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
-  })
+  @ResultMap("policyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "listPolicyPOsByMetalakeAndPolicyNames")
@@ -92,24 +78,7 @@ public interface PolicyMetaMapper {
   @InsertProvider(type = PolicyMetaSQLProviderFactory.class, method = "insertPolicyMeta")
   void insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at"),
-    @Result(property = "policyVersionPO.id", column = "id"),
-    @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
-    @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
-    @Result(property = "policyVersionPO.version", column = "version"),
-    @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
-    @Result(property = "policyVersionPO.enabled", column = "enabled"),
-    @Result(property = "policyVersionPO.content", column = "content"),
-    @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
-  })
+  @ResultMap("policyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "selectPolicyMetaByMetalakeAndName")
@@ -145,16 +114,18 @@ public interface PolicyMetaMapper {
   Integer deletePolicyMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @Results(
+      id = "policyOnlyPOResultMap",
+      value = {
+        @Result(property = "policyId", column = "policy_id"),
+        @Result(property = "policyName", column = "policy_name"),
+        @Result(property = "policyType", column = "policy_type"),
+        @Result(property = "metalakeId", column = "metalake_id"),
+        @Result(property = "auditInfo", column = "audit_info"),
+        @Result(property = "currentVersion", column = "current_version"),
+        @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "deletedAt", column = "deleted_at")
+      })
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "selectPolicyMetaByMetalakeIdAndName")
@@ -168,32 +139,14 @@ public interface PolicyMetaMapper {
    * @param policyName The policy name.
    * @return The locked policy, or null if the natural key is not active.
    */
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @ResultMap("policyOnlyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "selectPolicyMetaByMetalakeIdAndNameForUpdate")
   PolicyPO selectPolicyMetaByMetalakeIdAndNameForUpdate(
       @Param("metalakeId") long metalakeId, @Param("policyName") String policyName);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @ResultMap("policyOnlyPOResultMap")
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyByPolicyId")
   PolicyPO selectPolicyByPolicyId(@Param("policyId") Long policyId);
 
@@ -203,31 +156,13 @@ public interface PolicyMetaMapper {
    * @param policyId The policy ID.
    * @return The locked policy, or null if it is not active.
    */
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @ResultMap("policyOnlyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "selectPolicyByPolicyIdForUpdate")
   PolicyPO selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @ResultMap("policyOnlyPOResultMap")
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listPolicyPOsByPolicyIds")
   List<PolicyPO> listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds);
 
@@ -237,39 +172,13 @@ public interface PolicyMetaMapper {
    * @param policyIds The policy IDs to lock.
    * @return The locked policies. Policies that are not active are absent from the result.
    */
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at")
-  })
+  @ResultMap("policyOnlyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "listPolicyPOsByPolicyIdsForUpdate")
   List<PolicyPO> listPolicyPOsByPolicyIdsForUpdate(@Param("policyIds") List<Long> policyIds);
 
-  @Results({
-    @Result(property = "policyId", column = "policy_id"),
-    @Result(property = "policyName", column = "policy_name"),
-    @Result(property = "policyType", column = "policy_type"),
-    @Result(property = "metalakeId", column = "metalake_id"),
-    @Result(property = "auditInfo", column = "audit_info"),
-    @Result(property = "currentVersion", column = "current_version"),
-    @Result(property = "lastVersion", column = "last_version"),
-    @Result(property = "deletedAt", column = "deleted_at"),
-    @Result(property = "policyVersionPO.id", column = "id"),
-    @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
-    @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
-    @Result(property = "policyVersionPO.version", column = "version"),
-    @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
-    @Result(property = "policyVersionPO.enabled", column = "enabled"),
-    @Result(property = "policyVersionPO.content", column = "content"),
-    @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
-  })
+  @ResultMap("policyPOResultMap")
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "batchSelectPolicyByIdentifier")

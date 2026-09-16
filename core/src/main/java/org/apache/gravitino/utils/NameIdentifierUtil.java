@@ -705,6 +705,14 @@ public class NameIdentifierUtil {
         String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
 
+      case MODEL_VERSION:
+        checkModelVersion(ident);
+        Namespace modelVersionNs = ident.namespace();
+        String modelVersionParent =
+            dot.join(modelVersionNs.level(1), modelVersionNs.level(2), modelVersionNs.level(3));
+        return MetadataObjects.of(
+            modelVersionParent, ident.name(), MetadataObject.Type.MODEL_VERSION);
+
       case FUNCTION:
         checkFunction(ident);
         String functionParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));

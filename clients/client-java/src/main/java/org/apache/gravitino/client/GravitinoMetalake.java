@@ -132,6 +132,7 @@ import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -143,7 +144,12 @@ import org.apache.gravitino.tag.TagValueConstraint;
  * create, load, alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO
-    implements SupportsCatalogs, TagOperations, SupportsRoles, SupportsJobs, PolicyOperations {
+    implements SupportsCatalogs,
+        TagOperations,
+        SupportsRoles,
+        SupportsJobs,
+        PolicyOperations,
+        SupportsSecrets {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -158,6 +164,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
   private final RESTClient restClient;
   private final MetadataObjectRoleOperations metadataObjectRoleOperations;
+  private final MetadataObjectSecretOperations metadataObjectSecretOperations;
 
   GravitinoMetalake(
       String name,
@@ -167,9 +174,11 @@ public class GravitinoMetalake extends MetalakeDTO
       RESTClient restClient) {
     super(name, comment, properties, auditDTO);
     this.restClient = restClient;
+    MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
-        new MetadataObjectRoleOperations(
-            name, MetadataObjects.of(null, name, MetadataObject.Type.METALAKE), restClient);
+        new MetadataObjectRoleOperations(name, metalakeObject, restClient);
+    this.metadataObjectSecretOperations =
+        new MetadataObjectSecretOperations(name, metalakeObject, restClient);
   }
 
   /**
@@ -540,6 +549,16 @@ public class GravitinoMetalake extends MetalakeDTO
   @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return metadataObjectSecretOperations.getSecrets();
   }
 
   /**

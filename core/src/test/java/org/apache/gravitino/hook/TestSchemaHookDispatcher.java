@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -147,7 +148,9 @@ public class TestSchemaHookDispatcher {
     Schema mockSchema = mock(Schema.class);
     when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+    SchemaDispatcher normalizedDispatcher =
+        new SchemaNormalizeDispatcher(hookDispatcher, mockCatalogManager);
+    normalizedDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
     List<MetadataObject> owned = captureOwnedObjects();
     Assertions.assertEquals(1, owned.size(), "A flat schema only assigns ownership to the leaf");

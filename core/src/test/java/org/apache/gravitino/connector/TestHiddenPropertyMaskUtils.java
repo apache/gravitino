@@ -119,4 +119,47 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertFalse(masked.containsKey("gravitino.identifier"));
     Assertions.assertEquals("v", masked.get("visible"));
   }
+
+  @Test
+  void testMaskHiddenPropertiesMasksSensitiveNamedUndeclaredKeys() {
+    PropertiesMetadata metadata =
+        new PropertiesMetadata() {
+          @Override
+          public Map<String, PropertyEntry<?>> propertyEntries() {
+            return ImmutableMap.of(
+                "aws-region",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "aws-region", "region", false, null, false));
+          }
+        };
+
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "aws-region",
+            "us-east-2",
+            "warehouse",
+            "s3://bucket/prefix",
+            "s3-access-key-id",
+            "AKIA...",
+            "s3-secret-access-key",
+            "super-secret",
+            "custom-token",
+            "tok",
+            "azure-storage-account-key",
+            "abs-key",
+            "azure-storage-account-name",
+            "abs-account");
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
+
+    Assertions.assertEquals("us-east-2", masked.get("aws-region"));
+    Assertions.assertEquals("s3://bucket/prefix", masked.get("warehouse"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-access-key-id"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-secret-access-key"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("custom-token"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-key"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-name"));
+  }
 }

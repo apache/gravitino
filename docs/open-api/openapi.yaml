@@ -58,6 +58,9 @@ paths:
   /health/ready:
     $ref: "./health.yaml#/paths/~1health~1ready"
 
+  /system/iceberg-rest:
+    $ref: "./system.yaml#/paths/~1system~1iceberg-rest"
+
   /metalakes:
     # escape the path name by replacing `/` with `~1`
     $ref: "./metalakes.yaml#/paths/~1metalakes"
@@ -267,6 +270,9 @@ paths:
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 
+  /metalakes/{metalake}/secrets/providers:
+    $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1secrets~1providers"
+
 components:
 
   schemas:
@@ -312,6 +318,14 @@ components:
           description: A human-readable message
         stack:
           type: array
+          deprecated: true
+          description: >-
+            Deprecated diagnostic stack trace. Operators should disable it with
+            gravitino.server.webserver.includeErrorStackTrace=false because it can expose internal
+            implementation details. It remains enabled by default only to avoid breaking legacy
+            clients that expect this field. See
+            [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling)
+            and [CWE-209](https://cwe.mitre.org/data/definitions/209.html).
           items:
             type: string
 
@@ -624,6 +638,7 @@ components:
           - "FILESET"
           - "TOPIC"
           - "MODEL"
+          - "MODEL_VERSION"
           - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:

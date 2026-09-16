@@ -62,6 +62,8 @@ dependencies {
   implementation(libs.iceberg.azure)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.iceberg.gcp)
+  // Load gcs-service-account-file into Iceberg GCSFileIO properties (gcs.oauth2.token).
+  implementation(libs.google.auth.http)
   // Upgrade to Hadoop 3.3+ for Iceberg 1.10 compatibility
   // Iceberg 1.10 requires Hadoop 3.3+ APIs like FileSystem.openFile() and FsTracer.get()
   implementation(libs.hadoop3.client.api)

@@ -416,6 +416,19 @@ public class MetalakeMetaService {
         () -> metalakeWriteFailure(identifier, metalakeId, identifier.name()));
   }
 
+  /** Locks and validates a metalake while inserting a child in the current transaction. */
+  void lockMetalakeForChildWrite(String name, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), name));
+  }
+
   private RuntimeException metalakeWriteFailure(
       NameIdentifier identifier, Long metalakeId, String observedName) {
     return OccWriteSupport.writeFailure(

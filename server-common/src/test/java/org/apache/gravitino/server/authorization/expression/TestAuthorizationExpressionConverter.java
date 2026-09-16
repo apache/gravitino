@@ -129,4 +129,14 @@ public class TestAuthorizationExpressionConverter {
             + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))",
         replaced);
   }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyUseSecret() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRET");
+    Assertions.assertEquals(
+        "((ANY(USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE,"
+            + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
+        replaced);
+  }
 }

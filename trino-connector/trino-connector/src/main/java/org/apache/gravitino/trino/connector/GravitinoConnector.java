@@ -67,6 +67,9 @@ import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 public class GravitinoConnector implements Connector {
 
   private static final Logger LOG = Logger.get(GravitinoConnector.class);
+  private static final String ICEBERG_PROVIDER = "lakehouse-iceberg";
+  private static final String TRINO_ICEBERG_REST_SECURITY = "iceberg.rest-catalog.security";
+  private static final String OAUTH2_PASSTHROUGH = "OAUTH2_PASSTHROUGH";
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
@@ -111,15 +114,39 @@ public class GravitinoConnector implements Connector {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
 
-    Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
-        internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
+        getInternalMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     CatalogConnectorMetadata metadata =
         forwardUser ? resolveSessionMetadata(session) : connectorMetadata;
     return createGravitinoMetadata(
         metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  }
+
+  /**
+   * Defers native REST authentication until a data operation needs it. Catalog registration uses a
+   * password-authenticated management session without a delegated user token.
+   *
+   * @param session the authenticated query session
+   * @param transactionHandle the native transaction handle
+   * @return metadata that preserves user authentication at first data access
+   */
+  protected ConnectorMetadata getInternalMetadata(
+      ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
+    if (ICEBERG_PROVIDER.equals(catalogConnectorContext.getCatalog().getProvider())
+        && OAUTH2_PASSTHROUGH.equalsIgnoreCase(
+            catalogConnectorContext
+                .getInternalConnectorConfig()
+                .get(TRINO_ICEBERG_REST_SECURITY))) {
+      return DeferredConnectorMetadata.create(
+          session,
+          currentSession ->
+              catalogConnectorContext
+                  .getInternalConnector()
+                  .getMetadata(currentSession, transactionHandle));
+    }
+    return catalogConnectorContext.getInternalConnector().getMetadata(session, transactionHandle);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
@@ -242,6 +269,12 @@ public class GravitinoConnector implements Connector {
                 GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
                 GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
     String token = session.getIdentity().getExtraCredentials().get(credentialKey);
+    // Password-authenticated sessions have no OAuth token. Reuse the configured service
+    // identity in that case; failures with a supplied token must still propagate.
+    if (GravitinoAuthProvider.parseAuthType(authType) == GravitinoAuthProvider.AuthType.OAUTH2
+        && StringUtils.isBlank(token)) {
+      return connectorMetadata;
+    }
     String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(

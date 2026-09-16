@@ -56,7 +56,7 @@ Builds with Apache Paimon `1.2`.
 | `dlf-token-loader`                                 | The token loader for Aliyun DLF.                                                                                                                                                                            | (none)                                                                         | No                                                                                                                                                                   |
 
 :::note
-- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/libs` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
 - If you use an S3 warehouse, also download [`gravitino-aws-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) and place it in the `catalogs/lakehouse-paimon/libs` directory to enable credential vending. For OSS, use [`gravitino-aliyun-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) instead.
 - If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
 ```
@@ -79,6 +79,43 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 :::
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
+
+#### Hadoop S3A (optional)
+
+Paimon's native S3 filesystem uses an `s3://` warehouse and the `paimon-s3` dependency. As an
+alternative, you can use Hadoop S3A with an `s3a://` warehouse. Gravitino does not package the
+optional S3A dependencies by default. To enable it, add the following JARs to
+`catalogs/lakehouse-paimon/libs` and restart Gravitino:
+
+- `hadoop-aws-<hadoop-version>.jar`, with the same version as the Hadoop libraries packaged by
+  Gravitino.
+- The `aws-java-sdk-bundle` version required by that `hadoop-aws` release.
+
+The following example configures static credentials and a custom HTTP S3 endpoint:
+
+```json
+{
+  "name": "paimon_s3a",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-paimon",
+  "properties": {
+    "catalog-backend": "filesystem",
+    "warehouse": "s3a://bucket/warehouse",
+    "gravitino.bypass.hadoop.fs.s3a.access.key": "<access-key-id>",
+    "gravitino.bypass.hadoop.fs.s3a.secret.key": "<secret-access-key>",
+    "gravitino.bypass.hadoop.fs.s3a.endpoint": "http://s3.example.com",
+    "gravitino.bypass.hadoop.fs.s3a.path.style.access": "true",
+    "gravitino.bypass.hadoop.fs.s3a.connection.ssl.enabled": "false"
+  }
+}
+```
+
+The endpoint-related properties are only needed for a custom endpoint. Omit
+`gravitino.bypass.hadoop.fs.s3a.connection.ssl.enabled` when the endpoint uses HTTPS, and enable
+path-style access only when the S3-compatible service requires it. Hadoop S3A automatically
+discovers `S3AFileSystem` and uses its default credential provider chain, so `fs.s3a.impl` and
+`fs.s3a.aws.credentials.provider` do not need to be configured for this example. You can pass other
+Hadoop S3A properties by prefixing them with `gravitino.bypass.hadoop.`.
 
 #### JDBC Backend
 

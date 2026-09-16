@@ -27,9 +27,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.TopicDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
@@ -70,16 +68,9 @@ public class TopicHookDispatcher implements TopicDispatcher {
     // Set the creator as the owner of the topic.
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the topic name (and its schema namespace)
-      // based on catalog capabilities, so the entity is stored under the normalized identifier.
-      // Apply the same normalization here so the owner is attached to the same identifier the
-      // manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.TOPIC, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TOPIC),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TOPIC),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }

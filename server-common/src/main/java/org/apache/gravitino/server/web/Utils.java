@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Parameter;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +38,9 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class Utils {
@@ -100,6 +103,7 @@ public class Utils {
   }
 
   public static Response internalError(String message, Throwable throwable) {
+    ServerHealth.getInstance().recordFailure(throwable);
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
         .entity(ErrorResponse.internalError(message, throwable))
         .type(MediaType.APPLICATION_JSON)
@@ -260,6 +264,21 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Returns the health response used after an observed out-of-memory failure.
+   *
+   * @return HTTP 503 with a JVM failure requiring process restart
+   */
+  public static Response outOfMemoryResponse() {
+    HealthCheckDTO check =
+        new HealthCheckDTO(
+            "jvm",
+            HealthCheckDTO.Status.DOWN,
+            Collections.singletonMap("reason", "OutOfMemoryError; restart required"));
+    return serviceUnavailable(
+        new HealthResponse(HealthCheckDTO.Status.DOWN, Collections.singletonList(check)));
+  }
+
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
@@ -268,7 +287,13 @@ public class Utils {
     if (principal == null) {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
-    return PrincipalUtils.doAs(principal, action);
+    try {
+      return PrincipalUtils.doAs(principal, action);
+    } catch (Exception | Error failure) {
+      // Record before a resource converts a wrapped failure into an ordinary error response.
+      ServerHealth.getInstance().recordFailure(failure);
+      throw failure;
+    }
   }
 
   public static Map<String, String> filterFilesetAuditHeaders(HttpServletRequest httpRequest) {

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -40,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -95,7 +97,6 @@ public class TestGravitinoServer {
       ImmutableSet.<String>builder()
           .addAll(STATIC_AND_FORWARDING_PATHS)
           .add("/configs") // Intentionally public: backs the Web UI's pre-login OAuth bootstrap.
-          .add("/configs/secrets/providers") // Open pending GH-12921 (tracked authz gate).
           .addAll(JettyServer.METRICS_PATH_SPECS) // Conventionally scraped without credentials.
           .build();
 
@@ -212,8 +213,88 @@ public class TestGravitinoServer {
     assertEquals(1, providers.size());
     assertEquals("memory", providers.get(0).get("name"));
     assertEquals("memory", providers.get(0).get("type"));
-    assertEquals("https://secrets.example.com", providers.get(0).get("uri"));
+    assertFalse(providers.get(0).containsKey("uri"));
     assertFalse(providers.get(0).containsKey("className"));
+  }
+
+  @Test
+  public void testSecretProvidersOldPathRemoved() throws Exception {
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(spyServerConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    assertEquals(404, response.statusCode());
+  }
+
+  @Test
+  public void testJerseyErrorOmitsStackWhenDisabled() throws Exception {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX
+            + JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getKey(),
+        "false");
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(configs, key -> true);
+    serverConfig = spyServerConfig(serverConfig);
+    gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/metalakes"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+    assertEquals(400, response.statusCode(), response.body());
+    JsonNode responseJson = ObjectMapperProvider.objectMapper(false).readTree(response.body());
+    assertTrue(responseJson.hasNonNull("message"));
+    assertFalse(responseJson.has("stack"));
+  }
+
+  @Test
+  public void testSecretProvidersRequestIsAudited() throws Exception {
+    // GH-12921 moved discovery under /api/metalakes/{metalake}/secrets/providers so it inherits
+    // the /api/* HttpAuditFilter (and AuthenticationFilter) binding. Capturing live EventBus
+    // traffic here is flaky under the shared GravitinoEnv singleton used by this suite (CI saw
+    // empty captures or create-metalake HttpRequestEvent noise even when GET returned 200).
+    // Assert the concrete path is covered; HttpAuditFilter emission itself is covered by
+    // TestHttpAuditFilter / HttpAuditFilterIT.
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    ServletHandler servletHandler = getServletContextHandler(gravitinoServer).getServletHandler();
+    Set<String> auditedPathSpecs =
+        JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
+    assertTrue(
+        auditedPathSpecs.stream()
+            .anyMatch(
+                spec ->
+                    new ServletPathSpec(spec).matches("/api/metalakes/test_ml/secrets/providers")),
+        "GET /api/metalakes/{metalake}/secrets/providers must be covered by HttpAuditFilter");
+
+    List<Map<String, Object>> providers = fetchSecretProviders(spyServerConfig);
+    assertTrue(providers.isEmpty());
   }
 
   @Test
@@ -319,6 +400,16 @@ public class TestGravitinoServer {
     return serverConfig;
   }
 
+  private static ServerConfig serverConfigWithAvailablePort() throws IOException {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(configs, t -> true);
+    return serverConfig;
+  }
+
   private static ServerConfig spyServerConfig(ServerConfig serverConfig) {
     ServerConfig spy = Mockito.spy(serverConfig);
     Mockito.when(spy.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX))
@@ -328,6 +419,32 @@ public class TestGravitinoServer {
 
   private static List<Map<String, Object>> fetchSecretProviders(ServerConfig serverConfig)
       throws Exception {
+    return fetchSecretProviders(serverConfig, createMetalakeForSecretProviders(serverConfig));
+  }
+
+  private static String createMetalakeForSecretProviders(ServerConfig serverConfig)
+      throws Exception {
+    int port =
+        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    String metalake = "secret_providers_" + UUID.randomUUID().toString().replace("-", "");
+    HttpResponse<String> createResponse =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/metalakes"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
+                    .header("Content-Type", "application/json")
+                    .POST(
+                        HttpRequest.BodyPublishers.ofString(
+                            "{\"name\":\"" + metalake + "\",\"comment\":\"\",\"properties\":{}}"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, createResponse.statusCode(), createResponse.body());
+    return metalake;
+  }
+
+  private static List<Map<String, Object>> fetchSecretProviders(
+      ServerConfig serverConfig, String metalake) throws Exception {
     int port =
         JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
             .getHttpPort();
@@ -335,11 +452,17 @@ public class TestGravitinoServer {
         HttpClient.newHttpClient()
             .send(
                 HttpRequest.newBuilder(
-                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
+                        URI.create(
+                            "http://127.0.0.1:"
+                                + port
+                                + "/api/metalakes/"
+                                + metalake
+                                + "/secrets/providers"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, response.statusCode());
+    assertEquals(200, response.statusCode(), response.body());
     Map<String, Object> body =
         ObjectMapperProvider.objectMapper()
             .readValue(response.body(), new TypeReference<Map<String, Object>>() {});

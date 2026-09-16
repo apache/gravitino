@@ -19,28 +19,12 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobTemplateMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.Param;
 
 public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLProvider {
-
-  @Override
-  public String softDeleteJobTemplateMetaByMetalakeAndName(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return "UPDATE "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE metalake_id IN ("
-        + " SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND job_template_name = #{jobTemplateName} AND deleted_at = 0";
-  }
 
   @Override
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -81,5 +65,20 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
         + " WHERE job_template_id IN (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit})";
+  }
+
+  @Override
+  public String softDeleteJobTemplateById(
+      @Param("jobTemplateId") Long jobTemplateId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE job_template_id = #{jobTemplateId} AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  @Override
+  public String selectJobTemplateByIdForShare(Long jobTemplateId) {
+    return selectJobTemplateIdentityById() + " FOR SHARE";
   }
 }

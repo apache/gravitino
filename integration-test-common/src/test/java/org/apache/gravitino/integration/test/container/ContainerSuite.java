@@ -93,7 +93,7 @@ public class ContainerSuite implements Closeable {
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
-  private static volatile MinIOContainer minIOContainer;
+  private static volatile RustFSContainer rustFSContainer;
 
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
@@ -698,27 +698,33 @@ public class ContainerSuite implements Closeable {
     return gravitinoLocalStackContainer;
   }
 
-  public void startMinIOContainer() {
+  /** Starts the shared RustFS object store for S3 credential-vending tests. */
+  public void startRustFSContainer() {
     ITUtils.cleanDisk();
-    if (minIOContainer == null) {
+    if (rustFSContainer == null) {
       synchronized (ContainerSuite.class) {
-        if (minIOContainer == null) {
-          MinIOContainer.Builder builder = MinIOContainer.builder().withNetwork(network);
-          MinIOContainer container = closer.register(builder.build());
+        if (rustFSContainer == null) {
+          RustFSContainer.Builder builder = RustFSContainer.builder().withNetwork(network);
+          RustFSContainer container = closer.register(builder.build());
           try {
             container.start();
           } catch (Exception e) {
-            LOG.error("Failed to start MinIO container", e);
-            throw new RuntimeException("Failed to start MinIO container", e);
+            LOG.error("Failed to start RustFS container", e);
+            throw new RuntimeException("Failed to start RustFS container", e);
           }
-          minIOContainer = container;
+          rustFSContainer = container;
         }
       }
     }
   }
 
-  public MinIOContainer getMinIOContainer() {
-    return minIOContainer;
+  /**
+   * Returns the shared RustFS fixture after {@link #startRustFSContainer()}.
+   *
+   * @return the RustFS fixture
+   */
+  public RustFSContainer getRustFSContainer() {
+    return rustFSContainer;
   }
 
   public HiveContainer getHiveContainerWithS3() {

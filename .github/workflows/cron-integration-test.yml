@@ -1,110 +1,302 @@
 name: Cron Integration Test
 
-# Controls when the workflow will run
+# Orchestrates Apache Gravitino integration tests. Nightly schedule stays on
+# apache/gravitino. Manual / workflow_call runs can select suites (used later
+# by gravitino-test release-test).
+#
+# Phase-1 suites (gvfs-fuse, web-ui, frontend, contrib-catalog are excluded):
+#   backend, spark, flink, maintenance, python, trino, access-control,
+#   iceberg-rest-trino, mcp, idp, trino-multi-version, lance, multi-instance
+
+run-name: OSS IT (${{ inputs.suites || 'all' }}) caller=${{ inputs.caller_run_id || 'manual' }}
+
 on:
-  schedule: # Runs by default on main branch
-    - cron: '0 19 * * *' # Runs every day at 19:00 PM UTC, equal to 03:00 AM the next day in GMT+8 time zone
+  schedule:
+    - cron: '0 19 * * *' # 19:00 UTC; 03:00 GMT+8 next day
+  workflow_dispatch:
+    inputs:
+      suites:
+        description: 'Comma-separated suites, or all'
+        required: false
+        type: string
+        default: 'all'
+      java-version:
+        description: 'JDK version'
+        required: false
+        type: string
+        default: '17'
+      caller_run_id:
+        description: 'Optional caller GitHub run id'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      suites:
+        required: false
+        type: string
+        default: 'all'
+      java-version:
+        required: false
+        type: string
+        default: '17'
+      caller_run_id:
+        required: false
+        type: string
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ contains(github.ref, 'main') }}
+  group: cron-integration-test-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  changes:
-    if: github.repository == 'apache/gravitino'
+  select-suites:
+    name: Select suites
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Disable Git automatic maintenance
-        run: git config --local maintenance.auto false
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
-        id: filter
-        with:
-          filters: |
-            source_changes:
-              - .github/**
-              - api/**
-              - bin/**
-              - catalogs/**
-              - clients/**
-              - common/**
-              - conf/**
-              - core/**
-              - dev/**
-              - gradle/**
-              - iceberg/**
-              - integration-test/**
-              - meta/**
-              - server/**
-              - server-common/**
-              - spark-connector/**
-              - trino-connector/**
-              - web/**
-              - docs/open-api/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - settings.gradle.kts
     outputs:
-      source_changes: ${{ steps.filter.outputs.source_changes }}
-
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
-    needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      matrix:
-        architecture: [linux/amd64]
-        java-version: [ 17 ]
-        test-mode: [ embedded, deploy ]
-    env:
-      DOCKER_RUN_NAME: hive-amd64
-      PLATFORM: ${{ matrix.architecture }}
+      backend: ${{ steps.parse.outputs.backend }}
+      spark: ${{ steps.parse.outputs.spark }}
+      flink: ${{ steps.parse.outputs.flink }}
+      maintenance: ${{ steps.parse.outputs.maintenance }}
+      python: ${{ steps.parse.outputs.python }}
+      trino: ${{ steps.parse.outputs.trino }}
+      access-control: ${{ steps.parse.outputs.access-control }}
+      iceberg-rest-trino: ${{ steps.parse.outputs.iceberg-rest-trino }}
+      mcp: ${{ steps.parse.outputs.mcp }}
+      idp: ${{ steps.parse.outputs.idp }}
+      trino-multi-version: ${{ steps.parse.outputs.trino-multi-version }}
+      lance: ${{ steps.parse.outputs.lance }}
+      multi-instance: ${{ steps.parse.outputs.multi-instance }}
+      java-version: ${{ steps.parse.outputs.java-version }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-java-toolchains
-        with:
-          java-version: ${{ matrix.java-version }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-
-      - name: Package Gravitino
+      - name: Parse suite selection
+        id: parse
+        env:
+          SUITES: ${{ inputs.suites || 'all' }}
+          JAVA_VERSION: ${{ inputs.java-version || '17' }}
+          CALLER_RUN_ID: ${{ inputs.caller_run_id || 'manual' }}
         run: |
-          ./gradlew compileDistribution -PskipWeb=true -x test
+          python3 << 'PY'
+          import os
 
-      - name: Free up disk space
+          known = [
+              "backend",
+              "spark",
+              "flink",
+              "maintenance",
+              "python",
+              "trino",
+              "access-control",
+              "iceberg-rest-trino",
+              "mcp",
+              "idp",
+              "trino-multi-version",
+              "lance",
+              "multi-instance",
+          ]
+          raw = os.environ["SUITES"].strip().lower()
+          if raw in ("all", ""):
+              selected = set(known)
+          else:
+              selected = {item.strip() for item in raw.split(",") if item.strip()}
+              unknown = selected - set(known)
+              if unknown:
+                  raise SystemExit(f"Unknown suites: {sorted(unknown)}. Known: {known}")
+
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8") as handle:
+              for name in known:
+                  value = "true" if name in selected else "false"
+                  handle.write(f"{name}={value}\n")
+                  print(f"{name}={value}")
+              handle.write(f"java-version={os.environ['JAVA_VERSION']}\n")
+          print(f"caller_run_id={os.environ['CALLER_RUN_ID']}")
+          PY
+
+  backend:
+    name: backend
+    needs: select-suites
+    if: needs.select-suites.outputs.backend == 'true'
+    uses: ./.github/workflows/backend-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+      backend: mysql
+      test-mode: deploy
+
+  spark:
+    name: spark
+    needs: select-suites
+    if: needs.select-suites.outputs.spark == 'true'
+    uses: ./.github/workflows/spark-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+      scala-version: '2.12'
+      test-mode: deploy
+
+  flink:
+    name: flink
+    needs: select-suites
+    if: needs.select-suites.outputs.flink == 'true'
+    uses: ./.github/workflows/flink-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  maintenance:
+    name: maintenance
+    needs: select-suites
+    if: needs.select-suites.outputs.maintenance == 'true'
+    uses: ./.github/workflows/maintenance-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  python:
+    name: python
+    needs: select-suites
+    if: needs.select-suites.outputs.python == 'true'
+    uses: ./.github/workflows/python-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  trino:
+    name: trino
+    needs: select-suites
+    if: needs.select-suites.outputs.trino == 'true'
+    uses: ./.github/workflows/trino-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  access-control:
+    name: access-control
+    needs: select-suites
+    if: needs.select-suites.outputs.access-control == 'true'
+    uses: ./.github/workflows/access-control-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  iceberg-rest-trino:
+    name: iceberg-rest-trino
+    needs: select-suites
+    if: needs.select-suites.outputs.iceberg-rest-trino == 'true'
+    uses: ./.github/workflows/iceberg-rest-trino-integration-test-action.yml
+    with:
+      architecture: linux/amd64
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  mcp:
+    name: mcp
+    needs: select-suites
+    if: needs.select-suites.outputs.mcp == 'true'
+    uses: ./.github/workflows/mcp-integration-test-action.yml
+    with:
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  idp:
+    name: idp
+    needs: select-suites
+    if: needs.select-suites.outputs.idp == 'true'
+    uses: ./.github/workflows/idp-basic-test-action.yml
+    with:
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  trino-multi-version:
+    name: trino-multi-version
+    needs: select-suites
+    if: needs.select-suites.outputs.trino-multi-version == 'true'
+    uses: ./.github/workflows/trino-multi-version-test-action.yml
+
+  lance:
+    name: lance
+    needs: select-suites
+    if: needs.select-suites.outputs.lance == 'true'
+    uses: ./.github/workflows/lance-compatibility-matrix-test-action.yml
+
+  multi-instance:
+    name: multi-instance
+    needs: select-suites
+    if: needs.select-suites.outputs.multi-instance == 'true'
+    uses: ./.github/workflows/multi-instance-consistency-test-action.yml
+
+  summary:
+    name: Integration test summary
+    needs:
+      - select-suites
+      - backend
+      - spark
+      - flink
+      - maintenance
+      - python
+      - trino
+      - access-control
+      - iceberg-rest-trino
+      - mcp
+      - idp
+      - trino-multi-version
+      - lance
+      - multi-instance
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write summary
+        env:
+          BACKEND: ${{ needs.backend.result }}
+          SPARK: ${{ needs.spark.result }}
+          FLINK: ${{ needs.flink.result }}
+          MAINTENANCE: ${{ needs.maintenance.result }}
+          PYTHON: ${{ needs.python.result }}
+          TRINO: ${{ needs.trino.result }}
+          ACCESS_CONTROL: ${{ needs.access-control.result }}
+          ICEBERG_REST_TRINO: ${{ needs.iceberg-rest-trino.result }}
+          MCP: ${{ needs.mcp.result }}
+          IDP: ${{ needs.idp.result }}
+          TRINO_MULTI_VERSION: ${{ needs.trino-multi-version.result }}
+          LANCE: ${{ needs.lance.result }}
+          MULTI_INSTANCE: ${{ needs.multi-instance.result }}
         run: |
-          dev/ci/util_free_space.sh
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## OSS Integration Test Summary
 
-      - name: Integration Test
-        id: integrationTest
-        run: |
-          # iceberg-rest-trino-it runs in its own dedicated workflow (Java 24 / Trino, deploy
-          # only); exclude it here so it is not run redundantly.
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PskipDockerTests=false -PskipWeb=true \
-            -x :iceberg:iceberg-rest-trino-it:test
+          | | |
+          |---|---|
+          | **Ref** | \`${{ github.ref_name }} (${{ github.sha }})\` |
+          | **Suites** | \`${{ inputs.suites || 'all' }}\` |
+          | **Java** | \`${{ needs.select-suites.outputs.java-version }}\` |
+          | **Caller run** | \`${{ inputs.caller_run_id || 'manual' }}\` |
 
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v7
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
-        with:
-          name: integrate test reports
-          path: |
-            build/reports
-            iceberg/iceberg-rest-server/build/*.log
-            integration-test/build/*.log
-            integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log
-            distribution/package/logs/*.out
-            distribution/package/logs/*.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
-            distribution/**/*.log
-            spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
-            spark-connector/v4.0/spark/build/spark-4.0-integration-test.log
-            flink-connector/build/flink-connector-integration-test.log
-            flink-connector/build/*.tar
+          | Suite | Result |
+          |-------|--------|
+          | backend | ${BACKEND} |
+          | spark | ${SPARK} |
+          | flink | ${FLINK} |
+          | maintenance | ${MAINTENANCE} |
+          | python | ${PYTHON} |
+          | trino | ${TRINO} |
+          | access-control | ${ACCESS_CONTROL} |
+          | iceberg-rest-trino | ${ICEBERG_REST_TRINO} |
+          | mcp | ${MCP} |
+          | idp | ${IDP} |
+          | trino-multi-version | ${TRINO_MULTI_VERSION} |
+          | lance | ${LANCE} |
+          | multi-instance | ${MULTI_INSTANCE} |
+          EOF
+
+          failed=0
+          if [[ "${{ needs.select-suites.result }}" != "success" ]]; then
+            failed=1
+          fi
+          for result in "$BACKEND" "$SPARK" "$FLINK" "$MAINTENANCE" "$PYTHON" "$TRINO" \
+            "$ACCESS_CONTROL" "$ICEBERG_REST_TRINO" "$MCP" "$IDP" \
+            "$TRINO_MULTI_VERSION" "$LANCE" "$MULTI_INSTANCE"
+          do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
+              failed=1
+            fi
+          done
+          exit "$failed"
