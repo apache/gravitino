@@ -58,4 +58,43 @@ public class TestIndexes {
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> index.properties().put("k2", "v2"));
   }
+
+  @Test
+  public void testNullFieldNameRowIsTolerated() {
+    // A null row must not blow up the defensive copy in either the constructor or fieldNames().
+    String[][] fieldNames = {{"col1"}, null};
+
+    Index index = Indexes.of(Index.IndexType.PRIMARY_KEY, "idx", fieldNames, ImmutableMap.of());
+
+    String[][] returned = index.fieldNames();
+    Assertions.assertArrayEquals(new String[] {"col1"}, returned[0]);
+    Assertions.assertNull(returned[1]);
+
+    // equals/hashCode must stay null-safe across the null row.
+    Index same =
+        Indexes.of(
+            Index.IndexType.PRIMARY_KEY, "idx", new String[][] {{"col1"}, null}, ImmutableMap.of());
+    Assertions.assertEquals(index, same);
+    Assertions.assertEquals(index.hashCode(), same.hashCode());
+  }
+
+  @Test
+  public void testNullPropertyValueIsTolerated() {
+    // Storing the map by reference used to tolerate null values; the defensive copy must too, to
+    // match the sibling TableChange.AddIndex contract.
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key", null);
+
+    Index index =
+        Indexes.of(Index.IndexType.PRIMARY_KEY, "idx", new String[][] {{"col1"}}, properties);
+
+    Assertions.assertTrue(index.properties().containsKey("key"));
+    Assertions.assertNull(index.properties().get("key"));
+
+    // Still an immutable snapshot: neither the returned map nor later caller mutations leak.
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> index.properties().put("k2", "v2"));
+    properties.put("added", "later");
+    Assertions.assertFalse(index.properties().containsKey("added"));
+  }
 }
