@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,23 +136,12 @@ public class TrinoContainer extends BaseContainer {
   }
 
   public boolean initTrinoJdbcConnection() {
-    final String dbUrl = String.format("jdbc:trino://127.0.0.1:%d", getMappedPort(coordinatorPort));
-    Properties properties = new Properties();
-    properties.setProperty("user", "admin");
-    if (tlsEnabled) {
-      properties.setProperty("SSL", "true");
-      properties.setProperty("SSLVerification", "FULL");
-      properties.setProperty("SSLTrustStorePath", truststorePath);
-      properties.setProperty("SSLTrustStorePassword", truststorePassword);
-      properties.setProperty("SSLTrustStoreType", truststoreType);
-    }
-
     long now = System.currentTimeMillis();
     boolean result = false;
 
     while (!result && System.currentTimeMillis() - now <= 20000) {
       try {
-        trinoJdbcConnection = DriverManager.getConnection(dbUrl, properties);
+        trinoJdbcConnection = openJdbcConnection("admin", Map.of());
         result = true;
       } catch (SQLException e) {
         LOG.error(e.getMessage(), e);
@@ -196,6 +186,37 @@ public class TrinoContainer extends BaseContainer {
     }
 
     return true;
+  }
+
+  /**
+   * Opens a new JDBC connection to the coordinator as the given user, applying the container's TLS
+   * settings when enabled.
+   *
+   * @param user the Trino session user
+   * @param extraCredentials extra credentials to attach to the session, e.g. a forwarded token
+   * @return a new connection; the caller closes it
+   * @throws SQLException if the connection cannot be established
+   */
+  public Connection openJdbcConnection(String user, Map<String, String> extraCredentials)
+      throws SQLException {
+    String dbUrl = String.format("jdbc:trino://127.0.0.1:%d", getMappedPort(coordinatorPort));
+    Properties properties = new Properties();
+    properties.setProperty("user", user);
+    if (!extraCredentials.isEmpty()) {
+      properties.setProperty(
+          "extraCredentials",
+          extraCredentials.entrySet().stream()
+              .map(e -> e.getKey() + ":" + e.getValue())
+              .collect(Collectors.joining(",")));
+    }
+    if (tlsEnabled) {
+      properties.setProperty("SSL", "true");
+      properties.setProperty("SSLVerification", "FULL");
+      properties.setProperty("SSLTrustStorePath", truststorePath);
+      properties.setProperty("SSLTrustStorePassword", truststorePassword);
+      properties.setProperty("SSLTrustStoreType", truststoreType);
+    }
+    return DriverManager.getConnection(dbUrl, properties);
   }
 
   public ArrayList<ArrayList<String>> executeQuerySQL(String sql) {
