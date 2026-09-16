@@ -178,8 +178,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the view node, not the schema, so views in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        schemaIdent,
+        ident,
         LockType.WRITE,
         () ->
             internalCreateView(

@@ -208,8 +208,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the table node, not the schema, so tables in the same schema can be created
+    // concurrently. The connector call and the entity-store write otherwise run under one
+    // schema-wide lock, which serialized all creates in a schema. Ancestors are still read-locked,
+    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop/import
+    // (schema WRITE); a same-name create, load or alter contends on the table node.
+    // Trade-off: listTables may briefly observe a table whose creation has not committed yet.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
+        ident,
         LockType.WRITE,
         () ->
             internalCreateTable(
