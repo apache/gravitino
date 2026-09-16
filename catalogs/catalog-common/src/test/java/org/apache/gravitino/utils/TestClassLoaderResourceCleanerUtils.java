@@ -34,6 +34,7 @@ import java.security.Security;
 import java.util.IdentityHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Test;
 
@@ -336,44 +337,66 @@ class TestClassLoaderResourceCleanerUtils {
     Thread hookThread = new Thread(() -> {}, "cleaner-monitor-test-hook");
     hookThread.setContextClassLoader(targetLoader);
     Runtime.getRuntime().addShutdownHook(hookThread);
+
+    CountDownLatch clearCompleted = new CountDownLatch(1);
+    AtomicReference<Throwable> clearFailure = new AtomicReference<>();
+    Thread clearer =
+        new Thread(
+            () -> {
+              try {
+                ClassLoaderResourceCleanerUtils.clearShutdownHooks(targetLoader);
+              } catch (Throwable t) {
+                clearFailure.set(t);
+              } finally {
+                clearCompleted.countDown();
+              }
+            },
+            "cleaner-monitor-clearer");
+
     try {
-      CountDownLatch monitorHeld = new CountDownLatch(1);
-      Thread monitorHolder =
-          new Thread(
-              () -> {
-                synchronized (shutdownHooksClass) {
-                  monitorHeld.countDown();
-                  try {
-                    Thread.sleep(600);
-                  } catch (InterruptedException ignored) {
-                  }
-                }
-              },
-              "cleaner-monitor-holder");
-      monitorHolder.start();
-      assertTrue(monitorHeld.await(5, TimeUnit.SECONDS));
+      // Hold the exact monitor clearShutdownHooks must acquire, then observe that the clear
+      // cannot make progress until this thread releases it. This is gated by the monitor, not
+      // by a sleep threshold, so it is deterministic under any CI load.
+      synchronized (shutdownHooksClass) {
+        clearer.start();
 
-      long start = System.nanoTime();
-      ClassLoaderResourceCleanerUtils.clearShutdownHooks(targetLoader);
-      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-      monitorHolder.join();
+        // With the monitor held, clearShutdownHooks must park in BLOCKED trying to enter its own
+        // synchronized(ApplicationShutdownHooks) block. If the read-modify sequence were not
+        // guarded by the monitor, the clearer would run to completion right here instead.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (clearer.getState() != Thread.State.BLOCKED
+            && clearCompleted.getCount() > 0
+            && System.nanoTime() < deadline) {
+          Thread.sleep(5);
+        }
 
-      // Before the fix, the hooks map was mutated without the ApplicationShutdownHooks monitor,
-      // so this completed immediately even while another thread held the monitor.
-      assertTrue(
-          elapsedMs >= 250,
-          "clearShutdownHooks must block on the ApplicationShutdownHooks monitor, completed in "
-              + elapsedMs
-              + "ms");
+        assertEquals(
+            1,
+            clearCompleted.getCount(),
+            "clearShutdownHooks completed while another thread held the ApplicationShutdownHooks"
+                + " monitor");
+        assertEquals(
+            Thread.State.BLOCKED,
+            clearer.getState(),
+            "clearShutdownHooks must block on the ApplicationShutdownHooks monitor");
+      }
+
+      // Releasing the monitor unblocks the clearer, which then removes the target hook.
+      assertTrue(clearCompleted.await(10, TimeUnit.SECONDS));
+      if (clearFailure.get() != null) {
+        throw new AssertionError("clearShutdownHooks threw", clearFailure.get());
+      }
 
       IdentityHashMap<Thread, Thread> hooks =
           (IdentityHashMap<Thread, Thread>)
               FieldUtils.readStaticField(shutdownHooksClass, "hooks", true);
       assertFalse(hooks.containsKey(hookThread));
     } finally {
+      clearer.join(TimeUnit.SECONDS.toMillis(10));
       try {
         Runtime.getRuntime().removeShutdownHook(hookThread);
       } catch (Exception ignored) {
+        // Already removed by the clear, or shutdown is in progress.
       }
     }
   }

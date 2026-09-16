@@ -301,18 +301,28 @@ public class ClassLoaderResourceCleanerUtils {
    * <p>All shutdown hooks are run with the system class loader, so we need to manually clear the
    * shutdown hooks registered by the target class loader.
    *
-   * <p>The map is JVM-global and {@code ApplicationShutdownHooks.add/remove} synchronize on the
-   * {@code ApplicationShutdownHooks} class monitor, so the mutation must hold that monitor too.
+   * <p>The map is JVM-global and {@code ApplicationShutdownHooks.add/remove/runHooks} synchronize
+   * on the {@code ApplicationShutdownHooks} class monitor, so reading the field, null-checking it,
+   * and mutating the map must all hold that monitor. {@code runHooks} nulls the field under the
+   * monitor once shutdown starts, in which case there is nothing left for us to clear.
    *
    * @param targetClassLoader the classloader where the shutdown hooks are registered.
    */
   @VisibleForTesting
   static void clearShutdownHooks(ClassLoader targetClassLoader) throws Exception {
     Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
-    IdentityHashMap<Thread, Thread> hooks =
-        (IdentityHashMap<Thread, Thread>) FieldUtils.readStaticField(shutdownHooks, "hooks", true);
 
+    // Read the field, null-check it, and mutate the map all under the same monitor the JDK's
+    // add/remove/runHooks hold. During shutdown runHooks nulls the field while holding this
+    // monitor, so reading it outside the lock could see a stale map or throw an NPE.
     synchronized (shutdownHooks) {
+      IdentityHashMap<Thread, Thread> hooks =
+          (IdentityHashMap<Thread, Thread>)
+              FieldUtils.readStaticField(shutdownHooks, "hooks", true);
+      if (hooks == null) {
+        // Shutdown is already in progress; the JDK owns the hooks now and will run them.
+        return;
+      }
       hooks
           .entrySet()
           .removeIf(
