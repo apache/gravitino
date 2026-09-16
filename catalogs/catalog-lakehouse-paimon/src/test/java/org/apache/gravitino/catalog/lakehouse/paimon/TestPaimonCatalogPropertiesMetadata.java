@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -58,5 +59,15 @@ public class TestPaimonCatalogPropertiesMetadata {
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_TOKEN_PROVIDER));
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_TOKEN_PATH));
     assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER));
+    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ENDPOINT));
+    assertFalse(metadata.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+  }
+
+  @Test
+  void testCredentialAndAzureConfigPropertiesAreDeclared() {
+    assertTrue(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertTrue(metadata.containsProperty(S3Properties.GRAVITINO_S3_ROLE_ARN));
+    assertTrue(metadata.containsProperty(AzureProperties.GRAVITINO_AZURE_TENANT_ID));
   }
 }

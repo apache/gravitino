@@ -48,6 +48,46 @@ public class COSPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_REGION,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_REGION,
+                  "Tencent Cloud COS region",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ENDPOINT,
+                  "Tencent Cloud COS endpoint",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ROLE_ARN,
+                  "Tencent Cloud CAM role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+                  "Optional external ID for cross-account assume-role",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_APP_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_APP_ID,
+                  "Tencent Cloud APPID that owns the COS buckets",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   private COSPropertiesMetadata() {}

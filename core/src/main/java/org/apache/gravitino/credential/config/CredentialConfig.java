@@ -35,6 +35,8 @@ public class CredentialConfig extends Config {
   private static final long DEFAULT_CREDENTIAL_CACHE_MAX_SIZE = 10_000L;
   private static final double DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO = 0.15d;
 
+  private static final int DEFAULT_TOKEN_EXPIRE_IN_SECS = 3600;
+
   public static final Map<String, PropertyEntry<?>> CREDENTIAL_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
@@ -65,6 +67,46 @@ public class CredentialConfig extends Config {
                   false /* required */,
                   false /* immutable */,
                   DEFAULT_CREDENTIAL_CACHE_MAX_SIZE /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS,
+                  "S3 STS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS,
+                  "OSS security token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+                  "COS STS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
+                  "ADLS SAS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
                   false /* hidden */,
                   false /* reserved */))
           .build();

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.cloud.storage;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
 import com.google.common.collect.ImmutableMap;
@@ -46,6 +47,64 @@ public class S3PropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_ENDPOINT,
+                  "Alternative S3 service endpoint",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_REGION,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_REGION,
+                  "S3 service region",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_ROLE_ARN,
+                  "S3 IAM role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_EXTERNAL_ID,
+                  "S3 external ID for cross-account AssumeRole",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_STS_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_STS_ENDPOINT,
+                  "Alternative STS endpoint for S3-compatible storage",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS,
+              booleanPropertyEntry(
+                  S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS,
+                  "Whether to use path-style S3 access",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              S3Properties.GRAVITINO_S3_CREDS_PROVIDER,
+              stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_CREDS_PROVIDER,
+                  "S3 credentials provider class name",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   private S3PropertiesMetadata() {}
