@@ -17,9 +17,11 @@
 # under the License.
 #
 
-# A missing class and a provider that fails to instantiate exercise the skip path; the fake
-# below must still be registered.
+# A missing class exercises the ServiceConfigurationError skip path, a provider that fails to link
+# the LinkageError skip path and one that throws from createAdapter the RuntimeException skip
+# path; the fake below must still be registered.
 org.apache.gravitino.trino.connector.catalog.MissingCatalogConnectorAdapterProvider
 org.apache.gravitino.trino.connector.catalog.BrokenCatalogConnectorAdapterProvider
+org.apache.gravitino.trino.connector.catalog.FailingCatalogConnectorAdapterProvider
 org.apache.gravitino.trino.connector.catalog.FakeCatalogConnectorAdapterProvider
 org.apache.gravitino.trino.connector.catalog.DuplicateCatalogConnectorAdapterProvider

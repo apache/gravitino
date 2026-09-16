@@ -20,18 +20,18 @@ package org.apache.gravitino.trino.connector.catalog;
 
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 
-/** Fails to link once its methods run, like a provider built against another Trino version. */
-public class BrokenCatalogConnectorAdapterProvider implements CatalogConnectorAdapterProvider {
+/** Throws while creating its adapter, like a provider that rejects the connector configuration. */
+public class FailingCatalogConnectorAdapterProvider implements CatalogConnectorAdapterProvider {
 
-  public static final String PROVIDER = "jdbc-broken";
+  public static final String PROVIDER = "jdbc-failing";
 
   @Override
   public String provider() {
-    throw new NoClassDefFoundError("io/trino/spi/Missing");
+    return PROVIDER;
   }
 
   @Override
   public CatalogConnectorAdapter createAdapter(GravitinoConfig config) {
-    return null;
+    throw new IllegalStateException("adapter creation failed");
   }
 }

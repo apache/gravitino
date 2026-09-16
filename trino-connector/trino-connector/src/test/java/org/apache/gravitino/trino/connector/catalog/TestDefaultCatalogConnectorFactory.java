@@ -51,7 +51,14 @@ public class TestDefaultCatalogConnectorFactory {
   @Test
   void testUnloadableAdapterProviderIsSkipped() {
     DefaultCatalogConnectorFactory factory = new DefaultCatalogConnectorFactory(config());
-    Assertions.assertFalse(factory.getSupportedCatalogProviders().contains("jdbc-broken"));
+    Assertions.assertFalse(
+        factory
+            .getSupportedCatalogProviders()
+            .contains(BrokenCatalogConnectorAdapterProvider.PROVIDER));
+    Assertions.assertFalse(
+        factory
+            .getSupportedCatalogProviders()
+            .contains(FailingCatalogConnectorAdapterProvider.PROVIDER));
   }
 
   private static GravitinoConfig config() {

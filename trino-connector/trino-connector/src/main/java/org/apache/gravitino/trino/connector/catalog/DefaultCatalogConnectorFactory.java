@@ -114,8 +114,11 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         catalogBuilders.put(
             providerName, new CatalogConnectorContext.Builder(provider.createAdapter(config)));
         LOG.info("Registered catalog connector adapter for %s", providerName);
-      } catch (ServiceConfigurationError e) {
-        // A provider jar built for another Trino version may fail to link; keep the rest.
+      } catch (ServiceConfigurationError | LinkageError | RuntimeException e) {
+        // ServiceLoader reports a missing class or a failing constructor as
+        // ServiceConfigurationError; a provider built against another Trino version fails with a
+        // LinkageError once its methods run, and a misconfigured one may throw from provider() or
+        // createAdapter(). Skip that entry and keep the rest.
         LOG.warn(e, "Skip a catalog connector adapter provider that cannot be loaded.");
       }
     }
