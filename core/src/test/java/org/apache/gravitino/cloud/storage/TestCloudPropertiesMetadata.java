@@ -65,6 +65,10 @@ public class TestCloudPropertiesMetadata {
     var metadata = COSPropertiesMetadata.PROPERTY_ENTRIES;
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_REGION));
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_ENDPOINT));
+    assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_ROLE_ARN));
+    assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_EXTERNAL_ID));
+    assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_APP_ID));
+    assertFalse(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID).isHidden());
     assertTrue(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET).isHidden());
   }
 
@@ -74,6 +78,7 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(CredentialConstants.CREDENTIAL_PROVIDERS));
     assertTrue(metadata.containsKey(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
     assertTrue(metadata.containsKey(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS));
+    assertTrue(metadata.containsKey(CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS));
     assertFalse(metadata.get(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS).isHidden());
   }
 

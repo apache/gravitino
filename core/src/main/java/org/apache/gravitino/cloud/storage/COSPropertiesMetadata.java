@@ -64,6 +64,30 @@ public class COSPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ROLE_ARN,
+                  "Tencent Cloud COS role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+                  "Tencent Cloud COS external ID for cross-account AssumeRole",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_APP_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_APP_ID,
+                  "Tencent Cloud COS application ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   private COSPropertiesMetadata() {}

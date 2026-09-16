@@ -97,6 +97,16 @@ public class CredentialConfig extends Config {
                   null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+                  "COS STS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .build();
 
   public static final ConfigEntry<List<String>> CREDENTIAL_PROVIDERS =

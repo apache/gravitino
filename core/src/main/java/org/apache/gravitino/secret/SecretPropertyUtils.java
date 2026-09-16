@@ -99,6 +99,21 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Builds a map of plaintext secret properties for {@code getSecrets} without properties metadata.
+   *
+   * <p>Equivalent to {@link #buildSecrets(SecretManager, Map, PropertiesMetadata)} with {@code
+   * metadata == null}, which keeps historical fuzzy recovery for all sensitive-named keys.
+   *
+   * @param secretManager secret manager used to resolve URNs
+   * @param rawProperties raw entity properties (may be null)
+   * @return a new secret plaintext property map; never null
+   */
+  public static Map<String, String> buildSecrets(
+      SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
+    return buildSecrets(secretManager, rawProperties, null);
+  }
+
+  /**
    * Builds a map of plaintext secret properties for {@code getSecrets}.
    *
    * <p>Starting from raw entity properties:
