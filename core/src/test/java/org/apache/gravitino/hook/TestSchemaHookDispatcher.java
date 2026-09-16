@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -207,6 +208,28 @@ public class TestSchemaHookDispatcher {
         Arrays.asList("A:B", "A:B:C"),
         ownedNames,
         "Pre-existing ancestor 'A' must keep its owner; only newly-created schemas are claimed");
+  }
+
+  @Test
+  public void testDropSchemaKeepsPrivilegesWhenExternalDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      any(NameIdentifier.class), any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hookDispatcher.dropSchema(ident, false));
+
+      // Nothing was dropped, so the schema that is still registered keeps its privileges.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
   }
 
   @Test
