@@ -28,8 +28,15 @@ import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.WAITING_QUE
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -40,6 +47,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -83,6 +91,10 @@ public class LocalJobExecutor implements JobExecutor {
   private volatile boolean finished = false;
 
   private Map<String, Process> runningProcesses;
+
+  // The working directory of each job, used to locate its captured stdout/stderr files. Cleaned
+  // up together with jobStatus so the two maps stay in sync.
+  private Map<String, File> jobWorkingDirs;
 
   @Override
   public void initialize(Map<String, String> configs) {
@@ -165,6 +177,7 @@ public class LocalJobExecutor implements JobExecutor {
         TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
+    this.jobWorkingDirs = Maps.newConcurrentMap();
 
     // Spark is optional for the local job executor, so a missing Spark installation must not fail
     // the server startup. Warn early instead; Spark jobs will be rejected at submission.
@@ -195,6 +208,9 @@ public class LocalJobExecutor implements JobExecutor {
       }
 
       jobStatus.put(newJobId, Pair.of(JobHandle.Status.QUEUED, UNEXPIRED_TIME_IN_MS));
+      // Retain the working directory so output.log/error.log can be located later without
+      // needing to keep the running Process object around after the job finishes.
+      jobWorkingDirs.put(newJobId, LocalProcessBuilder.resolveWorkingDirectory(jobTemplate));
     }
 
     return newJobId;
@@ -265,6 +281,16 @@ public class LocalJobExecutor implements JobExecutor {
   }
 
   @Override
+  public List<String> getJobStdout(String jobId, int maxLines, int maxBytes) {
+    return getJobOutput(jobId, LocalProcessBuilder.STDOUT_FILE_NAME, maxLines, maxBytes);
+  }
+
+  @Override
+  public List<String> getJobStderr(String jobId, int maxLines, int maxBytes) {
+    return getJobOutput(jobId, LocalProcessBuilder.STDERR_FILE_NAME, maxLines, maxBytes);
+  }
+
+  @Override
   public void close() throws IOException {
     // Mark the executor as finished to stop processing jobs
     this.finished = true;
@@ -291,6 +317,7 @@ public class LocalJobExecutor implements JobExecutor {
     // Stop the job status cleanup executor
     jobStatusCleanupExecutor.shutdownNow();
     jobStatus.clear();
+    jobWorkingDirs.clear();
   }
 
   public void runJob(Pair<String, JobTemplate> jobPair) {
@@ -377,9 +404,104 @@ public class LocalJobExecutor implements JobExecutor {
       jobStatus
           .entrySet()
           .removeIf(
-              entry ->
-                  entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
-                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs);
+              entry -> {
+                boolean expired =
+                    entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
+                        && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs;
+                if (expired) {
+                  jobWorkingDirs.remove(entry.getKey());
+                }
+                return expired;
+              });
     }
+  }
+
+  private List<String> getJobOutput(String jobId, String fileName, int maxLines, int maxBytes) {
+    File workingDir = getWorkingDir(jobId);
+    if (workingDir == null) {
+      return ImmutableList.of();
+    }
+    return readLastLines(new File(workingDir, fileName), maxLines, maxBytes);
+  }
+
+  @Nullable
+  private File getWorkingDir(String jobId) {
+    return jobWorkingDirs.get(jobId);
+  }
+
+  private List<String> readLastLines(File file, int maxLines, int maxBytes) {
+    if (!file.exists()) {
+      // The job hasn't started (or hasn't produced this stream) yet.
+      return ImmutableList.of();
+    }
+
+    long fileLength = file.length();
+    int windowSize = (int) Math.min(fileLength, maxBytes);
+    long startOffset = fileLength - windowSize;
+
+    // Read one extra leading byte (when available) so we can tell whether the window's first
+    // line is already complete - i.e. the file byte immediately before the window is itself a
+    // line terminator - rather than always assuming it's a partial line and discarding it.
+    long readOffset = Math.max(0, startOffset - 1);
+    byte[] probeWindow = new byte[(int) (fileLength - readOffset)];
+    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+      raf.seek(readOffset);
+      raf.readFully(probeWindow);
+    } catch (FileNotFoundException e) {
+      // The file existed at the check above but is gone now - most likely
+      // JobManager#cleanUpStagingDirs deleted the staging directory concurrently with this call.
+      // That's the same "output no longer available" situation the file-doesn't-exist check above
+      // handles, not a real I/O failure, so it must degrade to empty output the same way.
+      return ImmutableList.of();
+    } catch (IOException e) {
+      // Any other I/O failure while reading an existing file is unexpected and must not be
+      // silently reported as "no output" - that would be actively misleading for the debugging
+      // use case this method exists for.
+      throw new RuntimeException("Failed to read job output file: " + file, e);
+    }
+
+    boolean windowStartsAtLineBoundary = startOffset == 0 || probeWindow[0] == '\n';
+    int contentStart = startOffset == 0 ? 0 : 1;
+    // The window may start mid-character if the file byte at contentStart happens to be a UTF-8
+    // continuation byte - skip forward to the next character boundary so the decoded content
+    // never begins with a corrupted replacement character. A '\n' byte never appears inside a
+    // multi-byte UTF-8 character, so this can't skip past a real line boundary.
+    while (contentStart < probeWindow.length && (probeWindow[contentStart] & 0xC0) == 0x80) {
+      contentStart++;
+    }
+
+    String content =
+        new String(
+            probeWindow, contentStart, probeWindow.length - contentStart, StandardCharsets.UTF_8);
+    if (!windowStartsAtLineBoundary) {
+      // The window starts mid-file and the preceding byte isn't a line terminator, so its first
+      // line may be a partial line whose true beginning fell outside the window - drop up to and
+      // including the first newline, but only when something actually follows it. If the only
+      // newline in the window is its very last character, that newline terminates the single
+      // oversized line the window is entirely made of, rather than starting a subsequent one -
+      // dropping through it would discard the whole line instead of truncating it. Keep the
+      // content as-is in that case (and when no newline is found at all), since a truncated line
+      // is more useful for debugging than silently returning nothing.
+      int firstNewline = content.indexOf('\n');
+      if (firstNewline >= 0 && firstNewline < content.length() - 1) {
+        content = content.substring(firstNewline + 1);
+      }
+    }
+
+    if (content.isEmpty()) {
+      return ImmutableList.of();
+    }
+
+    // Recognize both LF and CRLF line endings, so output captured with Windows-style line
+    // endings doesn't leave a dangling '\r' on every returned line.
+    List<String> lines = Splitter.onPattern("\r\n|\n").splitToList(content);
+    if (content.endsWith("\n")) {
+      // A trailing separator produces a spurious empty trailing element - drop it so a
+      // completed line isn't followed by a phantom blank one.
+      lines = lines.subList(0, lines.size() - 1);
+    }
+
+    int fromIndex = Math.max(0, lines.size() - maxLines);
+    return ImmutableList.copyOf(lines.subList(fromIndex, lines.size()));
   }
 }
