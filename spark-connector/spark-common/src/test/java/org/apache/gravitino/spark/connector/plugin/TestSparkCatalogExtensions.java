@@ -48,6 +48,12 @@ public class TestSparkCatalogExtensions {
   }
 
   @Test
+  void testLinkageFailureIsSkipped() {
+    Assertions.assertNull(
+        SparkCatalogExtensions.catalogClassName(BrokenSparkCatalogExtension.PROVIDER));
+  }
+
+  @Test
   void testUnknownProviderIsNotServed() {
     Assertions.assertNull(SparkCatalogExtensions.catalogClassName("jdbc-unknown"));
   }

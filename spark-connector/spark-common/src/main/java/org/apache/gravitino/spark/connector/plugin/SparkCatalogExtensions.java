@@ -93,9 +93,11 @@ public class SparkCatalogExtensions {
               normalized,
               previous);
         }
-      } catch (ServiceConfigurationError e) {
+      } catch (ServiceConfigurationError | LinkageError e) {
         // ServiceLoader reports a missing provider class, a malformed META-INF entry or a failing
-        // constructor as ServiceConfigurationError; skip that entry and keep the rest.
+        // constructor as ServiceConfigurationError; an extension built against another Spark
+        // version fails with a LinkageError once its methods run. Skip that entry and keep the
+        // rest.
         LOG.error("Skip a Spark catalog extension that cannot be loaded.", e);
       }
     }
