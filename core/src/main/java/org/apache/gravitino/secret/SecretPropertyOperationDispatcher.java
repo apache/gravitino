@@ -122,8 +122,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
               Table table = wrapper.doWithTableOps(ops -> ops.loadTable(identifier));
-              Map<String, String> raw =
-                  table.properties() == null ? Map.of() : table.properties();
+              Map<String, String> raw = table.properties() == null ? Map.of() : table.properties();
               return SecretPropertyUtils.buildSecrets(
                   secretManager, raw, wrapper.catalog().tablePropertiesMetadata());
             },
@@ -136,8 +135,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
               Topic topic = wrapper.doWithTopicOps(ops -> ops.loadTopic(identifier));
-              Map<String, String> raw =
-                  topic.properties() == null ? Map.of() : topic.properties();
+              Map<String, String> raw = topic.properties() == null ? Map.of() : topic.properties();
               return SecretPropertyUtils.buildSecrets(
                   secretManager, raw, wrapper.catalog().topicPropertiesMetadata());
             },
@@ -152,7 +150,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
               View view = wrapper.doWithViewOps(ops -> ops.loadView(identifier));
               Map<String, String> raw = view.properties() == null ? Map.of() : view.properties();
               return SecretPropertyUtils.buildSecrets(
-                  secretManager, raw, wrapper.catalog().viewPropertiesMetadata());
+                  secretManager, raw, wrapper.catalog().tablePropertiesMetadata());
             },
             NoSuchCatalogException.class,
             NoSuchViewException.class);
@@ -163,8 +161,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
               Model model = wrapper.doWithModelOps(ops -> ops.getModel(identifier));
-              Map<String, String> raw =
-                  model.properties() == null ? Map.of() : model.properties();
+              Map<String, String> raw = model.properties() == null ? Map.of() : model.properties();
               return SecretPropertyUtils.buildSecrets(
                   secretManager, raw, wrapper.catalog().modelPropertiesMetadata());
             },
