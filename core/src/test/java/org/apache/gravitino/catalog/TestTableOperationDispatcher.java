@@ -64,6 +64,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -1337,6 +1338,73 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
   public static TableOperationDispatcher getTableOperationDispatcher() {
     return tableOperationDispatcher;
+  }
+
+  @Test
+  public void testCreateTableRunsConcurrentlyWithCreateOfAnotherTable() throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_create_lock_1");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    // Another in-flight create holds the WRITE lock on its own table node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(tableNs, "other_table"), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate, () -> createTable(NameIdentifier.of(tableNs, "table1")));
+    }
+  }
+
+  @Test
+  public void testCreateTableWaitsForCreateOfSameName() throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_create_lock_2");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(tableIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> createTable(tableIdent));
+  }
+
+  @Test
+  public void testCreateTableWaitsForSchemaWriteLock() throws Exception {
+    // Rename, drop and import of tables in the schema take the schema WRITE lock.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_create_lock_3");
+    NameIdentifier schemaIdent = NameIdentifier.of(tableNs.levels());
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter, () -> createTable(NameIdentifier.of(tableNs, "table1")));
+  }
+
+  @Test
+  public void testCreateTableWaitsForCatalogWriteLock() throws Exception {
+    // dropSchema and createSchema take the catalog WRITE lock.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_create_lock_4");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter, () -> createTable(NameIdentifier.of(tableNs, "table1")));
+  }
+
+  private static Table createTable(NameIdentifier ident) {
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    return tableOperationDispatcher.createTable(
+        ident, columns, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"), new Transform[0]);
   }
 
   public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
