@@ -57,7 +57,7 @@ public class TestExpressionUtil {
     partitionField = List.of("hour(f4)");
     transforms = ExpressionUtil.partitionFiledToExpression(partitionField);
     Assertions.assertEquals(1, transforms.length);
-    Assertions.assertEquals(transforms[0], Transforms.day("f4"));
+    Assertions.assertEquals(transforms[0], Transforms.hour("f4"));
 
     partitionField = List.of("bucket(f2,10)");
     transforms = ExpressionUtil.partitionFiledToExpression(partitionField);
