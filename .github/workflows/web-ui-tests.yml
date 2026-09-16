@@ -1,24 +1,42 @@
 name: Web UI Tests
 
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-    paths:
-      - 'web/web/**'
-      - '.github/workflows/web-ui-tests.yml'
-  pull_request:
-    branches: [ "main", "branch-*" ]
-    paths:
-      - 'web/web/**'
-      - '.github/workflows/web-ui-tests.yml'
+  workflow_call:
+
+concurrency:
+  group: fork-ci-web-ui-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/checkout-and-sync
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+        id: filter
+        with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
+          filters: |
+            source_changes:
+              - 'web/web/**'
+              - '.github/**'
+
   test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - uses: ./.github/actions/checkout-and-sync
     
     - name: Setup pnpm
       uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
