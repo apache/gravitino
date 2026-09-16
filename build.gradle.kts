@@ -614,8 +614,11 @@ subprojects {
 
   plugins.withId("com.github.johnrengelman.shadow") {
     tasks.withType<ShadowJar>().configureEach {
-      transform(LegalFilesTransformer(rootProject.file("LICENSE.bin"), "META-INF/LICENSE"))
-      transform(LegalFilesTransformer(rootProject.file("NOTICE.bin"), "META-INF/NOTICE"))
+      listOf("LICENSE", "NOTICE").forEach { name ->
+        // Source release archives omit the binary distribution's legal files.
+        val legalFile = rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
+        transform(LegalFilesTransformer(legalFile, "META-INF/$name"))
+      }
     }
   }
 

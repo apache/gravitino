@@ -49,7 +49,7 @@ class TestRuntimeJarLegalFiles {
             "Expected exactly one " + entryName);
         String projectContent =
             new String(
-                Files.readAllBytes(Paths.get(requiredProperty("legalFilesRoot"), name + ".bin")),
+                Files.readAllBytes(Paths.get(requiredProperty("projectLegalFile." + name))),
                 StandardCharsets.UTF_8);
         String mergedContent = readEntry(jar, entryName);
         assertTrue(

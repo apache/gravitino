@@ -69,13 +69,16 @@ tasks.jar {
 
 tasks.test {
   val shadowJar = tasks.named<ShadowJar>("shadowJar")
+  val legalFiles = listOf("LICENSE", "NOTICE").associateWith { name ->
+    rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
+  }
   dependsOn(shadowJar)
   inputs.file(shadowJar.flatMap { it.archiveFile })
-  inputs.files(rootProject.file("LICENSE.bin"), rootProject.file("NOTICE.bin"))
+  inputs.files(legalFiles.values)
   inputs.files(configurations.runtimeClasspath)
   doFirst {
     systemProperty("shadowJarPath", shadowJar.get().archiveFile.get().asFile.absolutePath)
-    systemProperty("legalFilesRoot", rootProject.projectDir.absolutePath)
+    legalFiles.forEach { (name, file) -> systemProperty("projectLegalFile.$name", file.absolutePath) }
     systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
   }
 }
