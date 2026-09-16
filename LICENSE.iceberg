@@ -238,7 +238,14 @@
    DataNucleus
    Apache Derby
    Dropwizard Hadoop Metrics
-   Error Pront Annotations
+   Dropwizard Metrics Annotation
+   Dropwizard Metrics Core
+   Dropwizard Metrics Healthchecks
+   Dropwizard Metrics JMX
+   Dropwizard Metrics JSON
+   Dropwizard Metrics JVM
+   Dropwizard Metrics Servlets
+   Error Prone Annotations
    AWS EventStream for Java
    Guava Failure Access
    Apache Gravitino
@@ -251,6 +258,8 @@
    Apache HTrace
    Google HTTP Client
    Google HTTP Client GSON
+   gRPC API
+   gRPC Context
    Apache HttpComponents Client
    Apache HttpClient
    Apache HttpCore
@@ -315,6 +324,7 @@
    Apache Avro
    Apache Yetus - Audience Annotations
    ASM
+   bigint
    Google auth Credentials
    Google auth HTTP
    Javolution
@@ -330,7 +340,10 @@
    MIT license
 
    Checker Framework
+   FastDoubleParser
+   fast_float
    Reactive Streams
+   Schubfach
    SLF4J
 
    This product bundles various third-party components also under the

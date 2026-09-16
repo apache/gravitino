@@ -219,23 +219,26 @@
    Jackson Parameter Names
    Jakarta Dependency Injection
    Airlift
-   Apache Log4j 1.x Compatibility API
-   Apache Log4j API
-   Apache Log4j Core
-   Apache Log4j Layout For Templated JSON Encoding
-   Apache Log4j SLF4J Binding
    Trino JDBC Driver
 
    This product bundles various third-party components also under the
    MIT license
    
    Checker Framework
+   FastDoubleParser
+   fast_float
    SLF4J API Module
 
    This product bundles various third-party components also under the
    BSD license
       
+   bigint
    JSR305
+
+   This product bundles various third-party components also under the
+   Boost Software License 1.0
+
+   fast_double_parser
 
    This product bundles various third-party components also placed in
    the public domain.

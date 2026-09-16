@@ -258,12 +258,21 @@
    MIT license
 
    Checker Framework
+   FastDoubleParser
+   fast_float
    SLF4J API Module
 
    This product bundles various third-party components also under the
    BSD license
 
+   ASM
+   bigint
    JSR305
+
+   This product bundles various third-party components also under the
+   Boost Software License 1.0
+
+   fast_double_parser
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0

@@ -201,7 +201,7 @@
    limitations under the License.
 
    The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE.bin for these.
+   different licenses, please see web/LICENSE and web-v2/LICENSE for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
@@ -230,6 +230,13 @@
    Jackson Xml Compatibility Extensions
    Caffeine
    Dropwizard Hadoop Metrics
+   Dropwizard Metrics Annotation
+   Dropwizard Metrics Core
+   Dropwizard Metrics Healthchecks
+   Dropwizard Metrics JMX
+   Dropwizard Metrics JSON
+   Dropwizard Metrics JVM
+   Dropwizard Metrics Servlets
    GSON
    Error Prone Annotations
    Failure Access
@@ -305,6 +312,8 @@
    Apache HTrace
    Google HTTP Client
    Google HTTP Client GSON
+   gRPC API
+   gRPC Context
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
@@ -415,6 +424,7 @@
    String Template 4
    JSch
    ASM
+   bigint
    Protobuf
    ParaNamer
    RE2/J
@@ -433,12 +443,20 @@
    SLF4J
    SLF4J-API
    Checker Framework
+   FastDoubleParser
+   fast_float
+   Schubfach
    Janino Common Compiler
    Protocol Buffers
    Treelayout
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
+
+   This product bundles various third-party components also under the
+   Boost Software License 1.0
+
+   fast_double_parser
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
