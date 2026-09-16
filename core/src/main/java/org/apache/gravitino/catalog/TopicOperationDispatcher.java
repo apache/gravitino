@@ -138,10 +138,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the topic node, not the schema, so topics in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> internalCreateTopic(ident, comment, dataLayout, properties));
+        ident, LockType.WRITE, () -> internalCreateTopic(ident, comment, dataLayout, properties));
   }
 
   /**

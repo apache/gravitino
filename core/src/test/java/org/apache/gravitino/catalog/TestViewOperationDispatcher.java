@@ -53,6 +53,7 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.ViewEntity;
@@ -698,5 +699,81 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
                 AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
             .build();
     entityStore.put(entity, true);
+  }
+
+  @Test
+  public void testCreateViewRunsConcurrentlyWithCreateViewOfAnotherView() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own view node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_view_lock_1", "other_view"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              createViewForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_view_lock_1", "view1")));
+    }
+  }
+
+  @Test
+  public void testCreateViewWaitsForCreateViewOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_view_lock_2", "view1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> createViewForLockTest(ident));
+  }
+
+  @Test
+  public void testCreateViewWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            createViewForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_view_lock_3", "view1")));
+  }
+
+  @Test
+  public void testCreateViewWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            createViewForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_view_lock_4", "view1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private static View createViewForLockTest(NameIdentifier ident) {
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    return viewOperationDispatcher.createView(
+        ident,
+        "comment",
+        new Column[0],
+        representations,
+        null,
+        null,
+        ImmutableMap.of("k1", "v1", "p1", "pv1"));
   }
 }
