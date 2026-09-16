@@ -97,26 +97,26 @@ exists only as the pile of grants someone remembered to issue.
 
 ### Not in this version
 
-| Excluded | Reason |
-|---|---|
-| `DENY` | A deny that a descendant tag cannot undo is a separate problem. Allow-only means every rule set has an answer and the order rules are applied in never matters. |
-| Users and groups as the matched condition | The condition schema can gain them later without changing the model. |
-| Row filtering and column masking | Distinct policy types; this design governs whole-object decisions. |
-| Cross-tag conditions | A rule matches one tag. Conditions spanning several tags await the `EXPRESSION` selector type in [policy-on-tag.md](policy-on-tag.md). |
-| Column-level decisions | A tag on a column does not affect decisions about its table. |
+| Excluded                                                      | Reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DENY`                                                        | A deny that a descendant tag cannot undo is a separate problem. Allow-only means every rule set has an answer and the order rules are applied in never matters.                                                                                                                                                                                                                                                                                                                     |
+| Users and groups as the matched condition                     | The condition schema can gain them later without changing the model.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Row filtering and column masking                              | Distinct policy types; this design governs whole-object decisions.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Cross-tag conditions                                          | A rule matches one tag. Conditions spanning several tags await the `EXPRESSION` selector type in [policy-on-tag.md](policy-on-tag.md).                                                                                                                                                                                                                                                                                                                                              |
+| Column-level decisions                                        | A tag on a column does not affect decisions about its table.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | A `scope` field in `content`, restricting a rule to a subtree | Not a security boundary: creating a policy already needs metalake-wide `CREATE_POLICY`, so whoever writes the rule chooses its reach anyway. It is also not checked when a tag is applied, so it limits where a rule takes effect rather than stopping a wrong tag. One tag meaning different things in different subtrees is already covered by tag assignment values with a value-sensitive selector. Can be added later, since an absent `scope` has always meant metalake-wide. |
-| Replacing RBAC | Baseline privileges, ownership and traversal are unchanged. See [Composition with RBAC](#composition-with-rbac). |
+| Replacing RBAC                                                | Baseline privileges, ownership and traversal are unchanged. See [Composition with RBAC](#composition-with-rbac).                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
 ## Alternatives considered
 
-| Option | Pros | Cons | Status |
-|---|---|---|---|
-| **A `system_access_control` policy type bound to a tag** | Reuses the entity, relation, selector and resolver; no new REST or client surface; one governance model to learn | The role condition lives in `content` JSON, so lookup by role needs a derived index rather than a foreign key | **Proposed** |
-| A dedicated `tag_access_policy` entity with action and role as columns | Foreign key on role; indexed lookup; cascade on role deletion falls out of the schema | New table across three dialects, new REST resource, new client and CLI surface, a second governance model alongside policies | Rejected |
-| Extend RBAC grants with a tag predicate | No new concepts | The grant table is object-identified; a predicate has no object, and every grant read path would change | Rejected |
-| Evaluate tags in an external engine (OPA and similar) | Arbitrary policy language | Moves the decision out of Gravitino, duplicates the tag hierarchy, and cannot use the existing expression path | Rejected |
+| Option                                                                 | Pros                                                                                                             | Cons                                                                                                                         | Status       |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **A `system_access_control` policy type bound to a tag**               | Reuses the entity, relation, selector and resolver; no new REST or client surface; one governance model to learn | The role condition lives in `content` JSON, so lookup by role needs a derived index rather than a foreign key                | **Proposed** |
+| A dedicated `tag_access_policy` entity with action and role as columns | Foreign key on role; indexed lookup; cascade on role deletion falls out of the schema                            | New table across three dialects, new REST resource, new client and CLI surface, a second governance model alongside policies | Rejected     |
+| Extend RBAC grants with a tag predicate                                | No new concepts                                                                                                  | The grant table is object-identified; a predicate has no object, and every grant read path would change                      | Rejected     |
+| Evaluate tags in an external engine (OPA and similar)                  | Arbitrary policy language                                                                                        | Moves the decision out of Gravitino, duplicates the tag hierarchy, and cannot use the existing expression path               | Rejected     |
 
 That one con means the server keeps the role reference consistent, rather than the database schema
 doing it. [Lifecycle](#lifecycle) covers how.
@@ -132,10 +132,10 @@ typed fields and a `validate()` that runs at write time. `IcebergDataCompactionC
 existing example. `system_access_control` follows the same pattern with a new
 `AccessControlContent`:
 
-| Field | Type | Meaning |
-|---|---|---|
-| `privileges` | list of `Privilege.Name` | The privileges the rule confers. Each must be a permitted name — see [Permitted privileges](#permitted-privileges). |
-| `applicable_roles` | list of role names | The **condition**. Satisfied when any listed role is among the caller's expanded roles. |
+| Field              | Type                     | Meaning                                                                                                             |
+| ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `privileges`       | list of `Privilege.Name` | The privileges the rule confers. Each must be a permitted name — see [Permitted privileges](#permitted-privileges). |
+| `applicable_roles` | list of role names       | The **condition**. Satisfied when any listed role is among the caller's expanded roles.                             |
 
 `validate()` rejects at creation rather than at evaluation:
 
@@ -283,11 +283,11 @@ poll of `owner_meta`.
 
 Tag state reaches none of that, and the transport differs by what changed:
 
-| Change | Reaches other nodes today |
-|---|---|
+| Change                                         | Reaches other nodes today                                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Tag or policy entity created, altered, dropped | Yes — `entity_change_log` carries `TAG` and `POLICY`, but `JcasbinChangeListener` discards both as virtual-namespace types |
-| Tag applied to or removed from an object | No — relation changes emit no change-log rows |
-| Policy bound to or unbound from a tag | No — same |
+| Tag applied to or removed from an object       | No — relation changes emit no change-log rows                                                                              |
+| Policy bound to or unbound from a tag          | No — same                                                                                                                  |
 
 The first needs the existing filter relaxed. The second and third need a transport that does not
 exist yet: relation changes emitted into `entity_change_log`, a poll of the relation tables, or a
@@ -327,11 +327,11 @@ filtering, where most candidates are objects the caller cannot see. The feature 
 On that branch, one check resolves the object's effective tags, then loads the policies bound to
 them:
 
-| Step | Cost today |
-|---|---|
+| Step                                | Cost today                                                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Resolve the object's effective tags | One relation query per level of the ancestor chain. Nothing caches the result — `RelationalEntityStore` caches entities, not relation queries. |
-| Load the policies bound to each tag | One `POLICY_METADATA_OBJECT_REL` query per distinct effective tag. |
-| Test `applicable_roles` | In memory, against roles the request has already loaded. |
+| Load the policies bound to each tag | One `POLICY_METADATA_OBJECT_REL` query per distinct effective tag.                                                                             |
+| Test `applicable_roles`             | In memory, against roles the request has already loaded.                                                                                       |
 
 The chain is not bounded by a constant. `getParentMetadataObjects` expands a hierarchical schema
 one level at a time, so a column under `catalog.a:b.table` walks five levels, and a deeper schema
@@ -426,11 +426,11 @@ between a tag rule that allows and an RBAC grant that denies; the proposal is th
 
 Four write paths can change who has access. Their current authority requirements:
 
-| Operation | Expression today | Scoping available |
-|---|---|---|
-| Create a policy | `METALAKE::OWNER \|\| METALAKE::CREATE_POLICY` | metalake only |
-| Create a tag | `METALAKE::OWNER \|\| METALAKE::CREATE_TAG` | metalake only |
-| Bind a policy to a tag | tag-scoped | metalake, or the specific tag |
+| Operation                | Expression today                                                                | Scoping available                                                |
+| ------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Create a policy          | `METALAKE::OWNER \|\| METALAKE::CREATE_POLICY`                                  | metalake only                                                    |
+| Create a tag             | `METALAKE::OWNER \|\| METALAKE::CREATE_TAG`                                     | metalake only                                                    |
+| Bind a policy to a tag   | tag-scoped                                                                      | metalake, or the specific tag                                    |
 | Apply a tag to an object | `METALAKE::OWNER \|\| ((TAG::OWNER \|\| ANY_APPLY_TAG) && CAN_ACCESS_METADATA)` | the specific tag, and only objects the caller can already access |
 
 Creating a policy and creating a tag are both metalake-wide, with no way to scope either to a
@@ -537,14 +537,14 @@ no additional payload. The bind and unbind operations emit the existing policy-t
 Three systems solve this problem, and the shape proposed here matches them. The table records only
 what current vendor documentation states; `—` means not verified rather than absent.
 
-| | Apache Ranger | AWS Lake Formation | Databricks Unity Catalog |
-|---|---|---|---|
-| Feature | Tag-based policies | LF-TBAC | ABAC `GRANT` policies |
-| Rule attaches to | A tag, within a tag service | An LF-Tag expression | A catalog or schema, with a tag condition |
-| Evaluated | At request time; `RangerTagEnricher` adds the resource's tags to the request context | At request time, against the resource's tags | At request time, on each access attempt |
-| Inheritance | From the tag source | Table from database, column from table; override allowed | From parent catalog or schema; override allowed |
-| Can a tag rule deny? | Yes | No — grant only | No — adds access only |
-| Authority to apply a tag | — | A distinct grant to assign LF-Tags | `ASSIGN` on the tag **and** `APPLY TAG` on the object |
+|                          | Apache Ranger                                                                        | AWS Lake Formation                                       | Databricks Unity Catalog                              |
+| ------------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------- |
+| Feature                  | Tag-based policies                                                                   | LF-TBAC                                                  | ABAC `GRANT` policies                                 |
+| Rule attaches to         | A tag, within a tag service                                                          | An LF-Tag expression                                     | A catalog or schema, with a tag condition             |
+| Evaluated                | At request time; `RangerTagEnricher` adds the resource's tags to the request context | At request time, against the resource's tags             | At request time, on each access attempt               |
+| Inheritance              | From the tag source                                                                  | Table from database, column from table; override allowed | From parent catalog or schema; override allowed       |
+| Can a tag rule deny?     | Yes                                                                                  | No — grant only                                          | No — adds access only                                 |
+| Authority to apply a tag | —                                                                                    | A distinct grant to assign LF-Tags                       | `ASSIGN` on the tag **and** `APPLY TAG` on the object |
 
 Four points of agreement, each corresponding to a decision made above:
 
@@ -577,12 +577,12 @@ shape of answer OQ-1 is likely to need.
 
 None of these are settled. Where this revision has a preference, the option is marked **Proposed**.
 
-| | Question | Discussed in | Proposal |
-|---|---|---|---|
-| OQ-1 | Where tags are evaluated | [Evaluation](#evaluation) | Inside `authorize`, at the privilege leaf |
-| OQ-2 | Composition when a tag allows and RBAC denies | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins |
-| OQ-3 | What happens when a referenced role is deleted | [below](#oq-3--deleting-a-referenced-role) | Refuse the deletion |
-| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag) | Grant authority on the object, and an explicit tag grant |
+|      | Question                                                | Discussed in                                                  | Proposal                                                 |
+| ---- | ------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------- |
+| OQ-1 | Where tags are evaluated                                | [Evaluation](#evaluation)                                     | Inside `authorize`, at the privilege leaf                |
+| OQ-2 | Composition when a tag allows and RBAC denies           | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins                                                |
+| OQ-3 | What happens when a referenced role is deleted          | [below](#oq-3--deleting-a-referenced-role)                    | Refuse the deletion                                      |
+| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag)      | Grant authority on the object, and an explicit tag grant |
 
 ### OQ-1 — where tags are evaluated
 
@@ -600,10 +600,10 @@ What stays open is not the placement but the freshness transport: two of the thr
 The overlap in question is an explicit RBAC `DENY_*` row against a tag allow, not the absence of an
 RBAC grant — absence is what sends the decision to tags in the first place.
 
-| | Option | Behaviour |
-|---|---|---|
-| **Proposed** | Deny wins | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
-| | Refuse the overlap | Treat allow-from-tag over deny-from-RBAC as ambiguous and fail closed. Surfaces the conflict at the point it occurs, at the cost of a third decision outcome the authorizer does not have today. |
+|              | Option             | Behaviour                                                                                                                                                                                                                         |
+| ------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proposed** | Deny wins          | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
+|              | Refuse the overlap | Treat allow-from-tag over deny-from-RBAC as ambiguous and fail closed. Surfaces the conflict at the point it occurs, at the cost of a third decision outcome the authorizer does not have today.                                  |
 
 Justification: deny wins for free under the placement proposed in [Evaluation](#evaluation).
 `AuthorizationExpressionConverter` already expands every `ANY_*` macro to `ANY(X) && !ANY(DENY_X)`,
@@ -621,12 +621,12 @@ Only the policy is affected; the tag, the bind and the tagged objects are not. T
 whether `validate()` requires the role to exist at creation, since rejecting a dangling reference
 at one end while allowing it at the other reaches the same state either way.
 
-| | Option | Behaviour |
-|---|---|---|
-| **Proposed** | Refuse the deletion | The role cannot be deleted while a policy still references it; the operator clears those references first. No delete in Gravitino is blocked by a reference today, so this would be the first. |
-| | Delete the referencing policies | No dangling state, but it removes rules the operator may not have known existed. Acceptable only as an explicit, confirmed cascade, which is out of scope here. |
-| | Leave it dangling | Inert until a role of the same name is created, which silently reactivates the rule against a different population. |
-| | Disable them | Deleting a role would then also change policy state, conflating two operations that should stay separate. |
+|              | Option                          | Behaviour                                                                                                                                                                                      |
+| ------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proposed** | Refuse the deletion             | The role cannot be deleted while a policy still references it; the operator clears those references first. No delete in Gravitino is blocked by a reference today, so this would be the first. |
+|              | Delete the referencing policies | No dangling state, but it removes rules the operator may not have known existed. Acceptable only as an explicit, confirmed cascade, which is out of scope here.                                |
+|              | Leave it dangling               | Inert until a role of the same name is created, which silently reactivates the rule against a different population.                                                                            |
+|              | Disable them                    | Deleting a role would then also change policy state, conflating two operations that should stay separate.                                                                                      |
 
 Justification: the operator deleting a role and the operator owning the policies that reference
 it are often not the same person, so the deletion should stop rather than silently change rules
@@ -639,12 +639,12 @@ policy, and binding an access policy to a tag that is already applied. Neither c
 authority. A user holding only `SELECT_TABLE` can apply a tag that gives another role
 `MODIFY_TABLE` — read access on an object becomes authority over who else can reach it.
 
-| | Option | Behaviour |
-|---|---|---|
+|              | Option                                                                  | Behaviour                                                                                                                                                                                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Proposed** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
-| | Leave as is | Reading an object is enough to change who else can reach it. |
-| | Require the applier to hold the privilege the tag confers | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles. |
-| | Require policy authority to bind an access policy to a tag | Covers the other write path. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once. |
+|              | Leave as is                                                             | Reading an object is enough to change who else can reach it.                                                                                                                                                                                                                                                        |
+|              | Require the applier to hold the privilege the tag confers               | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles.                                                                                                                        |
+|              | Require policy authority to bind an access policy to a tag              | Covers the other write path. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                         |
 
 Justification: the two requirements cover different halves — one governs who may change access
 on an object, the other who may wield a tag that confers it. Neither adds a new privilege, and
@@ -658,13 +658,13 @@ schema.
 Each milestone names the open questions it rests on. Those are proposals, not decisions — if one
 resolves differently, the milestones marked against it change shape.
 
-| Milestone | What lands | Rests on |
-|---|---|---|
-| M1 — model and storage | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet. | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist. |
-| M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked. | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated. |
-| M3 — enforcement, single node | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
-| M4 — freshness | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment. | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way. |
-| M5 — affordable list filtering | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive. | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3. |
-| M6 — lifecycle and documentation | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac). | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour. |
+| Milestone                         | What lands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Rests on                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 — model and storage            | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist.                                                                                                                                                                      |
+| M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
+| M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression.                                                                                                                                                 | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
+| M4 — freshness                    | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way.                                                                                                                             |
+| M5 — affordable list filtering    | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3.                                                                                                                                                                                                                         |
+| M6 — lifecycle and documentation  | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour.                                                                                                                                                                                                                      |
 
 M1, M2 and M4 hold whichever way OQ-1 is answered. M3 and M5 are the two that change with it.
