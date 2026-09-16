@@ -170,4 +170,13 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
+
+  @Test
+  public void testPropertiesMetadataOrNullFallsBackOnUnsupportedOperation() {
+    Assertions.assertNull(
+        SecretPropertyOperationDispatcher.propertiesMetadataOrNull(
+            () -> {
+              throw new UnsupportedOperationException("no metadata");
+            }));
+  }
 }

@@ -63,32 +63,41 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
     if (propertyEntries == null) {
       synchronized (this) {
         if (propertyEntries == null) {
-          ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-          Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
-          builder.putAll(properties);
-
-          BASIC_PROPERTY_ENTRIES.forEach(
-              (name, entry) -> {
-                Preconditions.checkArgument(
-                    !properties.containsKey(name), "Property metadata already exists: " + name);
-                builder.put(name, entry);
-              });
-
-          // Credential vending keys (e.g. credential-providers) are valid on schema / fileset /
-          // table as well as catalog. Register once so official non-hidden keys are not
-          // fuzzy-masked when declared on non-catalog entities.
-          CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
-              (name, entry) -> {
-                Preconditions.checkArgument(
-                    !properties.containsKey(name), "Property metadata already exists: " + name);
-                builder.put(name, entry);
-              });
-
-          propertyEntries = builder.build();
+          propertyEntries = buildBasePropertyEntries();
         }
       }
     }
     return propertyEntries;
+  }
+
+  /**
+   * Builds specific + shared base property entries (including {@link CredentialConfig}) without
+   * caching. Catalog metadata subclasses add catalog-only entries on top of this map.
+   *
+   * @return an immutable property entry map
+   */
+  protected final Map<String, PropertyEntry<?>> buildBasePropertyEntries() {
+    ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
+    Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
+    builder.putAll(properties);
+
+    BASIC_PROPERTY_ENTRIES.forEach(
+        (name, entry) -> {
+          Preconditions.checkArgument(
+              !properties.containsKey(name), "Property metadata already exists: " + name);
+          builder.put(name, entry);
+        });
+
+    // Credential vending keys (e.g. credential-providers) are valid on schema / fileset / table as
+    // well as catalog. Register once so official non-hidden keys are not fuzzy-masked.
+    CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
+        (name, entry) -> {
+          Preconditions.checkArgument(
+              !properties.containsKey(name), "Property metadata already exists: " + name);
+          builder.put(name, entry);
+        });
+
+    return builder.build();
   }
 
   /**

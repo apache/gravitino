@@ -20,6 +20,7 @@ package org.apache.gravitino.secret;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
 import org.apache.gravitino.Entity;
@@ -84,125 +85,67 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * @return secret plaintext properties; never null
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
-    Map<String, String> rawProperties = loadRawProperties(identifier, entityType);
-    return SecretPropertyUtils.buildSecrets(
-        secretManager, rawProperties, resolvePropertiesMetadata(identifier, entityType));
+    RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
+    return SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
   }
 
   /**
-   * Resolves properties metadata for fuzzy recovery filtering. Metalake has no catalog metadata.
+   * Loads raw properties and matching properties metadata in one catalog lease when possible.
+   *
+   * <p>If the catalog does not expose properties metadata for the entity type ({@link
+   * UnsupportedOperationException}), metadata is {@code null} so {@link
+   * SecretPropertyUtils#buildSecrets} falls back to metadata-unaware fuzzy recovery instead of
+   * failing the whole {@code getSecrets} call.
    */
-  @Nullable
-  private PropertiesMetadata resolvePropertiesMetadata(
+  private RawPropertiesAndMetadata loadRawPropertiesAndMetadata(
       NameIdentifier identifier, Entity.EntityType entityType) {
     switch (entityType) {
       case METALAKE:
-        return null;
+        return new RawPropertiesAndMetadata(loadMetalakeRawProperties(identifier), null);
       case CATALOG:
         return doWithCatalog(
             identifier,
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
-              return wrapper.catalog().catalogPropertiesMetadata();
+              return new RawPropertiesAndMetadata(
+                  wrapper.catalog().entity().getProperties(),
+                  propertiesMetadataOrNull(() -> wrapper.catalog().catalogPropertiesMetadata()));
             },
             NoSuchCatalogException.class);
       case SCHEMA:
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().schemaPropertiesMetadata(),
-            NoSuchCatalogException.class);
+        return loadSchemaRawPropertiesAndMetadata(identifier);
       case FILESET:
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().filesetPropertiesMetadata(),
-            NoSuchCatalogException.class);
+        return loadFilesetRawPropertiesAndMetadata(identifier);
       case TABLE:
-      case VIEW:
-        // View masking uses table properties metadata elsewhere in OperationDispatcher.
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().tablePropertiesMetadata(),
-            NoSuchCatalogException.class);
+        return loadTableRawPropertiesAndMetadata(identifier);
       case TOPIC:
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().topicPropertiesMetadata(),
-            NoSuchCatalogException.class);
-      case MODEL:
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().modelPropertiesMetadata(),
-            NoSuchCatalogException.class);
-      case MODEL_VERSION:
-        return doWithCatalog(
-            NameIdentifierUtil.getCatalogIdentifier(identifier),
-            wrapper -> wrapper.catalog().modelVersionPropertiesMetadata(),
-            NoSuchCatalogException.class);
-      default:
-        return null;
-    }
-  }
-
-  private Map<String, String> loadRawProperties(
-      NameIdentifier identifier, Entity.EntityType entityType) {
-    switch (entityType) {
-      case METALAKE:
-        return loadMetalakeRawProperties(identifier);
-      case CATALOG:
-        return loadCatalogRawProperties(identifier);
-      case SCHEMA:
-        return loadSchemaRawProperties(identifier);
-      case FILESET:
-        return loadFilesetRawProperties(identifier);
-      case TABLE:
-        return loadTableRawProperties(identifier);
-      case TOPIC:
-        return loadTopicRawProperties(identifier);
+        return loadTopicRawPropertiesAndMetadata(identifier);
       case VIEW:
-        return loadViewRawProperties(identifier);
+        return loadViewRawPropertiesAndMetadata(identifier);
       case MODEL:
-        return loadModelRawProperties(identifier);
+        return loadModelRawPropertiesAndMetadata(identifier);
       case MODEL_VERSION:
-        return loadModelVersionRawProperties(identifier);
+        return loadModelVersionRawPropertiesAndMetadata(identifier);
       default:
         throw new NotSupportedException(
             "Doesn't support secret property operations for entity type: " + entityType);
     }
   }
 
-  private Map<String, String> loadMetalakeRawProperties(NameIdentifier identifier) {
-    try {
-      BaseMetalake entity = store.get(identifier, Entity.EntityType.METALAKE, BaseMetalake.class);
-      return entity.properties() == null ? Map.of() : entity.properties();
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchMetalakeException(e, "Metalake %s does not exist", identifier);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load metalake entity " + identifier, e);
-    }
-  }
-
-  private Map<String, String> loadCatalogRawProperties(NameIdentifier identifier) {
-    return doWithCatalog(
-        identifier,
-        wrapper -> {
-          wrapper.catalog().checkMetalakeInUse();
-          return wrapper.catalog().entity().getProperties();
-        },
-        NoSuchCatalogException.class);
-  }
-
-  private Map<String, String> loadSchemaRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadSchemaRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
-    doWithCatalog(
-        catalogIdent,
-        wrapper -> {
-          wrapper.catalog().checkMetalakeInUse();
-          return null;
-        },
-        NoSuchCatalogException.class);
+    PropertiesMetadata metadata =
+        doWithCatalog(
+            catalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              return propertiesMetadataOrNull(() -> wrapper.catalog().schemaPropertiesMetadata());
+            },
+            NoSuchCatalogException.class);
     try {
       SchemaEntity entity = store.get(identifier, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      return entity.properties() == null ? Map.of() : entity.properties();
+      return new RawPropertiesAndMetadata(
+          entity.properties() == null ? Map.of() : entity.properties(), metadata);
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", identifier);
     } catch (IOException e) {
@@ -210,18 +153,20 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
     }
   }
 
-  private Map<String, String> loadFilesetRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadFilesetRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
-    doWithCatalog(
-        catalogIdent,
-        wrapper -> {
-          wrapper.catalog().checkMetalakeInUse();
-          return null;
-        },
-        NoSuchCatalogException.class);
+    PropertiesMetadata metadata =
+        doWithCatalog(
+            catalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              return propertiesMetadataOrNull(() -> wrapper.catalog().filesetPropertiesMetadata());
+            },
+            NoSuchCatalogException.class);
     try {
       FilesetEntity entity = store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
-      return entity.properties() == null ? Map.of() : entity.properties();
+      return new RawPropertiesAndMetadata(
+          entity.properties() == null ? Map.of() : entity.properties(), metadata);
     } catch (NoSuchEntityException e) {
       throw new NoSuchFilesetException(e, "Fileset %s does not exist", identifier);
     } catch (IOException e) {
@@ -229,7 +174,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
     }
   }
 
-  private Map<String, String> loadTableRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadTableRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
     return doWithCatalog(
         catalogIdent,
@@ -238,52 +183,62 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
           // Load from the connector so we get the same raw property map that EntityCombinedTable
           // masks for API responses (including Flink connector options like flink.password).
           Table table = wrapper.doWithTableOps(ops -> ops.loadTable(identifier));
-          return table.properties() == null ? Map.of() : table.properties();
+          Map<String, String> raw = table.properties() == null ? Map.of() : table.properties();
+          return new RawPropertiesAndMetadata(
+              raw, propertiesMetadataOrNull(() -> wrapper.catalog().tablePropertiesMetadata()));
         },
         NoSuchCatalogException.class,
         NoSuchTableException.class);
   }
 
-  private Map<String, String> loadTopicRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadTopicRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
     return doWithCatalog(
         catalogIdent,
         wrapper -> {
           wrapper.catalog().checkMetalakeInUse();
           Topic topic = wrapper.doWithTopicOps(ops -> ops.loadTopic(identifier));
-          return topic.properties() == null ? Map.of() : topic.properties();
+          Map<String, String> raw = topic.properties() == null ? Map.of() : topic.properties();
+          return new RawPropertiesAndMetadata(
+              raw, propertiesMetadataOrNull(() -> wrapper.catalog().topicPropertiesMetadata()));
         },
         NoSuchCatalogException.class,
         NoSuchTopicException.class);
   }
 
-  private Map<String, String> loadViewRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadViewRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
     return doWithCatalog(
         catalogIdent,
         wrapper -> {
           wrapper.catalog().checkMetalakeInUse();
           View view = wrapper.doWithViewOps(ops -> ops.loadView(identifier));
-          return view.properties() == null ? Map.of() : view.properties();
+          Map<String, String> raw = view.properties() == null ? Map.of() : view.properties();
+          // View masking uses table properties metadata elsewhere in OperationDispatcher.
+          return new RawPropertiesAndMetadata(
+              raw, propertiesMetadataOrNull(() -> wrapper.catalog().tablePropertiesMetadata()));
         },
         NoSuchCatalogException.class,
         NoSuchViewException.class);
   }
 
-  private Map<String, String> loadModelRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadModelRawPropertiesAndMetadata(NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
     return doWithCatalog(
         catalogIdent,
         wrapper -> {
           wrapper.catalog().checkMetalakeInUse();
           Model model = wrapper.doWithModelOps(ops -> ops.getModel(identifier));
-          return model.properties() == null ? Map.of() : model.properties();
+          Map<String, String> raw = model.properties() == null ? Map.of() : model.properties();
+          return new RawPropertiesAndMetadata(
+              raw, propertiesMetadataOrNull(() -> wrapper.catalog().modelPropertiesMetadata()));
         },
         NoSuchCatalogException.class,
         NoSuchModelException.class);
   }
 
-  private Map<String, String> loadModelVersionRawProperties(NameIdentifier identifier) {
+  private RawPropertiesAndMetadata loadModelVersionRawPropertiesAndMetadata(
+      NameIdentifier identifier) {
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
     NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
     String versionName = identifier.name();
@@ -299,9 +254,48 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             modelVersion =
                 wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, versionName));
           }
-          return modelVersion.properties() == null ? Map.of() : modelVersion.properties();
+          Map<String, String> raw =
+              modelVersion.properties() == null ? Map.of() : modelVersion.properties();
+          return new RawPropertiesAndMetadata(
+              raw,
+              propertiesMetadataOrNull(() -> wrapper.catalog().modelVersionPropertiesMetadata()));
         },
         NoSuchCatalogException.class,
         NoSuchModelVersionException.class);
+  }
+
+  private Map<String, String> loadMetalakeRawProperties(NameIdentifier identifier) {
+    try {
+      BaseMetalake entity = store.get(identifier, Entity.EntityType.METALAKE, BaseMetalake.class);
+      return entity.properties() == null ? Map.of() : entity.properties();
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetalakeException(e, "Metalake %s does not exist", identifier);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load metalake entity " + identifier, e);
+    }
+  }
+
+  /**
+   * Returns properties metadata, or {@code null} when the catalog does not support it for this
+   * entity type.
+   */
+  @Nullable
+  static PropertiesMetadata propertiesMetadataOrNull(Supplier<PropertiesMetadata> supplier) {
+    try {
+      return supplier.get();
+    } catch (UnsupportedOperationException e) {
+      return null;
+    }
+  }
+
+  private static final class RawPropertiesAndMetadata {
+    private final Map<String, String> rawProperties;
+    @Nullable private final PropertiesMetadata metadata;
+
+    private RawPropertiesAndMetadata(
+        @Nullable Map<String, String> rawProperties, @Nullable PropertiesMetadata metadata) {
+      this.rawProperties = rawProperties == null ? Map.of() : rawProperties;
+      this.metadata = metadata;
+    }
   }
 }
