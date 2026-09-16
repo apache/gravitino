@@ -27,6 +27,7 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 /**
  * An abstract class representing a base properties metadata for entities. Developers should extend
@@ -67,6 +68,16 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
           builder.putAll(properties);
 
           BASIC_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                Preconditions.checkArgument(
+                    !properties.containsKey(name), "Property metadata already exists: " + name);
+                builder.put(name, entry);
+              });
+
+          // Credential vending keys (e.g. credential-providers) are valid on schema / fileset /
+          // table as well as catalog. Register once so official non-hidden keys are not
+          // fuzzy-masked when declared on non-catalog entities.
+          CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
                     !properties.containsKey(name), "Property metadata already exists: " + name);
