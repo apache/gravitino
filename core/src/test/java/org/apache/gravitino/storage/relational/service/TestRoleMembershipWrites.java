@@ -351,6 +351,22 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testMetalakeCascadeWaitsForMetadataOnlyUpdate() throws Exception {
+    for (boolean group : List.of(false, true)) {
+      initialize();
+      RoleEntity role = role(METALAKE, "metadata_cascade", true);
+      long id = RandomIdGenerator.INSTANCE.nextId();
+      insertPrincipal(group, id, List.of(role), false);
+      assertNull(
+          whileTransactionHeld(
+              () -> updatePrincipal(group, List.of(role), () -> {}),
+              () -> backend.delete(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, true)));
+      assertEquals(0, memberships(group, id));
+      assertFalse(backend.exists(identifier(group), type(group)));
+    }
+  }
+
+  @TestTemplate
   void testRevokeWaitsForMetalakeCascade() throws Exception {
     for (boolean group : List.of(false, true)) {
       initialize();

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -84,12 +85,8 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (userEntity.roleNames() != null) {
-                  for (String role : userEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
+                List<RoleEntity> roleEntities =
+                    getExistingRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
                 List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
                 List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -173,12 +170,8 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (groupEntity.roleNames() != null) {
-                  for (String role : groupEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
+                List<RoleEntity> roleEntities =
+                    getExistingRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
                 List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
                 List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -262,19 +255,17 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (groupEntity.roleNames() != null) {
-                  for (String role : groupEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
+                List<RoleEntity> roleEntities =
+                    getExistingRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
                 List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
                 List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
-                  roleNames.remove(roleEntityToRevoke.name());
-                  boolean removed = roleIds.remove(roleEntityToRevoke.id());
-                  if (!removed) {
+                  int index = roleIds.indexOf(roleEntityToRevoke.id());
+                  if (index >= 0) {
+                    roleNames.remove(index);
+                    roleIds.remove(index);
+                  } else {
                     LOG.warn(
                         "Failed to revoke, role {} does not exist in the group {} of metalake {}",
                         roleEntityToRevoke.name(),
@@ -351,20 +342,18 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (userEntity.roleNames() != null) {
-                  for (String role : userEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
+                List<RoleEntity> roleEntities =
+                    getExistingRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
 
                 List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
                 List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
-                  roleNames.remove(roleEntityToRevoke.name());
-                  boolean removed = roleIds.remove(roleEntityToRevoke.id());
-                  if (!removed) {
+                  int index = roleIds.indexOf(roleEntityToRevoke.id());
+                  if (index >= 0) {
+                    roleNames.remove(index);
+                    roleIds.remove(index);
+                  } else {
                     LOG.warn(
                         "Failed to revoke, role {} doesn't exist in the user {} of metalake {}",
                         roleEntityToRevoke.name(),
@@ -868,6 +857,29 @@ class PermissionManager {
         callback.run();
       }
     }
+  }
+
+  private List<RoleEntity> getExistingRoles(
+      String metalake, @Nullable List<String> roleNames, @Nullable List<Long> roleIds) {
+    List<RoleEntity> roles = Lists.newArrayList();
+    if (roleNames == null || roleNames.isEmpty()) {
+      return roles;
+    }
+    if (roleIds == null || roleNames.size() != roleIds.size()) {
+      throw new IllegalRoleException("Existing role names and IDs must be paired");
+    }
+    for (int i = 0; i < roleNames.size(); i++) {
+      RoleEntity role = roleManager.getRole(metalake, roleNames.get(i));
+      // Names can be reused after deletion. Never turn an observed membership into a grant of
+      // the replacement, even when that replacement is active and would pass the storage fence.
+      if (!role.id().equals(roleIds.get(i))) {
+        throw new IllegalRoleException(
+            "Role %s in metalake %s no longer has the observed ID %s",
+            role.name(), metalake, roleIds.get(i));
+      }
+      roles.add(role);
+    }
+    return roles;
   }
 
   private List<Long> toRoleIds(List<RoleEntity> roleEntities) {
