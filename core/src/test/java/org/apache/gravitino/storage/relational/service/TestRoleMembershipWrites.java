@@ -31,7 +31,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -116,40 +118,19 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
             NoSuchRoleException.class,
             () -> insertPrincipal(group, id, List.of(valid, invalid), true));
         assertEquals(version, version(group, id));
-        assertEquals(1, memberships(group, id));
-        assertEquals(
-            1,
-            queryLong(
-                "SELECT COUNT(*) FROM "
-                    + relationTable(group)
-                    + " WHERE "
-                    + principalColumn(group)
-                    + " = "
-                    + id
-                    + " AND role_id = "
-                    + retained.id()
-                    + " AND deleted_at = 0"));
+        assertMemberships(group, id, retained);
+        assertFalse(SessionUtils.isInTransaction());
         assertThrows(
             NoSuchRoleException.class,
             () -> updatePrincipal(group, List.of(valid, invalid), () -> {}));
         assertEquals(version, version(group, id));
-        assertEquals(1, memberships(group, id));
-        assertEquals(
-            1,
-            queryLong(
-                "SELECT COUNT(*) FROM "
-                    + relationTable(group)
-                    + " WHERE "
-                    + principalColumn(group)
-                    + " = "
-                    + id
-                    + " AND role_id = "
-                    + retained.id()
-                    + " AND deleted_at = 0"));
+        assertMemberships(group, id, retained);
+        assertFalse(SessionUtils.isInTransaction());
       }
       // The old ID must fail, but a fresh reference to the replacement remains usable.
       updatePrincipal(group, List.of(replacement), () -> {});
-      assertEquals(1, memberships(group, id));
+      assertMemberships(group, id, replacement);
+      assertFalse(SessionUtils.isInTransaction());
     }
   }
 
@@ -162,13 +143,14 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
       long id = RandomIdGenerator.INSTANCE.nextId();
       insertPrincipal(group, id, List.of(first), false);
       insertPrincipal(group, id, List.of(second), true);
-      assertEquals(1, memberships(group, id));
+      assertMemberships(group, id, second);
       updatePrincipal(group, List.of(second, first), () -> {});
       updatePrincipal(group, List.of(second, first), () -> {});
-      assertEquals(2, memberships(group, id));
+      assertMemberships(group, id, first, second);
       updatePrincipal(group, List.of(), () -> {});
+      assertMemberships(group, id);
       updatePrincipal(group, List.of(), () -> {});
-      assertEquals(0, memberships(group, id));
+      assertMemberships(group, id);
     }
   }
 
@@ -187,6 +169,108 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
       Assertions.assertInstanceOf(NoSuchRoleException.class, failure);
       assertEquals(version, version(group, id));
       assertEquals(0, memberships(group, id));
+    }
+  }
+
+  @TestTemplate
+  void testInsertAndOverwriteWithoutRoles() throws Exception {
+    initialize();
+    RoleEntity role = role(METALAKE, "cleared_by_overwrite", true);
+    for (boolean group : List.of(false, true)) {
+      long id = RandomIdGenerator.INSTANCE.nextId();
+      for (boolean overwrite : List.of(false, true)) {
+        if (overwrite) {
+          updatePrincipal(group, List.of(role), () -> {});
+          assertMemberships(group, id, role);
+        }
+        if (group) {
+          GroupMetaService.getInstance()
+              .insertGroup(
+                  createGroupEntity(
+                      id,
+                      AuthorizationUtils.ofGroupNamespace(METALAKE),
+                      "group",
+                      AUDIT_INFO,
+                      null,
+                      null),
+                  overwrite);
+        } else {
+          UserMetaService.getInstance()
+              .insertUser(
+                  createUserEntity(
+                      id,
+                      AuthorizationUtils.ofUserNamespace(METALAKE),
+                      "user",
+                      AUDIT_INFO,
+                      null,
+                      null),
+                  overwrite);
+        }
+        assertMemberships(group, id);
+        assertFalse(SessionUtils.isInTransaction());
+      }
+    }
+  }
+
+  @TestTemplate
+  void testMembershipLocksRequireTransaction() throws Exception {
+    initialize();
+    RoleEntity role = role(METALAKE, "transaction_required", true);
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE);
+    assertFalse(SessionUtils.isInTransaction());
+    IllegalStateException failure =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                RoleMetaService.getInstance()
+                    .lockRolesForMembership(metalakeId, List.of(role.id())));
+    assertEquals("Role membership locks require an active transaction", failure.getMessage());
+    assertFalse(SessionUtils.isInTransaction());
+
+    // A failed standalone call must not leave a session or lock behind.
+    SessionUtils.doMultipleWithCommit(
+        () -> RoleMetaService.getInstance().lockRolesForMembership(metalakeId, List.of(role.id())));
+    assertFalse(SessionUtils.isInTransaction());
+    assertTrue(RoleMetaService.getInstance().deleteRole(role.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testGrantSucceedsAfterRoleDeleteRollsBack() throws Exception {
+    initialize();
+    for (boolean group : List.of(false, true)) {
+      RoleEntity role = role(METALAKE, "delete_rollback_" + group, true);
+      long id = RandomIdGenerator.INSTANCE.nextId();
+      insertPrincipal(group, id, List.of(), false);
+      long oldVersion = version(group, id);
+      assertNull(
+          whileTransactionHeld(
+              () -> RoleMetaService.getInstance().deleteRole(role.nameIdentifier()),
+              () -> updatePrincipal(group, List.of(role), () -> {}),
+              () -> {},
+              false));
+      assertEquals(oldVersion + 1, version(group, id));
+      assertMemberships(group, id, role);
+      assertTrue(backend.exists(role.nameIdentifier(), Entity.EntityType.ROLE));
+    }
+  }
+
+  @TestTemplate
+  void testRoleDeleteSucceedsAfterGrantRollsBack() throws Exception {
+    initialize();
+    for (boolean group : List.of(false, true)) {
+      RoleEntity role = role(METALAKE, "grant_rollback_" + group, true);
+      long id = RandomIdGenerator.INSTANCE.nextId();
+      insertPrincipal(group, id, List.of(), false);
+      long oldVersion = version(group, id);
+      assertNull(
+          whileTransactionHeld(
+              () -> updatePrincipal(group, List.of(role), () -> {}),
+              () -> RoleMetaService.getInstance().deleteRole(role.nameIdentifier()),
+              () -> {},
+              false));
+      assertEquals(oldVersion, version(group, id));
+      assertMemberships(group, id);
+      assertFalse(backend.exists(role.nameIdentifier(), Entity.EntityType.ROLE));
     }
   }
 
@@ -298,7 +382,7 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testUpdatesWithoutNewRolesAvoidUnneededParentLocks() throws Exception {
+  void testUnchangedMembershipsAndRevokesAvoidRoleLocks() throws Exception {
     initialize();
     RoleEntity role = role(METALAKE, "unchanged", true);
     for (boolean group : List.of(false, true)) {
@@ -465,6 +549,31 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
     return group ? "group_id" : "user_id";
   }
 
+  private void assertMemberships(boolean group, long id, RoleEntity... expected) throws Exception {
+    Set<Long> actual = new HashSet<>();
+    String sql =
+        "SELECT role_id FROM "
+            + relationTable(group)
+            + " WHERE "
+            + principalColumn(group)
+            + " = "
+            + id
+            + " AND deleted_at = 0";
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement();
+        ResultSet rows = statement.executeQuery(sql)) {
+      while (rows.next()) {
+        assertTrue(actual.add(rows.getLong(1)), "Duplicate active role membership");
+      }
+    }
+    Set<Long> expectedIds = new HashSet<>();
+    for (RoleEntity role : expected) {
+      expectedIds.add(role.id());
+    }
+    assertEquals(expectedIds, actual);
+  }
+
   private long memberships(boolean group, long id) throws Exception {
     return queryLong(
         "SELECT COUNT(*) FROM "
@@ -503,6 +612,12 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
 
   private Throwable whileTransactionHeld(
       Executable holder, Executable contender, Executable beforeCommit) throws Exception {
+    return whileTransactionHeld(holder, contender, beforeCommit, true);
+  }
+
+  private Throwable whileTransactionHeld(
+      Executable holder, Executable contender, Executable beforeCompletion, boolean commitHolder)
+      throws Exception {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     CompletableFuture<Long> started = new CompletableFuture<>();
     SessionUtils.beginTransaction();
@@ -511,8 +626,12 @@ class TestRoleMembershipWrites extends TestJDBCBackend {
       Assertions.assertDoesNotThrow(holder);
       Future<Throwable> result = submitTransaction(executor, started, contender);
       awaitBlockedBy(result, started.get(10, TimeUnit.SECONDS), holderId);
-      Assertions.assertDoesNotThrow(beforeCommit);
-      SessionUtils.commitTransaction();
+      Assertions.assertDoesNotThrow(beforeCompletion);
+      if (commitHolder) {
+        SessionUtils.commitTransaction();
+      } else {
+        SessionUtils.rollbackTransaction();
+      }
       return result.get(10, TimeUnit.SECONDS);
     } finally {
       SessionUtils.rollbackTransaction();

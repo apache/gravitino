@@ -306,8 +306,12 @@ public class RoleMetaService {
    * metalake before the principal write. Shared locks permit independent grants of the same role
    * while excluding its deletion; H2 uses exclusive locks instead. Roles are locked by stable ID in
    * ascending order, never re-resolved by a reusable name.
+   *
+   * @throws IllegalStateException if called outside a transaction
    */
   void lockRolesForMembership(Long metalakeId, Collection<Long> roleIds) {
+    Preconditions.checkState(
+        SessionUtils.isInTransaction(), "Role membership locks require an active transaction");
     for (Long roleId : new TreeSet<>(roleIds)) {
       RolePO role =
           SessionUtils.getWithoutCommit(
