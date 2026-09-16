@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.job.local;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -26,6 +27,7 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -256,6 +258,84 @@ public class TestLocalJobExecutor {
           .until(() -> exec.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
     } finally {
       exec.close();
+    }
+  }
+
+  @Test
+  public void testGetJobOutputSuccessfully() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000);
+    Assertions.assertEquals(6, stdout.size());
+    Assertions.assertEquals("starting test test job", stdout.get(0));
+    Assertions.assertEquals("in common script", stdout.get(1));
+    Assertions.assertTrue(stdout.get(2).startsWith("Submitting job with name:"));
+    Assertions.assertEquals("value1", stdout.get(3));
+    Assertions.assertEquals("success", stdout.get(4));
+    Assertions.assertEquals("value3", stdout.get(5));
+
+    // The test script never writes to stderr.
+    Assertions.assertEquals(Collections.emptyList(), jobExecutor.getJobStderr(jobId, 1000));
+
+    // The full output has 6 lines; only the last 3 should be returned when capped.
+    Assertions.assertEquals(
+        ImmutableList.of("value1", "success", "value3"), jobExecutor.getJobStdout(jobId, 3));
+  }
+
+  @Test
+  public void testGetJobOutputForUnknownJobThrows() {
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> jobExecutor.getJobStdout("no-such-job", 100));
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> jobExecutor.getJobStderr("no-such-job", 100));
+  }
+
+  @Test
+  public void testGetJobOutputForQueuedJobReturnsEmpty() throws IOException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1"));
+
+    File workingDirA = Files.createTempDirectory("gravitino-test-local-job-executor-a").toFile();
+    File workingDirB = Files.createTempDirectory("gravitino-test-local-job-executor-b").toFile();
+    try {
+      Map<String, String> jobConf =
+          ImmutableMap.of(
+              "arg1", "value1",
+              "arg2", "success",
+              "var", "value3");
+
+      // Submit two jobs to a single-threaded executor - the second one stays QUEUED until the
+      // first (which sleeps for a few seconds) finishes.
+      JobTemplate templateA =
+          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirA);
+      JobTemplate templateB =
+          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirB);
+      exec.submitJob(templateA);
+      String jobIdB = exec.submitJob(templateB);
+
+      Assertions.assertEquals(JobHandle.Status.QUEUED, exec.getJobStatus(jobIdB));
+      Assertions.assertEquals(Collections.emptyList(), exec.getJobStdout(jobIdB, 100));
+      Assertions.assertEquals(Collections.emptyList(), exec.getJobStderr(jobIdB, 100));
+
+      Awaitility.await()
+          .atMost(3, TimeUnit.MINUTES)
+          .until(() -> exec.getJobStatus(jobIdB) == JobHandle.Status.SUCCEEDED);
+    } finally {
+      exec.close();
+      FileUtils.deleteDirectory(workingDirA);
+      FileUtils.deleteDirectory(workingDirB);
     }
   }
 

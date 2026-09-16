@@ -18,7 +18,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from gravitino.api.job.job_template import JobTemplate
 
@@ -79,3 +79,19 @@ class JobHandle(ABC):
         this field was introduced.
         """
         raise NotImplementedError("runtime_job_template is not implemented")
+
+    def stdout(self) -> List[str]:
+        """Returns the captured standard output of the job, as a list of lines. This is only
+        populated when the handle was obtained via ``SupportsJobs.get_job`` with
+        ``include_output=True``; handles obtained via the plain ``get_job``, ``list_jobs``, or
+        ``run_job`` always return an empty list here.
+        """
+        return []
+
+    def stderr(self) -> List[str]:
+        """Returns the captured standard error output of the job, as a list of lines. This is only
+        populated when the handle was obtained via ``SupportsJobs.get_job`` with
+        ``include_output=True``; handles obtained via the plain ``get_job``, ``list_jobs``, or
+        ``run_job`` always return an empty list here.
+        """
+        return []

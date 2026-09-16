@@ -30,6 +30,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -71,9 +73,17 @@ public class JobDTO {
   @JsonProperty("runtimeJobTemplate")
   private final JobTemplateDTO runtimeJobTemplate;
 
+  @JsonProperty("stdout")
+  @Nullable
+  private final List<String> stdout;
+
+  @JsonProperty("stderr")
+  @Nullable
+  private final List<String> stderr;
+
   /** Default constructor for Jackson deserialization. */
   private JobDTO() {
-    this(null, null, null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null, null, null);
   }
 
   /**
@@ -91,6 +101,10 @@ public class JobDTO {
    * @param runtimeJobTemplate The resolved job template that was actually submitted for execution,
    *     with placeholders replaced and referenced files downloaded, or null for jobs run before
    *     this field was introduced.
+   * @param stdout The captured standard output of the job, as a list of lines, or null if output
+   *     was not requested.
+   * @param stderr The captured standard error output of the job, as a list of lines, or null if
+   *     output was not requested.
    */
   public JobDTO(
       String jobId,
@@ -100,7 +114,9 @@ public class JobDTO {
       Instant queuedAt,
       Instant startedAt,
       Instant finishedAt,
-      JobTemplateDTO runtimeJobTemplate) {
+      JobTemplateDTO runtimeJobTemplate,
+      @Nullable List<String> stdout,
+      @Nullable List<String> stderr) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.status = status;
@@ -109,6 +125,8 @@ public class JobDTO {
     this.startedAt = startedAt;
     this.finishedAt = finishedAt;
     this.runtimeJobTemplate = runtimeJobTemplate;
+    this.stdout = stdout;
+    this.stderr = stderr;
   }
 
   /**

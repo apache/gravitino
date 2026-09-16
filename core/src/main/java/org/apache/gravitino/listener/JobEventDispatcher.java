@@ -201,12 +201,13 @@ public class JobEventDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
+  public JobEntity getJob(String metalake, String jobId, boolean includeOutput)
+      throws NoSuchJobException {
     eventBus.dispatchEvent(
         new GetJobPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId));
 
     try {
-      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId);
+      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId, includeOutput);
       eventBus.dispatchEvent(
           new GetJobEvent(
               PrincipalUtils.getCurrentUserName(), metalake, JobInfo.fromJobEntity(job)));

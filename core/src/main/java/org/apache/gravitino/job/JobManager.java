@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -109,6 +110,8 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
+  private final int jobOutputMaxLines;
+
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
   @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
@@ -154,6 +157,8 @@ public class JobManager implements JobOperationDispatcher {
           jobStagingDirKeepTimeInMs,
           JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS);
     }
+
+    this.jobOutputMaxLines = config.get(Configs.JOB_OUTPUT_MAX_LINES);
 
     this.cleanUpExecutor =
         Executors.newSingleThreadScheduledExecutor(
@@ -414,23 +419,52 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
+  public JobEntity getJob(String metalake, String jobId, boolean includeOutput)
+      throws NoSuchJobException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, jobId);
-    return TreeLockUtils.doWithTreeLock(
-        jobIdent,
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchJobException(
-                "Job with ID %s under metalake %s does not exist", jobId, metalake);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    JobEntity entity =
+        TreeLockUtils.doWithTreeLock(
+            jobIdent,
+            LockType.READ,
+            () -> {
+              try {
+                return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
+              } catch (NoSuchEntityException e) {
+                throw new NoSuchJobException(
+                    "Job with ID %s under metalake %s does not exist", jobId, metalake);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+
+    if (!includeOutput) {
+      return entity;
+    }
+
+    // The job entity's existence was already confirmed above via the entity store, which is the
+    // durable source of truth. The executor's own bookkeeping for a job's output is best-effort
+    // and can legitimately expire or be lost independently of the entity (e.g. LocalJobExecutor
+    // only retains in-memory output location for a limited time, and loses it entirely across a
+    // restart) - so a NoSuchJobException from the executor at this point means "output is no
+    // longer available", not "job does not exist", and should degrade to empty output rather
+    // than be reported as a 404.
+    List<String> stdout;
+    List<String> stderr;
+    try {
+      stdout = jobExecutor.getJobStdout(entity.jobExecutionId(), jobOutputMaxLines);
+      stderr = jobExecutor.getJobStderr(entity.jobExecutionId(), jobOutputMaxLines);
+    } catch (NoSuchJobException e) {
+      LOG.warn(
+          "Output for job {} under metalake {} is no longer available from the job executor",
+          jobId,
+          metalake,
+          e);
+      stdout = Collections.emptyList();
+      stderr = Collections.emptyList();
+    }
+    return entity.withOutput(stdout, stderr);
   }
 
   @Override
@@ -534,7 +568,7 @@ public class JobManager implements JobOperationDispatcher {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
-    JobEntity jobEntity = getJob(metalake, jobId);
+    JobEntity jobEntity = getJob(metalake, jobId, false);
 
     if (jobEntity.status() == JobHandle.Status.CANCELLING
         || jobEntity.status() == JobHandle.Status.CANCELLED

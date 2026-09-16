@@ -584,6 +584,17 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_LINES =
+      new ConfigBuilder("gravitino.job.outputMaxLines")
+          .doc(
+              "The maximum number of lines returned by JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr. This is resolved by JobManager and passed as an "
+                  + "argument to those two APIs, so all executors honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
       new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
           .doc(

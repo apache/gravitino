@@ -595,7 +595,7 @@ public class TestJobManager {
         .thenReturn(job);
 
     // Get an existing job
-    JobEntity retrievedJob = jobManager.getJob(metalake, job.name());
+    JobEntity retrievedJob = jobManager.getJob(metalake, job.name(), false);
     Assertions.assertEquals(job, retrievedJob);
 
     // Throw exception if job does not exist
@@ -607,7 +607,7 @@ public class TestJobManager {
 
     Exception e =
         Assertions.assertThrows(
-            NoSuchJobException.class, () -> jobManager.getJob(metalake, "non_existent"));
+            NoSuchJobException.class, () -> jobManager.getJob(metalake, "non_existent", false));
     Assertions.assertEquals(
         "Job with ID non_existent under metalake test_metalake does not exist", e.getMessage());
 
@@ -615,7 +615,71 @@ public class TestJobManager {
     doThrow(new IOException("Entity store error"))
         .when(entityStore)
         .get(NameIdentifierUtil.ofJob(metalake, "job"), Entity.EntityType.JOB, JobEntity.class);
-    Assertions.assertThrows(RuntimeException.class, () -> jobManager.getJob(metalake, "job"));
+    Assertions.assertThrows(
+        RuntimeException.class, () -> jobManager.getJob(metalake, "job", false));
+  }
+
+  @Test
+  public void testGetJobWithOutput() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.SUCCEEDED);
+    when(entityStore.get(
+            NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB, JobEntity.class))
+        .thenReturn(job);
+
+    List<String> stdout = ImmutableList.of("line1", "line2");
+    List<String> stderr = ImmutableList.of("err1");
+    // The default gravitino.job.outputMaxLines value (1000) is what JobManager should resolve
+    // and pass through, since the test config doesn't override it.
+    when(jobExecutor.getJobStdout(job.jobExecutionId(), 1000)).thenReturn(stdout);
+    when(jobExecutor.getJobStderr(job.jobExecutionId(), 1000)).thenReturn(stderr);
+
+    // includeOutput = true fetches and attaches the output.
+    JobEntity jobWithOutput = jobManager.getJob(metalake, job.name(), true);
+    Assertions.assertEquals(stdout, jobWithOutput.stdout());
+    Assertions.assertEquals(stderr, jobWithOutput.stderr());
+    // The rest of the entity is unaffected.
+    Assertions.assertEquals(job.jobExecutionId(), jobWithOutput.jobExecutionId());
+    Assertions.assertEquals(job.status(), jobWithOutput.status());
+
+    // includeOutput = false never touches the executor for output.
+    JobEntity jobWithoutOutput = jobManager.getJob(metalake, job.name(), false);
+    Assertions.assertNull(jobWithoutOutput.stdout());
+    Assertions.assertNull(jobWithoutOutput.stderr());
+
+    verify(jobExecutor, times(1)).getJobStdout(job.jobExecutionId(), 1000);
+    verify(jobExecutor, times(1)).getJobStderr(job.jobExecutionId(), 1000);
+  }
+
+  @Test
+  public void testGetJobWithOutputDegradesToEmptyWhenExecutorForgetsJob() throws IOException {
+    // The job entity is confirmed to exist (via the entity store) before the executor is ever
+    // consulted for output, so a NoSuchJobException from the executor at that point means its
+    // own bookkeeping for this job's output has expired or been lost (e.g. the local executor's
+    // in-memory state ages out independently of the job entity/staging directory) - not that the
+    // job itself doesn't exist. getJob(..., true) must degrade to empty output rather than
+    // propagate a "job not found" error for a job that plain getJob() can still retrieve.
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.SUCCEEDED);
+    when(entityStore.get(
+            NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB, JobEntity.class))
+        .thenReturn(job);
+
+    when(jobExecutor.getJobStdout(job.jobExecutionId(), 1000))
+        .thenThrow(new NoSuchJobException("mock: executor no longer knows about this job"));
+
+    JobEntity jobWithOutput = jobManager.getJob(metalake, job.name(), true);
+    Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stdout());
+    Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stderr());
+    // The entity itself is still fully returned, not treated as missing.
+    Assertions.assertEquals(job.jobExecutionId(), jobWithOutput.jobExecutionId());
+    Assertions.assertEquals(job.status(), jobWithOutput.status());
   }
 
   @Test
@@ -790,7 +854,7 @@ public class TestJobManager {
   @Test
   public void testCancelJobDoesNotReplayExecutorOnOccConflict() throws IOException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    when(jobManager.getJob(metalake, job.name(), false)).thenReturn(job);
     doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
     when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
         .thenThrow(new OptimisticLockException("job changed"));
@@ -806,7 +870,7 @@ public class TestJobManager {
         .thenAnswer(a -> null);
 
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    when(jobManager.getJob(metalake, job.name(), false)).thenReturn(job);
     doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
     stubEntityStoreUpdateToApply(job);
 
@@ -816,7 +880,7 @@ public class TestJobManager {
     Assertions.assertEquals(JobHandle.Status.CANCELLING, cancelledJob.status());
 
     // Test cancel a nonexistent job
-    when(jobManager.getJob(metalake, "non_existent"))
+    when(jobManager.getJob(metalake, "non_existent", false))
         .thenThrow(new NoSuchJobException("Job does not exist"));
 
     Exception e =
@@ -830,7 +894,7 @@ public class TestJobManager {
         .forEach(
             status -> {
               JobEntity finishedJob = newJobEntity("shell_job", status);
-              when(jobManager.getJob(metalake, finishedJob.name())).thenReturn(finishedJob);
+              when(jobManager.getJob(metalake, finishedJob.name(), false)).thenReturn(finishedJob);
 
               JobEntity cancelledFinishedJob = jobManager.cancelJob(metalake, finishedJob.name());
               Assertions.assertEquals(
@@ -861,7 +925,7 @@ public class TestJobManager {
         .thenAnswer(a -> null);
 
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    when(jobManager.getJob(metalake, job.name(), false)).thenReturn(job);
     doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
 
     // Simulate the job having been deleted concurrently (e.g. by legacy-timeline cleanup) in the
@@ -883,7 +947,7 @@ public class TestJobManager {
     // the time entityStore.update() re-fetches the entity, a concurrent status poll has already
     // persisted a terminal status - that must not be regressed back to CANCELLING.
     JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    when(jobManager.getJob(metalake, queuedSnapshot.name())).thenReturn(queuedSnapshot);
+    when(jobManager.getJob(metalake, queuedSnapshot.name(), false)).thenReturn(queuedSnapshot);
     doNothing().when(jobExecutor).cancelJob(queuedSnapshot.jobExecutionId());
 
     JobEntity latestSucceeded =
@@ -915,7 +979,7 @@ public class TestJobManager {
     // snapshot and this update; re-applying CANCELLING here must not stamp a fresh
     // lastModifiedTime over the entity the other writer already wrote.
     JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
-    when(jobManager.getJob(metalake, queuedSnapshot.name())).thenReturn(queuedSnapshot);
+    when(jobManager.getJob(metalake, queuedSnapshot.name(), false)).thenReturn(queuedSnapshot);
     doNothing().when(jobExecutor).cancelJob(queuedSnapshot.jobExecutionId());
 
     JobEntity latestCancelling =
@@ -958,7 +1022,7 @@ public class TestJobManager {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
-    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    when(jobManager.getJob(metalake, job.name(), false)).thenReturn(job);
     doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
     stubEntityStoreUpdateToApply(job);
 
@@ -1411,7 +1475,7 @@ public class TestJobManager {
 
     JobEntity job =
         newJobEntity("local-job-other-1", JobHandle.Status.STARTED, Instant.now(), null);
-    doReturn(job).when(jobManager).getJob(metalake, job.name());
+    doReturn(job).when(jobManager).getJob(metalake, job.name(), false);
     when(jobExecutor.ownsJob(job.jobExecutionId())).thenReturn(false);
     stubEntityStoreUpdateToApply(job);
 
@@ -1428,7 +1492,7 @@ public class TestJobManager {
         .thenAnswer(a -> null);
 
     JobEntity job = newJobEntity("local-job-mine-1", JobHandle.Status.STARTED, Instant.now(), null);
-    doReturn(job).when(jobManager).getJob(metalake, job.name());
+    doReturn(job).when(jobManager).getJob(metalake, job.name(), false);
     doThrow(new NoSuchJobException("lost")).when(jobExecutor).cancelJob(job.jobExecutionId());
     stubEntityStoreUpdateToApply(job);
 

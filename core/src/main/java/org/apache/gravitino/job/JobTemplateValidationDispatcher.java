@@ -114,8 +114,9 @@ public class JobTemplateValidationDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
-    return dispatcher.getJob(metalake, jobId);
+  public JobEntity getJob(String metalake, String jobId, boolean includeOutput)
+      throws NoSuchJobException {
+    return dispatcher.getJob(metalake, jobId, includeOutput);
   }
 
   @Override

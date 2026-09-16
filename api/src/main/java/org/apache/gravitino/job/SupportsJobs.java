@@ -124,7 +124,23 @@ public interface SupportsJobs {
    * @return a handle to the job
    * @throws NoSuchJobException if the job with the specified ID does not exist
    */
-  JobHandle getJob(String jobId) throws NoSuchJobException;
+  default JobHandle getJob(String jobId) throws NoSuchJobException {
+    return getJob(jobId, false);
+  }
+
+  /**
+   * Retrieves a job by its ID, optionally including its captured stdout/stderr output (see {@link
+   * JobHandle#stdout()}/{@link JobHandle#stderr()}).
+   *
+   * <p>Output is fetched live from the job executor on every call, not persisted, so {@code
+   * includeOutput} should only be set to {@code true} when the output is actually needed.
+   *
+   * @param jobId the ID of the job to retrieve
+   * @param includeOutput whether to also fetch and populate the job's stdout/stderr output
+   * @return a handle to the job
+   * @throws NoSuchJobException if the job with the specified ID does not exist
+   */
+  JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException;
 
   /**
    * Cancel a job by its ID. This operation will attempt to cancel the job if it is still running.

@@ -517,6 +517,7 @@ server, are documented with those services. See
 | `gravitino.job.stagingDir`             | Directory holding staging files for running jobs.                                                          | `/tmp/gravitino/jobs/staging` |
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
+| `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                               | `1000`                        |
 
 ### Key Management
 
