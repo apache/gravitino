@@ -92,6 +92,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -744,6 +745,9 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, catalogObject);
     Assertions.assertEquals(2, policiesInfo.length);
     Assertions.assertEquals(ImmutableSet.of(policy1, policy3), ImmutableSet.copyOf(policiesInfo));
+    PolicyEntity[] directPolicies =
+        policyManager.listDirectPolicyInfosForMetadataObject(METALAKE, catalogObject);
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy3}, directPolicies);
 
     String[] policies1 = policyManager.listPoliciesForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, policies1.length);
@@ -754,6 +758,8 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, policiesInfo1.length);
     Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo1));
+    Assertions.assertEquals(
+        0, policyManager.listDirectPolicyInfosForMetadataObject(METALAKE, schemaObject).length);
 
     String[] policies2 = policyManager.listPoliciesForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(3, policies2.length);
@@ -777,6 +783,39 @@ public class TestPolicyManager {
             () -> policyManager.listPoliciesForMetadataObject(METALAKE, nonExistentObject));
     Assertions.assertTrue(
         e.getMessage().contains("non_existent_catalog"), "Actual message: " + e.getMessage());
+  }
+
+  @Test
+  public void testChildTagValueOverridesParentPolicySelector() {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyEntity policy =
+        createCustomPolicy(
+            METALAKE,
+            policyName,
+            PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null));
+    String tagName = "tag_" + UUID.randomUUID().toString().replace("-", "");
+    tagManager.createTag(METALAKE, tagName, null, null);
+    tagManager.addPolicyForTag(METALAKE, tagName, policy.name(), TagValueSelector.of("finance"));
+
+    MetadataObject schemaObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, schemaObject, new TagValue[] {TagValue.of(tagName, "finance")}, null);
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.of(tagName, "risk")}, null);
+
+    Assertions.assertArrayEquals(
+        new PolicyEntity[] {policy},
+        policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
+    Assertions.assertEquals(
+        0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+    Assertions.assertThrows(
+        NoSuchPolicyException.class,
+        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policyName));
   }
 
   @Test

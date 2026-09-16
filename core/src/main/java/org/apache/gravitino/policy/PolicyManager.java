@@ -299,17 +299,23 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-    checkMetalake(NameIdentifier.of(metalake), entityStore);
-
     Map<Long, PolicyEntity> policiesById = new LinkedHashMap<>();
-    Arrays.stream(listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject))
+    Arrays.stream(listDirectPolicyInfosForMetadataObject(metalake, metadataObject))
         .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
     Arrays.stream(objectPolicyResolver.resolve(metalake, metadataObject))
         .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
     return policiesById.values().toArray(new PolicyEntity[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PolicyEntity[] listDirectPolicyInfosForMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject);
   }
 
   @Override

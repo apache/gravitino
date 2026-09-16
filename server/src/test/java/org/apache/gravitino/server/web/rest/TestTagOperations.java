@@ -64,12 +64,14 @@ import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -255,6 +257,35 @@ public class TestTagOperations extends BaseOperationsTest {
             .delete();
     Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), removeResponse.getStatus());
     Mockito.verify(tagManager).removePolicyFromTag(metalake, tagName, policyName);
+  }
+
+  @Test
+  public void testAddPolicyForTagAlreadyAssociated() {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    doThrow(new PolicyAlreadyAssociatedException("mock error"))
+        .when(tagManager)
+        .addPolicyForTag(
+            Mockito.eq(metalake), Mockito.eq(tagName), Mockito.eq(policyName), Mockito.any());
+
+    for (PolicyAssociationSelectorDTO selector :
+        new PolicyAssociationSelectorDTO[] {
+          PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get()),
+          PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance"))
+        }) {
+      Response response =
+          target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(
+                  Entity.entity(
+                      new PolicyTagAddRequest(selector), MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse.getCode());
+      Assertions.assertEquals(
+          PolicyAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
+    }
   }
 
   @Test

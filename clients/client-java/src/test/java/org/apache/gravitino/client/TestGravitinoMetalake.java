@@ -74,6 +74,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -843,6 +844,19 @@ public class TestGravitinoMetalake extends TestBase {
 
     PolicyTagAssociation added = gravitinoClient.addPolicyForTag(tagName, policyName);
     Assertions.assertEquals(AllValuesSelector.get(), added.selector());
+
+    ErrorResponse alreadyAssociated =
+        ErrorResponse.alreadyExists(
+            PolicyAlreadyAssociatedException.class.getSimpleName(), "mock error");
+    buildMockResource(
+        Method.POST,
+        tagPolicyPath + "/" + policyName,
+        new PolicyTagAddRequest(allValues),
+        alreadyAssociated,
+        HttpStatus.SC_CONFLICT);
+    Assertions.assertThrows(
+        PolicyAlreadyAssociatedException.class,
+        () -> gravitinoClient.addPolicyForTag(tagName, policyName));
 
     buildMockResource(
         Method.DELETE,

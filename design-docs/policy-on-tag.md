@@ -662,10 +662,12 @@ The new privileges follow the existing allow and deny model. A grant on a metala
 policies or tags in that metalake. A grant on one policy or tag applies only to that entity. Metalake
 owners and entity owners retain view access.
 
-For backward compatibility, an effective `APPLY_POLICY` grant implies `VIEW_POLICY`, and an
-effective `APPLY_TAG` grant implies `VIEW_TAG`. Existing roles with apply privileges therefore keep
-their current read access without a grant migration. A corresponding explicit deny of the view
-privilege blocks response visibility but does not change server-side policy enforcement.
+For backward compatibility, an effective `APPLY_POLICY` grant provides policy read access, and an
+effective `APPLY_TAG` grant provides tag read access. Existing roles with apply privileges therefore
+keep their current read access without a grant migration. View and apply denies are evaluated
+independently: `DENY_VIEW_POLICY` does not revoke read access provided by an effective
+`APPLY_POLICY` grant, and `DENY_APPLY_POLICY` does not revoke access provided by an effective
+`VIEW_POLICY` grant. The same rules apply to `VIEW_TAG` and `APPLY_TAG`.
 
 Recommended authorization rules:
 

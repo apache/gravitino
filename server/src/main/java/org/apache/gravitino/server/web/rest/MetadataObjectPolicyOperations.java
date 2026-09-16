@@ -22,12 +22,11 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Sets;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
@@ -116,7 +115,7 @@ public class MetadataObjectPolicyOperations {
               if (policyEntity.isPresent()) {
                 break;
               }
-              policyEntity = getPolicyForObject(metalake, parentObject, policyName);
+              policyEntity = getDirectPolicyForObject(metalake, parentObject, policyName);
               policyDTO = policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(true)));
             }
 
@@ -179,48 +178,51 @@ public class MetadataObjectPolicyOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            Set<PolicyDTO> policies = Sets.newHashSet();
+            Map<String, PolicyDTO> policiesByName = new LinkedHashMap<>();
             PolicyEntity[] nonInheritedPolicies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
-            nonInheritedPolicies =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.POLICY,
-                    nonInheritedPolicies,
-                    (policyEntity -> NameIdentifierUtil.ofPolicy(metalake, policyEntity.name())));
             if (ArrayUtils.isNotEmpty(nonInheritedPolicies)) {
-              Collections.addAll(
-                  policies,
-                  Arrays.stream(nonInheritedPolicies)
-                      .map(t -> PolicyOperations.toDTO(t, Optional.of(false)))
-                      .toArray(PolicyDTO[]::new));
+              Arrays.stream(nonInheritedPolicies)
+                  .forEach(
+                      policy ->
+                          policiesByName.putIfAbsent(
+                              policy.name(), PolicyOperations.toDTO(policy, Optional.of(false))));
             }
 
             for (MetadataObject parentObject :
                 MetadataObjectUtil.getParentMetadataObjects(object)) {
               PolicyEntity[] inheritedPolicies =
-                  policyDispatcher.listPolicyInfosForMetadataObject(metalake, parentObject);
+                  policyDispatcher.listDirectPolicyInfosForMetadataObject(metalake, parentObject);
               if (ArrayUtils.isNotEmpty(inheritedPolicies)) {
-                Collections.addAll(
-                    policies,
-                    Arrays.stream(inheritedPolicies)
-                        .map(t -> PolicyOperations.toDTO(t, Optional.of(true)))
-                        .toArray(PolicyDTO[]::new));
+                Arrays.stream(inheritedPolicies)
+                    .forEach(
+                        policy ->
+                            policiesByName.putIfAbsent(
+                                policy.name(), PolicyOperations.toDTO(policy, Optional.of(true))));
               }
             }
+
+            PolicyDTO[] policies = policiesByName.values().toArray(new PolicyDTO[0]);
+            policies =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.POLICY,
+                    policies,
+                    policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
 
             if (verbose) {
               LOG.info(
                   "List {} policies info for object type: {}, full name: {} under metalake: {}",
-                  policies.size(),
+                  policies.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyListResponse(policies.toArray(new PolicyDTO[0])));
+              return Utils.ok(new PolicyListResponse(policies));
 
             } else {
-              String[] policyNames = policies.stream().map(PolicyDTO::name).toArray(String[]::new);
+              String[] policyNames =
+                  Arrays.stream(policies).map(PolicyDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} policies for object type: {}, full name: {} under metalake: {}",
@@ -310,5 +312,15 @@ public class MetadataObjectPolicyOperations {
       LOG.info("Policy {} not found for object: {}", policyName, object);
       return Optional.empty();
     }
+  }
+
+  private Optional<PolicyEntity> getDirectPolicyForObject(
+      String metalake, MetadataObject object, String policyName) {
+    PolicyEntity[] policies =
+        policyDispatcher.listDirectPolicyInfosForMetadataObject(metalake, object);
+    if (ArrayUtils.isEmpty(policies)) {
+      return Optional.empty();
+    }
+    return Arrays.stream(policies).filter(policy -> policy.name().equals(policyName)).findFirst();
   }
 }

@@ -318,6 +318,13 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
     }
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public PolicyEntity[] listDirectPolicyInfosForMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    return dispatcher.listDirectPolicyInfosForMetadataObject(metalake, metadataObject);
+  }
+
   @Override
   public String[] associatePoliciesForMetadataObject(
       String metalake,
