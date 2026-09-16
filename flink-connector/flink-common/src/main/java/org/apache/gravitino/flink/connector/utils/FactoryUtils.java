@@ -72,8 +72,6 @@ public class FactoryUtils {
 
   @VisibleForTesting
   static boolean isProvidedByCatalogFactory(Iterator<Factory> factories, String type) {
-    // hasNext() links the provider class and can throw LinkageError; next() reports the
-    // ServiceConfigurationError of a broken entry. Both stay inside the try.
     while (true) {
       try {
         if (!factories.hasNext()) {
