@@ -79,24 +79,71 @@ The initial implementation enters at the jobs API. A future policy-driven flow w
 
 ### 5.2 Layer 1 - Policy Definition (`api/`, follow-up)
 
-A future `system_iceberg_rewrite_manifests` policy can express thresholds over manifest statistics. Its typed fields and defaults need a separate proposal informed by collected measurements. No policy type is added by #12937.
+The follow-up `system_iceberg_rewrite_manifests` policy uses the following configurable thresholds. No policy type is added by #12937.
+
+| Policy setting                      | Default           | Meaning                                                           |
+| ----------------------------------- | ----------------- | ----------------------------------------------------------------- |
+| `manifest_count_critical`           | `500`             | Trigger at or above this count, regardless of average size        |
+| `manifest_count_warning`            | `100`             | Minimum count for the size-based trigger                          |
+| `avg_manifest_size_threshold_bytes` | `8388608` (8 MiB) | Trigger below this average size when the warning count is reached |
+
+Evaluate the following expression using statistics for the resolved target spec only:
+
+```text
+IF manifest_count >= manifest_count_critical:
+    trigger
+ELSE IF manifest_count >= manifest_count_warning
+        AND avg_manifest_size_bytes < avg_manifest_size_threshold_bytes:
+    trigger
+ELSE:
+    do not trigger
+```
+
+Count comparisons are inclusive; the size comparison is strict. For example, 500 manifests trigger regardless of size, 100 manifests averaging less than 8 MiB trigger, and 100 manifests averaging exactly 8 MiB do not. Counts below 100 do not trigger under these defaults.
 
 ### 5.3 Layer 2 - Strategy Handler (`maintenance/optimizer/`, follow-up)
 
-Start by collecting only these two table-level statistics through `IcebergUpdateStatsAndMetricsJob`:
+#### 5.3.1 Resolve the Target Spec
 
-| Proposed statistic         | Source from `.manifests` | Purpose                                             |
-| -------------------------- | ------------------------ | --------------------------------------------------- |
-| `custom-manifest-number`   | `COUNT(*)`               | Measures current snapshot manifest count            |
-| `custom-avg-manifest-size` | `AVG(length)`            | Distinguishes many small manifests from larger ones |
+At the start of a collection/evaluation cycle, resolve `spec_id` from the requested ID or, if omitted, from the table's `default-spec-id`. Validate that the resolved spec exists and carry that ID through collection, evaluation, and job submission. Do not resolve the default again between these steps: partition evolution could otherwise make the job target a different spec from the one evaluated.
 
-Do not add small-manifest counts or spec-count statistics without a demonstrated policy use case. A future handler declares `DataRequirement.TABLE_STATISTICS` and reads measured values through the existing statistics path. Policy thresholds come from policy content. Any last-success time needed for a cooldown belongs in `statistic_meta` as a `custom-` statistic written after successful completion.
+Collect only manifests in the current snapshot whose `partition_spec_id` equals that resolved ID:
 
-These aggregates span all specs in the current snapshot. Since a rewrite targets one spec, an automatic policy must account for this mismatch before shipping, for example by evaluating per-spec measurements. A high total count alone does not prove the default-spec rewrite will reduce it.
+```sql
+-- Example: the resolved spec ID is 1.
+SELECT COUNT(*) AS manifest_count, AVG(length) AS avg_manifest_size_bytes
+FROM rest_catalog.db.t1.manifests
+WHERE partition_spec_id = 1;
+```
+
+The SQL ID is rendered from a validated integer. With no matching manifests, record a count of zero and normalize the null average to zero; this cannot trigger under the default count thresholds. A missing map entry means statistics have not been collected for that spec, not zero manifests: collect it before evaluating.
+
+#### 5.3.2 Statistics Storage
+
+Store one row per table and statistic name in `statistic_meta`, not one row per spec. Each statistic value is an object keyed by the decimal spec ID. Use the existing `StatisticValues.objectValue` representation with numeric values, retaining two statistics only:
+
+| Statistic name                     | Value for each spec key            | Purpose                             |
+| ---------------------------------- | ---------------------------------- | ----------------------------------- |
+| `custom-manifest-number-by-spec`   | Long from `COUNT(*)`               | Manifest count for that spec        |
+| `custom-avg-manifest-size-by-spec` | Double from `AVG(length)` in bytes | Average manifest size for that spec |
+
+Example logical contents of the two rows for one table:
+
+```text
+statistic_name:  custom-manifest-number-by-spec
+statistic_value: {"0": 620, "1": 120}
+
+statistic_name:  custom-avg-manifest-size-by-spec
+statistic_value: {"0": 10485760.0, "1": 4194304.0}
+```
+
+These illustrate the object values, not a new REST serialization format. A collection run for spec `1` replaces only key `"1"` in each map and preserves key `"0"` and every other spec entry. Read and merge the existing maps before writing them through the table-statistics API. Coordinate concurrent collectors for the same table so one read/merge/write does not overwrite another spec's update. Publish both measurements from the same collection and do not evaluate a partially updated pair; the follow-up implementation must test these update guarantees.
+
+The handler declares `DataRequirement.TABLE_STATISTICS` and looks up the same resolved spec key in both objects. The threshold expression uses those two numeric values, never table-wide totals or values from another spec. Do not add small-manifest counts or spec-count statistics. Any last-success time required for a future cooldown belongs in `statistic_meta` as a `custom-` statistic written after successful completion.
 
 ### 5.4 Layer 3 - Job Adapter (`maintenance/optimizer/`, follow-up)
 
-A future adapter maps a strategy decision to `builtin-iceberg-rewrite-manifests`, supplies the catalog and table identifiers, and forwards the selected spec and caching option. It reuses existing job submission and tracking. The initial PR requires no adapter because operators submit the template directly.
+The adapter maps a positive strategy decision to `builtin-iceberg-rewrite-manifests`, supplying the catalog, table, caching option, and the exact resolved `spec_id` used by the collector and trigger expression. Always include that resolved ID in the submitted `jobConf`, even when the original request omitted it. This preserves the target if the table default changes after collection. Reuse existing job submission and tracking. The initial PR requires no adapter because operators submit the template directly.
 
 ### 5.5 Layer 4 - Spark Job (`maintenance/jobs/`)
 
@@ -278,14 +325,16 @@ The template is additive. No existing template name, REST endpoint, client API, 
 ## 8. Proposed PR Plan
 
 1. **Job implementation (#12937)**: Register the template, implement procedure execution and validation, and document submission and spec discovery. Add a Spark-backed test with manifests under two specs: verify that a run affects only the selected spec, preserves records, and handles a no-op.
-2. **Manifest statistics**: Collect `custom-manifest-number` and `custom-avg-manifest-size`, with aggregation tests and user documentation.
-3. **Automatic triggering**: Once measurements inform thresholds and spec selection, propose typed policy content, a handler, and an adapter. Test the complete collect, evaluate, and submit flow.
+2. **Manifest statistics**: Collect `custom-manifest-number-by-spec` and `custom-avg-manifest-size-by-spec`. Test spec-filtered aggregation, empty results, missing entries, merge updates preserving other specs, and concurrent collection updates. Document the two object-valued statistics.
+3. **Automatic triggering**: Implement the policy defaults and expression in Section 5.2, the handler, and the adapter. Test counts at 99, 100, 499, and 500; sizes below, at, and above 8 MiB; and a default-spec change between collection and submission. Verify the submitted ID matches the collected and evaluated key.
 
-## 9. Open Questions
+## 9. Review Decisions and Initial Compatibility
 
-- Which measured thresholds justify a rewrite without repeatedly submitting no-op jobs?
-- How should automatic triggering choose specs after partition evolution? Table-wide aggregates alone are insufficient.
-- Which Spark and Iceberg versions should be covered by the job's integration-test matrix?
+The three open questions are resolved:
+
+1. **Trigger thresholds**: Use the critical-count or warning-count-plus-size expression in Section 5.2, with defaults of 500, 100, and 8 MiB respectively.
+2. **Spec consistency**: Collect, store, evaluate, and submit against the same resolved spec. Represent multiple specs in one object-valued row per statistic name, as specified in Sections 5.3 and 5.4.
+3. **Initial runtime support**: Commit to and run CI against **Spark 3.5 and Iceberg 1.11.0** for the initial release, aligned with the other built-in Iceberg jobs. Other version combinations are outside the initial compatibility commitment. The Spark-backed tests in the PR plan must run on this combination.
 
 ## 10. Comparison with Other Maintenance Flows
 
