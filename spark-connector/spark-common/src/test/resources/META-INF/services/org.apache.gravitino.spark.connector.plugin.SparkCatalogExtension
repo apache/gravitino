@@ -21,3 +21,4 @@
 org.apache.gravitino.spark.connector.plugin.MissingSparkCatalogExtension
 org.apache.gravitino.spark.connector.plugin.FakeSparkCatalogExtension
 org.apache.gravitino.spark.connector.plugin.DuplicateSparkCatalogExtension
+org.apache.gravitino.spark.connector.plugin.BlankSparkCatalogExtension

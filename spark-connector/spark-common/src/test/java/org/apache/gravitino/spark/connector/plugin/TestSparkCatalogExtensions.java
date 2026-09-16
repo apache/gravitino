@@ -36,9 +36,15 @@ public class TestSparkCatalogExtensions {
 
   @Test
   void testFirstDiscoveredExtensionWinsForDuplicateProvider() {
-    Assertions.assertNotEquals(
-        DuplicateSparkCatalogExtension.CATALOG_CLASS_NAME,
+    Assertions.assertEquals(
+        FakeSparkCatalogExtension.CATALOG_CLASS_NAME,
         SparkCatalogExtensions.catalogClassName(FakeSparkCatalogExtension.PROVIDER));
+  }
+
+  @Test
+  void testBlankCatalogClassNameIsSkipped() {
+    Assertions.assertNull(
+        SparkCatalogExtensions.catalogClassName(BlankSparkCatalogExtension.PROVIDER));
   }
 
   @Test

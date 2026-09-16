@@ -229,6 +229,8 @@ sourceSets {
 val testJar by tasks.registering(Jar::class) {
   archiveClassifier.set("tests")
   from(sourceSets["test"].output)
+  // The SPI fixture is only for this module's tests; keep it off the version modules' classpath.
+  exclude("META-INF/services/**")
 }
 
 configurations {
