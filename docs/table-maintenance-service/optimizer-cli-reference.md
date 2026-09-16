@@ -254,6 +254,12 @@ in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2
 Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
 Iceberg support.
 
+Optional template arguments are still listed as `--flag` + `{{placeholder}}` pairs. If `jobConf`
+omits a key (or leaves the placeholder unresolved), the flag remains on the process command line as
+a dangling argument (for example `--updater-options` with no value before `--spark-conf`). Callers
+and UIs should supply every placeholder they care about with an explicit value, including optional
+ones they intentionally disable or leave at a documented default, rather than omitting the key.
+
 ## Update Statistics
 
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.

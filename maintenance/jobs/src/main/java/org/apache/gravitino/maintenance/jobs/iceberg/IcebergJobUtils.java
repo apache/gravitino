@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
@@ -109,30 +107,7 @@ public final class IcebergJobUtils {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
-      return new HashMap<>();
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
-
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        configs.put(key, value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse Spark configurations JSON: "
-              + sparkConfJson
-              + ". Error: "
-              + e.getMessage(),
-          e);
-    }
+    return IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf");
   }
 
   /**

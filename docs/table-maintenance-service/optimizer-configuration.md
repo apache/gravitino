@@ -79,6 +79,12 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
 
 `updater_options` and `spark_conf` are JSON strings inside a JSON object, so their quotes are escaped. That nesting is the most common source of malformed submissions.
 
+Built-in Iceberg templates list optional keys as `--flag` + `{{placeholder}}`. Omitting a key from
+`jobConf` does not remove that flag from the submitted command; it can leave a dangling flag such as
+`--updater-options` with no value. Prefer sending an explicit value for each placeholder you use
+(or a documented default) instead of dropping the key. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
 ship that JAR or fill template `jars`, so include it yourself — for example
 `"spark.jars":"/path/to/iceberg-spark-runtime-....jar"` inside `spark_conf`. Match the artifact to

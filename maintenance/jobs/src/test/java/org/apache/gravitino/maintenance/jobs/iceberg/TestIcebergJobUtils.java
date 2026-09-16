@@ -45,4 +45,13 @@ public class TestIcebergJobUtils {
     assertTrue(ex.getMessage().contains("iceberg-spark-runtime"));
     assertTrue(ex.getMessage().contains("spark.jars"));
   }
+
+  @Test
+  public void testParseCustomSparkConfigsUsesSparkConfFlagName() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergJobUtils.parseCustomSparkConfigs("{not_json}"));
+    assertTrue(ex.getMessage().contains("--spark-conf"));
+  }
 }

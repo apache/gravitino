@@ -96,7 +96,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
+    Map<String, String> updaterOptions =
+        parseJsonOptions(argMap.get("updater-options"), "updater-options");
     String sparkConfJson = argMap.get("spark-conf");
 
     SparkSession.Builder sparkBuilder =
@@ -392,15 +393,22 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson);
+    return parseJsonOptions(sparkConfJson, "spark-conf");
   }
 
+  /**
+   * Parse a flat JSON option map and report parse errors with the real CLI flag name.
+   *
+   * @param json JSON string; null or empty yields an empty map
+   * @param optionName CLI flag name without {@code --} (for example {@code updater-options})
+   * @return parsed flat string map
+   */
   @VisibleForTesting
-  static Map<String, String> parseJsonOptions(String json) {
+  static Map<String, String> parseJsonOptions(String json, String optionName) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, optionName);
   }
 
   @VisibleForTesting
