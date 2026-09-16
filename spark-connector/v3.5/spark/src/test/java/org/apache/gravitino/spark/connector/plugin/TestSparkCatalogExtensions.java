@@ -35,6 +35,13 @@ public class TestSparkCatalogExtensions {
   }
 
   @Test
+  void testFirstDiscoveredExtensionWinsForDuplicateProvider() {
+    Assertions.assertNotEquals(
+        DuplicateSparkCatalogExtension.CATALOG_CLASS_NAME,
+        SparkCatalogExtensions.catalogClassName(FakeSparkCatalogExtension.PROVIDER));
+  }
+
+  @Test
   void testUnknownProviderIsNotServed() {
     Assertions.assertNull(SparkCatalogExtensions.catalogClassName("jdbc-unknown"));
   }

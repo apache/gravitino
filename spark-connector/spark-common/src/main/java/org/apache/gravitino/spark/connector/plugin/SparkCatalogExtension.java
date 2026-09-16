@@ -21,7 +21,9 @@ package org.apache.gravitino.spark.connector.plugin;
 /**
  * Service provider interface that lets a jar outside the connector supply the Spark catalog
  * implementation for a Gravitino catalog provider. Implementations are discovered through {@link
- * java.util.ServiceLoader} and take precedence over the catalogs the connector ships itself.
+ * java.util.ServiceLoader} and take precedence over the catalogs the connector ships itself. When
+ * several extensions declare the same provider, the first one discovered is used and the others are
+ * ignored with a warning.
  */
 public interface SparkCatalogExtension {
 
@@ -34,6 +36,7 @@ public interface SparkCatalogExtension {
 
   /**
    * The fully qualified name of the Spark {@code TableCatalog} class registered for the provider.
+   * Spark loads it when the session is created, so it must be on the Spark class path.
    *
    * @return the Spark catalog class name
    */

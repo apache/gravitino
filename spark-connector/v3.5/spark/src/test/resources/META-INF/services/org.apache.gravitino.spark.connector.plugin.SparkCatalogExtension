@@ -17,4 +17,7 @@
 # under the License.
 #
 
+# A missing class exercises the ServiceConfigurationError skip path; the fake below must still load.
+org.apache.gravitino.spark.connector.plugin.MissingSparkCatalogExtension
 org.apache.gravitino.spark.connector.plugin.FakeSparkCatalogExtension
+org.apache.gravitino.spark.connector.plugin.DuplicateSparkCatalogExtension

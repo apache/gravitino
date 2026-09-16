@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,29 +66,49 @@ public class SparkCatalogExtensions {
   private static Map<String, String> load() {
     Map<String, String> byProvider = new HashMap<>();
     Iterator<SparkCatalogExtension> iterator =
-        ServiceLoader.load(
-                SparkCatalogExtension.class, SparkCatalogExtensions.class.getClassLoader())
-            .iterator();
+        ServiceLoader.load(SparkCatalogExtension.class, extensionClassLoader()).iterator();
     while (true) {
       try {
         if (!iterator.hasNext()) {
           break;
         }
         SparkCatalogExtension extension = iterator.next();
-        String provider = extension.provider().toLowerCase(Locale.ROOT);
-        String previous = byProvider.putIfAbsent(provider, extension.catalogClassName());
+        String provider = extension.provider();
+        String catalogClassName = extension.catalogClassName();
+        if (StringUtils.isBlank(provider) || StringUtils.isBlank(catalogClassName)) {
+          LOG.error(
+              "Skip Spark catalog extension {}: provider and catalog class name must not be blank,"
+                  + " got provider={}, catalogClassName={}.",
+              extension.getClass().getName(),
+              provider,
+              catalogClassName);
+          continue;
+        }
+        String normalized = provider.toLowerCase(Locale.ROOT);
+        String previous = byProvider.putIfAbsent(normalized, catalogClassName);
         if (previous != null) {
           LOG.warn(
               "Ignore Spark catalog extension {} for provider {}: already served by {}.",
-              extension.catalogClassName(),
-              provider,
+              catalogClassName,
+              normalized,
               previous);
         }
       } catch (ServiceConfigurationError e) {
-        // An extension jar built for another Spark version may fail to link; keep the rest.
-        LOG.warn("Skip a Spark catalog extension that cannot be loaded.", e);
+        // ServiceLoader reports a missing provider class, a malformed META-INF entry or a failing
+        // constructor as ServiceConfigurationError; skip that entry and keep the rest.
+        LOG.error("Skip a Spark catalog extension that cannot be loaded.", e);
       }
     }
+    LOG.info("Discovered Spark catalog extensions: {}", byProvider);
     return byProvider;
+  }
+
+  /**
+   * Prefers the context class loader so extension jars added through {@code --jars} are visible
+   * when the connector itself sits on the driver class path.
+   */
+  private static ClassLoader extensionClassLoader() {
+    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    return loader != null ? loader : SparkCatalogExtensions.class.getClassLoader();
   }
 }
