@@ -25,6 +25,11 @@ import org.junit.jupiter.api.Test;
 
 public class TestDistributions {
 
+  // A separate Distribution implementation, used to prove Distributions.isNone recognizes NONE
+  // structurally across representations rather than by concrete type. DistributionDTO.NONE would be
+  // the natural other representation, but DistributionDTO lives in the common module and the api
+  // module does not depend on common (main or test), so it is not on this test classpath. An
+  // anonymous implementation stands in for that cross-representation check.
   private static Distribution distributionOf(Strategy strategy, int number, Expression... exprs) {
     return new Distribution() {
       @Override

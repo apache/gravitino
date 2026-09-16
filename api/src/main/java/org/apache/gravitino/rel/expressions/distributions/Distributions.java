@@ -20,6 +20,7 @@ package org.apache.gravitino.rel.expressions.distributions;
 
 import java.util.Arrays;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 
@@ -43,7 +44,7 @@ public class Distributions {
    * @param distribution The distribution to check; may be null.
    * @return true if the distribution is not null and represents the NONE distribution.
    */
-  public static boolean isNone(Distribution distribution) {
+  public static boolean isNone(@Nullable Distribution distribution) {
     return distribution != null
         && distribution.strategy() == Strategy.NONE
         && distribution.number() == 0
