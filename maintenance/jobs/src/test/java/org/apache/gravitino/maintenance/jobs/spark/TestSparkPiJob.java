@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.jobs.spark;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -111,7 +110,7 @@ public class TestSparkPiJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v3", version);
+    assertEquals("v1", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -131,36 +130,5 @@ public class TestSparkPiJob {
 
     assertNotNull(executable);
     assertFalse(executable.trim().isEmpty());
-  }
-
-  @Test
-  public void testParseSlicesRequiresPositiveInteger() {
-    assertEquals(4, SparkPiJob.parseSlices(new String[] {"4"}));
-    assertEquals(1, SparkPiJob.parseSlices(new String[] {" 1 "}));
-
-    IllegalArgumentException missing =
-        assertThrows(IllegalArgumentException.class, () -> SparkPiJob.parseSlices(new String[0]));
-    assertTrue(missing.getMessage().contains("Missing slices"));
-
-    IllegalArgumentException placeholder =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> SparkPiJob.parseSlices(new String[] {"{{slices}}"}));
-    assertTrue(placeholder.getMessage().contains("{{slices}}"));
-
-    IllegalArgumentException blank =
-        assertThrows(
-            IllegalArgumentException.class, () -> SparkPiJob.parseSlices(new String[] {" "}));
-    assertTrue(blank.getMessage().contains("Invalid number of slices"));
-
-    IllegalArgumentException notANumber =
-        assertThrows(
-            IllegalArgumentException.class, () -> SparkPiJob.parseSlices(new String[] {"abc"}));
-    assertTrue(notANumber.getMessage().contains("Invalid number of slices"));
-
-    IllegalArgumentException zero =
-        assertThrows(
-            IllegalArgumentException.class, () -> SparkPiJob.parseSlices(new String[] {"0"}));
-    assertTrue(zero.getMessage().contains("must be >= 1"));
   }
 }

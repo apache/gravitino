@@ -31,9 +31,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -44,7 +42,6 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -801,45 +798,35 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executableUri = replacePlaceholder(content.executable(), jobConf);
-    rejectUnresolvedPlaceholder(executableUri, "executable");
-    String executable = fetchFileFromUri(executableUri, stagingDir, TIMEOUT_IN_MS);
+    String executable =
+        fetchFileFromUri(
+            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
-        omitEmptyArguments(
-            content.arguments().stream()
-                .map(arg -> replacePlaceholder(arg, jobConf))
-                .collect(Collectors.toList()));
-    for (String arg : args) {
-      rejectEmbeddedUnresolvedPlaceholder(arg, "argument");
-    }
+        content.arguments().stream()
+            .map(arg -> replacePlaceholder(arg, jobConf))
+            .collect(Collectors.toList());
     Map<String, String> environments =
-        omitUnresolvedTemplateMap(content.environments(), jobConf, "environment");
-    Map<String, String> customFields = new LinkedHashMap<>();
-    for (Map.Entry<String, String> entry : content.customFields().entrySet()) {
-      String key = replacePlaceholder(entry.getKey(), jobConf);
-      String value = replacePlaceholder(entry.getValue(), jobConf);
-      rejectEmbeddedUnresolvedPlaceholder(key, "customFields key");
-      rejectEmbeddedUnresolvedPlaceholder(value, "customFields value");
-      if (customFields.containsKey(key)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Duplicate key %s (attempted merging values %s and %s)",
-                key, customFields.get(key), value));
-      }
-      customFields.put(key, value);
-    }
+        content.environments().entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry -> replacePlaceholder(entry.getKey(), jobConf),
+                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
+    Map<String, String> customFields =
+        content.customFields().entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry -> replacePlaceholder(entry.getKey(), jobConf),
+                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
 
     // For shell job template
     if (content.jobType() == JobTemplate.JobType.SHELL) {
       List<String> scripts =
           content.scripts().stream()
               .map(
-                  script -> {
-                    String resolved = replacePlaceholder(script, jobConf);
-                    rejectUnresolvedPlaceholder(resolved, "script");
-                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
-                  })
+                  script ->
+                      fetchFileFromUri(
+                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -856,39 +843,35 @@ public class JobManager implements JobOperationDispatcher {
     // For Spark job template
     if (content.jobType() == JobTemplate.JobType.SPARK) {
       String className = replacePlaceholder(content.className(), jobConf);
-      rejectUnresolvedPlaceholder(className, "className");
       List<String> jars =
           content.jars().stream()
               .map(
-                  jar -> {
-                    String resolved = replacePlaceholder(jar, jobConf);
-                    rejectUnresolvedPlaceholder(resolved, "jar");
-                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
-                  })
+                  jar ->
+                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> files =
           content.files().stream()
               .map(
-                  file -> {
-                    String resolved = replacePlaceholder(file, jobConf);
-                    rejectUnresolvedPlaceholder(resolved, "file");
-                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
-                  })
+                  file ->
+                      fetchFileFromUri(
+                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> archives =
           content.archives().stream()
               .map(
-                  archive -> {
-                    String resolved = replacePlaceholder(archive, jobConf);
-                    rejectUnresolvedPlaceholder(resolved, "archive");
-                    return fetchFileFromUri(resolved, stagingDir, TIMEOUT_IN_MS);
-                  })
+                  archive ->
+                      fetchFileFromUri(
+                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
-          omitUnresolvedTemplateMap(content.configs(), jobConf, "configs");
+          content.configs().entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      entry -> replacePlaceholder(entry.getKey(), jobConf),
+                      entry -> replacePlaceholder(entry.getValue(), jobConf)));
 
       return SparkJobTemplate.builder()
           .withName(name)
@@ -908,13 +891,6 @@ public class JobManager implements JobOperationDispatcher {
     throw new IllegalArgumentException("Unsupported job type: " + content.jobType());
   }
 
-  /**
-   * Replace {@code {{placeholder}}} tokens using {@code replacements}.
-   *
-   * <p>A key present in {@code replacements} always substitutes, including when the mapped value is
-   * {@code null} (treated as an explicit empty string). A missing key leaves the placeholder
-   * unchanged so optional omit/keep rules can distinguish omit from empty.
-   */
   @VisibleForTesting
   static String replacePlaceholder(String inputString, Map<String, String> replacements) {
     if (StringUtils.isBlank(inputString)) {
@@ -926,121 +902,17 @@ public class JobManager implements JobOperationDispatcher {
     Matcher matcher = PLACEHOLDER_PATTERN.matcher(inputString);
     while (matcher.find()) {
       String key = matcher.group(1);
-      if (replacements.containsKey(key)) {
-        String replacement = replacements.get(key);
-        matcher.appendReplacement(
-            result, Matcher.quoteReplacement(replacement != null ? replacement : ""));
+      String replacement = replacements.get(key);
+      if (replacement != null) {
+        matcher.appendReplacement(result, replacement);
       } else {
         // If no replacement is found, keep the placeholder as is
-        matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
+        matcher.appendReplacement(result, matcher.group(0));
       }
     }
     matcher.appendTail(result);
 
     return result.toString();
-  }
-
-  /**
-   * Drop unresolved optional {@code --flag}/value pairs after placeholder substitution.
-   *
-   * <p>Built-in templates list optional flags as {@code --flag} + {@code {{placeholder}}} with
-   * matching names (for example {@code --updater-options} / {@code {{updater_options}}}). When the
-   * job conf omits that key, leaving the unresolved placeholder produces dangling arguments such as
-   * {@code --updater-options {{updater_options}}}. This method removes a pair only when the
-   * following token is an entire unresolved placeholder whose name matches the flag (after
-   * normalizing {@code -} / {@code _} and case).
-   *
-   * <p>A boolean flag followed by an unrelated placeholder (for example {@code --verbose} / {@code
-   * {{unset_flag}}}) is not treated as a pair. Bare / positional unresolved placeholders (for
-   * example {@code {{slices}}} in SparkPi) are kept so a missing required argument stays visible.
-   * An explicit empty string in {@code jobConf} is also kept.
-   *
-   * @param arguments arguments after {@link #replacePlaceholder(String, Map)}; must not be null
-   * @return compacted argument list suitable for process execution; never null
-   */
-  @VisibleForTesting
-  static List<String> omitEmptyArguments(List<String> arguments) {
-    Preconditions.checkNotNull(arguments, "arguments");
-    if (arguments.isEmpty()) {
-      return arguments;
-    }
-
-    List<String> result = new ArrayList<>(arguments.size());
-    for (int i = 0; i < arguments.size(); i++) {
-      String arg = arguments.get(i);
-      if (arg.startsWith("--") && i + 1 < arguments.size()) {
-        String next = arguments.get(i + 1);
-        // Drop --flag + {{flag_name}} only when names match after normalizing -/_ and case.
-        if (!next.startsWith("--")) {
-          Matcher matcher = PLACEHOLDER_PATTERN.matcher(next);
-          if (matcher.matches()) {
-            String normalizedFlag = arg.substring(2).replace('-', '_').toLowerCase(Locale.ROOT);
-            String normalizedPlaceholder =
-                matcher.group(1).replace('-', '_').toLowerCase(Locale.ROOT);
-            if (normalizedFlag.equals(normalizedPlaceholder)) {
-              i++;
-              continue;
-            }
-          }
-        }
-      }
-
-      result.add(arg);
-    }
-    return result;
-  }
-
-  /**
-   * Fails when {@code value} still embeds an unresolved placeholder that is not a whole-token match
-   * (for example {@code prefix-{{missing}}}).
-   *
-   * <p>Whole-token unresolved placeholders are allowed here for optional argument / customField
-   * keep rules. Required URI-like fields use {@link #rejectUnresolvedPlaceholder(String, String)}
-   * instead.
-   *
-   * @param value resolved string that may contain placeholders; may be null
-   * @param context label used in the error message
-   */
-  @VisibleForTesting
-  static void rejectEmbeddedUnresolvedPlaceholder(@Nullable String value, String context) {
-    if (value == null) {
-      return;
-    }
-    Matcher matcher = PLACEHOLDER_PATTERN.matcher(value);
-    if (!matcher.find()) {
-      return;
-    }
-    // Whole-token placeholders are handled by omit/keep rules; only embedded forms fail here.
-    if (matcher.start() == 0 && matcher.end() == value.length()) {
-      return;
-    }
-    throw new IllegalArgumentException(
-        String.format(
-            "Unresolved placeholder remains embedded in %s after substitution: %s",
-            context, value));
-  }
-
-  /**
-   * Fails when {@code value} still contains any unresolved {@code {{placeholder}}} (whole-token or
-   * embedded).
-   *
-   * <p>Used for required fields such as {@code executable}, {@code className}, {@code jars}, {@code
-   * files}, {@code archives}, and {@code scripts} so missing jobConf keys fail at template
-   * resolution instead of later URI fetch / Spark submit errors.
-   *
-   * @param value resolved string that may contain placeholders; may be null
-   * @param context label used in the error message
-   */
-  @VisibleForTesting
-  static void rejectUnresolvedPlaceholder(@Nullable String value, String context) {
-    if (value == null) {
-      return;
-    }
-    if (PLACEHOLDER_PATTERN.matcher(value).find()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Unresolved placeholder remains in %s after substitution: %s", context, value));
-    }
   }
 
   @VisibleForTesting
@@ -1181,67 +1053,6 @@ public class JobManager implements JobOperationDispatcher {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
-  }
-
-  /**
-   * Resolves optional template maps such as {@code environments} and Spark {@code configs}. Entries
-   * whose keys or values are still an unresolved {@code {{placeholder}}} after substitution are
-   * dropped so optional credentials / Spark confs do not become literal placeholder strings.
-   *
-   * <p>Explicit empty strings from {@code jobConf} are kept. {@code arguments} use {@link
-   * #omitEmptyArguments(List)}; {@code customFields} still keep unresolved placeholders as literal
-   * text when the entire token is one placeholder.
-   *
-   * <p>Config / environment keys that still embed an unresolved placeholder (for example {@code
-   * spark.sql.catalog.{{catalog_name}}}) are dropped rather than rejected, so omitting optional
-   * catalog keys does not surface as a JobManager-level error.
-   *
-   * <p>If two entries resolve to the same key after placeholder substitution, this method fails
-   * fast with {@link IllegalArgumentException} so the REST layer returns HTTP 400 for client input
-   * errors.
-   *
-   * <p>Composite values that still embed an unresolved placeholder (for example {@code
-   * prefix-{{missing}}} or {@code {{a}}.{{b}}} with only one key supplied) fail fast with {@link
-   * IllegalArgumentException} instead of being passed through as literal text.
-   *
-   * @param source template map before substitution
-   * @param jobConf replacement values
-   * @param context label used in error messages (for example {@code environment} or {@code
-   *     configs})
-   * @return resolved map without unresolved optional entries
-   */
-  private static Map<String, String> omitUnresolvedTemplateMap(
-      Map<String, String> source, Map<String, String> jobConf, String context) {
-    Map<String, String> resolved = new LinkedHashMap<>();
-    for (Map.Entry<String, String> entry : source.entrySet()) {
-      String key = replacePlaceholder(entry.getKey(), jobConf);
-      String value = replacePlaceholder(entry.getValue(), jobConf);
-      // Whole-token or embedded unresolved keys (e.g. spark.sql.catalog.{{catalog_name}}) are
-      // optional and dropped.
-      if (key != null && PLACEHOLDER_PATTERN.matcher(key).find()) {
-        continue;
-      }
-      if (value != null) {
-        Matcher valueMatcher = PLACEHOLDER_PATTERN.matcher(value);
-        if (valueMatcher.find()) {
-          if (valueMatcher.start() == 0 && valueMatcher.end() == value.length()) {
-            continue;
-          }
-          throw new IllegalArgumentException(
-              String.format(
-                  "Unresolved placeholder remains embedded in %s value after substitution: %s",
-                  context, value));
-        }
-      }
-      if (resolved.containsKey(key)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Duplicate key %s (attempted merging values %s and %s)",
-                key, resolved.get(key), value));
-      }
-      resolved.put(key, value);
-    }
-    return resolved;
   }
 
   private void deleteStagingDirOfUnsubmittedJob(File jobStagingDir, long jobId) {

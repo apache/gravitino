@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,15 +42,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v1";
 
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";
   private static final String STRATEGY_SORT = "sort";
-  private static final String OPTION_STRATEGY = "strategy";
-  private static final String OPTION_SORT_ORDER = "sort-order";
-  private static final String OPTION_WHERE = "where-clause";
-  private static final String OPTION_OPTIONS = "options";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -70,11 +68,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * <p>Uses named arguments for flexibility:
    *
    * <ul>
-   *   <li>--catalog-name &lt;catalog_name&gt; Required. Iceberg catalog name.
-   *   <li>--table-identifier &lt;table_identifier&gt; Required. Table name (db.table)
+   *   <li>--catalog &lt;catalog_name&gt; Required. Iceberg catalog name.
+   *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
    *   <li>--strategy &lt;strategy&gt; Optional. binpack or sort
    *   <li>--sort-order &lt;sort_order&gt; Optional. Sort order specification
-   *   <li>--where-clause &lt;where_clause&gt; Optional. Filter predicate
+   *   <li>--where &lt;where_clause&gt; Optional. Filter predicate
    *   <li>--options &lt;options_json&gt; Optional. JSON map of options
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
@@ -87,15 +85,14 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    *       ProcessBuilder.
    *   <li><b>Via Command Line:</b> Use shell quoting. Example: {@code --options
    *       '{"min-input-files":"2"}'}
-   *   <li><b>SQL Single Quotes:</b> Use as-is in where clauses. Example: {@code --where-clause
-   *       "status = 'active'"} - Single quotes are automatically escaped for SQL.
+   *   <li><b>SQL Single Quotes:</b> Use as-is in where clauses. Example: {@code --where "status =
+   *       'active'"} - Single quotes are automatically escaped for SQL.
    *   <li><b>JSON Values:</b> Must be valid JSON strings. The job parses and validates JSON before
    *       use.
    * </ul>
    *
-   * <p>Example via command line: --catalog-name iceberg_catalog --table-identifier db.sample
-   * --strategy binpack --options '{"min-input-files":"2"}' --spark-conf
-   * '{"spark.sql.shuffle.partitions":"200"}'
+   * <p>Example via command line: --catalog iceberg_catalog --table db.sample --strategy binpack
+   * --options '{"min-input-files":"2"}' --spark-conf '{"spark.sql.shuffle.partitions":"200"}'
    *
    * <p>Example via Gravitino API:
    *
@@ -109,31 +106,30 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * }</pre>
    */
   public static void main(String[] args) {
+    if (args.length < 4) {
+      printUsage();
+      System.exit(1);
+    }
+
+    // Parse named arguments
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
-    String catalogName = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_CATALOG));
-    String tableIdentifier = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_TABLE));
+    String catalogName = argMap.get("catalog");
+    String tableIdentifier = argMap.get("table");
 
     if (catalogName == null || tableIdentifier == null) {
-      System.err.println(
-          "Error: --"
-              + IcebergJobUtils.OPTION_CATALOG
-              + " and --"
-              + IcebergJobUtils.OPTION_TABLE
-              + " are required arguments");
+      System.err.println("Error: --catalog and --table are required arguments");
       printUsage();
       System.exit(1);
-      return;
     }
 
     // Optional arguments
-    String strategy = IcebergJobUtils.trimToNull(argMap.get(OPTION_STRATEGY));
-    String sortOrder = IcebergJobUtils.trimToNull(argMap.get(OPTION_SORT_ORDER));
-    String whereClause = IcebergJobUtils.trimToNull(argMap.get(OPTION_WHERE));
-    String optionsJson = IcebergJobUtils.trimToNull(argMap.get(OPTION_OPTIONS));
-    String sparkConfJson =
-        IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_SPARK_CONF));
+    String strategy = argMap.get("strategy");
+    String sortOrder = argMap.get("sort-order");
+    String whereClause = argMap.get("where");
+    String optionsJson = argMap.get("options");
+    String sparkConfJson = argMap.get("spark-conf");
 
     // Validate strategy if provided
     try {
@@ -142,7 +138,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       System.err.println("Error: " + e.getMessage());
       printUsage();
       System.exit(1);
-      return;
     }
 
     // Build Spark session with custom configs if provided
@@ -161,7 +156,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         System.err.println("Error: " + e.getMessage());
         printUsage();
         System.exit(1);
-        return;
       }
     }
 
@@ -324,98 +318,87 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
-  /**
-   * Parse rewrite options from a flat JSON map.
-   *
-   * <p>Expected format: {"key1": "value1", "key2": "value2"}
-   *
-   * @param optionsJson JSON string
-   * @return map of option keys to values
-   * @throws IllegalArgumentException if JSON is invalid or not a flat map
-   */
-  static Map<String, String> parseOptionsJson(String optionsJson) {
-    return new HashMap<>(IcebergSparkConfigUtils.parseFlatJsonMap(optionsJson, OPTION_OPTIONS));
-  }
-
   /** Print usage information. */
   private static void printUsage() {
     System.err.println(
         "Usage: IcebergRewriteDataFilesJob [OPTIONS]\n"
             + "\n"
             + "Required Options:\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " <name>          Iceberg catalog name registered in Spark\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " <identifier>      Fully qualified table name (e.g., db.table_name)\n"
+            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
+            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
             + "\n"
             + "Optional Options:\n"
-            + "  --"
-            + OPTION_STRATEGY
-            + " <name>         Rewrite strategy: binpack (default) or sort\n"
-            + "  --"
-            + OPTION_SORT_ORDER
-            + " <spec>       Sort order specification:\n"
+            + "  --strategy <name>         Rewrite strategy: binpack (default) or sort\n"
+            + "  --sort-order <spec>       Sort order specification:\n"
             + "                              For columns: 'id DESC NULLS LAST, name ASC'\n"
             + "                              For Z-Order: 'zorder(c1,c2,c3)'\n"
-            + "  --"
-            + OPTION_WHERE
-            + " <predicate>       Filter predicate to select files\n"
+            + "  --where <predicate>       Filter predicate to select files\n"
             + "                              Example: 'year = 2024 and status = ''active'''\n"
-            + "  --"
-            + OPTION_OPTIONS
-            + " <json>          JSON map of Iceberg rewrite options\n"
+            + "  --options <json>          JSON map of Iceberg rewrite options\n"
             + "                              Example: '{\"min-input-files\":\"2\"}'\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_SPARK_CONF
-            + " <json>       JSON map of custom Spark configurations\n"
+            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
             + "                              Note: Cannot override catalog, extensions, or app name configs\n"
             + "\n"
             + "Examples:\n"
             + "  # Basic binpack\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample\n"
+            + "  --catalog iceberg_prod --table db.sample\n"
             + "\n"
             + "  # Sort by columns\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_STRATEGY
-            + " sort \\\n"
-            + "    --"
-            + OPTION_SORT_ORDER
-            + " 'id DESC NULLS LAST'\n"
+            + "  --catalog iceberg_prod --table db.sample --strategy sort \\\n"
+            + "    --sort-order 'id DESC NULLS LAST'\n"
             + "\n"
             + "  # With filter and options\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_WHERE
-            + " 'year = 2024 and status = ''active''' \\\n"
-            + "    --"
-            + OPTION_OPTIONS
-            + " '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'\n"
+            + "  --catalog iceberg_prod --table db.sample --where 'year = 2024 and status = ''active''' \\\n"
+            + "    --options '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'\n"
             + "\n"
             + "  # With custom Spark configurations\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_STRATEGY
-            + " binpack \\\n"
-            + "    --"
-            + IcebergJobUtils.OPTION_SPARK_CONF
-            + " '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'");
+            + "  --catalog iceberg_prod --table db.sample --strategy binpack \\\n"
+            + "    --spark-conf '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'");
+  }
+
+  /**
+   * Parse options from JSON string using Jackson for robust parsing.
+   *
+   * <p>Expected format: {"key1": "value1", "key2": "value2"}
+   *
+   * <p>This method uses Jackson ObjectMapper to properly handle:
+   *
+   * <ul>
+   *   <li>Escaped quotes in values
+   *   <li>Colons and commas in values
+   *   <li>Complex JSON structures
+   *   <li>Various data types (strings, numbers, booleans)
+   * </ul>
+   *
+   * @param optionsJson JSON string
+   * @return map of option keys to values
+   */
+  static Map<String, String> parseOptionsJson(String optionsJson) {
+    Map<String, String> options = new HashMap<>();
+    if (optionsJson == null || optionsJson.isEmpty()) {
+      return options;
+    }
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      // Parse JSON into a Map<String, Object> to handle various value types
+      Map<String, Object> parsedMap =
+          mapper.readValue(optionsJson, new TypeReference<Map<String, Object>>() {});
+
+      // Convert all values to strings
+      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
+        String key = entry.getKey();
+        Object value = entry.getValue();
+        // Convert value to string - handles strings, numbers, booleans, etc.
+        options.put(key, value == null ? "" : value.toString());
+      }
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "Failed to parse options JSON: " + optionsJson + ". Error: " + e.getMessage(), e);
+    }
+
+    return options;
   }
 
   /**
@@ -425,19 +408,19 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    */
   private static List<String> buildArguments() {
     return Arrays.asList(
-        "--" + IcebergJobUtils.OPTION_CATALOG,
+        "--catalog",
         "{{catalog_name}}",
-        "--" + IcebergJobUtils.OPTION_TABLE,
+        "--table",
         "{{table_identifier}}",
-        "--" + OPTION_STRATEGY,
+        "--strategy",
         "{{strategy}}",
-        "--" + OPTION_SORT_ORDER,
+        "--sort-order",
         "{{sort_order}}",
-        "--" + OPTION_WHERE,
+        "--where",
         "{{where_clause}}",
-        "--" + OPTION_OPTIONS,
+        "--options",
         "{{options}}",
-        "--" + IcebergJobUtils.OPTION_SPARK_CONF,
+        "--spark-conf",
         "{{spark_conf}}");
   }
 

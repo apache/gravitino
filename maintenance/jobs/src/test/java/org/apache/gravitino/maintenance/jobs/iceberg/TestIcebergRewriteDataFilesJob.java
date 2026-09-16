@@ -77,15 +77,15 @@ public class TestIcebergRewriteDataFilesJob {
     assertEquals(14, template.arguments().size()); // 7 flags * 2 (flag + value)
 
     // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog-name"));
+    assertTrue(template.arguments().contains("--catalog"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table-identifier"));
+    assertTrue(template.arguments().contains("--table"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--strategy"));
     assertTrue(template.arguments().contains("{{strategy}}"));
     assertTrue(template.arguments().contains("--sort-order"));
     assertTrue(template.arguments().contains("{{sort_order}}"));
-    assertTrue(template.arguments().contains("--where-clause"));
+    assertTrue(template.arguments().contains("--where"));
     assertTrue(template.arguments().contains("{{where_clause}}"));
     assertTrue(template.arguments().contains("--options"));
     assertTrue(template.arguments().contains("{{options}}"));
@@ -132,7 +132,7 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v2", version);
+    assertEquals("v1", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -149,77 +149,74 @@ public class TestIcebergRewriteDataFilesJob {
 
   @Test
   public void testParseArgumentsWithAllRequired() {
-    String[] args = {"--catalog-name", "iceberg_prod", "--table-identifier", "db.sample"};
+    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
     assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog-name"));
-    assertEquals("db.sample", result.get("table-identifier"));
+    assertEquals("iceberg_prod", result.get("catalog"));
+    assertEquals("db.sample", result.get("table"));
   }
 
   @Test
   public void testParseArgumentsWithOptional() {
     String[] args = {
-      "--catalog-name", "iceberg_prod",
-      "--table-identifier", "db.sample",
+      "--catalog", "iceberg_prod",
+      "--table", "db.sample",
       "--strategy", "binpack",
-      "--where-clause", "year = 2024"
+      "--where", "year = 2024"
     };
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
     assertEquals(4, result.size());
-    assertEquals("iceberg_prod", result.get("catalog-name"));
-    assertEquals("db.sample", result.get("table-identifier"));
+    assertEquals("iceberg_prod", result.get("catalog"));
+    assertEquals("db.sample", result.get("table"));
     assertEquals("binpack", result.get("strategy"));
-    assertEquals("year = 2024", result.get("where-clause"));
+    assertEquals("year = 2024", result.get("where"));
   }
 
   @Test
   public void testParseArgumentsWithEmptyValues() {
-    String[] args = {
-      "--catalog-name", "iceberg_prod", "--table-identifier", "db.sample", "--strategy", ""
-    };
+    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--strategy", ""};
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
-    // Empty values are preserved (aligned with JobManager keeping explicit "")
-    assertEquals(3, result.size());
-    assertEquals("iceberg_prod", result.get("catalog-name"));
-    assertEquals("db.sample", result.get("table-identifier"));
-    assertEquals("", result.get("strategy"));
-    assertTrue(result.containsKey("strategy"));
+    // Empty values should be ignored
+    assertEquals(2, result.size());
+    assertEquals("iceberg_prod", result.get("catalog"));
+    assertEquals("db.sample", result.get("table"));
+    assertFalse(result.containsKey("strategy"));
   }
 
   @Test
   public void testParseArgumentsWithMissingValues() {
-    String[] args = {"--catalog-name", "iceberg_prod", "--table-identifier"};
+    String[] args = {"--catalog", "iceberg_prod", "--table"};
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
     // catalog has a value, table is a flag at end (treated as boolean)
     assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog-name"));
-    assertEquals("true", result.get("table-identifier"));
+    assertEquals("iceberg_prod", result.get("catalog"));
+    assertEquals("true", result.get("table"));
   }
 
   @Test
   public void testParseArgumentsWithComplexValues() {
     String[] args = {
-      "--catalog-name", "iceberg_prod",
-      "--table-identifier", "db.sample",
-      "--where-clause", "year = 2024 and month = 1",
+      "--catalog", "iceberg_prod",
+      "--table", "db.sample",
+      "--where", "year = 2024 and month = 1",
       "--options", "{\"min-input-files\":\"2\"}"
     };
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
     assertEquals(4, result.size());
-    assertEquals("year = 2024 and month = 1", result.get("where-clause"));
+    assertEquals("year = 2024 and month = 1", result.get("where"));
     assertEquals("{\"min-input-files\":\"2\"}", result.get("options"));
   }
 
   @Test
   public void testParseArgumentsWithSortOrder() {
     String[] args = {
-      "--catalog-name", "iceberg_prod",
-      "--table-identifier", "db.sample",
+      "--catalog", "iceberg_prod",
+      "--table", "db.sample",
       "--strategy", "sort",
       "--sort-order", "id DESC NULLS LAST, name ASC"
     };
@@ -232,12 +229,8 @@ public class TestIcebergRewriteDataFilesJob {
 
   @Test
   public void testParseArgumentsOrderIndependent() {
-    String[] args1 = {
-      "--catalog-name", "cat1", "--table-identifier", "tbl1", "--strategy", "binpack"
-    };
-    String[] args2 = {
-      "--strategy", "binpack", "--table-identifier", "tbl1", "--catalog-name", "cat1"
-    };
+    String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--strategy", "binpack"};
+    String[] args2 = {"--strategy", "binpack", "--table", "tbl1", "--catalog", "cat1"};
 
     Map<String, String> result1 = IcebergRewriteDataFilesJob.parseArguments(args1);
     Map<String, String> result2 = IcebergRewriteDataFilesJob.parseArguments(args2);
@@ -382,7 +375,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseOptionsJson(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Option --options"));
+      assertTrue(e.getMessage().contains("Failed to parse options JSON"));
     }
   }
 
@@ -713,7 +706,7 @@ public class TestIcebergRewriteDataFilesJob {
       IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Option --spark-conf"));
+      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
     }
   }
 }

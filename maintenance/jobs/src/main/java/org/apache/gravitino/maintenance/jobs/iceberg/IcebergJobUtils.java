@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
@@ -31,66 +33,9 @@ import org.apache.spark.sql.SparkSession;
  */
 public final class IcebergJobUtils {
 
-  /** Shared CLI flag name (without leading dashes) for Iceberg catalog. */
-  public static final String OPTION_CATALOG = "catalog-name";
-
-  /** Shared CLI flag name (without leading dashes) for table identifier. */
-  public static final String OPTION_TABLE = "table-identifier";
-
-  /** Shared CLI flag name (without leading dashes) for custom Spark configs JSON. */
-  public static final String OPTION_SPARK_CONF = "spark-conf";
-
   private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
 
   private IcebergJobUtils() {}
-
-  /**
-   * Trims {@code value} and returns {@code null} when the result is empty.
-   *
-   * @param value string to normalize; may be null
-   * @return trimmed non-empty string, or null
-   */
-  public static String trimToNull(String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? null : trimmed;
-  }
-
-  /**
-   * Ensures the Iceberg Spark runtime is on the current classpath.
-   *
-   * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
-   * but Spark only warns when those classes are missing and continues without Iceberg support. Call
-   * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
-   * visible) and fail the job when the runtime is absent. Job {@code main} methods should call
-   * {@link #requireIcebergSparkRuntimeOrExit(SparkSession)} instead.
-   *
-   * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
-   */
-  public static void requireIcebergSparkRuntime() {
-    requireClass(
-        IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, "Iceberg Spark session extensions");
-    requireClass(ICEBERG_SPARK_CATALOG, "Iceberg Spark catalog");
-  }
-
-  /**
-   * Ensures the Iceberg Spark runtime is on the classpath, or prints the error, stops {@code
-   * spark}, and exits the process.
-   *
-   * @param spark Spark session created for this job; stopped if the runtime check fails
-   */
-  public static void requireIcebergSparkRuntimeOrExit(SparkSession spark) {
-    try {
-      requireIcebergSparkRuntime();
-    } catch (IllegalStateException e) {
-      System.err.println("Error: " + e.getMessage());
-      spark.stop();
-      System.exit(1);
-      return;
-    }
-  }
 
   /**
    * Escape single quotes in SQL string literals by replacing ' with ''.
@@ -140,9 +85,11 @@ public final class IcebergJobUtils {
 
         // Check if there's a value for this key (not another flag)
         if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-          // Keep explicit empty strings so JobManager's "preserve empty jobConf values"
-          // contract is observable in built-in Iceberg jobs.
-          argMap.put(key, args[i + 1]);
+          String value = args[i + 1];
+          // Only add non-empty values
+          if (value != null && !value.trim().isEmpty()) {
+            argMap.put(key, value);
+          }
           i++; // Skip the value in next iteration
         } else {
           // Boolean flag with no value - treat as "true"
@@ -162,8 +109,63 @@ public final class IcebergJobUtils {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return new HashMap<>(
-        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
+    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      Map<String, Object> parsedMap =
+          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
+
+      Map<String, String> configs = new HashMap<>();
+      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
+        String key = entry.getKey();
+        Object value = entry.getValue();
+        configs.put(key, value == null ? "" : value.toString());
+      }
+      return configs;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "Failed to parse Spark configurations JSON: "
+              + sparkConfJson
+              + ". Error: "
+              + e.getMessage(),
+          e);
+    }
+  }
+
+  /**
+   * Ensures the Iceberg Spark runtime is on the current classpath.
+   *
+   * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
+   * but Spark only warns when those classes are missing and continues without Iceberg support. Call
+   * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
+   * visible) and fail the job when the runtime is absent.
+   *
+   * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
+   */
+  public static void requireIcebergSparkRuntime() {
+    requireClass(
+        IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, "Iceberg Spark session extensions");
+    requireClass(ICEBERG_SPARK_CATALOG, "Iceberg Spark catalog");
+  }
+
+  /**
+   * Checks the Iceberg Spark runtime after the session is created, then stops Spark and exits the
+   * process on failure.
+   *
+   * @param spark Spark session created for this job; stopped if the runtime check fails
+   */
+  public static void requireIcebergSparkRuntimeOrExit(SparkSession spark) {
+    try {
+      requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
+      return;
+    }
   }
 
   /** Visible for unit tests that assert the missing-class error message. */

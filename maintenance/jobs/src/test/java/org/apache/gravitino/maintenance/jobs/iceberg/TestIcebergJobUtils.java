@@ -19,26 +19,12 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergJobUtils {
-
-  @Test
-  public void testParseArgumentsKeepsExplicitEmptyValues() {
-    Map<String, String> parsed =
-        IcebergJobUtils.parseArguments(
-            new String[] {"--catalog-name", "", "--table-identifier", "db.t1"});
-    assertEquals("", parsed.get("catalog-name"));
-    assertEquals("db.t1", parsed.get("table-identifier"));
-    assertNull(IcebergJobUtils.trimToNull(parsed.get("catalog-name")));
-    assertEquals("aws_remote", IcebergJobUtils.trimToNull("  aws_remote  "));
-  }
 
   @Test
   public void testRequireIcebergSparkRuntimeSucceedsWhenPresent() {
@@ -58,14 +44,5 @@ public class TestIcebergJobUtils {
     assertTrue(ex.getMessage().contains("Missing Iceberg Spark session extensions"));
     assertTrue(ex.getMessage().contains("iceberg-spark-runtime"));
     assertTrue(ex.getMessage().contains("spark.jars"));
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsUsesSparkConfFlagName() {
-    IllegalArgumentException ex =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> IcebergJobUtils.parseCustomSparkConfigs("{not_json}"));
-    assertTrue(ex.getMessage().contains("--spark-conf"));
   }
 }

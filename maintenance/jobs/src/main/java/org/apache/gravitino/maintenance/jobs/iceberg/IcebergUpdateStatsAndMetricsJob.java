@@ -60,15 +60,13 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v1";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
   private static final long SMALL_FILE_THRESHOLD_BYTES = 32L * 1024 * 1024;
   private static final String DEFAULT_UPDATE_MODE = UpdateMode.ALL.modeName;
   private static final String CUSTOM_STAT_PREFIX = "custom-";
-  private static final String OPTION_UPDATE_MODE = "update-mode";
-  private static final String OPTION_UPDATER_OPTIONS = "updater-options";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -87,62 +85,27 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   /** Main entry point. */
   public static void main(String[] args) {
-    Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
-    String catalogName = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_CATALOG));
-    String tableIdentifier = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_TABLE));
+    Map<String, String> argMap = parseArguments(args);
+    String catalogName = argMap.get("catalog");
+    String tableIdentifier = argMap.get("table");
+    UpdateMode updateMode = parseUpdateMode(argMap.get("update-mode"));
 
     if (catalogName == null || tableIdentifier == null) {
-      System.err.println(
-          "Error: --"
-              + IcebergJobUtils.OPTION_CATALOG
-              + " and --"
-              + IcebergJobUtils.OPTION_TABLE
-              + " are required arguments");
+      System.err.println("Error: --catalog and --table are required arguments");
       printUsage();
       System.exit(1);
-      return;
     }
 
-    UpdateMode updateMode;
-    try {
-      updateMode = parseUpdateMode(argMap.get(OPTION_UPDATE_MODE));
-    } catch (IllegalArgumentException e) {
-      System.err.println("Error: " + e.getMessage());
-      printUsage();
-      System.exit(1);
-      return;
-    }
-
-    Map<String, String> updaterOptions;
-    try {
-      updaterOptions =
-          parseJsonOptions(
-              IcebergJobUtils.trimToNull(argMap.get(OPTION_UPDATER_OPTIONS)),
-              OPTION_UPDATER_OPTIONS);
-    } catch (IllegalArgumentException e) {
-      System.err.println("Error: " + e.getMessage());
-      printUsage();
-      System.exit(1);
-      return;
-    }
-
-    String sparkConfJson =
-        IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_SPARK_CONF));
+    Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
+    String sparkConfJson = argMap.get("spark-conf");
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
 
-    if (sparkConfJson != null) {
-      try {
-        Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
-        for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
-          sparkBuilder.config(entry.getKey(), entry.getValue());
-        }
-      } catch (IllegalArgumentException e) {
-        System.err.println("Error: " + e.getMessage());
-        printUsage();
-        System.exit(1);
-        return;
+    if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
+      Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
+      for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
+        sparkBuilder.config(entry.getKey(), entry.getValue());
       }
     }
 
@@ -409,30 +372,35 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return PartitionPath.of(entries);
   }
 
-  /** Delegates to {@link IcebergJobUtils#parseArguments(String[])}. */
   @VisibleForTesting
   static Map<String, String> parseArguments(String[] args) {
-    return IcebergJobUtils.parseArguments(args);
+    Map<String, String> argMap = new HashMap<>();
+    for (int i = 0; i < args.length; i++) {
+      if (args[i].startsWith("--")) {
+        String key = args[i].substring(2);
+        if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
+          String value = args[i + 1];
+          if (value != null && !value.trim().isEmpty()) {
+            argMap.put(key, value);
+          }
+          i++;
+        }
+      }
+    }
+    return argMap;
   }
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson, IcebergJobUtils.OPTION_SPARK_CONF);
+    return parseJsonOptions(sparkConfJson);
   }
 
-  /**
-   * Parse a flat JSON option map and report parse errors with the real CLI flag name.
-   *
-   * @param json flat JSON map text, or null/empty for an empty map
-   * @param optionName CLI flag name without leading dashes (for example {@code updater-options})
-   * @return parsed string map
-   */
   @VisibleForTesting
-  static Map<String, String> parseJsonOptions(String json, String optionName) {
+  static Map<String, String> parseJsonOptions(String json) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, optionName);
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
   }
 
   @VisibleForTesting
@@ -530,10 +498,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     String[] levels = tableIdentifier.split("\\.");
     if (levels.length != 2) {
       throw new IllegalArgumentException(
-          "--"
-              + IcebergJobUtils.OPTION_TABLE
-              + " must use schema.table format, but got: "
-              + tableIdentifier);
+          "--table must use schema.table format, but got: " + tableIdentifier);
     }
     return NameIdentifier.of(catalogName, levels[0], levels[1]);
   }
@@ -542,10 +507,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     String[] levels = tableIdentifier.split("\\.");
     if (levels.length != 2) {
       throw new IllegalArgumentException(
-          "--"
-              + IcebergJobUtils.OPTION_TABLE
-              + " must use schema.table format, but got: "
-              + tableIdentifier);
+          "--table must use schema.table format, but got: " + tableIdentifier);
     }
     return escapeSqlIdentifier(catalogName)
         + "."
@@ -556,7 +518,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   private static String escapeSqlIdentifier(String identifier) {
-    return IcebergJobUtils.escapeSqlIdentifier(identifier);
+    String escaped = identifier.replace("`", "``");
+    return "`" + escaped + "`";
   }
 
   private static long toLongValue(Row row, String fieldName) {
@@ -580,15 +543,15 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static List<String> buildArguments() {
     return Arrays.asList(
-        "--" + IcebergJobUtils.OPTION_CATALOG,
+        "--catalog",
         "{{catalog_name}}",
-        "--" + IcebergJobUtils.OPTION_TABLE,
+        "--table",
         "{{table_identifier}}",
-        "--" + OPTION_UPDATE_MODE,
+        "--update-mode",
         "{{update_mode}}",
-        "--" + OPTION_UPDATER_OPTIONS,
+        "--updater-options",
         "{{updater_options}}",
-        "--" + IcebergJobUtils.OPTION_SPARK_CONF,
+        "--spark-conf",
         "{{spark_conf}}");
   }
 
@@ -598,34 +561,22 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static void printUsage() {
     System.err.println(
-        "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\n"
-            + "\n"
-            + "Required Options:\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " <name>                   Iceberg catalog name registered in Spark\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " <identifier>               Table name in schema.table format\n"
-            + "\n"
-            + "Optional Options:\n"
-            + "  --"
-            + OPTION_UPDATE_MODE
-            + " <stats|metrics|all> Update behavior mode, default: all\n"
-            + "  data-file-mse target file size is fixed at 134217728 (128MB)\n"
-            + "                                     small-file-number threshold is fixed at 33554432 (32MB)\n"
-            + "  --"
-            + OPTION_UPDATER_OPTIONS
-            + " <json>           JSON map for updater and repository settings\n"
-            + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\n"
-            + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_SPARK_CONF
-            + " <json>                JSON map of custom Spark configs\n"
-            + "                                     Must include Iceberg catalog configs for --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + "\n"
+        "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\\n"
+            + "\\n"
+            + "Required Options:\\n"
+            + "  --catalog <name>                   Iceberg catalog name registered in Spark\\n"
+            + "  --table <identifier>               Table name in schema.table format\\n"
+            + "\\n"
+            + "Optional Options:\\n"
+            + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
+            + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
+            + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
+            + "  --updater-options <json>           JSON map for updater and repository settings\\n"
+            + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
+            + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
+            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\\n"
+            + "  --spark-conf <json>                JSON map of custom Spark configs\\n"
+            + "                                     Must include Iceberg catalog configs for --catalog\\n"
             + "                                     Example: '{\"spark.master\":\"local[2]\","
             + "\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\","
             + "\"spark.sql.catalog.rest_catalog.type\":\"rest\","

@@ -39,10 +39,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
-  private static final String VERSION = "v2";
-  private static final String OPTION_OLDER_THAN = "older-than";
-  private static final String OPTION_RETAIN_LAST = "retain-last";
-  private static final String OPTION_STREAM_RESULTS = "stream-results";
+  private static final String VERSION = "v1";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -64,13 +61,12 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    * <p>Uses named arguments for flexibility:
    *
    * <ul>
-   *   <li>--catalog-name &lt;catalog_name&gt; Required. Iceberg catalog name.
-   *   <li>--table-identifier &lt;table_identifier&gt; Required. Table name (db.table)
+   *   <li>--catalog &lt;catalog_name&gt; Required. Iceberg catalog name.
+   *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
    *   <li>--older-than &lt;timestamp&gt; Optional. Expire snapshots older than this timestamp
    *       (e.g., '2024-01-01 00:00:00')
    *   <li>--retain-last &lt;count&gt; Optional. Number of most recent snapshots to retain
-   *   <li>--stream-results &lt;true|false&gt; Optional. Set jobConf {@code stream_results} to
-   *       {@code true} (or pass CLI {@code --stream-results true}) to stream intermediate results
+   *   <li>--stream-results Optional. Flag to enable streaming of intermediate results
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
    *
@@ -83,8 +79,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    *       00:00:00'}
    * </ul>
    *
-   * <p>Example via command line: --catalog-name iceberg_catalog --table-identifier db.sample
-   * --older-than '2024-01-01 00:00:00' --retain-last 5
+   * <p>Example via command line: --catalog iceberg_catalog --table db.sample --older-than
+   * '2024-01-01 00:00:00' --retain-last 5
    *
    * <p>Example via Gravitino API:
    *
@@ -98,41 +94,38 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    * }</pre>
    */
   public static void main(String[] args) {
+    if (args.length < 4) {
+      printUsage();
+      System.exit(1);
+    }
+
+    // Parse named arguments
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
-    String catalogName = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_CATALOG));
-    String tableIdentifier = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_TABLE));
+    String catalogName = argMap.get("catalog");
+    String tableIdentifier = argMap.get("table");
 
     if (catalogName == null || tableIdentifier == null) {
-      System.err.println(
-          "Error: --"
-              + IcebergJobUtils.OPTION_CATALOG
-              + " and --"
-              + IcebergJobUtils.OPTION_TABLE
-              + " are required arguments");
+      System.err.println("Error: --catalog and --table are required arguments");
       printUsage();
       System.exit(1);
-      return;
     }
 
     // Optional arguments
-    String olderThan = IcebergJobUtils.trimToNull(argMap.get(OPTION_OLDER_THAN));
-    String retainLast = IcebergJobUtils.trimToNull(argMap.get(OPTION_RETAIN_LAST));
-    // jobConf "stream_results":"true" (or CLI --stream-results true) enables streaming.
-    String streamResultsRaw = argMap.get(OPTION_STREAM_RESULTS);
-    String sparkConfJson =
-        IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_SPARK_CONF));
+    String olderThan = argMap.get("older-than");
+    String retainLast = argMap.get("retain-last");
+    // --stream-results is a boolean flag (presence = true)
+    boolean streamResults = argMap.containsKey("stream-results");
+    String sparkConfJson = argMap.get("spark-conf");
 
-    boolean streamResults;
+    // Validate retain-last if provided
     try {
-      streamResults = resolveStreamResults(streamResultsRaw);
       validateRetainLast(retainLast);
     } catch (IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       printUsage();
       System.exit(1);
-      return;
     }
 
     // Build Spark session with custom configs if provided
@@ -151,7 +144,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         System.err.println("Error: " + e.getMessage());
         printUsage();
         System.exit(1);
-        return;
       }
     }
 
@@ -231,31 +223,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   /**
-   * Resolve {@code --stream-results} to a boolean.
-   *
-   * <p>Null/blank means omitted (false). Surrounding whitespace is trimmed. Only {@code true} /
-   * {@code false} (case-insensitive) are accepted; other values fail fast.
-   *
-   * @param value raw CLI / jobConf value; may be null
-   * @return whether streaming intermediate results is enabled
-   * @throws IllegalArgumentException if {@code value} is non-blank and not true/false
-   */
-  static boolean resolveStreamResults(String value) {
-    String trimmed = IcebergJobUtils.trimToNull(value);
-    if (trimmed == null) {
-      return false;
-    }
-    if ("true".equalsIgnoreCase(trimmed)) {
-      return true;
-    }
-    if ("false".equalsIgnoreCase(trimmed)) {
-      return false;
-    }
-    throw new IllegalArgumentException(
-        "Invalid stream-results value '" + value + "'. Must be true or false");
-  }
-
-  /**
    * Validate the retain-last parameter value.
    *
    * @param retainLast the retain-last value to validate
@@ -284,73 +251,34 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         "Usage: IcebergExpireSnapshotsJob [OPTIONS]\n"
             + "\n"
             + "Required Options:\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " <name>          Iceberg catalog name registered in Spark\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " <identifier>      Fully qualified table name (e.g., db.table_name)\n"
+            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
+            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
             + "\n"
             + "Optional Options:\n"
-            + "  --"
-            + OPTION_OLDER_THAN
-            + " <timestamp>  Expire snapshots older than this timestamp\n"
+            + "  --older-than <timestamp>  Expire snapshots older than this timestamp\n"
             + "                              Example: '2024-01-01 00:00:00'\n"
             + "                              Default: 5 days ago (Iceberg default)\n"
-            + "  --"
-            + OPTION_RETAIN_LAST
-            + " <count>     Number of most recent snapshots to retain\n"
+            + "  --retain-last <count>     Number of most recent snapshots to retain\n"
             + "                              Must be a positive integer (>= 1)\n"
             + "                              Default: 1 (Iceberg default)\n"
-            + "  --"
-            + OPTION_STREAM_RESULTS
-            + " <true|false> Enable streaming of intermediate delete results\n"
-            + "                              Default: false (disabled when omitted)\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_SPARK_CONF
-            + " <json>       JSON map of custom Spark configurations\n"
+            + "  --stream-results          Enable streaming of intermediate delete results\n"
+            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
             + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
             + "\n"
             + "Examples:\n"
             + "  # Basic expire with defaults (5 days, retain 1)\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample\n"
+            + "  --catalog iceberg_prod --table db.sample\n"
             + "\n"
             + "  # Expire snapshots older than a specific date\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_OLDER_THAN
-            + " '2024-01-01 00:00:00'\n"
+            + "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'\n"
             + "\n"
             + "  # Retain the last 5 snapshots\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_RETAIN_LAST
-            + " 5\n"
+            + "  --catalog iceberg_prod --table db.sample --retain-last 5\n"
             + "\n"
             + "  # Expire with all options and streaming\n"
-            + "  --"
-            + IcebergJobUtils.OPTION_CATALOG
-            + " iceberg_prod --"
-            + IcebergJobUtils.OPTION_TABLE
-            + " db.sample --"
-            + OPTION_OLDER_THAN
-            + " '2024-06-01 00:00:00' \\\n"
-            + "    --"
-            + OPTION_RETAIN_LAST
-            + " 3 --"
-            + OPTION_STREAM_RESULTS
-            + " true");
+            + "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\\n"
+            + "    --retain-last 3 --stream-results");
   }
 
   /**
@@ -360,17 +288,16 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    */
   private static List<String> buildArguments() {
     return Arrays.asList(
-        "--" + IcebergJobUtils.OPTION_CATALOG,
+        "--catalog",
         "{{catalog_name}}",
-        "--" + IcebergJobUtils.OPTION_TABLE,
+        "--table",
         "{{table_identifier}}",
-        "--" + OPTION_OLDER_THAN,
+        "--older-than",
         "{{older_than}}",
-        "--" + OPTION_RETAIN_LAST,
+        "--retain-last",
         "{{retain_last}}",
-        "--" + OPTION_STREAM_RESULTS,
         "{{stream_results}}",
-        "--" + IcebergJobUtils.OPTION_SPARK_CONF,
+        "--spark-conf",
         "{{spark_conf}}");
   }
 

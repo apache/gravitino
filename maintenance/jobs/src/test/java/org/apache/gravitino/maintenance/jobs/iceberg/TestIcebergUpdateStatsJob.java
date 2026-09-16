@@ -41,7 +41,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v2", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
@@ -51,9 +51,9 @@ public class TestIcebergUpdateStatsJob {
 
     assertNotNull(template.arguments());
     assertEquals(10, template.arguments().size());
-    assertTrue(template.arguments().contains("--catalog-name"));
+    assertTrue(template.arguments().contains("--catalog"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table-identifier"));
+    assertTrue(template.arguments().contains("--table"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--update-mode"));
     assertTrue(template.arguments().contains("{{update_mode}}"));
@@ -87,16 +87,16 @@ public class TestIcebergUpdateStatsJob {
   @Test
   public void testParseArguments() {
     String[] args = {
-      "--catalog-name", "cat",
-      "--table-identifier", "db.tbl",
+      "--catalog", "cat",
+      "--table", "db.tbl",
       "--update-mode", "metrics",
       "--updater-options", "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
       "--spark-conf", "{\"spark.master\":\"local[2]\"}"
     };
 
     Map<String, String> parsed = IcebergUpdateStatsAndMetricsJob.parseArguments(args);
-    assertEquals("cat", parsed.get("catalog-name"));
-    assertEquals("db.tbl", parsed.get("table-identifier"));
+    assertEquals("cat", parsed.get("catalog"));
+    assertEquals("db.tbl", parsed.get("table"));
     assertEquals("metrics", parsed.get("update-mode"));
     assertEquals(
         "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
@@ -148,43 +148,20 @@ public class TestIcebergUpdateStatsJob {
   public void testParseJsonOptions() {
     Map<String, String> parsed =
         IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
-            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}", "updater-options");
+            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
     assertEquals("b", parsed.get("a"));
     assertEquals("1", parsed.get("x"));
     assertEquals("true", parsed.get("flag"));
     assertEquals("", parsed.get("nil"));
-
-    IllegalArgumentException invalidJson =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}", "updater-options"));
-    assertTrue(invalidJson.getMessage().contains("--updater-options"));
-
-    IllegalArgumentException nested =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
-                    "{\"nested\":{\"a\":1}}", "updater-options"));
-    assertTrue(nested.getMessage().contains("--updater-options"));
-
-    IllegalArgumentException array =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
-                    "{\"array\":[1,2,3]}", "spark-conf"));
-    assertTrue(array.getMessage().contains("--spark-conf"));
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsUsesSparkConfFlagName() {
-    IllegalArgumentException ex =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> IcebergUpdateStatsAndMetricsJob.parseCustomSparkConfigs("{not_json}"));
-    assertTrue(ex.getMessage().contains("--spark-conf"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
   }
 
   @Test

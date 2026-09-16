@@ -278,7 +278,7 @@ The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 |-------------|-----------------------------------------------------------------------------|
 | Name        | `builtin-iceberg-expire-snapshots`                                          |
 | Type        | Spark                                                                       |
-| Version     | `v2`                                                                        |
+| Version     | `v1`                                                                        |
 | Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob`   |
 
 ## Parameters
@@ -291,7 +291,7 @@ The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 | `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
 | `older_than`     | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp     | Five days ago               |
 | `retain_last`    | Minimum number of recent snapshots to keep regardless of age         | `1`                         |
-| `stream_results` | Set to `true` to stream intermediate delete results                  | Disabled (`false` / omitted) |
+| `stream_results` | Streams intermediate delete results when present                     | Disabled                    |
 | `spark_conf`     | JSON map of Spark configuration                                      | None                        |
 
 `older_than` and `retain_last` work together, and `retain_last` wins. Setting `older_than` to yesterday with `retain_last` at `5` keeps five snapshots even if all five are older than yesterday.
@@ -329,7 +329,8 @@ The job builds this statement, including only the optional parameters you suppli
 CALL `rest_catalog`.system.expire_snapshots(
   table => 'db.t1',
   older_than => TIMESTAMP '2024-01-01 00:00:00',
-  retain_last => 3
+  retain_last => 3,
+  stream_results => true
 )
 ```
 
