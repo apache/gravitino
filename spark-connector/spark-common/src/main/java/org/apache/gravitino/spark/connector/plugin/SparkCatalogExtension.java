@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.spark.connector.plugin;
 
+import java.util.ServiceLoader;
+
 /**
  * Service provider interface that lets a jar outside the connector supply the Spark catalog
  * implementation for a Gravitino catalog provider. Implementations are discovered through {@link
- * java.util.ServiceLoader} and take precedence over the catalogs the connector ships itself. When
- * several extensions declare the same provider, the first one discovered is used and the others are
- * ignored with a warning.
+ * ServiceLoader} and take precedence over the catalogs the connector ships itself. The {@code
+ * lakehouse-iceberg} and {@code lakehouse-paimon} providers stay behind their opt-in flags: an
+ * extension for either is only consulted once the corresponding flag is enabled. When several
+ * extensions declare the same provider, the first one discovered is used and the others are ignored
+ * with a warning.
  */
 public interface SparkCatalogExtension {
 
