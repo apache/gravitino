@@ -220,7 +220,8 @@ tasks.clean {
 sourceSets {
   named("test") {
     resources {
-      exclude("**/*")
+      // Keep only SPI registrations; the version modules supply their own test configs and data.
+      exclude { !it.relativePath.pathString.startsWith("META-INF") }
     }
   }
 }
