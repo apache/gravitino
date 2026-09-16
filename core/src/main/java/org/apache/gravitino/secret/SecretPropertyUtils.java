@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.connector.PropertiesMetadata;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -67,27 +66,6 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Returns whether a sensitive-named inline property should be recovered via {@code getSecrets}.
-   *
-   * <p>Undeclared sensitive-named keys are recovered for Spark/Flink clients. Declared non-hidden
-   * keys (for example {@code credential-providers}) are configuration, not secrets, and are
-   * excluded even when the name matches {@link #isSensitivePropertyKey}.
-   *
-   * @param key the property key
-   * @param metadata entity properties metadata, or null when unavailable
-   * @return true when the inline plaintext should be included in {@code getSecrets}
-   */
-  public static boolean shouldRecoverSensitiveNamedSecret(
-      String key, @Nullable PropertiesMetadata metadata) {
-    if (!isSensitivePropertyKey(key)) {
-      return false;
-    }
-    return metadata == null
-        || !metadata.containsProperty(key)
-        || metadata.isHiddenProperty(key);
-  }
-
-  /**
    * Returns whether a property value is a Gravitino secret URN for the given key.
    *
    * @param key the property key
@@ -107,8 +85,7 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
    *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
-   *       not a secret URN, returning the stored plaintext, when {@link
-   *       #shouldRecoverSensitiveNamedSecret} is true.
+   *       not a secret URN, returning the stored plaintext.
    * </ol>
    *
    * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
@@ -126,21 +103,6 @@ public final class SecretPropertyUtils {
    */
   public static Map<String, String> buildSecrets(
       SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
-    return buildSecrets(secretManager, rawProperties, null);
-  }
-
-  /**
-   * Like {@link #buildSecrets(SecretManager, Map)} with entity {@link PropertiesMetadata}.
-   *
-   * @param secretManager secret manager used to resolve URNs
-   * @param rawProperties raw entity properties (may be null)
-   * @param metadata entity properties metadata, or null when unavailable
-   * @return a new secret plaintext property map; never null
-   */
-  public static Map<String, String> buildSecrets(
-      SecretManager secretManager,
-      @Nullable Map<String, String> rawProperties,
-      @Nullable PropertiesMetadata metadata) {
     Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
     if (rawProperties == null || rawProperties.isEmpty()) {
       return Map.of();
@@ -154,7 +116,7 @@ public final class SecretPropertyUtils {
       }
       if (isSecretProperty(key, value)) {
         secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
-      } else if (shouldRecoverSensitiveNamedSecret(key, metadata)) {
+      } else if (isSensitivePropertyKey(key)) {
         secrets.put(key, value);
       }
     }
