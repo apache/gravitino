@@ -334,10 +334,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
         .thenReturn(
             new PolicyEntity[] {
               createPolicy("tablePolicy"),
-              createPolicy("schemaCPolicy"),
-              createPolicy("schemaBPolicy"),
-              createPolicy("schemaAPolicy"),
-              createPolicy("catalogPolicy")
+              createPolicy("schemaCPolicy").copyWithInherited(true),
+              createPolicy("schemaBPolicy").copyWithInherited(true),
+              createPolicy("schemaAPolicy").copyWithInherited(true),
+              createPolicy("catalogPolicy").copyWithInherited(true)
             });
 
     Response response =
@@ -360,10 +360,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
             .collect(Collectors.toMap(Policy::name, Function.identity()));
 
     Assertions.assertFalse(resultPolicies.get("tablePolicy").inherited().get());
-    Assertions.assertFalse(resultPolicies.get("schemaCPolicy").inherited().get());
-    Assertions.assertFalse(resultPolicies.get("schemaBPolicy").inherited().get());
-    Assertions.assertFalse(resultPolicies.get("schemaAPolicy").inherited().get());
-    Assertions.assertFalse(resultPolicies.get("catalogPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaCPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaBPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaAPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("catalogPolicy").inherited().get());
   }
 
   @Test
@@ -372,8 +372,8 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     // The REST layer queries only the requested table.
     MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
 
-    PolicyEntity schemaAPolicy = createPolicy("schemaAPolicy");
-    PolicyEntity schemaBPolicy = createPolicy("schemaBPolicy");
+    PolicyEntity schemaAPolicy = createPolicy("schemaAPolicy").copyWithInherited(true);
+    PolicyEntity schemaBPolicy = createPolicy("schemaBPolicy").copyWithInherited(true);
     when(policyManager.getPolicyForMetadataObject(metalake, table, schemaAPolicy.name()))
         .thenReturn(schemaAPolicy);
     when(policyManager.getPolicyForMetadataObject(metalake, table, schemaBPolicy.name()))
@@ -392,7 +392,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseB.getStatus());
     Policy respPolicyB = responseB.readEntity(PolicyResponse.class).getPolicy();
     Assertions.assertEquals("schemaBPolicy", respPolicyB.name());
-    Assertions.assertFalse(respPolicyB.inherited().get());
+    Assertions.assertTrue(respPolicyB.inherited().get());
 
     // The same rule applies to a tag inherited from a more distant ancestor.
     Response responseA =
@@ -407,7 +407,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseA.getStatus());
     Policy respPolicyA = responseA.readEntity(PolicyResponse.class).getPolicy();
     Assertions.assertEquals("schemaAPolicy", respPolicyA.name());
-    Assertions.assertFalse(respPolicyA.inherited().get());
+    Assertions.assertTrue(respPolicyA.inherited().get());
   }
 
   @Test
@@ -515,8 +515,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     MetadataObject table =
         MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE);
     when(policyManager.getPolicyForMetadataObject(metalake, table, "policy3")).thenReturn(policy3);
-    when(policyManager.getPolicyForMetadataObject(metalake, schema, "policy1")).thenReturn(policy1);
-    when(policyManager.getPolicyForMetadataObject(metalake, table, "policy2")).thenReturn(policy2);
+    when(policyManager.getPolicyForMetadataObject(metalake, schema, "policy1"))
+        .thenReturn(policy1.copyWithInherited(true));
+    when(policyManager.getPolicyForMetadataObject(metalake, table, "policy2"))
+        .thenReturn(policy2.copyWithInherited(true));
 
     // Test catalog policy
     Response response =
@@ -600,7 +602,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Policy respPolicy4 = policyResponse4.getPolicy();
     Assertions.assertEquals(policy1.name(), respPolicy4.name());
     Assertions.assertEquals(policy1.comment(), respPolicy4.comment());
-    Assertions.assertFalse(respPolicy4.inherited().get());
+    Assertions.assertTrue(respPolicy4.inherited().get());
 
     // Test a table policy resolved from an effective tag
     Response response5 =
@@ -621,7 +623,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Policy respPolicy5 = policyResponse5.getPolicy();
     Assertions.assertEquals(policy2.name(), respPolicy5.name());
     Assertions.assertEquals(policy2.comment(), respPolicy5.comment());
-    Assertions.assertFalse(respPolicy5.inherited().get());
+    Assertions.assertTrue(respPolicy5.inherited().get());
 
     // Test catalog policy throw NoSuchPolicyException
     Response response7 =

@@ -104,7 +104,10 @@ public class MetadataObjectPolicyOperations {
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             Optional<PolicyEntity> policyEntity = getPolicyForObject(metalake, object, policyName);
             Optional<PolicyDTO> policyDTO =
-                policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(false)));
+                policyEntity.map(
+                    policy ->
+                        PolicyOperations.toDTO(
+                            policy, Optional.of(policy.inherited().orElse(false))));
 
             if (!policyDTO.isPresent()) {
               LOG.warn(
@@ -177,7 +180,10 @@ public class MetadataObjectPolicyOperations {
 
             PolicyDTO[] policyDTOs =
                 Arrays.stream(policies)
-                    .map(policy -> PolicyOperations.toDTO(policy, Optional.of(false)))
+                    .map(
+                        policy ->
+                            PolicyOperations.toDTO(
+                                policy, Optional.of(policy.inherited().orElse(false))))
                     .toArray(PolicyDTO[]::new);
 
             if (verbose) {

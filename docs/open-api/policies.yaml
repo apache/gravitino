@@ -441,7 +441,8 @@ components:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         inherited:
           type: boolean
-          description: Whether the policy is inherited from the parent metadata object
+          description: Whether the policy is selected only through tags inherited from ancestor
+            metadata objects
           nullable: true
 
     CustomPolicy:

@@ -119,7 +119,7 @@ public class ObjectPolicyResolver {
       boolean matches = matches(selector, assignment);
       MatchState state =
           matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
-      state.record(matches);
+      state.record(matches, tag.inherited().orElse(false));
       if (state.hasConflict()) {
         throw new IllegalStateException(
             String.format(
@@ -152,14 +152,16 @@ public class ObjectPolicyResolver {
     private final PolicyEntity policy;
     private boolean matched;
     private boolean unmatched;
+    private boolean directMatch;
 
     private MatchState(PolicyEntity policy) {
       this.policy = policy;
     }
 
-    private void record(boolean matches) {
+    private void record(boolean matches, boolean inherited) {
       matched |= matches;
       unmatched |= !matches;
+      directMatch |= matches && !inherited;
     }
 
     private boolean hasConflict() {
@@ -171,7 +173,7 @@ public class ObjectPolicyResolver {
     }
 
     private PolicyEntity policy() {
-      return policy;
+      return policy.copyWithInherited(!directMatch);
     }
   }
 }

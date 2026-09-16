@@ -565,6 +565,7 @@ corresponding view privileges.
       "name": "iceberg_compaction_standard",
       "policyType": "system_iceberg_compaction",
       "enabled": true,
+      "inherited": true,
       "content": {}
     }
   ]
@@ -576,6 +577,9 @@ corresponding view privileges.
 modify policy objects or object-policy relationships. The caller must be authorized to access the
 metadata object. Resolved policies for which the caller lacks `VIEW_POLICY` are filtered from both
 response shapes. `APPLY_POLICY` implies `VIEW_POLICY` for backward compatibility.
+With `details=true`, `inherited` is `true` when the policy is selected only through effective tags
+inherited from ancestor metadata objects. It is `false` when at least one matching policy-tag
+relation uses a tag assigned directly to the requested object.
 
 A single policy can be associated with multiple effective tags on the same object. The resolver
 deduplicates by policy entity and current version, not by equivalent policy content. Different

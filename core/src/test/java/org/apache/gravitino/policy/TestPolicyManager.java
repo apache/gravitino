@@ -837,29 +837,34 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Keep one legacy direct relation to verify it remains available during migration.
+    // Keep one legacy direct relation to verify derived object-policy lookup ignores it.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policyName3}, null);
 
     PolicyEntity result =
         policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policyName1);
     Assertions.assertEquals(policy1, result);
+    Assertions.assertFalse(result.inherited().orElseThrow());
 
     PolicyEntity result1 =
         policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policyName1);
     Assertions.assertEquals(policy1, result1);
+    Assertions.assertTrue(result1.inherited().orElseThrow());
 
     PolicyEntity result2 =
         policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy2.name());
     Assertions.assertEquals(policy2, result2);
+    Assertions.assertTrue(result2.inherited().orElseThrow());
 
     PolicyEntity result3 =
         policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy3.name());
     Assertions.assertEquals(policy3, result3);
+    Assertions.assertFalse(result3.inherited().orElseThrow());
 
     PolicyEntity result4 =
         policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy1.name());
     Assertions.assertEquals(policy1, result4);
+    Assertions.assertTrue(result4.inherited().orElseThrow());
 
     // Test get non-existent policy for metadata object
     Throwable e =
@@ -870,9 +875,9 @@ public class TestPolicyManager {
                     METALAKE, catalogObject, "non_existent_policy"));
     Assertions.assertTrue(e.getMessage().contains("Policy non_existent_policy does not exist"));
 
-    PolicyEntity directPolicy =
-        policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name());
-    Assertions.assertEquals(policy3, directPolicy);
+    Assertions.assertThrows(
+        NoSuchPolicyException.class,
+        () -> policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name()));
 
     Throwable e2 =
         Assertions.assertThrows(
