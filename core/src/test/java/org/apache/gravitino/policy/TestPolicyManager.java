@@ -732,22 +732,18 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Direct object-policy relations remain visible during the compatibility period.
+    // Direct object-policy relations are ignored by derived object-policy lookup.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policy3.name()}, null);
 
     String[] policies = policyManager.listPoliciesForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(2, policies.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies));
+    Assertions.assertEquals(1, policies.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies));
 
     PolicyEntity[] policiesInfo =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(2, policiesInfo.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1, policy3), ImmutableSet.copyOf(policiesInfo));
-    PolicyEntity[] directPolicies =
-        policyManager.listDirectPolicyInfosForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertArrayEquals(new PolicyEntity[] {policy3}, directPolicies);
+    Assertions.assertEquals(1, policiesInfo.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1), ImmutableSet.copyOf(policiesInfo));
 
     String[] policies1 = policyManager.listPoliciesForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, policies1.length);
@@ -758,8 +754,6 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, policiesInfo1.length);
     Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo1));
-    Assertions.assertEquals(
-        0, policyManager.listDirectPolicyInfosForMetadataObject(METALAKE, schemaObject).length);
 
     String[] policies2 = policyManager.listPoliciesForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(3, policies2.length);

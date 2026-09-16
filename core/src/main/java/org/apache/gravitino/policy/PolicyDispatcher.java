@@ -174,17 +174,6 @@ public interface PolicyDispatcher {
   PolicyEntity[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
 
   /**
-   * List policies directly associated with a metadata object, excluding policies resolved from
-   * tags.
-   *
-   * @param metalake the name of the metalake
-   * @param metadataObject the metadata object for which directly associated policies are listed
-   * @return The array of policies directly associated with the specified metadata object.
-   */
-  PolicyEntity[] listDirectPolicyInfosForMetadataObject(
-      String metalake, MetadataObject metadataObject);
-
-  /**
    * Associate policies to a metadata object under a metalake.
    *
    * @param metalake the name of the metalake

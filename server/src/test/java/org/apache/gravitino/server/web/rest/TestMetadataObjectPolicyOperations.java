@@ -44,7 +44,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -134,16 +133,15 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     PolicyEntity[] catalogPolicyInfos = new PolicyEntity[] {createPolicy("policy1")};
     when(policyManager.listPolicyInfosForMetadataObject(metalake, catalog))
         .thenReturn(catalogPolicyInfos);
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, catalog))
-        .thenReturn(catalogPolicyInfos);
 
-    PolicyEntity[] schemaPolicyInfos = new PolicyEntity[] {createPolicy("policy3")};
+    PolicyEntity[] schemaPolicyInfos =
+        new PolicyEntity[] {createPolicy("policy1"), createPolicy("policy3")};
     when(policyManager.listPolicyInfosForMetadataObject(metalake, schema))
         .thenReturn(schemaPolicyInfos);
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schema))
-        .thenReturn(schemaPolicyInfos);
 
-    PolicyEntity[] tablePolicyInfos = {createPolicy("policy5")};
+    PolicyEntity[] tablePolicyInfos = {
+      createPolicy("policy1"), createPolicy("policy3"), createPolicy("policy5")
+    };
     when(policyManager.listPolicyInfosForMetadataObject(metalake, table))
         .thenReturn(tablePolicyInfos);
 
@@ -204,9 +202,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     PolicyListResponse policyListResponse1 = response2.readEntity(PolicyListResponse.class);
     Assertions.assertEquals(0, policyListResponse1.getCode());
-    Assertions.assertEquals(
-        schemaPolicyInfos.length + catalogPolicyInfos.length,
-        policyListResponse1.getPolicies().length);
+    Assertions.assertEquals(schemaPolicyInfos.length, policyListResponse1.getPolicies().length);
 
     Map<String, Policy> resultPolicies1 =
         Arrays.stream(policyListResponse1.getPolicies())
@@ -215,7 +211,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertTrue(resultPolicies1.containsKey("policy1"));
     Assertions.assertTrue(resultPolicies1.containsKey("policy3"));
 
-    Assertions.assertTrue(resultPolicies1.get("policy1").inherited().get());
+    Assertions.assertFalse(resultPolicies1.get("policy1").inherited().get());
     Assertions.assertFalse(resultPolicies1.get("policy3").inherited().get());
 
     Response response3 =
@@ -231,8 +227,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     NameListResponse nameListResponse1 = response3.readEntity(NameListResponse.class);
     Assertions.assertEquals(0, nameListResponse1.getCode());
-    Assertions.assertEquals(
-        schemaPolicyInfos.length + catalogPolicyInfos.length, nameListResponse1.getNames().length);
+    Assertions.assertEquals(schemaPolicyInfos.length, nameListResponse1.getNames().length);
     Set<String> resultNames = Sets.newHashSet(nameListResponse1.getNames());
     Assertions.assertTrue(resultNames.contains("policy1"));
     Assertions.assertTrue(resultNames.contains("policy3"));
@@ -252,9 +247,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     PolicyListResponse policyListResponse2 = response4.readEntity(PolicyListResponse.class);
     Assertions.assertEquals(0, policyListResponse2.getCode());
-    Assertions.assertEquals(
-        schemaPolicyInfos.length + catalogPolicyInfos.length + tablePolicyInfos.length,
-        policyListResponse2.getPolicies().length);
+    Assertions.assertEquals(tablePolicyInfos.length, policyListResponse2.getPolicies().length);
 
     Map<String, Policy> resultPolicies2 =
         Arrays.stream(policyListResponse2.getPolicies())
@@ -264,8 +257,8 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertTrue(resultPolicies2.containsKey("policy3"));
     Assertions.assertTrue(resultPolicies2.containsKey("policy5"));
 
-    Assertions.assertTrue(resultPolicies2.get("policy1").inherited().get());
-    Assertions.assertTrue(resultPolicies2.get("policy3").inherited().get());
+    Assertions.assertFalse(resultPolicies2.get("policy1").inherited().get());
+    Assertions.assertFalse(resultPolicies2.get("policy3").inherited().get());
     Assertions.assertFalse(resultPolicies2.get("policy5").inherited().get());
 
     Response response5 =
@@ -281,9 +274,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     NameListResponse nameListResponse2 = response5.readEntity(NameListResponse.class);
     Assertions.assertEquals(0, nameListResponse2.getCode());
-    Assertions.assertEquals(
-        schemaPolicyInfos.length + catalogPolicyInfos.length + tablePolicyInfos.length,
-        nameListResponse2.getNames().length);
+    Assertions.assertEquals(tablePolicyInfos.length, nameListResponse2.getNames().length);
 
     Set<String> resultNames1 = Sets.newHashSet(nameListResponse2.getNames());
     Assertions.assertTrue(resultNames1.contains("policy1"));
@@ -335,35 +326,19 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
   @Test
   public void testListPoliciesForObjectUnderHierarchicalSchema() {
-    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". Its ancestor
-    // schemas are "a" and "a:b". A table under it must inherit policies from the schema itself,
-    // all ancestor schemas, and the catalog. The REST operation resolves the separator via
-    // MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which falls back to the default
-    // ":" here because GravitinoEnv config is not booted in this unit test.
-    MetadataObject catalog = MetadataObjects.parse("hcat", MetadataObject.Type.CATALOG);
-    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
-    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
-    MetadataObject schemaC = MetadataObjects.parse("hcat.a:b:c", MetadataObject.Type.SCHEMA);
+    // The manager resolves effective tags across the complete hierarchy before returning policies.
+    // The REST layer must consume that result without querying each ancestor again.
     MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
 
-    when(policyManager.listPolicyInfosForMetadataObject(metalake, catalog))
-        .thenReturn(new PolicyEntity[] {createPolicy("catalogPolicy")});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, catalog))
-        .thenReturn(new PolicyEntity[] {createPolicy("catalogPolicy")});
-    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaA))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaAPolicy")});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schemaA))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaAPolicy")});
-    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaB))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaBPolicy")});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schemaB))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaBPolicy")});
-    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaC))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaCPolicy")});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schemaC))
-        .thenReturn(new PolicyEntity[] {createPolicy("schemaCPolicy")});
     when(policyManager.listPolicyInfosForMetadataObject(metalake, table))
-        .thenReturn(new PolicyEntity[] {createPolicy("tablePolicy")});
+        .thenReturn(
+            new PolicyEntity[] {
+              createPolicy("tablePolicy"),
+              createPolicy("schemaCPolicy"),
+              createPolicy("schemaBPolicy"),
+              createPolicy("schemaAPolicy"),
+              createPolicy("catalogPolicy")
+            });
 
     Response response =
         target(basePath(metalake))
@@ -385,30 +360,26 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
             .collect(Collectors.toMap(Policy::name, Function.identity()));
 
     Assertions.assertFalse(resultPolicies.get("tablePolicy").inherited().get());
-    Assertions.assertTrue(resultPolicies.get("schemaCPolicy").inherited().get());
-    Assertions.assertTrue(resultPolicies.get("schemaBPolicy").inherited().get());
-    Assertions.assertTrue(resultPolicies.get("schemaAPolicy").inherited().get());
-    Assertions.assertTrue(resultPolicies.get("catalogPolicy").inherited().get());
+    Assertions.assertFalse(resultPolicies.get("schemaCPolicy").inherited().get());
+    Assertions.assertFalse(resultPolicies.get("schemaBPolicy").inherited().get());
+    Assertions.assertFalse(resultPolicies.get("schemaAPolicy").inherited().get());
+    Assertions.assertFalse(resultPolicies.get("catalogPolicy").inherited().get());
   }
 
   @Test
   public void testGetPolicyForObjectUnderHierarchicalSchema() {
-    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". The REST operation
-    // resolves the separator via MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which
-    // falls back to the default ":" here because GravitinoEnv config is not booted in this unit
-    // test.
-    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
-    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    // The manager resolves policies from the table's effective tags, including inherited tags.
+    // The REST layer queries only the requested table.
     MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
 
     PolicyEntity schemaAPolicy = createPolicy("schemaAPolicy");
     PolicyEntity schemaBPolicy = createPolicy("schemaBPolicy");
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schemaA))
-        .thenReturn(new PolicyEntity[] {schemaAPolicy});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schemaB))
-        .thenReturn(new PolicyEntity[] {schemaBPolicy});
+    when(policyManager.getPolicyForMetadataObject(metalake, table, schemaAPolicy.name()))
+        .thenReturn(schemaAPolicy);
+    when(policyManager.getPolicyForMetadataObject(metalake, table, schemaBPolicy.name()))
+        .thenReturn(schemaBPolicy);
 
-    // A policy on the intermediate schema "a:b" is inherited by a table under "a:b:c".
+    // A policy selected by an inherited tag is resolved directly for the table.
     Response responseB =
         target(basePath(metalake))
             .path(table.type().toString())
@@ -421,9 +392,9 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseB.getStatus());
     Policy respPolicyB = responseB.readEntity(PolicyResponse.class).getPolicy();
     Assertions.assertEquals("schemaBPolicy", respPolicyB.name());
-    Assertions.assertTrue(respPolicyB.inherited().get());
+    Assertions.assertFalse(respPolicyB.inherited().get());
 
-    // A policy on the ancestor schema "a" is also inherited by a table under "a:b:c".
+    // The same rule applies to a tag inherited from a more distant ancestor.
     Response responseA =
         target(basePath(metalake))
             .path(table.type().toString())
@@ -436,7 +407,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseA.getStatus());
     Policy respPolicyA = responseA.readEntity(PolicyResponse.class).getPolicy();
     Assertions.assertEquals("schemaAPolicy", respPolicyA.name());
-    Assertions.assertTrue(respPolicyA.inherited().get());
+    Assertions.assertFalse(respPolicyA.inherited().get());
   }
 
   @Test
@@ -449,8 +420,6 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
         .thenReturn(new PolicyEntity[0]);
     when(policyManager.listPolicyInfosForMetadataObject(metalake, schema))
         .thenReturn(new PolicyEntity[] {parentDerivedPolicy});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schema))
-        .thenReturn(new PolicyEntity[0]);
     when(policyManager.getPolicyForMetadataObject(metalake, table, parentDerivedPolicy.name()))
         .thenThrow(new NoSuchPolicyException("not applicable"));
     when(policyManager.getPolicyForMetadataObject(metalake, schema, parentDerivedPolicy.name()))
@@ -487,15 +456,13 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testListPoliciesFiltersCompleteMergedResult() throws IllegalAccessException {
+  public void testListPoliciesFiltersResolvedResult() throws IllegalAccessException {
     MetadataObject schema = MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA);
     MetadataObject table = MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
     PolicyEntity policy = createPolicy("hiddenPolicy");
     when(policyManager.listPolicyInfosForMetadataObject(metalake, table))
-        .thenReturn(new PolicyEntity[0]);
-    when(policyManager.listPolicyInfosForMetadataObject(metalake, schema))
         .thenReturn(new PolicyEntity[] {policy});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schema))
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schema))
         .thenReturn(new PolicyEntity[] {policy});
 
     MetadataObjectPolicyOperations operations = new MetadataObjectPolicyOperations(policyManager);
@@ -512,9 +479,9 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
                       Mockito.eq(
                           AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION),
                       Mockito.eq(org.apache.gravitino.Entity.EntityType.POLICY),
-                      Mockito.any(PolicyDTO[].class),
+                      Mockito.any(PolicyEntity[].class),
                       Mockito.any()))
-          .thenReturn(new PolicyDTO[0]);
+          .thenReturn(new PolicyEntity[0]);
 
       Response detailsResponse =
           operations.listPoliciesForMetadataObject(
@@ -529,6 +496,8 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), namesResponse.getStatus());
       Assertions.assertEquals(0, ((NameListResponse) namesResponse.getEntity()).getNames().length);
     }
+    Mockito.verify(policyManager, Mockito.never())
+        .listPolicyInfosForMetadataObject(metalake, schema);
   }
 
   @Test
@@ -546,10 +515,8 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     MetadataObject table =
         MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE);
     when(policyManager.getPolicyForMetadataObject(metalake, table, "policy3")).thenReturn(policy3);
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, catalog))
-        .thenReturn(new PolicyEntity[] {policy1});
-    when(policyManager.listDirectPolicyInfosForMetadataObject(metalake, schema))
-        .thenReturn(new PolicyEntity[] {policy2});
+    when(policyManager.getPolicyForMetadataObject(metalake, schema, "policy1")).thenReturn(policy1);
+    when(policyManager.getPolicyForMetadataObject(metalake, table, "policy2")).thenReturn(policy2);
 
     // Test catalog policy
     Response response =
@@ -614,7 +581,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(policy3.comment(), respPolicy2.comment());
     Assertions.assertFalse(respPolicy2.inherited().get());
 
-    // Test get schema inherited policy
+    // Test a schema policy resolved from an effective tag
     Response response4 =
         target(basePath(metalake))
             .path(schema.type().toString())
@@ -633,9 +600,9 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Policy respPolicy4 = policyResponse4.getPolicy();
     Assertions.assertEquals(policy1.name(), respPolicy4.name());
     Assertions.assertEquals(policy1.comment(), respPolicy4.comment());
-    Assertions.assertTrue(respPolicy4.inherited().get());
+    Assertions.assertFalse(respPolicy4.inherited().get());
 
-    // Test get table inherited policy
+    // Test a table policy resolved from an effective tag
     Response response5 =
         target(basePath(metalake))
             .path(table.type().toString())
@@ -654,7 +621,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     Policy respPolicy5 = policyResponse5.getPolicy();
     Assertions.assertEquals(policy2.name(), respPolicy5.name());
     Assertions.assertEquals(policy2.comment(), respPolicy5.comment());
-    Assertions.assertTrue(respPolicy5.inherited().get());
+    Assertions.assertFalse(respPolicy5.inherited().get());
 
     // Test catalog policy throw NoSuchPolicyException
     Response response7 =

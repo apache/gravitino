@@ -23,9 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -38,7 +36,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -59,7 +56,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,15 +105,6 @@ public class MetadataObjectPolicyOperations {
             Optional<PolicyEntity> policyEntity = getPolicyForObject(metalake, object, policyName);
             Optional<PolicyDTO> policyDTO =
                 policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(false)));
-
-            for (MetadataObject parentObject :
-                MetadataObjectUtil.getParentMetadataObjects(object)) {
-              if (policyEntity.isPresent()) {
-                break;
-              }
-              policyEntity = getDirectPolicyForObject(metalake, parentObject, policyName);
-              policyDTO = policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(true)));
-            }
 
             if (!policyDTO.isPresent()) {
               LOG.warn(
@@ -178,31 +165,8 @@ public class MetadataObjectPolicyOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            Map<String, PolicyDTO> policiesByName = new LinkedHashMap<>();
-            PolicyEntity[] nonInheritedPolicies =
+            PolicyEntity[] policies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
-            if (ArrayUtils.isNotEmpty(nonInheritedPolicies)) {
-              Arrays.stream(nonInheritedPolicies)
-                  .forEach(
-                      policy ->
-                          policiesByName.putIfAbsent(
-                              policy.name(), PolicyOperations.toDTO(policy, Optional.of(false))));
-            }
-
-            for (MetadataObject parentObject :
-                MetadataObjectUtil.getParentMetadataObjects(object)) {
-              PolicyEntity[] inheritedPolicies =
-                  policyDispatcher.listDirectPolicyInfosForMetadataObject(metalake, parentObject);
-              if (ArrayUtils.isNotEmpty(inheritedPolicies)) {
-                Arrays.stream(inheritedPolicies)
-                    .forEach(
-                        policy ->
-                            policiesByName.putIfAbsent(
-                                policy.name(), PolicyOperations.toDTO(policy, Optional.of(true))));
-              }
-            }
-
-            PolicyDTO[] policies = policiesByName.values().toArray(new PolicyDTO[0]);
             policies =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
@@ -211,18 +175,23 @@ public class MetadataObjectPolicyOperations {
                     policies,
                     policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
 
+            PolicyDTO[] policyDTOs =
+                Arrays.stream(policies)
+                    .map(policy -> PolicyOperations.toDTO(policy, Optional.of(false)))
+                    .toArray(PolicyDTO[]::new);
+
             if (verbose) {
               LOG.info(
                   "List {} policies info for object type: {}, full name: {} under metalake: {}",
-                  policies.length,
+                  policyDTOs.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyListResponse(policies));
+              return Utils.ok(new PolicyListResponse(policyDTOs));
 
             } else {
               String[] policyNames =
-                  Arrays.stream(policies).map(PolicyDTO::name).toArray(String[]::new);
+                  Arrays.stream(policyDTOs).map(PolicyDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} policies for object type: {}, full name: {} under metalake: {}",
@@ -312,15 +281,5 @@ public class MetadataObjectPolicyOperations {
       LOG.info("Policy {} not found for object: {}", policyName, object);
       return Optional.empty();
     }
-  }
-
-  private Optional<PolicyEntity> getDirectPolicyForObject(
-      String metalake, MetadataObject object, String policyName) {
-    PolicyEntity[] policies =
-        policyDispatcher.listDirectPolicyInfosForMetadataObject(metalake, object);
-    if (ArrayUtils.isEmpty(policies)) {
-      return Optional.empty();
-    }
-    return Arrays.stream(policies).filter(policy -> policy.name().equals(policyName)).findFirst();
   }
 }
