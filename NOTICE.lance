@@ -92,6 +92,7 @@ That code is available under an MIT license <https://github.com/wrandelshofer/Fa
 under the following copyright.
 
 Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+Copyright © 2024 Werner Randelshofer, Switzerland. MIT License.
 
 FastDoubleParser includes code derived from the following projects:
 
@@ -321,3 +322,8 @@ which has the following notices:
        http://www.eclipse.org/legal/epl-v10.html
 
    Jetty may be distributed under either license.
+
+Metrics code included in Jersey Server
+org.glassfish.jersey.server.internal.monitoring.core
+Copyright (c) 2015-2018 Oracle and/or its affiliates. All rights reserved.
+Copyright 2010-2013 Coda Hale and Yammer, Inc.

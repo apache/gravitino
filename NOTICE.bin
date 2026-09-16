@@ -84,8 +84,11 @@ That code is available under an MIT license <https://github.com/wrandelshofer/Fa
 under the following copyright.
 
 Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+Copyright © 2024 Werner Randelshofer, Switzerland. MIT License.
 
-FastDoubleParser includes code derived from the following projects:
+FastDoubleParser includes code derived from the following projects. Jackson 2.15.2
+includes fast_double_parser and fast_float under the Apache 2.0 License; newer
+bundled Jackson versions include them under the licenses listed below:
 
   fast_double_parser, Copyright (c) 2022 Daniel Lemire. Boost Software License 1.0.
   <https://github.com/lemire/fast_double_parser>
@@ -985,3 +988,26 @@ Copyright 1999-2023 The Apache Software Foundation
 Apache HttpCore
 Copyright 2005-2020 The Apache Software Foundation
 
+
+Metrics code included in Jersey Server
+org.glassfish.jersey.server.internal.monitoring.core
+Copyright (c) 2015-2018 Oracle and/or its affiliates. All rights reserved.
+Copyright 2010-2013 Coda Hale and Yammer, Inc.
+
+Apache Paimon (paimon-common)
+Copyright 2023-2025 The Apache Software Foundation
+
+DataSketches included in paimon-common:
+
+datasketches-java
+Copyright 2015-2022 The Apache Software Foundation
+
+Apache DataSketches Memory
+Copyright 2022 - The Apache Software Foundation
+
+Copyright 2015-2018 Yahoo Inc.
+Copyright 2019-2020 Verizon Media
+Copyright 2021 Yahoo Inc.
+
+Prior to moving to ASF, the software for this project was developed at
+Yahoo Inc. (https://developer.yahoo.com).

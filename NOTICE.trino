@@ -33,10 +33,10 @@ Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
 
 FastDoubleParser includes code derived from the following projects:
 
-  fast_double_parser, Copyright (c) 2022 Daniel Lemire. Boost Software License 1.0.
+  fast_double_parser, Copyright (c) 2022 Daniel Lemire. Apache 2.0 License.
   <https://github.com/lemire/fast_double_parser>
 
-  fast_float, Copyright (c) 2021 The fast_float authors. MIT License.
+  fast_float, Copyright (c) 2021 The fast_float authors. Apache 2.0 License.
   <https://github.com/fastfloat/fast_float>
 
   bigint, Copyright 2020 Tim Buktu. 2-clause BSD License.

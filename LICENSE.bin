@@ -207,6 +207,9 @@
    Apache Software License 2.0 from:
 
    Apache Hive
+   Apache Paimon
+   Apache DataSketches Java
+   Apache DataSketches Memory
    Apache Iceberg
    Apache Kafka
    Apache Spark
@@ -526,3 +529,9 @@
    XZ For Java
    HdrHistogram
    LatencyUtils
+
+
+   For the FastDoubleParser license text, see licenses/FastDoubleParser.txt.
+   Third-party license texts for code included in FastDoubleParser are in
+   licenses/FastDoubleParser-thirdparty.txt.
+   For the Schubfach license text, see licenses/Schubfach.txt.
