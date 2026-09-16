@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.config.CredentialConfig;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -62,7 +63,7 @@ public class TestCloudPropertiesMetadata {
   void testCosCredentialConfigPropertiesAreDeclared() {
     var metadata = COSPropertiesMetadata.PROPERTY_ENTRIES;
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_REGION));
-    assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_APP_ID));
+    assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_ENDPOINT));
     assertTrue(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET).isHidden());
   }
 
@@ -73,5 +74,28 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
     assertTrue(metadata.containsKey(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS));
     assertFalse(metadata.get(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS).isHidden());
+  }
+
+  @Test
+  void testDeclaredSensitiveNamedCredentialKeysAreNonHidden() {
+    assertFalse(
+        CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .isHidden());
+    assertTrue(
+        SecretPropertyUtils.isSensitivePropertyKey(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(
+        CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES
+            .get(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS)
+            .isHidden());
+    assertTrue(
+        SecretPropertyUtils.isSensitivePropertyKey(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+    assertFalse(
+        AzurePropertiesMetadata.PROPERTY_ENTRIES
+            .get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME)
+            .isHidden());
+    assertTrue(
+        SecretPropertyUtils.isSensitivePropertyKey(
+            AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
   }
 }

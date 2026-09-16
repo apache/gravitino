@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -69,5 +70,8 @@ public class TestPaimonCatalogPropertiesMetadata {
     assertTrue(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
     assertTrue(metadata.containsProperty(S3Properties.GRAVITINO_S3_ROLE_ARN));
     assertTrue(metadata.containsProperty(AzureProperties.GRAVITINO_AZURE_TENANT_ID));
+    assertTrue(
+        SecretPropertyUtils.isSensitivePropertyKey(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(metadata.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
   }
 }

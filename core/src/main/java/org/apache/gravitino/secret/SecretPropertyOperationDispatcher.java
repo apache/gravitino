@@ -82,31 +82,119 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * @return secret plaintext properties; never null
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
-    Map<String, String> rawProperties = loadRawProperties(identifier, entityType);
-    return SecretPropertyUtils.buildSecrets(secretManager, rawProperties);
-  }
-
-  private Map<String, String> loadRawProperties(
-      NameIdentifier identifier, Entity.EntityType entityType) {
     switch (entityType) {
       case METALAKE:
-        return loadMetalakeRawProperties(identifier);
+        return SecretPropertyUtils.buildSecrets(
+            secretManager, loadMetalakeRawProperties(identifier), null);
       case CATALOG:
-        return loadCatalogRawProperties(identifier);
+        return doWithCatalog(
+            identifier,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager,
+                  wrapper.catalog().entity().getProperties(),
+                  wrapper.catalog().catalogPropertiesMetadata());
+            },
+            NoSuchCatalogException.class);
       case SCHEMA:
-        return loadSchemaRawProperties(identifier);
+        NameIdentifier schemaCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        Map<String, String> schemaRaw = loadSchemaRawProperties(identifier);
+        return doWithCatalog(
+            schemaCatalogIdent,
+            wrapper ->
+                SecretPropertyUtils.buildSecrets(
+                    secretManager, schemaRaw, wrapper.catalog().schemaPropertiesMetadata()),
+            NoSuchCatalogException.class);
       case FILESET:
-        return loadFilesetRawProperties(identifier);
+        NameIdentifier filesetCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        Map<String, String> filesetRaw = loadFilesetRawProperties(identifier);
+        return doWithCatalog(
+            filesetCatalogIdent,
+            wrapper ->
+                SecretPropertyUtils.buildSecrets(
+                    secretManager, filesetRaw, wrapper.catalog().filesetPropertiesMetadata()),
+            NoSuchCatalogException.class);
       case TABLE:
-        return loadTableRawProperties(identifier);
+        NameIdentifier tableCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        return doWithCatalog(
+            tableCatalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              Table table = wrapper.doWithTableOps(ops -> ops.loadTable(identifier));
+              Map<String, String> raw =
+                  table.properties() == null ? Map.of() : table.properties();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager, raw, wrapper.catalog().tablePropertiesMetadata());
+            },
+            NoSuchCatalogException.class,
+            NoSuchTableException.class);
       case TOPIC:
-        return loadTopicRawProperties(identifier);
+        NameIdentifier topicCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        return doWithCatalog(
+            topicCatalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              Topic topic = wrapper.doWithTopicOps(ops -> ops.loadTopic(identifier));
+              Map<String, String> raw =
+                  topic.properties() == null ? Map.of() : topic.properties();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager, raw, wrapper.catalog().topicPropertiesMetadata());
+            },
+            NoSuchCatalogException.class,
+            NoSuchTopicException.class);
       case VIEW:
-        return loadViewRawProperties(identifier);
+        NameIdentifier viewCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        return doWithCatalog(
+            viewCatalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              View view = wrapper.doWithViewOps(ops -> ops.loadView(identifier));
+              Map<String, String> raw = view.properties() == null ? Map.of() : view.properties();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager, raw, wrapper.catalog().viewPropertiesMetadata());
+            },
+            NoSuchCatalogException.class,
+            NoSuchViewException.class);
       case MODEL:
-        return loadModelRawProperties(identifier);
+        NameIdentifier modelCatalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+        return doWithCatalog(
+            modelCatalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              Model model = wrapper.doWithModelOps(ops -> ops.getModel(identifier));
+              Map<String, String> raw =
+                  model.properties() == null ? Map.of() : model.properties();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager, raw, wrapper.catalog().modelPropertiesMetadata());
+            },
+            NoSuchCatalogException.class,
+            NoSuchModelException.class);
       case MODEL_VERSION:
-        return loadModelVersionRawProperties(identifier);
+        NameIdentifier modelVersionCatalogIdent =
+            NameIdentifierUtil.getCatalogIdentifier(identifier);
+        NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
+        String versionName = identifier.name();
+        return doWithCatalog(
+            modelVersionCatalogIdent,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              ModelVersion modelVersion;
+              try {
+                int version = Integer.parseInt(versionName);
+                modelVersion =
+                    wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, version));
+              } catch (NumberFormatException e) {
+                modelVersion =
+                    wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, versionName));
+              }
+              Map<String, String> raw =
+                  modelVersion.properties() == null ? Map.of() : modelVersion.properties();
+              return SecretPropertyUtils.buildSecrets(
+                  secretManager, raw, wrapper.catalog().modelVersionPropertiesMetadata());
+            },
+            NoSuchCatalogException.class,
+            NoSuchModelVersionException.class);
       default:
         throw new NotSupportedException(
             "Doesn't support secret property operations for entity type: " + entityType);

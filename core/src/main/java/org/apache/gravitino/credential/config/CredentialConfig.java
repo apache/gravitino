@@ -90,16 +90,6 @@ public class CredentialConfig extends Config {
                   false /* hidden */,
                   false /* reserved */))
           .put(
-              CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
-              PropertyEntry.integerPropertyEntry(
-                  CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
-                  "COS STS token expire time in seconds.",
-                  false /* required */,
-                  false /* immutable */,
-                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .put(
               CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
               PropertyEntry.integerPropertyEntry(
                   CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
