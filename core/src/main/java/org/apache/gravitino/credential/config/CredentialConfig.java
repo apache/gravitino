@@ -35,8 +35,6 @@ public class CredentialConfig extends Config {
   private static final long DEFAULT_CREDENTIAL_CACHE_MAX_SIZE = 10_000L;
   private static final double DEFAULT_CREDENTIAL_CACHE_EXPIRE_RATIO = 0.15d;
 
-  private static final int DEFAULT_TOKEN_EXPIRE_IN_SECS = 3600;
-
   public static final Map<String, PropertyEntry<?>> CREDENTIAL_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
@@ -76,7 +74,7 @@ public class CredentialConfig extends Config {
                   "S3 STS token expire time in seconds.",
                   false /* required */,
                   false /* immutable */,
-                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
           .put(
@@ -86,7 +84,7 @@ public class CredentialConfig extends Config {
                   "OSS security token expire time in seconds.",
                   false /* required */,
                   false /* immutable */,
-                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
           .put(
@@ -96,7 +94,7 @@ public class CredentialConfig extends Config {
                   "ADLS SAS token expire time in seconds.",
                   false /* required */,
                   false /* immutable */,
-                  DEFAULT_TOKEN_EXPIRE_IN_SECS /* default value */,
+                  null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
           .build();
