@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
@@ -124,6 +125,18 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
               (name, entry) -> {
                 Preconditions.checkArgument(
                     !properties.containsKey(name), "Property metadata already exists: " + name);
+                builder.put(name, entry);
+              });
+
+          // Credential vending is a catalog-level capability shared by Hive / Iceberg / Paimon /
+          // Fileset / etc. Register once here so official keys such as credential-providers are
+          // declared for all catalogs and are not fuzzy-masked as secrets.
+          CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                Preconditions.checkArgument(
+                    !properties.containsKey(name)
+                        && !BASIC_CATALOG_PROPERTY_ENTRIES.containsKey(name),
+                    "Property metadata already exists: " + name);
                 builder.put(name, entry);
               });
           propertyEntries = builder.build();
