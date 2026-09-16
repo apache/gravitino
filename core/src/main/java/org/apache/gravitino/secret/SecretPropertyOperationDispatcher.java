@@ -20,12 +20,14 @@ package org.apache.gravitino.secret;
 
 import java.io.IOException;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.OperationDispatcher;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -83,7 +85,62 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
     Map<String, String> rawProperties = loadRawProperties(identifier, entityType);
-    return SecretPropertyUtils.buildSecrets(secretManager, rawProperties);
+    return SecretPropertyUtils.buildSecrets(
+        secretManager, rawProperties, resolvePropertiesMetadata(identifier, entityType));
+  }
+
+  /**
+   * Resolves properties metadata for fuzzy recovery filtering. Metalake has no catalog metadata.
+   */
+  @Nullable
+  private PropertiesMetadata resolvePropertiesMetadata(
+      NameIdentifier identifier, Entity.EntityType entityType) {
+    switch (entityType) {
+      case METALAKE:
+        return null;
+      case CATALOG:
+        return doWithCatalog(
+            identifier,
+            wrapper -> {
+              wrapper.catalog().checkMetalakeInUse();
+              return wrapper.catalog().catalogPropertiesMetadata();
+            },
+            NoSuchCatalogException.class);
+      case SCHEMA:
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().schemaPropertiesMetadata(),
+            NoSuchCatalogException.class);
+      case FILESET:
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().filesetPropertiesMetadata(),
+            NoSuchCatalogException.class);
+      case TABLE:
+      case VIEW:
+        // View masking uses table properties metadata elsewhere in OperationDispatcher.
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().tablePropertiesMetadata(),
+            NoSuchCatalogException.class);
+      case TOPIC:
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().topicPropertiesMetadata(),
+            NoSuchCatalogException.class);
+      case MODEL:
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().modelPropertiesMetadata(),
+            NoSuchCatalogException.class);
+      case MODEL_VERSION:
+        return doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(identifier),
+            wrapper -> wrapper.catalog().modelVersionPropertiesMetadata(),
+            NoSuchCatalogException.class);
+      default:
+        return null;
+    }
   }
 
   private Map<String, String> loadRawProperties(

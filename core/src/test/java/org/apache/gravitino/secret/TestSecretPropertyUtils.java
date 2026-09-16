@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.secret;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -164,6 +167,55 @@ public class TestSecretPropertyUtils {
     try (SecretManager sm = memorySecretManager()) {
       Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
       Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
+    }
+  }
+
+  @Test
+  void testBuildSecretsExcludesDeclaredNonHiddenSensitiveKeys() {
+    try (SecretManager sm = memorySecretManager()) {
+      PropertiesMetadata metadata =
+          new PropertiesMetadata() {
+            @Override
+            public Map<String, PropertyEntry<?>> propertyEntries() {
+              return ImmutableMap.of(
+                  "credential-providers",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "credential-providers", "providers", false, null, false),
+                  "azure-storage-account-name",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "azure-storage-account-name", "account", false, null, false),
+                  "s3-access-key-id",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "s3-access-key-id", "ak", false, null, false),
+                  "jdbc-password",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "jdbc-password", "password", false, null, true),
+                  "s3-secret-access-key",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "s3-secret-access-key", "sk", false, null, true));
+            }
+          };
+      Map<String, String> entityProps =
+          Map.of(
+              "credential-providers",
+              "s3-token",
+              "azure-storage-account-name",
+              "abs-account",
+              "s3-access-key-id",
+              "AKIA",
+              "jdbc-password",
+              "inline-secret",
+              "s3-secret-access-key",
+              "super-secret",
+              "custom-token",
+              "tok");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
+      Assertions.assertFalse(secrets.containsKey("credential-providers"));
+      Assertions.assertFalse(secrets.containsKey("azure-storage-account-name"));
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+      Assertions.assertEquals("inline-secret", secrets.get("jdbc-password"));
+      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
+      Assertions.assertEquals("tok", secrets.get("custom-token"));
     }
   }
 
