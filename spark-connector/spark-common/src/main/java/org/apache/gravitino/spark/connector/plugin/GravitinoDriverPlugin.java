@@ -162,7 +162,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
     String catalogClassName = CatalogNameAdaptor.getCatalogName(provider);
     if (StringUtils.isBlank(catalogClassName)) {
-      LOG.warn("Skip registering {} because {} is not supported yet.", catalogName, provider);
+      LOG.warn(
+          "Skip registering {} because no Spark catalog is bound to provider {}: neither built into"
+              + " the connector nor supplied by a SparkCatalogExtension.",
+          catalogName,
+          provider);
       return;
     }
 
