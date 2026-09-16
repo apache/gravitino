@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
@@ -157,7 +158,7 @@ public interface MetadataObjectChange {
 
     private RemoveMetadataObject(MetadataObject metadataObject, List<String> locations) {
       this.metadataObject = metadataObject;
-      this.locations = locations;
+      this.locations = locations == null ? null : ImmutableList.copyOf(locations);
     }
 
     /**
@@ -190,7 +191,8 @@ public interface MetadataObjectChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       RemoveMetadataObject that = (RemoveMetadataObject) o;
-      return metadataObject.equals(that.metadataObject) && locations.equals(that.locations);
+      return Objects.equals(metadataObject, that.metadataObject)
+          && Objects.equals(locations, that.locations);
     }
 
     /**

@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Lists;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -72,5 +73,38 @@ public class TestMetadataObjectChange {
         changes.contains(MetadataObjectChange.remove(tableObject(), Lists.newArrayList("loc2"))));
     Assertions.assertTrue(
         changes.contains(MetadataObjectChange.remove(tableObject(), Lists.newArrayList("loc1"))));
+  }
+
+  @Test
+  void testRemoveEqualsWithNullLocations() {
+    // remove(mo, null) is constructible; comparing two such instances must not throw NPE.
+    MetadataObjectChange remove1 = MetadataObjectChange.remove(tableObject(), null);
+    MetadataObjectChange remove2 = MetadataObjectChange.remove(tableObject(), null);
+
+    Assertions.assertEquals(remove1, remove2);
+    Assertions.assertEquals(remove1.hashCode(), remove2.hashCode());
+
+    MetadataObjectChange removeWithLocations =
+        MetadataObjectChange.remove(tableObject(), List.of("a"));
+    Assertions.assertNotEquals(remove1, removeWithLocations);
+    Assertions.assertNotEquals(removeWithLocations, remove1);
+  }
+
+  @Test
+  void testRemoveDefensiveCopyStableHashKey() {
+    List<String> mutableList = Lists.newArrayList("loc1");
+    MetadataObjectChange.RemoveMetadataObject remove =
+        (MetadataObjectChange.RemoveMetadataObject)
+            MetadataObjectChange.remove(tableObject(), mutableList);
+
+    Set<MetadataObjectChange> changes = new HashSet<>();
+    changes.add(remove);
+
+    // Mutating the caller's list after remove(...) must not change the object's hash key nor be
+    // reflected in getLocations().
+    mutableList.add("x");
+
+    Assertions.assertTrue(changes.contains(remove));
+    Assertions.assertEquals(Lists.newArrayList("loc1"), remove.getLocations());
   }
 }
