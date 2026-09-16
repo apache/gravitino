@@ -175,7 +175,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
   }
 
   @Test
-  public void testPropertiesMetadataOrNullFallsBackOnUnsupportedOperation() {
+  public void testResolvePropertiesMetadataFallsBackOnUnsupportedOperation() {
     CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     try {
       when(wrapper.doWithPropertiesMeta(org.mockito.ArgumentMatchers.any()))
@@ -183,8 +183,19 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    Assertions.assertNull(
-        SecretPropertyOperationDispatcher.propertiesMetadataOrNull(
-            wrapper, HasPropertyMetadata::catalogPropertiesMetadata));
+    org.apache.gravitino.connector.PropertiesMetadata metadata =
+        SecretPropertyOperationDispatcher.resolvePropertiesMetadata(
+            wrapper, HasPropertyMetadata::catalogPropertiesMetadata);
+    Assertions.assertSame(FallbackPropertiesMetadata.INSTANCE, metadata);
+    // Official non-hidden keys stay out of getSecrets.
+    Assertions.assertFalse(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
+    Assertions.assertFalse(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
+    // Declared hidden secrets and undeclared sensitive names still fuzzy-recover.
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
   }
 }

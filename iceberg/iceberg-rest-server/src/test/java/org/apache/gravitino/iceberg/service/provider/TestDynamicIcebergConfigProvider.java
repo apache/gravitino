@@ -706,7 +706,7 @@ public class TestDynamicIcebergConfigProvider {
                   new SecretBinding("memory", "mem-jdbc-pwd")),
               Map.of());
       sm.writeSecrets(writes);
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       String metalakeName = "test_metalake";
       String catalogName = "jdbc_catalog";

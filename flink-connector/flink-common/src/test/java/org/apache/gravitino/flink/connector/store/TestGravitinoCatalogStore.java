@@ -233,7 +233,7 @@ public class TestGravitinoCatalogStore {
               Map.of("jdbc-password", new SecretBinding("memory", "mem-pwd")),
               Map.of());
       sm.writeSecrets(writes);
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       Catalog catalog = mock(Catalog.class);
       SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);

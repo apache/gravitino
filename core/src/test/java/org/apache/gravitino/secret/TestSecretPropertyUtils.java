@@ -109,7 +109,7 @@ public class TestSecretPropertyUtils {
       entityProps.put("s3-access-key-id", "AKIA");
       entityProps.put("visible", "ok");
 
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       // Secret-URN entries, including keys also used by credential vending
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
@@ -154,7 +154,7 @@ public class TestSecretPropertyUtils {
               "AKIA...",
               "s3-secret-access-key",
               "super-secret");
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
       Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
       Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
       Assertions.assertFalse(secrets.containsKey("warehouse"));
@@ -163,10 +163,30 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
+  void testBuildSecretsNullMetadataIsUrnOnly() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>();
+      entityProps.put("s3-access-key-id", "AKIA");
+      entityProps.put("jdbc-password", "inline-secret");
+      Map<String, SecretBinding> bindings =
+          Map.of("custom-secret", new SecretBinding("memory", "custom-value"));
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
+      sm.writeSecrets(writes);
+
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-password"));
+    }
+  }
+
+  @Test
   void testBuildSecretsNullAndEmpty() {
     try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
       Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null, null).isEmpty());
-      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of(), null).isEmpty());
     }
   }
 

@@ -43,6 +43,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.metalake.MetalakePropertiesMetadata;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Table;
@@ -94,15 +95,16 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * Loads raw properties and matching properties metadata in one catalog lease when possible.
    *
    * <p>If the catalog does not expose properties metadata for the entity type ({@link
-   * UnsupportedOperationException}), metadata is {@code null} so {@link
-   * SecretPropertyUtils#buildSecrets} falls back to metadata-unaware fuzzy recovery instead of
-   * failing the whole {@code getSecrets} call.
+   * UnsupportedOperationException}), uses {@link FallbackPropertiesMetadata} which still registers
+   * shared base / credential / cloud entries so official non-hidden keys are not fuzzy-recovered,
+   * while undeclared sensitive-named keys keep fuzzy recovery.
    */
   private RawPropertiesAndMetadata loadRawPropertiesAndMetadata(
       NameIdentifier identifier, Entity.EntityType entityType) {
     switch (entityType) {
       case METALAKE:
-        return new RawPropertiesAndMetadata(loadMetalakeRawProperties(identifier), null);
+        return new RawPropertiesAndMetadata(
+            loadMetalakeRawProperties(identifier), new MetalakePropertiesMetadata());
       case CATALOG:
         return doWithCatalog(
             identifier,
@@ -110,7 +112,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
               wrapper.catalog().checkMetalakeInUse();
               return new RawPropertiesAndMetadata(
                   wrapper.catalog().entity().getProperties(),
-                  propertiesMetadataOrNull(
+                  resolvePropertiesMetadata(
                       wrapper, HasPropertyMetadata::catalogPropertiesMetadata));
             },
             NoSuchCatalogException.class);
@@ -141,7 +143,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             catalogIdent,
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
-              return propertiesMetadataOrNull(
+              return resolvePropertiesMetadata(
                   wrapper, HasPropertyMetadata::schemaPropertiesMetadata);
             },
             NoSuchCatalogException.class);
@@ -163,7 +165,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             catalogIdent,
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
-              return propertiesMetadataOrNull(
+              return resolvePropertiesMetadata(
                   wrapper, HasPropertyMetadata::filesetPropertiesMetadata);
             },
             NoSuchCatalogException.class);
@@ -189,7 +191,8 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
           Table table = wrapper.doWithTableOps(ops -> ops.loadTable(identifier));
           Map<String, String> raw = table.properties() == null ? Map.of() : table.properties();
           return new RawPropertiesAndMetadata(
-              raw, propertiesMetadataOrNull(wrapper, HasPropertyMetadata::tablePropertiesMetadata));
+              raw,
+              resolvePropertiesMetadata(wrapper, HasPropertyMetadata::tablePropertiesMetadata));
         },
         NoSuchCatalogException.class,
         NoSuchTableException.class);
@@ -204,7 +207,8 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
           Topic topic = wrapper.doWithTopicOps(ops -> ops.loadTopic(identifier));
           Map<String, String> raw = topic.properties() == null ? Map.of() : topic.properties();
           return new RawPropertiesAndMetadata(
-              raw, propertiesMetadataOrNull(wrapper, HasPropertyMetadata::topicPropertiesMetadata));
+              raw,
+              resolvePropertiesMetadata(wrapper, HasPropertyMetadata::topicPropertiesMetadata));
         },
         NoSuchCatalogException.class,
         NoSuchTopicException.class);
@@ -220,7 +224,8 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
           Map<String, String> raw = view.properties() == null ? Map.of() : view.properties();
           // View masking uses table properties metadata elsewhere in OperationDispatcher.
           return new RawPropertiesAndMetadata(
-              raw, propertiesMetadataOrNull(wrapper, HasPropertyMetadata::tablePropertiesMetadata));
+              raw,
+              resolvePropertiesMetadata(wrapper, HasPropertyMetadata::tablePropertiesMetadata));
         },
         NoSuchCatalogException.class,
         NoSuchViewException.class);
@@ -235,7 +240,8 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
           Model model = wrapper.doWithModelOps(ops -> ops.getModel(identifier));
           Map<String, String> raw = model.properties() == null ? Map.of() : model.properties();
           return new RawPropertiesAndMetadata(
-              raw, propertiesMetadataOrNull(wrapper, HasPropertyMetadata::modelPropertiesMetadata));
+              raw,
+              resolvePropertiesMetadata(wrapper, HasPropertyMetadata::modelPropertiesMetadata));
         },
         NoSuchCatalogException.class,
         NoSuchModelException.class);
@@ -262,7 +268,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
               modelVersion.properties() == null ? Map.of() : modelVersion.properties();
           return new RawPropertiesAndMetadata(
               raw,
-              propertiesMetadataOrNull(
+              resolvePropertiesMetadata(
                   wrapper, HasPropertyMetadata::modelVersionPropertiesMetadata));
         },
         NoSuchCatalogException.class,
@@ -281,17 +287,16 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   }
 
   /**
-   * Returns properties metadata under the catalog connector classloader, or {@code null} when the
-   * catalog does not support it for this entity type.
+   * Returns properties metadata under the catalog connector classloader, or {@link
+   * FallbackPropertiesMetadata#INSTANCE} when the catalog does not support it for this entity type.
    */
-  @Nullable
-  static PropertiesMetadata propertiesMetadataOrNull(
+  static PropertiesMetadata resolvePropertiesMetadata(
       CatalogManager.CatalogWrapper wrapper,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> getter) {
     try {
       return wrapper.doWithPropertiesMeta(getter);
     } catch (UnsupportedOperationException e) {
-      return null;
+      return FallbackPropertiesMetadata.INSTANCE;
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -301,10 +306,10 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
 
   private static final class RawPropertiesAndMetadata {
     private final Map<String, String> rawProperties;
-    @Nullable private final PropertiesMetadata metadata;
+    private final PropertiesMetadata metadata;
 
     private RawPropertiesAndMetadata(
-        @Nullable Map<String, String> rawProperties, @Nullable PropertiesMetadata metadata) {
+        @Nullable Map<String, String> rawProperties, PropertiesMetadata metadata) {
       this.rawProperties = rawProperties == null ? Map.of() : rawProperties;
       this.metadata = metadata;
     }

@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -45,6 +46,15 @@ public final class SecretPropertyUtils {
    */
   private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
       Pattern.compile(".*(secret|password|token|credential|access|account).*");
+
+  /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
+  private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
+      new PropertiesMetadata() {
+        @Override
+        public Map<String, PropertyEntry<?>> propertyEntries() {
+          return Map.of();
+        }
+      };
 
   private SecretPropertyUtils() {}
 
@@ -69,10 +79,19 @@ public final class SecretPropertyUtils {
   /**
    * Returns whether a sensitive-named inline property should be recovered via {@code getSecrets}.
    *
-   * <p>Secret-manager URNs are always recovered separately. For inline plaintext, only undeclared
-   * keys or declared {@code hidden} keys are recovered. Declared non-hidden configuration (for
-   * example {@code credential-providers}, {@code azure-storage-account-name}, {@code
-   * s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   * <p>Secret-manager URNs are always recovered separately. For inline plaintext:
+   *
+   * <ul>
+   *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
+   *       catalog does not expose properties metadata for the entity type.
+   *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
+   *       non-hidden configuration (for example {@code credential-providers}, {@code
+   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   * </ul>
+   *
+   * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty
+   * {@link PropertiesMetadata} (every key is undeclared) — see the two-argument {@link
+   * #buildSecrets(SecretManager, Map)}.
    *
    * @param key the property key
    * @param metadata entity properties metadata, or null when unavailable
@@ -83,8 +102,10 @@ public final class SecretPropertyUtils {
     if (!isSensitivePropertyKey(key)) {
       return false;
     }
-    // No metadata (e.g. metalake): keep historical fuzzy recovery for mistyped keys.
-    return metadata == null || !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
+    if (metadata == null) {
+      return false;
+    }
+    return !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
   }
 
   /**
@@ -99,10 +120,12 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Builds a map of plaintext secret properties for {@code getSecrets} without properties metadata.
+   * Builds a map of plaintext secret properties for {@code getSecrets} with historical fuzzy
+   * recovery for sensitive-named keys.
    *
-   * <p>Equivalent to {@link #buildSecrets(SecretManager, Map, PropertiesMetadata)} with {@code
-   * metadata == null}, which keeps historical fuzzy recovery for all sensitive-named keys.
+   * <p>Delegates to {@link #buildSecrets(SecretManager, Map, PropertiesMetadata)} with an empty
+   * properties metadata so every key is treated as undeclared. Prefer the three-argument overload
+   * when real entity metadata is available.
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
@@ -110,7 +133,7 @@ public final class SecretPropertyUtils {
    */
   public static Map<String, String> buildSecrets(
       SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
-    return buildSecrets(secretManager, rawProperties, null);
+    return buildSecrets(secretManager, rawProperties, EMPTY_PROPERTIES_METADATA);
   }
 
   /**
@@ -124,7 +147,8 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
    *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (undeclared or
    *       declared hidden). Declared non-hidden keys are excluded even when the name looks
-   *       sensitive.
+   *       sensitive. When {@code metadata} is {@code null}, sensitive-named plaintext is not
+   *       recovered (URN-only).
    * </ol>
    *
    * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
@@ -138,7 +162,7 @@ public final class SecretPropertyUtils {
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
-   * @param metadata entity properties metadata, or null when unavailable
+   * @param metadata entity properties metadata, or null when unavailable (URN-only recovery)
    * @return a new secret plaintext property map; never null
    */
   public static Map<String, String> buildSecrets(
