@@ -109,7 +109,7 @@ public class TestSecretPropertyUtils {
       entityProps.put("s3-access-key-id", "AKIA");
       entityProps.put("visible", "ok");
 
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
 
       // Secret-URN entries, including keys also used by credential vending
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
@@ -154,7 +154,7 @@ public class TestSecretPropertyUtils {
               "AKIA...",
               "s3-secret-access-key",
               "super-secret");
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
       Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
       Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
       Assertions.assertFalse(secrets.containsKey("warehouse"));
@@ -165,8 +165,8 @@ public class TestSecretPropertyUtils {
   @Test
   void testBuildSecretsNullAndEmpty() {
     try (SecretManager sm = memorySecretManager()) {
-      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
-      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null, null).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of(), null).isEmpty());
     }
   }
 

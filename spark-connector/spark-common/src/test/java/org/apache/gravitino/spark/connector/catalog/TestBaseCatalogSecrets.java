@@ -101,7 +101,7 @@ public class TestBaseCatalogSecrets {
               Map.of("jdbc-password", new SecretBinding("memory", "from-memory")),
               Map.of());
       sm.writeSecrets(writes);
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
 
       setUpCatalog(Map.of("jdbc-url", "jdbc:mysql://localhost/db"), secrets);
       catalog.initialize("jdbc", new CaseInsensitiveStringMap(Map.of()));

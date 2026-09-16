@@ -123,18 +123,6 @@ public final class SecretPropertyUtils {
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
-   * @return a new secret plaintext property map; never null
-   */
-  public static Map<String, String> buildSecrets(
-      SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
-    return buildSecrets(secretManager, rawProperties, null);
-  }
-
-  /**
-   * Like {@link #buildSecrets(SecretManager, Map)} with entity {@link PropertiesMetadata}.
-   *
-   * @param secretManager secret manager used to resolve URNs
-   * @param rawProperties raw entity properties (may be null)
    * @param metadata entity properties metadata, or null when unavailable
    * @return a new secret plaintext property map; never null
    */
