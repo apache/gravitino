@@ -19,12 +19,39 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergJobUtils {
+
+  @Test
+  public void testTrimToNullAndIsBlank() {
+    assertTrue(IcebergJobUtils.isBlank(null));
+    assertTrue(IcebergJobUtils.isBlank(""));
+    assertTrue(IcebergJobUtils.isBlank("  "));
+    assertFalse(IcebergJobUtils.isBlank("aws_remote"));
+
+    assertNull(IcebergJobUtils.trimToNull(null));
+    assertNull(IcebergJobUtils.trimToNull(""));
+    assertNull(IcebergJobUtils.trimToNull("  "));
+    assertEquals("aws_remote", IcebergJobUtils.trimToNull("  aws_remote  "));
+  }
+
+  @Test
+  public void testParseArgumentsKeepsExplicitEmptyValues() {
+    Map<String, String> parsed =
+        IcebergJobUtils.parseArguments(
+            new String[] {"--catalog-name", "", "--table-identifier", "db.t1"});
+    assertEquals("", parsed.get("catalog-name"));
+    assertEquals("db.t1", parsed.get("table-identifier"));
+    assertNull(IcebergJobUtils.trimToNull(parsed.get("catalog-name")));
+  }
 
   @Test
   public void testRequireIcebergSparkRuntimeSucceedsWhenPresent() {

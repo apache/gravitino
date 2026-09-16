@@ -74,18 +74,18 @@ public class TestIcebergExpireSnapshotsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(11, template.arguments().size());
+    assertEquals(12, template.arguments().size()); // 6 flags * 2 (flag + value)
 
     // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
+    assertTrue(template.arguments().contains("--catalog-name"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
+    assertTrue(template.arguments().contains("--table-identifier"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--older-than"));
     assertTrue(template.arguments().contains("{{older_than}}"));
     assertTrue(template.arguments().contains("--retain-last"));
     assertTrue(template.arguments().contains("{{retain_last}}"));
-    // --stream-results is a boolean flag, value is the template variable itself
+    assertTrue(template.arguments().contains("--stream-results"));
     assertTrue(template.arguments().contains("{{stream_results}}"));
     assertTrue(template.arguments().contains("--spark-conf"));
     assertTrue(template.arguments().contains("{{spark_conf}}"));
@@ -130,7 +130,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -147,61 +147,66 @@ public class TestIcebergExpireSnapshotsJob {
 
   @Test
   public void testParseArgumentsWithAllRequired() {
-    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
+    String[] args = {"--catalog-name", "iceberg_prod", "--table-identifier", "db.sample"};
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
+    assertEquals("iceberg_prod", result.get("catalog-name"));
+    assertEquals("db.sample", result.get("table-identifier"));
   }
 
   @Test
   public void testParseArgumentsWithOptional() {
     String[] args = {
-      "--catalog", "iceberg_prod",
-      "--table", "db.sample",
+      "--catalog-name", "iceberg_prod",
+      "--table-identifier", "db.sample",
       "--older-than", "2024-01-01 00:00:00",
       "--retain-last", "5"
     };
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(4, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
+    assertEquals("iceberg_prod", result.get("catalog-name"));
+    assertEquals("db.sample", result.get("table-identifier"));
     assertEquals("2024-01-01 00:00:00", result.get("older-than"));
     assertEquals("5", result.get("retain-last"));
   }
 
   @Test
   public void testParseArgumentsWithEmptyValues() {
-    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--older-than", ""};
+    String[] args = {
+      "--catalog-name", "iceberg_prod", "--table-identifier", "db.sample", "--older-than", ""
+    };
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
-    // Empty values should be ignored
-    assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
-    assertFalse(result.containsKey("older-than"));
+    // Empty values are preserved (aligned with JobManager keeping explicit "")
+    assertEquals(3, result.size());
+    assertEquals("iceberg_prod", result.get("catalog-name"));
+    assertEquals("db.sample", result.get("table-identifier"));
+    assertEquals("", result.get("older-than"));
+    assertTrue(result.containsKey("older-than"));
   }
 
   @Test
   public void testParseArgumentsFlagOnly() {
     // --stream-results as a flag (no value) should be treated as "true"
-    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--stream-results"};
+    String[] args = {
+      "--catalog-name", "iceberg_prod", "--table-identifier", "db.sample", "--stream-results"
+    };
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(3, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
+    assertEquals("iceberg_prod", result.get("catalog-name"));
+    assertEquals("db.sample", result.get("table-identifier"));
     assertEquals("true", result.get("stream-results"));
   }
 
   @Test
   public void testParseArgumentsWithAllOptions() {
     String[] args = {
-      "--catalog",
+      "--catalog-name",
       "iceberg_prod",
-      "--table",
+      "--table-identifier",
       "db.sample",
       "--older-than",
       "2024-06-01 00:00:00",
@@ -214,8 +219,8 @@ public class TestIcebergExpireSnapshotsJob {
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(6, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
+    assertEquals("iceberg_prod", result.get("catalog-name"));
+    assertEquals("db.sample", result.get("table-identifier"));
     assertEquals("2024-06-01 00:00:00", result.get("older-than"));
     assertEquals("3", result.get("retain-last"));
     assertEquals("true", result.get("stream-results"));
@@ -224,8 +229,8 @@ public class TestIcebergExpireSnapshotsJob {
 
   @Test
   public void testParseArgumentsOrderIndependent() {
-    String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--retain-last", "5"};
-    String[] args2 = {"--retain-last", "5", "--table", "tbl1", "--catalog", "cat1"};
+    String[] args1 = {"--catalog-name", "cat1", "--table-identifier", "tbl1", "--retain-last", "5"};
+    String[] args2 = {"--retain-last", "5", "--table-identifier", "tbl1", "--catalog-name", "cat1"};
 
     Map<String, String> result1 = IcebergJobUtils.parseArguments(args1);
     Map<String, String> result2 = IcebergJobUtils.parseArguments(args2);

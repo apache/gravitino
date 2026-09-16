@@ -40,14 +40,14 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";
   private static final String STRATEGY_SORT = "sort";
   private static final String OPTION_STRATEGY = "strategy";
   private static final String OPTION_SORT_ORDER = "sort-order";
-  private static final String OPTION_WHERE = "where";
+  private static final String OPTION_WHERE = "where-clause";
   private static final String OPTION_OPTIONS = "options";
 
   @Override
@@ -70,11 +70,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * <p>Uses named arguments for flexibility:
    *
    * <ul>
-   *   <li>--catalog &lt;catalog_name&gt; Required. Iceberg catalog name.
-   *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
+   *   <li>--catalog-name &lt;catalog_name&gt; Required. Iceberg catalog name.
+   *   <li>--table-identifier &lt;table_identifier&gt; Required. Table name (db.table)
    *   <li>--strategy &lt;strategy&gt; Optional. binpack or sort
    *   <li>--sort-order &lt;sort_order&gt; Optional. Sort order specification
-   *   <li>--where &lt;where_clause&gt; Optional. Filter predicate
+   *   <li>--where-clause &lt;where_clause&gt; Optional. Filter predicate
    *   <li>--options &lt;options_json&gt; Optional. JSON map of options
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
@@ -87,14 +87,15 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    *       ProcessBuilder.
    *   <li><b>Via Command Line:</b> Use shell quoting. Example: {@code --options
    *       '{"min-input-files":"2"}'}
-   *   <li><b>SQL Single Quotes:</b> Use as-is in where clauses. Example: {@code --where "status =
-   *       'active'"} - Single quotes are automatically escaped for SQL.
+   *   <li><b>SQL Single Quotes:</b> Use as-is in where clauses. Example: {@code --where-clause
+   *       "status = 'active'"} - Single quotes are automatically escaped for SQL.
    *   <li><b>JSON Values:</b> Must be valid JSON strings. The job parses and validates JSON before
    *       use.
    * </ul>
    *
-   * <p>Example via command line: --catalog iceberg_catalog --table db.sample --strategy binpack
-   * --options '{"min-input-files":"2"}' --spark-conf '{"spark.sql.shuffle.partitions":"200"}'
+   * <p>Example via command line: --catalog-name iceberg_catalog --table-identifier db.sample
+   * --strategy binpack --options '{"min-input-files":"2"}' --spark-conf
+   * '{"spark.sql.shuffle.partitions":"200"}'
    *
    * <p>Example via Gravitino API:
    *
@@ -117,8 +118,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
-    String catalogName = argMap.get(IcebergJobUtils.OPTION_CATALOG);
-    String tableIdentifier = argMap.get(IcebergJobUtils.OPTION_TABLE);
+    String catalogName = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_CATALOG));
+    String tableIdentifier = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_TABLE));
 
     if (catalogName == null || tableIdentifier == null) {
       System.err.println(
@@ -132,11 +133,12 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     }
 
     // Optional arguments
-    String strategy = argMap.get(OPTION_STRATEGY);
-    String sortOrder = argMap.get(OPTION_SORT_ORDER);
-    String whereClause = argMap.get(OPTION_WHERE);
-    String optionsJson = argMap.get(OPTION_OPTIONS);
-    String sparkConfJson = argMap.get(IcebergJobUtils.OPTION_SPARK_CONF);
+    String strategy = IcebergJobUtils.trimToNull(argMap.get(OPTION_STRATEGY));
+    String sortOrder = IcebergJobUtils.trimToNull(argMap.get(OPTION_SORT_ORDER));
+    String whereClause = IcebergJobUtils.trimToNull(argMap.get(OPTION_WHERE));
+    String optionsJson = IcebergJobUtils.trimToNull(argMap.get(OPTION_OPTIONS));
+    String sparkConfJson =
+        IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_SPARK_CONF));
 
     // Validate strategy if provided
     try {

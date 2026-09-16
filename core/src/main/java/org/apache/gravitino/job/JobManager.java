@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -858,15 +859,19 @@ public class JobManager implements JobOperationDispatcher {
     }
     Map<String, String> environments =
         omitUnresolvedTemplateMap(content.environments(), jobConf, "environment");
-    Map<String, String> customFields =
-        content.customFields().entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    entry -> replacePlaceholder(entry.getKey(), jobConf),
-                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
-    for (Map.Entry<String, String> entry : customFields.entrySet()) {
-      rejectEmbeddedUnresolvedPlaceholder(entry.getKey(), "customFields key");
-      rejectEmbeddedUnresolvedPlaceholder(entry.getValue(), "customFields value");
+    Map<String, String> customFields = new LinkedHashMap<>();
+    for (Map.Entry<String, String> entry : content.customFields().entrySet()) {
+      String key = replacePlaceholder(entry.getKey(), jobConf);
+      String value = replacePlaceholder(entry.getValue(), jobConf);
+      rejectEmbeddedUnresolvedPlaceholder(key, "customFields key");
+      rejectEmbeddedUnresolvedPlaceholder(value, "customFields value");
+      if (customFields.containsKey(key)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Duplicate key %s (attempted merging values %s and %s)",
+                key, customFields.get(key), value));
+      }
+      customFields.put(key, value);
     }
 
     // For shell job template
@@ -1018,7 +1023,7 @@ public class JobManager implements JobOperationDispatcher {
    */
   @VisibleForTesting
   static boolean isMatchingUnresolvedFlagValue(String flagArg, String value) {
-    if (!flagArg.startsWith("--") || !isUnresolvedPlaceholder(value)) {
+    if (!flagArg.startsWith("--") || value == null) {
       return false;
     }
     Matcher matcher = PLACEHOLDER_PATTERN.matcher(value);
@@ -1031,6 +1036,43 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   /**
+   * Whether {@code value} is exactly one unresolved {@code {{placeholder}}} token.
+   *
+   * <p>Blank / empty strings are not unresolved placeholders: a present {@code jobConf} key with
+   * value {@code ""} means the caller explicitly supplied an empty value.
+   */
+  @VisibleForTesting
+  static boolean isUnresolvedPlaceholder(@Nullable String value) {
+    return value != null && PLACEHOLDER_PATTERN.matcher(value).matches();
+  }
+
+  /**
+   * Fails when {@code value} still embeds an unresolved placeholder that is not a whole-token match
+   * (for example {@code prefix-{{missing}}}).
+   *
+   * @param value resolved string that may contain placeholders; may be null
+   * @param context label used in the error message
+   */
+  @VisibleForTesting
+  static void rejectEmbeddedUnresolvedPlaceholder(@Nullable String value, String context) {
+    if (value == null) {
+      return;
+    }
+    Matcher matcher = PLACEHOLDER_PATTERN.matcher(value);
+    if (!matcher.find()) {
+      return;
+    }
+    // Whole-token placeholders are handled by omit/keep rules; only embedded forms fail here.
+    if (matcher.start() == 0 && matcher.end() == value.length()) {
+      return;
+    }
+    throw new IllegalArgumentException(
+        String.format(
+            "Unresolved placeholder remains embedded in %s after substitution: %s",
+            context, value));
+  }
+
+  /**
    * Resolves optional template maps such as {@code environments} and Spark {@code configs}. Entries
    * whose keys or values are still an unresolved {@code {{placeholder}}} after substitution are
    * dropped so optional credentials / Spark confs do not become literal placeholder strings.
@@ -1039,8 +1081,13 @@ public class JobManager implements JobOperationDispatcher {
    * #omitEmptyArguments(List)}; {@code customFields} still keep unresolved placeholders as literal
    * text when the entire token is one placeholder.
    *
+   * <p>Config / environment keys that still embed an unresolved placeholder (for example {@code
+   * spark.sql.catalog.{{catalog_name}}}) are dropped rather than rejected, so omitting optional
+   * catalog keys does not surface as a JobManager-level error.
+   *
    * <p>If two entries resolve to the same key after placeholder substitution, this method fails
-   * fast with {@link IllegalStateException}, matching {@link Collectors#toMap}.
+   * fast with {@link IllegalArgumentException} so the REST layer returns HTTP 400 for client input
+   * errors.
    *
    * <p>Composite values that still embed an unresolved placeholder (for example {@code
    * prefix-{{missing}}} or {@code {{a}}.{{b}}} with only one key supplied) fail fast with {@link
@@ -1061,10 +1108,13 @@ public class JobManager implements JobOperationDispatcher {
       if (isUnresolvedPlaceholder(key) || isUnresolvedPlaceholder(value)) {
         continue;
       }
-      rejectEmbeddedUnresolvedPlaceholder(key, context + " key");
+      // Drop keys that still embed a placeholder (e.g. spark.sql.catalog.{{catalog_name}}).
+      if (PLACEHOLDER_PATTERN.matcher(key).find()) {
+        continue;
+      }
       rejectEmbeddedUnresolvedPlaceholder(value, context + " value");
       if (resolved.containsKey(key)) {
-        throw new IllegalStateException(
+        throw new IllegalArgumentException(
             String.format(
                 "Duplicate key %s (attempted merging values %s and %s)",
                 key, resolved.get(key), value));
@@ -1072,29 +1122,6 @@ public class JobManager implements JobOperationDispatcher {
       resolved.put(key, value);
     }
     return resolved;
-  }
-
-  /**
-   * Whether {@code value} is exactly one unresolved {@code {{placeholder}}} token.
-   *
-   * <p>Blank / empty strings are not unresolved placeholders: a present {@code jobConf} key with
-   * value {@code ""} means the caller explicitly supplied an empty value.
-   */
-  @VisibleForTesting
-  static boolean isUnresolvedPlaceholder(String value) {
-    return value != null && PLACEHOLDER_PATTERN.matcher(value).matches();
-  }
-
-  @VisibleForTesting
-  static void rejectEmbeddedUnresolvedPlaceholder(String value, String context) {
-    if (value != null
-        && !isUnresolvedPlaceholder(value)
-        && PLACEHOLDER_PATTERN.matcher(value).find()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Unresolved placeholder remains embedded in %s after substitution: %s",
-              context, value));
-    }
   }
 
   @VisibleForTesting

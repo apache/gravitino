@@ -41,7 +41,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v2", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
@@ -51,9 +51,9 @@ public class TestIcebergUpdateStatsJob {
 
     assertNotNull(template.arguments());
     assertEquals(10, template.arguments().size());
-    assertTrue(template.arguments().contains("--catalog"));
+    assertTrue(template.arguments().contains("--catalog-name"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
+    assertTrue(template.arguments().contains("--table-identifier"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--update-mode"));
     assertTrue(template.arguments().contains("{{update_mode}}"));
@@ -87,16 +87,16 @@ public class TestIcebergUpdateStatsJob {
   @Test
   public void testParseArguments() {
     String[] args = {
-      "--catalog", "cat",
-      "--table", "db.tbl",
+      "--catalog-name", "cat",
+      "--table-identifier", "db.tbl",
       "--update-mode", "metrics",
       "--updater-options", "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
       "--spark-conf", "{\"spark.master\":\"local[2]\"}"
     };
 
     Map<String, String> parsed = IcebergUpdateStatsAndMetricsJob.parseArguments(args);
-    assertEquals("cat", parsed.get("catalog"));
-    assertEquals("db.tbl", parsed.get("table"));
+    assertEquals("cat", parsed.get("catalog-name"));
+    assertEquals("db.tbl", parsed.get("table-identifier"));
     assertEquals("metrics", parsed.get("update-mode"));
     assertEquals(
         "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",

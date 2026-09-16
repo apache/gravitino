@@ -40,7 +40,7 @@ public class SparkPiJob implements BuiltInJob {
 
   private static final String NAME = JobTemplateProvider.BUILTIN_NAME_PREFIX + "sparkpi";
   // Bump VERSION whenever SparkPi template behavior changes (name/executable/class/args/configs).
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -59,10 +59,29 @@ public class SparkPiJob implements BuiltInJob {
   public static void main(String[] args) {
     int slices = 2;
     if (args.length > 0) {
+      String raw = args[0] == null ? "" : args[0].trim();
+      if (raw.isEmpty() || raw.contains("{{")) {
+        System.err.println(
+            "Invalid number of slices provided: '"
+                + args[0]
+                + "'. Pass a positive integer via jobConf key 'slices'.");
+        System.exit(1);
+        return;
+      }
       try {
-        slices = Integer.parseInt(args[0]);
+        slices = Integer.parseInt(raw);
       } catch (NumberFormatException e) {
-        System.err.println("Invalid number of slices provided. Using default value of 2.");
+        System.err.println(
+            "Invalid number of slices provided: '"
+                + args[0]
+                + "'. Pass a positive integer via jobConf key 'slices'.");
+        System.exit(1);
+        return;
+      }
+      if (slices < 1) {
+        System.err.println("Number of slices must be >= 1, got: " + slices);
+        System.exit(1);
+        return;
       }
     }
 
