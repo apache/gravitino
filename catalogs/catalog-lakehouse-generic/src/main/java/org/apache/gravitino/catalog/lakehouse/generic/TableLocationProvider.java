@@ -27,11 +27,34 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  * location} properties; deployments that allocate storage through an external service can register
  * their own implementation instead.
  *
- * <p>The interface is deliberately two operations wide: hand out a location for a table being
- * created, and hand one back for a table that is gone. Every decision that can be made from what
- * the catalog already knows is made by the catalog, so that an implementation has as little to get
- * right as possible. In particular, whether an external table's data survives a drop is decided
- * here and not there -- see {@link #unprovisionTableLocation(TableLocationContext)}.
+ * <p><b>The catalog reports; the provider decides.</b> The catalog's part is to hand over an
+ * accurate account of what happened -- what the creation request asked for, where the table ended
+ * up, whether the data under a location is gone -- and the provider's part is to decide what that
+ * account means for the storage it manages. The catalog does not model what an implementation
+ * keeps, and an implementation is never asked to reconstruct what the catalog or the table formats
+ * did.
+ *
+ * <p>There is one exception, and it is written here as an exception rather than dressed up as the
+ * rule: an external table that is <b>dropped</b> does not reach {@link
+ * #unprovisionTableLocation(TableLocationContext)} at all. That is the one path where a provider
+ * acting on an accurate report could still destroy data irrecoverably, because the table formats
+ * leave an external dataset in place on a drop. A leaked location can be reconciled and deleted
+ * data cannot, so the catalog withholds the call rather than making it.
+ *
+ * <p><b>Responsibilities.</b> A provider owns the right to use a path; the table format owns the
+ * content at the path. The dividing line is not physical against logical -- a provider may well
+ * create real infrastructure -- but what a thing was created for: anything brought into being so
+ * that the path can be used belongs to the provider, and anything written into the path belongs to
+ * the format. Concretely a provider owns its reservation, its registry entry, whatever quota or
+ * grant it books, the name itself, and any container it created to make the path usable; a table
+ * format owns the dataset, including deleting it; and the catalog owns neither, storing the
+ * location string verbatim and sequencing the two calls below.
+ *
+ * <p><b>Scope.</b> What this interface offers is allocation hooks plus best-effort release
+ * notification, with recovery owned by the provider and the deployment. It is deliberately not a
+ * distributed transaction and not a recovery system. The limitations below are real, and an
+ * implementation that manages storage has to reconcile against the catalog independently of these
+ * two calls.
  *
  * <p><b>There is no lifecycle.</b> An instance is created per catalog and is never initialized or
  * closed by the catalog, so an implementation needing configuration of its own -- a service
@@ -65,7 +88,7 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  *       that cannot be loaded at all still fails the lookup.
  * </ul>
  *
- * <p><b>Known limitations.</b> Five of them, and they all point the same way: a provider that
+ * <p><b>Known limitations.</b> Six of them, and they all point the same way: a provider that
  * manages real storage needs its own reconciliation against the catalog and cannot treat the
  * callbacks here as a complete record of what it handed out.
  *
@@ -84,17 +107,24 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  *       before failing, which this interface cannot express. Every check this catalog can make on
  *       its own is made before the provider is consulted, so the cases that remain are the ones
  *       only the table format can detect.
- *   <li>The catalog decides that a provisioned location went unused by comparing it with the
- *       location the created table reports, ignoring a trailing slash, which is the one rewrite the
- *       catalog performs itself. A format that rewrites the location further -- collapsing a
- *       duplicated separator, or normalizing a URI scheme -- looks from here like a format that
- *       declined the location outright, so an implementation whose paths may come back rewritten
- *       should verify before reclaiming.
+ *   <li>A location that is provisioned but then not used is not handed back either. A creation mode
+ *       such as Lance's {@code EXIST_OK} returns the table that already exists, at the location it
+ *       already has, and the location provisioned for that call goes nowhere. Detecting that from
+ *       here would mean comparing two location strings and concluding from the comparison what an
+ *       implementation did internally, which is exactly the inference this interface leaves to the
+ *       provider; and a retried creation is the ordinary way to reach it, so an implementation that
+ *       allocates has to reconcile these along with the failures above.
  *   <li>A table format that drops a table through its own internals, rather than through the
  *       catalog, does not trigger {@link #unprovisionTableLocation(TableLocationContext)}. Lance's
  *       {@code OVERWRITE} creation mode does this: it drops the existing table and creates a new
  *       one, so the old location is never handed back. A format-internal drop is not visible to the
  *       catalog, so this cannot be closed from here.
+ *   <li>A provider deriving a deterministic path from a table's identity hands out the same path
+ *       again when a table of the same name is created after the old one is gone, and the built-in
+ *       provider is one such provider. If anything survived under that path -- a drop whose data
+ *       deletion failed, or a format-internal drop as above -- the next creation of that name fails
+ *       inside the table format rather than here, and keeps failing, because every retry derives
+ *       the same path. Clearing what was left behind is outside what this interface can see or do.
  *   <li>{@code alterTable(rename(...))} changes a table's identity without telling this provider,
  *       and without moving any data. A provider deriving the path from the table name is left with
  *       a path that no longer matches the name, which is cosmetic. A provider that books
@@ -107,10 +137,14 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 public interface TableLocationProvider {
 
   /**
-   * Returns the name identifying this provider. The value is matched case-insensitively against the
-   * {@code table-location-provider} catalog property to select a provider.
+   * Returns the name this provider is selected by, matched against the {@code
+   * table-location-provider} catalog property.
    *
-   * @return the provider name, never null or blank
+   * <p>It must be unique across the classpath and must not be {@value
+   * DefaultTableLocationProvider#NAME}. It is read once per lookup, on every registered provider,
+   * so it must be cheap and must not throw.
+   *
+   * @return the name of this provider, never null or blank
    */
   String name();
 
@@ -122,6 +156,14 @@ public interface TableLocationProvider {
    * otherwise. Nothing else is required of it: the shape of the path belongs to the provider,
    * nothing downstream appends to the location, and storing it unchanged is what lets a provider
    * unprovisioning it later match the string it handed out.
+   *
+   * <p><b>What the returned location promises.</b> Exactly one thing: that the location is usable,
+   * meaning a table format may create its dataset there and will not be refused for any reason
+   * under the provider's control. Whether an implementation had to reserve, register or create
+   * anything to make that true is its own business, neither required nor forbidden here. It does
+   * <em>not</em> promise that a directory or prefix exists, that a dataset exists, or that the
+   * location is empty -- the last one deliberately, because in this catalog a caller usually
+   * supplies a location precisely when the data is already there.
    *
    * <p><b>A request that carries its own {@code location} reaches this method too</b>, with the
    * supplied value visible as the {@code location} entry of {@link
@@ -149,45 +191,51 @@ public interface TableLocationProvider {
   String provisionTableLocation(TableLocationContext context);
 
   /**
-   * Unprovisions the location of a table that has been dropped, so that a provider allocating
-   * storage through an external service can hand it back instead of leaking it. The location to
-   * hand back is the {@code location} entry of {@link TableLocationContext#tableProperties()}.
+   * Unprovisions the location of a table that is gone, so that a provider allocating through an
+   * external service can hand back what it issued instead of leaking it. The location in question
+   * is the {@code location} entry of {@link TableLocationContext#tableProperties()}.
    *
    * <p>There is deliberately no default implementation. A provider allocating from an external
    * system has to state what happens when the table goes away, and a provider deriving the path
    * from configuration writes an empty body and says so; an inherited empty body would let the
    * second answer be given by accident.
    *
+   * <p><b>What it releases.</b> What the implementation issued: the reservation, the registry
+   * entry, whatever quota or grant it booked, and the name itself so that it can be handed out
+   * again. An implementation may also remove a container it created itself -- a prefix or a bucket
+   * it brought into being so the path could be used -- but only after establishing that the
+   * container holds nothing except what the implementation itself put there, and it must leave the
+   * container in place otherwise.
+   *
+   * <p><b>What it must not touch.</b> The content at the location. The table format owns the
+   * lifecycle of the data and has already deleted it on every path that reaches this method;
+   * deleting anything further is at best redundant and at worst destroys data this catalog has
+   * promised not to touch. Nor does the location string establish ownership on its own: the catalog
+   * supplies one fact, that nothing anyone needs is under that location any more, and whether the
+   * implementation holds anything there is a fact only the implementation can establish, from its
+   * own records.
+   *
    * <p>It is called <em>after</em> the table metadata, and the underlying data of a managed table,
    * have been removed, so throwing does not roll the drop back: the table is gone either way. The
    * failure is logged at WARN and the drop still reports success. Dropping a schema with cascade
    * unprovisions the location of every table it contains, one by one.
    *
-   * <p>It is <em>not</em> called when an external table is <b>dropped</b>. The catalog does not own
-   * their data -- the table formats leave the dataset in place on drop -- so asking a provider to
-   * hand the location back would invite it to delete exactly the data the catalog just promised not
-   * to touch. A leak is recoverable and a deletion is not, so the callback is skipped.
+   * <p>It is <em>not</em> called when an external table is <b>dropped</b>, which is the exception
+   * named in this interface's description. The catalog does not own their data -- the table formats
+   * leave the dataset in place on drop -- so asking a provider to hand the location back would
+   * invite it to delete exactly the data the catalog just promised not to touch. A leak is
+   * recoverable and a deletion is not, so the callback is skipped.
    *
    * <p>It <em>is</em> called when an external table is <b>purged</b>. Purge and drop do not remove
    * the same things: {@code LanceTableOperations#purgeTable} deletes the external dataset that its
    * {@code dropTable} leaves alone, so by the time this runs the data is gone and the reason to
    * skip has gone with it.
    *
-   * <p>Which means this callback is reached in exactly four situations: a dropped managed table, a
-   * purged managed table, a purged external one, and a creation whose provisioned location the
-   * table format did not use. There is deliberately no flag distinguishing them, because the
-   * invariant they share is the one that matters, and it is about the location rather than the
-   * table: <b>nothing anyone needs is under the location named in the context</b>. In the first
-   * three the table format has already deleted the data under it; in the fourth nothing was ever
-   * written there, because the created table points somewhere else.
-   *
-   * <p><b>In that fourth case the table still exists.</b> It is the one call here that does not
-   * mean the table went away: an {@code EXIST_OK}-style creation mode returned the table that
-   * already exists, at the location it already had, and only the location provisioned for that call
-   * went unused. A client retrying a create is the ordinary way to reach it. This is safe for an
-   * implementation that does what this method asks -- release the location named in the context --
-   * and unsafe only for one that instead deletes everything it has booked against the table
-   * identity, which is not what is being asked for here or on any other path.
+   * <p>Which means this callback is reached in exactly three situations: a dropped managed table, a
+   * purged managed table, and a purged external one. There is deliberately no flag distinguishing
+   * them, because the invariant they share is the one that matters, and it is about the location
+   * rather than the table: <b>nothing anyone needs is under the location named in the context</b>.
+   * In all three the table format has already deleted the data under it.
    *
    * <p>Even so, {@code external} is only an approximation of the rule this callback actually wants,
    * which is "hand back only what was handed out". An external table created without a location
@@ -205,7 +253,7 @@ public interface TableLocationProvider {
    * #provisionTableLocation(TableLocationContext)}, it is called concurrently and must be
    * thread-safe.
    *
-   * @param context the table that was dropped and the context needed to release its location
+   * @param context the table that is gone and the context needed to release its location
    */
   void unprovisionTableLocation(TableLocationContext context);
 }

@@ -515,69 +515,6 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testAnUnusedProvisionedLocationIsHandedBack() {
-    NameIdentifier schemaIdent = createSchema();
-    String preExistingLocation = "s3://already-there/exist-ok-table/";
-    FakeTableDelegator.useLocationInstead(preExistingLocation);
-
-    Table created =
-        createTableThroughCatalog(
-            opsWithFakeProvider, schemaIdent, "exist_ok_table", ImmutableMap.of());
-
-    // A format may decline the location it was given and still report success: an EXIST_OK
-    // creation mode returns the table that already exists, at the location it already had. Without
-    // handing the provisioned location back, every retried create would leak one allocation.
-    Assertions.assertEquals(preExistingLocation, created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
-    Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
-
-    // The location handed back is the provisioned one, not the one the table ended up at. Getting
-    // this backwards would tell the provider to reclaim the storage of a live table.
-    Assertions.assertEquals(
-        locationOf("exist_ok_table"),
-        FakeTableLocationProvider.unprovisioned()
-            .get(0)
-            .tableProperties()
-            .get(Table.PROPERTY_LOCATION));
-  }
-
-  @Test
-  public void testATrailingSlashAloneDoesNotMakeALocationLookUnused() {
-    NameIdentifier schemaIdent = createSchema();
-    String provisioned = locationOf("slash_table");
-    String withoutSlash = provisioned.substring(0, provisioned.length() - 1);
-    FakeTableDelegator.useLocationInstead(withoutSlash);
-
-    Table created =
-        createTableThroughCatalog(
-            opsWithFakeProvider, schemaIdent, "slash_table", ImmutableMap.of());
-
-    // The catalog adds the trailing slash itself, so a format storing the location without one is
-    // using the location it was given, not declining it. Reclaiming it here would delete the
-    // storage of the table that was just created.
-    Assertions.assertEquals(withoutSlash, created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertTrue(
-        FakeTableLocationProvider.unprovisioned().isEmpty(),
-        "A location differing only by a trailing slash is the same location");
-  }
-
-  @Test
-  public void testAFormatUsingTheProvisionedLocationHandsNothingBack() {
-    NameIdentifier schemaIdent = createSchema();
-
-    Table created =
-        createTableThroughCatalog(
-            opsWithFakeProvider, schemaIdent, "normal_table", ImmutableMap.of());
-
-    Assertions.assertEquals(
-        locationOf("normal_table"), created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
-    Assertions.assertTrue(
-        FakeTableLocationProvider.unprovisioned().isEmpty(),
-        "A location the format actually used must not be handed back");
-  }
-
-  @Test
   public void testAPropertyWithANullValueReachesTheProvider() {
     NameIdentifier schemaIdent = createSchema();
     Map<String, String> properties = Maps.newHashMap();
