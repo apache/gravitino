@@ -17,44 +17,75 @@
 # limitations under the License.
 #
 
-# This script checks if all the files mentioned in the LICENSE file are present in the project.
-# Besides highlighting the missing files, it will display possible locations for any new files.
-# It adds text like [NOT FOUND] --> "new/path/to/the/file" in the end of the line where the file is missing.
-# With the output of this script, you can update the LICENSE file with the correct file paths.
+# This script checks that every file referenced by the LICENSE and NOTICE files is
+# present in the project, and reports the ones that are not. For each missing file it
+# prints the referencing line and any candidate locations found elsewhere in the tree,
+# so the reference can be corrected.
+#
+# A reference is only checked when its first path segment is an existing directory in
+# the project root. That keeps URLs, Java package names and paths internal to a bundled
+# jar such as META-INF/NOTICE out of scope, since none of those name a file that is
+# expected to exist here.
+#
+# The LICENSE.bin and NOTICE.bin variants are deliberately not checked: their paths
+# describe the layout of the binary package assembled by build.gradle.kts rather than
+# the source tree, so resolving them here would report failures that are not real.
 
 FAILED=0
 
-PROJECT_ROOT=${1:-$(dirname $(dirname $(dirname $(readlink -f "$0"))))}
-LICENSE_FILE=$(cat "$PROJECT_ROOT"/LICENSE)
+PROJECT_ROOT=${1:-$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")}
 
 cd "$PROJECT_ROOT" || exit 1
 
-while IFS= read -r line; do
-  echo -n "$line"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+RESET='\033[0m'
 
-  line=$(echo "$line" | xargs)
-  # check if the line is a file
-  if [[ "$line" == "./"* && "$line" == *"."* ]]; then
-    line=$(echo "$line" | cut -c 3-)
+check_document() {
+  local document="$1"
 
-    # check if the file does not exists
-    if [ ! -f "$line" ]; then
-      FAILED=1
-      echo -n -e " \033[0;31m[NOT FOUND]\033[0m --> "
-
-      file_name=$(basename "$line")
-      # scan for the file name in the project root excluding the '.gradle' directory
-      # and print the new file path if found in the project
-      find . -type f -not -path '*/\.gradle/*' -name "$file_name" | tr -d '\n'
-    fi
+  if [ ! -f "$document" ]; then
+    echo -e "${RED}$document not found in $PROJECT_ROOT${RESET}"
+    FAILED=1
+    return
   fi
-  echo
 
-done <<< "$LICENSE_FILE"
+  local line_number=0
+  local line token candidates
+  # the '|| [ -n "$line" ]' guard keeps the last line when the file has no trailing newline
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_number=$((line_number + 1))
+
+    for token in $(echo "$line" | grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+'); do
+      token=${token#./}
+
+      # only consider references rooted at a directory that exists here
+      [ -d "${token%%/*}" ] || continue
+      [ -e "$token" ] && continue
+
+      FAILED=1
+      echo -e "${RED}[NOT FOUND]${RESET} $document:$line_number --> $token"
+      echo "    $line"
+
+      # scan for the file name in the project root excluding the '.gradle' directory
+      # and print any candidate locations found
+      candidates=$(find . -type f -not -path '*/\.gradle/*' -name "$(basename "$token")")
+      if [ -n "$candidates" ]; then
+        echo "    candidates:"
+        while IFS= read -r candidate; do
+          echo "      $candidate"
+        done <<< "$candidates"
+      fi
+    done
+  done < "$document"
+}
+
+check_document LICENSE
+check_document NOTICE
 
 # check if any file is missing
 if [ $FAILED -ne 0 ]; then
-  echo -e "\033[0;31mSome files listed in the LICENSE file are missing. \033[0m"
+  echo -e "${RED}Some files referenced by the LICENSE or NOTICE files are missing.${RESET}"
   exit 1
 fi
-echo -e "\033[0;32mAll files listed in the LICENSE file are present. \033[0m"
+echo -e "${GREEN}All files referenced by the LICENSE and NOTICE files are present.${RESET}"
