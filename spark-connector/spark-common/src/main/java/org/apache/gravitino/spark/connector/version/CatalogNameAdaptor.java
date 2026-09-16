@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.version;
 import com.google.common.collect.ImmutableMap;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.gravitino.spark.connector.plugin.SparkCatalogExtensions;
 import org.apache.spark.package$;
 import org.apache.spark.util.VersionUtils$;
 
@@ -99,6 +100,10 @@ public class CatalogNameAdaptor {
   }
 
   public static String getCatalogName(String provider) {
+    String extensionCatalogName = SparkCatalogExtensions.catalogClassName(provider);
+    if (extensionCatalogName != null) {
+      return extensionCatalogName;
+    }
     int majorVersion = VersionUtils$.MODULE$.majorVersion(sparkVersion());
     int minorVersion = VersionUtils$.MODULE$.minorVersion(sparkVersion());
     return getCatalogName(provider, majorVersion, minorVersion);
