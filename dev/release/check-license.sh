@@ -50,6 +50,12 @@ check_document() {
     return
   fi
 
+  if [ ! -r "$document" ]; then
+    echo -e "${RED}$document is not readable in $PROJECT_ROOT${RESET}"
+    FAILED=1
+    return
+  fi
+
   local line_number=0
   local line token candidates candidate
   # the '|| [ -n "$line" ]' guard keeps the last line when the file has no trailing newline

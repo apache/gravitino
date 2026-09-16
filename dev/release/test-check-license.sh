@@ -99,3 +99,20 @@ CASE='missing NOTICE document'
 touch "$PROJECT_ROOT/LICENSE"
 rm "$PROJECT_ROOT/NOTICE"
 check_result 1 'NOTICE not found'
+
+CASE='unreadable source document'
+touch "$PROJECT_ROOT/NOTICE"
+chmod 000 "$PROJECT_ROOT/NOTICE"
+if [ -r "$PROJECT_ROOT/NOTICE" ]; then
+  echo "SKIP: $CASE (current user can read mode-000 files)"
+else
+  check_result 1 'NOTICE is not readable'
+fi
+chmod 600 "$PROJECT_ROOT/NOTICE"
+
+CASE='default project root resolved relative to script'
+mkdir -p "$PROJECT_ROOT/dev/release"
+cp "$CHECKER" "$PROJECT_ROOT/dev/release/check-license.sh"
+bash "$PROJECT_ROOT/dev/release/check-license.sh" > "$TEST_ROOT/output" 2>&1
+grep -Fq 'All files referenced' "$TEST_ROOT/output"
+echo "PASS: $CASE"
