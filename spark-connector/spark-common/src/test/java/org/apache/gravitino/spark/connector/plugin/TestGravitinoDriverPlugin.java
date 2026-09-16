@@ -30,8 +30,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
@@ -376,8 +376,7 @@ public class TestGravitinoDriverPlugin {
         GravitinoDriverPlugin.createGravitinoClient(
             "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of());
     IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, client::listCatalogs);
+        Assertions.assertThrows(IllegalArgumentException.class, client::listCatalogs);
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
     client.close();
