@@ -67,6 +67,7 @@ public class TestFactoryUtils {
               ImmutableList.of(
                       new ServiceConfigurationError("missing provider"),
                       new NoClassDefFoundError("missing/Dependency"),
+                      new IllegalStateException("factory init failed"),
                       new FakeExternalCatalogFactory())
                   .iterator();
 
@@ -80,6 +81,9 @@ public class TestFactoryUtils {
             Object step = steps.next();
             if (step instanceof Error) {
               throw (Error) step;
+            }
+            if (step instanceof RuntimeException) {
+              throw (RuntimeException) step;
             }
             return (Factory) step;
           }

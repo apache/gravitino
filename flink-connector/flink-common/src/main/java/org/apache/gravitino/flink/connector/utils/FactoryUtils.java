@@ -82,8 +82,9 @@ public class FactoryUtils {
         if (factory instanceof BaseCatalogFactory && type.equals(factory.factoryIdentifier())) {
           return true;
         }
-      } catch (ServiceConfigurationError | LinkageError e) {
-        // A factory whose optional dependencies are absent cannot be the one asked for.
+      } catch (ServiceConfigurationError | LinkageError | RuntimeException e) {
+        // A factory that cannot be loaded or fails to report its identifier cannot be the one
+        // asked for.
         LOG.debug(
             "Skip a {} entry that cannot be loaded while resolving catalog type '{}'.",
             Factory.class.getName(),
