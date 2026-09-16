@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.utils;
 import static org.apache.flink.table.factories.FactoryUtil.validateFactoryOptions;
 import static org.apache.flink.table.factories.FactoryUtil.validateWatermarkOptions;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -66,20 +67,28 @@ public class FactoryUtils {
     if (type == null) {
       return false;
     }
-    Iterator<Factory> iterator = ServiceLoader.load(Factory.class).iterator();
+    return isProvidedByCatalogFactory(ServiceLoader.load(Factory.class).iterator(), type);
+  }
+
+  @VisibleForTesting
+  static boolean isProvidedByCatalogFactory(Iterator<Factory> factories, String type) {
+    // Both hasNext() and next() may fail on a broken service entry, so both stay inside the try.
     while (true) {
       try {
-        if (!iterator.hasNext()) {
+        if (!factories.hasNext()) {
           return false;
         }
-        Factory factory = iterator.next();
-        if (factory instanceof BaseCatalogFactory
-            && type.equalsIgnoreCase(factory.factoryIdentifier())) {
+        Factory factory = factories.next();
+        if (factory instanceof BaseCatalogFactory && type.equals(factory.factoryIdentifier())) {
           return true;
         }
       } catch (ServiceConfigurationError | LinkageError e) {
         // A factory whose optional dependencies are absent cannot be the one asked for.
-        LOG.debug("Skip a {} entry that cannot be loaded.", Factory.class.getName(), e);
+        LOG.debug(
+            "Skip a {} entry that cannot be loaded while resolving catalog type '{}'.",
+            Factory.class.getName(),
+            type,
+            e);
       }
     }
   }
