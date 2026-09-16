@@ -26,13 +26,36 @@ public class IcebergCatalogCapability implements Capability {
 
   private final String schemaSeparator;
 
+  private final boolean hiveBackend;
+
   /**
    * Creates a capability with the given external schema separator.
    *
    * @param schemaSeparator the external separator used in logical schema names (e.g. {@code ":"})
    */
   public IcebergCatalogCapability(String schemaSeparator) {
+    this(schemaSeparator, false);
+  }
+
+  /**
+   * Creates a capability with backend-specific identifier handling.
+   *
+   * @param schemaSeparator The external separator used in logical schema names.
+   * @param hiveBackend Whether the catalog uses the case-insensitive Hive metastore.
+   */
+  public IcebergCatalogCapability(String schemaSeparator, boolean hiveBackend) {
     this.schemaSeparator = schemaSeparator;
+    this.hiveBackend = hiveBackend;
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE)) {
+      // Hive normalizes database and table names, but Iceberg column names retain their case.
+      return CapabilityResult.unsupported(
+          "The Hive backend is case insensitive for schema and table names.");
+    }
+    return Capability.super.caseSensitiveOnName(scope);
   }
 
   @Override
