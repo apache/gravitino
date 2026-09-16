@@ -257,7 +257,8 @@ public class MetadataAuthzHelper {
       String metalake,
       String expression,
       Entity.EntityType entityType,
-      NameIdentifier[] nameIdentifiers) {
+      NameIdentifier[] nameIdentifiers,
+      AuthorizationRequestContext requestContext) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();
     Map<String, List<ParentScopeAccessPath>> entityShortCircuits =
         LIST_SHORT_CIRCUITS.get(entityType);
@@ -295,7 +296,6 @@ public class MetadataAuthzHelper {
 
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
     Map<Entity.EntityType, NameIdentifier> metadataNames =
         NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
 
@@ -379,6 +379,10 @@ public class MetadataAuthzHelper {
     // short-circuit and the preloads live at this one point. Keeping them in the NameIdentifier[]
     // overload alone let the verbose catalog listing, which carries Catalog objects, run the
     // per-object loop over every catalog in the metalake.
+    GravitinoAuthorizer authorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    AuthorizationRequestContext authorizationRequestContext =
+        AuthorizationRequestScope.getOrCreate(metalake, authorizer);
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
     if (enableAuthorization() && nameIdentifiers.length > 0) {
@@ -389,7 +393,8 @@ public class MetadataAuthzHelper {
       }
 
       String principalName = PrincipalUtils.getCurrentPrincipal().getName();
-      if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
+      if (allVisibleViaParentScope(
+          metalake, expression, entityType, nameIdentifiers, authorizationRequestContext)) {
         // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
         // the list visible, and no object-level deny exists, so the per-object authorization loop
         // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
@@ -414,9 +419,6 @@ public class MetadataAuthzHelper {
     preloadToCache(entityType, nameIdentifiers);
     preloadOwner(entityType, nameIdentifiers);
 
-    GravitinoAuthorizer authorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return doFilter(
         expression,
         entities,

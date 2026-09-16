@@ -25,12 +25,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import javax.ws.rs.GET;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -222,6 +224,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    */
   protected final Object authorizeMethod(Method method, Object[] args, MethodInvoker methodInvoker)
       throws Throwable {
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      return authorizeMethod(method, args, methodInvoker, scope);
+    }
+  }
+
+  private Object authorizeMethod(
+      Method method, Object[] args, MethodInvoker methodInvoker, AuthorizationRequestScope scope)
+      throws Throwable {
     try {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
@@ -315,6 +325,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
             LOG.info(notAuthzMessage);
             throw new ForbiddenException(notAuthzMessage);
           }
+        }
+        // Only read operations can reuse entry decisions without crossing a metadata or policy
+        // mutation. The scope is closed even if authorization or the endpoint fails.
+        if (!skipStandardCheck && metalakeIdent != null && method.isAnnotationPresent(GET.class)) {
+          scope.bind(
+              metalakeIdent.name(),
+              GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+              authorizationRequestContext);
         }
       }
     } catch (Exception ex) {

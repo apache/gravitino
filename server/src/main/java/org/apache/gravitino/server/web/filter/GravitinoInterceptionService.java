@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.ws.rs.GET;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -51,6 +52,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
@@ -162,7 +164,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
 
-      try {
+      try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
@@ -269,6 +271,14 @@ public class GravitinoInterceptionService implements InterceptionService {
               return buildNoAuthResponse(
                   expressionAnnotation, metadataContext, method, evaluatedExpression);
             }
+          }
+          // Reuse entry authorization only while executing a read operation. The scope also
+          // isolates nested invocations and is removed on every success or failure path.
+          if (metalakeIdent != null && method.isAnnotationPresent(GET.class)) {
+            scope.bind(
+                metalakeIdent.name(),
+                GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+                authorizationRequestContext);
           }
         }
         return methodInvocation.proceed();

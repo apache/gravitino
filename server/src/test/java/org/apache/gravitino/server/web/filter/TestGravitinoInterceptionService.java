@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -37,6 +38,7 @@ import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -67,6 +69,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.metalake.MetalakeManager;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -78,6 +81,7 @@ import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -206,6 +210,60 @@ public class TestGravitinoInterceptionService {
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
       verify(invocation, never()).proceed();
       verify(dispatcher, never()).listViews(any());
+    }
+  }
+
+  /** The Gravitino list endpoint receives entry state and never leaks it into the next request. */
+  @Test
+  public void testListTablesReusesEntryContextAndCleansUp() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authorization = mockStatic(AuthorizationUtils.class)) {
+      UserPrincipal principal = new UserPrincipal("tester");
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn(principal.getName());
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+      AtomicReference<AuthorizationRequestContext> entry = new AtomicReference<>();
+      authorization
+          .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+          .thenAnswer(
+              call -> {
+                entry.set(call.getArgument(2));
+                return null;
+              });
+      Method method =
+          TableOperations.class.getMethod("listTables", String.class, String.class, String.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"metalake", "catalog", "schema"});
+      when(invocation.proceed())
+          .thenAnswer(
+              unused -> {
+                AuthorizationRequestContext context =
+                    AuthorizationRequestScope.getOrCreate("metalake", authorizer);
+                Assertions.assertSame(entry.get(), context);
+                return context;
+              });
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Object first = interceptor.invoke(invocation);
+      Assertions.assertSame(entry.get(), first);
+      Assertions.assertNotSame(
+          first, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+      Object second = interceptor.invoke(invocation);
+      Assertions.assertSame(entry.get(), second);
+      Assertions.assertNotSame(first, second);
+      doThrow(new IllegalStateException("list failed")).when(invocation).proceed();
+      try (Response failure = (Response) interceptor.invoke(invocation)) {
+        assertEquals(500, failure.getStatus());
+      }
+      Assertions.assertNotSame(
+          entry.get(), AuthorizationRequestScope.getOrCreate("metalake", authorizer));
     }
   }
 
