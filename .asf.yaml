@@ -63,6 +63,8 @@ github:
     - danhuawang
     - lasdf1234
     - nevzheng
+    - jiangxt2
+    - LiJie20190102
   # Copilot Code Review ruleset on the default branch (main).
   # https://github.com/apache/infrastructure-asfyaml#copilot-code-review
   # enabled:        true creates the ruleset; false or deleting this block removes it
