@@ -589,12 +589,33 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return;
     }
     NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
-    boolean ownerStillExists =
+    boolean distinctOwnerStillExists =
         doWithCatalog(
             catalogIdent,
-            c -> c.doWithTableOps(t -> t.tableExists(currentOwner)),
+            c ->
+                c.doWithTableOps(
+                    ops -> {
+                      if (!ops.tableExists(currentOwner)) {
+                        return false;
+                      }
+                      // REST backends may resolve case aliases without advertising this capability.
+                      // Only accept an alias when listing confirms a single matching object; two
+                      // case-distinct objects must still be rejected even if their ids are equal.
+                      if (currentOwner.name().equalsIgnoreCase(identifier.name())) {
+                        long matchingNames =
+                            Arrays.stream(ops.listTables(identifier.namespace()))
+                                .map(NameIdentifier::name)
+                                .filter(name -> name.equalsIgnoreCase(identifier.name()))
+                                .distinct()
+                                .count();
+                        if (matchingNames == 1) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    }),
             RuntimeException.class);
-    if (ownerStillExists) {
+    if (distinctOwnerStillExists) {
       throw new GravitinoRuntimeException(
           "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
               + "identifier was most likely copied with the table properties. Remove the property "
@@ -602,7 +623,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
     }
     LOG.info(
-        "Table {} was renamed to {} outside Gravitino; re-binding the registration {}",
+        "Table {} resolves to {} after an external rename or case-alias lookup; re-binding registration {}",
         currentOwner,
         identifier,
         id);

@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -688,12 +689,33 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       return;
     }
     NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
-    boolean ownerStillExists =
+    boolean distinctOwnerStillExists =
         doWithCatalog(
             catalogIdent,
-            c -> c.doWithSchemaOps(s -> s.schemaExists(currentOwner)),
+            c ->
+                c.doWithSchemaOps(
+                    ops -> {
+                      if (!ops.schemaExists(currentOwner)) {
+                        return false;
+                      }
+                      // REST backends may resolve case aliases without advertising this capability.
+                      // Only accept an alias when listing confirms a single matching object; two
+                      // case-distinct objects must still be rejected even if their ids are equal.
+                      if (currentOwner.name().equalsIgnoreCase(identifier.name())) {
+                        long matchingNames =
+                            Arrays.stream(ops.listSchemas(identifier.namespace()))
+                                .map(NameIdentifier::name)
+                                .filter(name -> name.equalsIgnoreCase(identifier.name()))
+                                .distinct()
+                                .count();
+                        if (matchingNames == 1) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    }),
             RuntimeException.class);
-    if (ownerStillExists) {
+    if (distinctOwnerStillExists) {
       throw new GravitinoRuntimeException(
           "Schema %s carries the Gravitino identifier %d of schema %s, which still exists. The "
               + "identifier was most likely copied with the schema properties. Remove the property "
@@ -701,7 +723,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
     }
     LOG.info(
-        "Schema {} was renamed to {} outside Gravitino; re-binding the registration {}",
+        "Schema {} resolves to {} after an external rename or case-alias lookup; re-binding registration {}",
         currentOwner,
         identifier,
         id);

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -221,11 +222,63 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
   }
 
+  /** A REST backend may accept case aliases while exposing only the canonical name in listings. */
+  @Test
+  public void testLoadSchemaAcceptsCaseAlias() throws Exception {
+    Namespace namespace = Namespace.of(metalake, catalog);
+    NameIdentifier original = NameIdentifier.of(namespace, "original");
+    NameIdentifier alias = NameIdentifier.of(namespace, "ORIGINAL");
+    dispatcher.createSchema(original, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity registered = entityStore.get(original, SCHEMA, SchemaEntity.class);
+    TestCatalog catalogInstance =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations ops = spy(testCatalogOperations());
+    // Like Iceberg REST, load returns the requested name even for an alias.
+    Schema aliasObject = mock(Schema.class);
+    Schema originalObject = ops.loadSchema(original);
+    doReturn(alias.name()).when(aliasObject).name();
+    doReturn(originalObject.properties()).when(aliasObject).properties();
+    doReturn(originalObject.auditInfo()).when(aliasObject).auditInfo();
+    doReturn(aliasObject).when(ops).loadSchema(alias);
+    FieldUtils.writeField(catalogInstance, "ops", ops, true);
+
+    dispatcher.loadSchema(alias);
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(alias, SCHEMA, SchemaEntity.class).id());
+  }
+
   @Test
   public void testLoadSchemaRejectsCopiedIdentifierWhileSourceStillExists() throws IOException {
     Namespace schemaNs = Namespace.of(metalake, catalog);
     NameIdentifier sourceIdent = NameIdentifier.of(schemaNs, "schemaCopiedIdSource");
     NameIdentifier copyIdent = NameIdentifier.of(schemaNs, "schemaCopiedIdCopy");
+    dispatcher.createSchema(sourceIdent, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity sourceEntity = entityStore.get(sourceIdent, SCHEMA, SchemaEntity.class);
+
+    // The copy is created outside Gravitino with source's properties, identifier included.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> copiedProps =
+        new HashMap<>(testCatalogOperations.loadSchema(sourceIdent).properties());
+    Assertions.assertTrue(copiedProps.containsKey(StringIdentifier.ID_KEY));
+    testCatalogOperations.createSchema(copyIdent, "copy", copiedProps);
+
+    GravitinoRuntimeException e =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> dispatcher.loadSchema(copyIdent));
+    Assertions.assertTrue(e.getMessage().contains(StringIdentifier.ID_KEY), e.getMessage());
+
+    SchemaEntity sourceAfter = entityStore.get(sourceIdent, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals(sourceEntity.id(), sourceAfter.id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, SCHEMA));
+  }
+
+  /** Case-sensitive backends may contain two distinct objects differing only in case. */
+  @Test
+  public void testLoadSchemaRejectsCaseDistinctCopiedIdentifier() throws IOException {
+    Namespace schemaNs = Namespace.of(metalake, catalog);
+    NameIdentifier sourceIdent = NameIdentifier.of(schemaNs, "schemaCaseCopiedIdSource");
+    NameIdentifier copyIdent = NameIdentifier.of(schemaNs, "SCHEMACASECOPIEDIDSOURCE");
     dispatcher.createSchema(sourceIdent, "comment", ImmutableMap.of("k1", "v1"));
     SchemaEntity sourceEntity = entityStore.get(sourceIdent, SCHEMA, SchemaEntity.class);
 
