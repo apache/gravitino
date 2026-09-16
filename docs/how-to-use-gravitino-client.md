@@ -26,14 +26,14 @@ Map<String, String> properties =
             "gravitino.client.socketTimeoutMs", "10"
         );
 
-GravitinoClient gravitinoClient = 
-   GravitinoClient.builder("http://localhost:8090")
+GravitinoClient gravitinoClient =
+    GravitinoClient.builder("http://localhost:8090")
       .withMetalake("metalake")
       .withClientConfig(properties) // add custom client config (optional)
       .build();
 
-GravitinoAdminClient gravitinoAdminClient = 
-   GravitinoAdminClient.builder("http://localhost:8090")
+GravitinoAdminClient gravitinoAdminClient =
+    GravitinoAdminClient.builder("http://localhost:8090")
       .withClientConfig(properties) // add custom client config (optional)
       .build();
 // ...
