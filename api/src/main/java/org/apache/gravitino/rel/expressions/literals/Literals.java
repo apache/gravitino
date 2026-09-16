@@ -298,7 +298,13 @@ public class Literals {
       if (value instanceof Object[] && literal.value instanceof Object[]) {
         return Arrays.deepEquals((Object[]) value, (Object[]) literal.value);
       }
-      // Now, it's safe to compare using toString() since neither value is null
+      // Exactly one side is an array here (or the array kinds differ), so the values are not
+      // equal. Reaching the toString() fallback below only when neither value is an array keeps
+      // an array's identity-based toString from spuriously matching a non-array value.
+      if (value.getClass().isArray() || literal.value.getClass().isArray()) {
+        return false;
+      }
+      // Now, it's safe to compare using toString() since neither value is null nor an array
       return Objects.equals(value, literal.value)
           || value.toString().equals(literal.value.toString());
     }
