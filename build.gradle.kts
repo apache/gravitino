@@ -18,12 +18,18 @@
  */
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.NodePlugin
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import com.github.jengelman.gradle.plugins.shadow.transformers.CacheableTransformer
+import com.github.jengelman.gradle.plugins.shadow.transformers.Transformer
+import com.github.jengelman.gradle.plugins.shadow.transformers.TransformerContext
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.apache.tools.zip.ZipEntry
+import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
@@ -32,6 +38,7 @@ import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.util.Locale
 
 Locale.setDefault(Locale.US)
@@ -45,6 +52,7 @@ plugins {
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.node) apply false
+  alias(libs.plugins.shadow) apply false
 
   // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue running against JDK21.
   if (JavaVersion.current() == JavaVersion.VERSION_17) {
@@ -70,6 +78,45 @@ val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
   SharedTestEnvironmentLock::class
 ) {
   maxParallelUsages.set(1)
+}
+
+/** Combines distinct legal documents, keeping Gravitino's document first. */
+@CacheableTransformer
+class LegalFilesTransformer(
+  @get:InputFile
+  @get:PathSensitive(PathSensitivity.NONE)
+  val projectLegalFile: File,
+  @get:Input
+  val resourcePath: String
+) : Transformer {
+  private val contents = linkedSetOf<ByteBuffer>()
+
+  @Internal
+  override fun getName(): String = javaClass.simpleName
+
+  override fun canTransformResource(element: FileTreeElement): Boolean =
+    element.relativePath.pathString == resourcePath
+
+  override fun transform(context: TransformerContext) {
+    contents.add(ByteBuffer.wrap(context.`is`.use { it.readBytes() }))
+  }
+
+  override fun hasTransformedResource(): Boolean = true
+
+  override fun modifyOutputStream(output: ZipOutputStream, preserveFileTimestamps: Boolean) {
+    // ByteBuffer equality compares bytes, so only identical documents are removed.
+    val documents = linkedSetOf(ByteBuffer.wrap(projectLegalFile.readBytes()))
+    documents.addAll(contents)
+    val entry = ZipEntry(resourcePath)
+    entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, projectLegalFile.lastModified())
+    output.putNextEntry(entry)
+    documents.forEach { document ->
+      output.write(document.array())
+      output.write('\n'.code)
+    }
+    output.closeEntry()
+    contents.clear()
+  }
 }
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
@@ -563,6 +610,13 @@ subprojects {
   val javadocJar by tasks.registering(Jar::class) {
     archiveClassifier.set("javadoc")
     from(tasks["javadoc"])
+  }
+
+  plugins.withId("com.github.johnrengelman.shadow") {
+    tasks.withType<ShadowJar>().configureEach {
+      transform(LegalFilesTransformer(rootProject.file("LICENSE.bin"), "META-INF/LICENSE"))
+      transform(LegalFilesTransformer(rootProject.file("NOTICE.bin"), "META-INF/NOTICE"))
+    }
   }
 
   tasks.withType<Jar> {

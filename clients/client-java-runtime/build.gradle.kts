@@ -34,6 +34,9 @@ configurations.all {
 
 dependencies {
   implementation(project(":clients:client-java"))
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
@@ -62,4 +65,17 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
+}
+
+tasks.test {
+  val shadowJar = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(shadowJar)
+  inputs.file(shadowJar.flatMap { it.archiveFile })
+  inputs.files(rootProject.file("LICENSE.bin"), rootProject.file("NOTICE.bin"))
+  inputs.files(configurations.runtimeClasspath)
+  doFirst {
+    systemProperty("shadowJarPath", shadowJar.get().archiveFile.get().asFile.absolutePath)
+    systemProperty("legalFilesRoot", rootProject.projectDir.absolutePath)
+    systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
+  }
 }
