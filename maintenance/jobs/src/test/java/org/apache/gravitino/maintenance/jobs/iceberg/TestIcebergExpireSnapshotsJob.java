@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -153,6 +154,14 @@ public class TestIcebergExpireSnapshotsJob {
     assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog-name"));
     assertEquals("db.sample", result.get("table-identifier"));
+  }
+
+  @Test
+  public void testParseArgumentsMissingRequiredLeavesNullAfterTrim() {
+    Map<String, String> result =
+        IcebergJobUtils.parseArguments(new String[] {"--older-than", "2024-01-01 00:00:00"});
+    assertNull(IcebergJobUtils.trimToNull(result.get(IcebergJobUtils.OPTION_CATALOG)));
+    assertNull(IcebergJobUtils.trimToNull(result.get(IcebergJobUtils.OPTION_TABLE)));
   }
 
   @Test
@@ -380,6 +389,22 @@ public class TestIcebergExpireSnapshotsJob {
     // All single quotes in string literals should be escaped
     assertTrue(sql.contains("db''.table"));
     assertTrue(sql.contains("2024-01-01'' DROP TABLE"));
+  }
+
+  // Tests for resolveStreamResults
+
+  @Test
+  public void testResolveStreamResults() {
+    assertFalse(IcebergExpireSnapshotsJob.resolveStreamResults(null));
+    assertFalse(IcebergExpireSnapshotsJob.resolveStreamResults(""));
+    assertFalse(IcebergExpireSnapshotsJob.resolveStreamResults(" FALSE "));
+    assertTrue(IcebergExpireSnapshotsJob.resolveStreamResults(" TRUE "));
+    try {
+      IcebergExpireSnapshotsJob.resolveStreamResults("yes");
+      fail("Expected IllegalArgumentException for stream-results=yes");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid stream-results value 'yes'"));
+    }
   }
 
   // Tests for validateRetainLast

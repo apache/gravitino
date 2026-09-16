@@ -109,12 +109,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * }</pre>
    */
   public static void main(String[] args) {
-    if (args.length < 4) {
-      printUsage();
-      System.exit(1);
-    }
-
-    // Parse named arguments
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
@@ -130,6 +124,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
               + " are required arguments");
       printUsage();
       System.exit(1);
+      return;
     }
 
     // Optional arguments
@@ -147,6 +142,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       System.err.println("Error: " + e.getMessage());
       printUsage();
       System.exit(1);
+      return;
     }
 
     // Build Spark session with custom configs if provided
@@ -165,6 +161,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         System.err.println("Error: " + e.getMessage());
         printUsage();
         System.exit(1);
+        return;
       }
     }
 
@@ -327,6 +324,19 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
+  /**
+   * Parse rewrite options from a flat JSON map.
+   *
+   * <p>Expected format: {"key1": "value1", "key2": "value2"}
+   *
+   * @param optionsJson JSON string
+   * @return map of option keys to values
+   * @throws IllegalArgumentException if JSON is invalid or not a flat map
+   */
+  static Map<String, String> parseOptionsJson(String optionsJson) {
+    return new HashMap<>(IcebergSparkConfigUtils.parseFlatJsonMap(optionsJson, OPTION_OPTIONS));
+  }
+
   /** Print usage information. */
   private static void printUsage() {
     System.err.println(
@@ -406,19 +416,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
             + "    --"
             + IcebergJobUtils.OPTION_SPARK_CONF
             + " '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'");
-  }
-
-  /**
-   * Parse rewrite options from a flat JSON map.
-   *
-   * <p>Expected format: {"key1": "value1", "key2": "value2"}
-   *
-   * @param optionsJson JSON string
-   * @return map of option keys to values
-   * @throws IllegalArgumentException if JSON is invalid or not a flat map
-   */
-  static Map<String, String> parseOptionsJson(String optionsJson) {
-    return new HashMap<>(IcebergSparkConfigUtils.parseFlatJsonMap(optionsJson, OPTION_OPTIONS));
   }
 
   /**

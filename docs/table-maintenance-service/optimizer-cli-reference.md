@@ -278,7 +278,7 @@ The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 |-------------|-----------------------------------------------------------------------------|
 | Name        | `builtin-iceberg-expire-snapshots`                                          |
 | Type        | Spark                                                                       |
-| Version     | `v1`                                                                        |
+| Version     | `v2`                                                                        |
 | Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob`   |
 
 ## Parameters
@@ -329,8 +329,7 @@ The job builds this statement, including only the optional parameters you suppli
 CALL `rest_catalog`.system.expire_snapshots(
   table => 'db.t1',
   older_than => TIMESTAMP '2024-01-01 00:00:00',
-  retain_last => 3,
-  stream_results => true
+  retain_last => 3
 )
 ```
 

@@ -39,8 +39,8 @@ import org.apache.spark.sql.SparkSession;
 public class SparkPiJob implements BuiltInJob {
 
   private static final String NAME = JobTemplateProvider.BUILTIN_NAME_PREFIX + "sparkpi";
-  // Bump VERSION whenever SparkPi template behavior changes (name/executable/class/args/configs).
-  private static final String VERSION = "v2";
+  // Bump VERSION whenever SparkPi template or required-arg behavior changes.
+  private static final String VERSION = "v3";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -57,35 +57,16 @@ public class SparkPiJob implements BuiltInJob {
   }
 
   public static void main(String[] args) {
-    int slices = 2;
-    if (args.length > 0) {
-      String raw = args[0] == null ? "" : args[0].trim();
-      if (raw.isEmpty() || raw.contains("{{")) {
-        System.err.println(
-            "Invalid number of slices provided: '"
-                + args[0]
-                + "'. Pass a positive integer via jobConf key 'slices'.");
-        System.exit(1);
-        return;
-      }
-      try {
-        slices = Integer.parseInt(raw);
-      } catch (NumberFormatException e) {
-        System.err.println(
-            "Invalid number of slices provided: '"
-                + args[0]
-                + "'. Pass a positive integer via jobConf key 'slices'.");
-        System.exit(1);
-        return;
-      }
-      if (slices < 1) {
-        System.err.println("Number of slices must be >= 1, got: " + slices);
-        System.exit(1);
-        return;
-      }
+    int slices;
+    try {
+      slices = parseSlices(args);
+    } catch (IllegalArgumentException e) {
+      System.err.println(e.getMessage());
+      System.exit(1);
+      return;
     }
 
-    int samples = Math.max(slices, 1) * 100000;
+    int samples = slices * 100000;
 
     SparkSession spark =
         SparkSession.builder()
@@ -109,6 +90,42 @@ public class SparkPiJob implements BuiltInJob {
     System.out.printf("Pi is roughly %.5f%n", pi);
 
     spark.stop();
+  }
+
+  /**
+   * Parse the required {@code slices} argument for SparkPi.
+   *
+   * @param args command-line arguments; the first token must be a positive integer
+   * @return parsed slice count
+   * @throws IllegalArgumentException if slices is missing, unresolved, or not a positive integer
+   */
+  static int parseSlices(String[] args) {
+    if (args == null || args.length == 0) {
+      throw new IllegalArgumentException(
+          "Missing slices argument. Pass a positive integer via jobConf key 'slices'.");
+    }
+
+    String raw = args[0] == null ? "" : args[0].trim();
+    if (raw.isEmpty() || raw.contains("{{")) {
+      throw new IllegalArgumentException(
+          "Invalid number of slices provided: '"
+              + args[0]
+              + "'. Pass a positive integer via jobConf key 'slices'.");
+    }
+
+    int slices;
+    try {
+      slices = Integer.parseInt(raw);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid number of slices provided: '"
+              + args[0]
+              + "'. Pass a positive integer via jobConf key 'slices'.");
+    }
+    if (slices < 1) {
+      throw new IllegalArgumentException("Number of slices must be >= 1, got: " + slices);
+    }
+    return slices;
   }
 
   private Map<String, String> buildSparkConfigs() {

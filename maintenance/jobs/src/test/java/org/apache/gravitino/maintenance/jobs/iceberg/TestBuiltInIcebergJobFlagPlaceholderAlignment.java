@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -32,18 +34,14 @@ public class TestBuiltInIcebergJobFlagPlaceholderAlignment {
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([^}]+)}}");
 
   @Test
-  public void testExpireSnapshotsJobTemplateFlagPlaceholderNamesAlign() {
-    assertFlagPlaceholderPairsAlign(new IcebergExpireSnapshotsJob().jobTemplate());
-  }
-
-  @Test
-  public void testRewriteDataFilesJobTemplateFlagPlaceholderNamesAlign() {
-    assertFlagPlaceholderPairsAlign(new IcebergRewriteDataFilesJob().jobTemplate());
-  }
-
-  @Test
-  public void testUpdateStatsJobTemplateFlagPlaceholderNamesAlign() {
-    assertFlagPlaceholderPairsAlign(new IcebergUpdateStatsAndMetricsJob().jobTemplate());
+  public void testBuiltInIcebergJobTemplateFlagPlaceholderNamesAlign() {
+    for (BuiltInJob job :
+        Arrays.asList(
+            new IcebergExpireSnapshotsJob(),
+            new IcebergRewriteDataFilesJob(),
+            new IcebergUpdateStatsAndMetricsJob())) {
+      assertFlagPlaceholderPairsAlign((SparkJobTemplate) job.jobTemplate());
+    }
   }
 
   private static void assertFlagPlaceholderPairsAlign(SparkJobTemplate template) {

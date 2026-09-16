@@ -40,15 +40,9 @@ public final class IcebergJobUtils {
   /** Shared CLI flag name (without leading dashes) for custom Spark configs JSON. */
   public static final String OPTION_SPARK_CONF = "spark-conf";
 
-  /**
-   * Returns {@code true} when {@code value} is null or only whitespace.
-   *
-   * @param value string to check; may be null
-   * @return whether the value is blank
-   */
-  public static boolean isBlank(String value) {
-    return value == null || value.trim().isEmpty();
-  }
+  private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
+
+  private IcebergJobUtils() {}
 
   /**
    * Trims {@code value} and returns {@code null} when the result is empty.
@@ -63,10 +57,6 @@ public final class IcebergJobUtils {
     String trimmed = value.trim();
     return trimmed.isEmpty() ? null : trimmed;
   }
-
-  private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
-
-  private IcebergJobUtils() {}
 
   /**
    * Ensures the Iceberg Spark runtime is on the current classpath.
@@ -98,6 +88,7 @@ public final class IcebergJobUtils {
       System.err.println("Error: " + e.getMessage());
       spark.stop();
       System.exit(1);
+      return;
     }
   }
 

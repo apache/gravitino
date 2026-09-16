@@ -87,15 +87,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   /** Main entry point. */
   public static void main(String[] args) {
-    if (args.length < 4) {
-      printUsage();
-      System.exit(1);
-    }
-
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
     String catalogName = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_CATALOG));
     String tableIdentifier = IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_TABLE));
-    UpdateMode updateMode = parseUpdateMode(argMap.get(OPTION_UPDATE_MODE));
 
     if (catalogName == null || tableIdentifier == null) {
       System.err.println(
@@ -106,6 +100,17 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
               + " are required arguments");
       printUsage();
       System.exit(1);
+      return;
+    }
+
+    UpdateMode updateMode;
+    try {
+      updateMode = parseUpdateMode(argMap.get(OPTION_UPDATE_MODE));
+    } catch (IllegalArgumentException e) {
+      System.err.println("Error: " + e.getMessage());
+      printUsage();
+      System.exit(1);
+      return;
     }
 
     Map<String, String> updaterOptions;

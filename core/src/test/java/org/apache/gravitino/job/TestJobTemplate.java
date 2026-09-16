@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -139,6 +140,16 @@ public class TestJobTemplate {
     replacements = ImmutableMap.of("user.name", "Hank", "score-123", "300");
     result = JobManager.replacePlaceholder(dotDashTemplate, replacements);
     Assertions.assertEquals("Hello, Hank! Your score is 300.", result);
+
+    // Present key with null value is explicit empty, not "omit"
+    Map<String, String> nullValueReplacements = new HashMap<>();
+    nullValueReplacements.put("name", null);
+    result = JobManager.replacePlaceholder("Hello, {{name}}!", nullValueReplacements);
+    Assertions.assertEquals("Hello, !", result);
+
+    // Missing key still leaves the placeholder
+    result = JobManager.replacePlaceholder("Hello, {{name}}!", ImmutableMap.of());
+    Assertions.assertEquals("Hello, {{name}}!", result);
   }
 
   @Test
@@ -461,8 +472,8 @@ public class TestJobTemplate {
 
   @Test
   public void testOmitEmptyArguments() {
-    // Explicit "" after --updater-options is kept; name-matched --options {{options}} is dropped;
-    // bare {{stream_results}} / {{slices}} are kept so missing positionals stay visible.
+    // Explicit "" kept; name-matched unresolved pairs dropped; bare positionals kept;
+    // --verbose + unrelated placeholder is not treated as a pair.
     Assertions.assertEquals(
         Lists.newArrayList(
             "--catalog",
@@ -489,285 +500,187 @@ public class TestJobTemplate {
                 "{{options}}",
                 "{{stream_results}}",
                 "  ")));
-
     Assertions.assertEquals(
         Lists.newArrayList("{{slices}}"),
         JobManager.omitEmptyArguments(Lists.newArrayList("{{slices}}")));
-
-    // Boolean flag + unrelated placeholder must not be dropped as a pair.
     Assertions.assertEquals(
         Lists.newArrayList("--verbose", "{{unset_flag}}"),
         JobManager.omitEmptyArguments(Lists.newArrayList("--verbose", "{{unset_flag}}")));
-
-    // Hyphen / underscore names still match for built-in optional flags.
     Assertions.assertEquals(
         Lists.newArrayList(),
         JobManager.omitEmptyArguments(
             Lists.newArrayList("--updater-options", "{{updater_options}}")));
-
     Assertions.assertEquals(
-        Lists.newArrayList("--catalog", "iceberg", "--stream-results"),
+        Lists.newArrayList(),
         JobManager.omitEmptyArguments(
-            Lists.newArrayList("--catalog", "iceberg", "--stream-results")));
-
-    Assertions.assertThrows(NullPointerException.class, () -> JobManager.omitEmptyArguments(null));
+            Lists.newArrayList("--stream-results", "{{stream_results}}")));
     Assertions.assertEquals(
-        Lists.newArrayList(), JobManager.omitEmptyArguments(Lists.newArrayList()));
+        Lists.newArrayList(),
+        JobManager.omitEmptyArguments(Lists.newArrayList("--where-clause", "{{where_clause}}")));
+    Assertions.assertEquals(
+        Lists.newArrayList(),
+        JobManager.omitEmptyArguments(Lists.newArrayList("--catalog-name", "{{catalog_name}}")));
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "{{catalog_name}}"),
+        JobManager.omitEmptyArguments(Lists.newArrayList("--catalog", "{{catalog_name}}")));
+    Assertions.assertThrows(NullPointerException.class, () -> JobManager.omitEmptyArguments(null));
   }
 
   @Test
-  public void testCreateSparkRuntimeJobTemplateOmitsUnresolvedEnvironments() throws IOException {
+  public void testOmitUnresolvedTemplateMaps() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
     SparkJobTemplate sparkJobTemplate =
         SparkJobTemplate.builder()
-            .withName("testSparkJobAuthEnv")
+            .withName("testOmitMaps")
             .withExecutable(executable.toURI().toString())
             .withClassName("org.apache.gravitino.TestSparkJob")
             .withEnvironments(
                 ImmutableMap.of(
-                    "GRAVITINO_AUTH_TYPE",
-                    "{{gravitino_auth_type}}",
-                    "GRAVITINO_AUTH_USERNAME",
-                    "{{gravitino_auth_username}}",
-                    "KEEP_ME",
-                    "literal"))
-            .build();
-
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(2L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-
-    JobTemplate omitted =
-        JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
-    Assertions.assertEquals(ImmutableMap.of("KEEP_ME", "literal"), omitted.environments());
-
-    JobTemplate withEmptyAuthType =
-        JobManager.createRuntimeJobTemplate(
-            entity, ImmutableMap.of("gravitino_auth_type", ""), tempStagingDir);
-    Assertions.assertEquals(
-        ImmutableMap.of("GRAVITINO_AUTH_TYPE", "", "KEEP_ME", "literal"),
-        withEmptyAuthType.environments());
-
-    JobTemplate resolved =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "gravitino_auth_type", "basic",
-                "gravitino_auth_username", "admin"),
-            tempStagingDir);
-    Assertions.assertEquals(
-        ImmutableMap.of(
-            "GRAVITINO_AUTH_TYPE",
-            "basic",
-            "GRAVITINO_AUTH_USERNAME",
-            "admin",
-            "KEEP_ME",
-            "literal"),
-        resolved.environments());
-  }
-
-  @Test
-  public void testCreateSparkRuntimeJobTemplateOmitsUnresolvedConfigs() throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
-        SparkJobTemplate.builder()
-            .withName("testSparkJobConfigs")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
+                    "GRAVITINO_AUTH_TYPE", "{{gravitino_auth_type}}", "KEEP_ME", "literal"))
             .withConfigs(
                 ImmutableMap.of(
                     "spark.executor.instances",
                     "{{spark_executor_instances}}",
-                    "spark.executor.memory",
-                    "{{spark_executor_memory}}",
+                    "spark.sql.catalog.{{catalog_name}}",
+                    "org.apache.iceberg.spark.SparkCatalog",
                     "spark.master",
                     "local"))
             .build();
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(6L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
+    JobTemplateEntity entity = entityOf(sparkJobTemplate, 2L);
 
     JobTemplate omitted =
         JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    Assertions.assertEquals(ImmutableMap.of("KEEP_ME", "literal"), omitted.environments());
     Assertions.assertEquals(
         ImmutableMap.of("spark.master", "local"), ((SparkJobTemplate) omitted).configs());
 
-    JobTemplate withEmptyInstances =
-        JobManager.createRuntimeJobTemplate(
-            entity, ImmutableMap.of("spark_executor_instances", ""), tempStagingDir);
-    Assertions.assertEquals(
-        ImmutableMap.of("spark.executor.instances", "", "spark.master", "local"),
-        ((SparkJobTemplate) withEmptyInstances).configs());
-
-    JobTemplate resolved =
+    JobTemplate withEmpty =
         JobManager.createRuntimeJobTemplate(
             entity,
-            ImmutableMap.of(
-                "spark_executor_instances", "2",
-                "spark_executor_memory", "1g"),
+            ImmutableMap.of("gravitino_auth_type", "", "spark_executor_instances", ""),
             tempStagingDir);
     Assertions.assertEquals(
-        ImmutableMap.of(
-            "spark.executor.instances",
-            "2",
-            "spark.executor.memory",
-            "1g",
-            "spark.master",
-            "local"),
-        ((SparkJobTemplate) resolved).configs());
+        ImmutableMap.of("GRAVITINO_AUTH_TYPE", "", "KEEP_ME", "literal"), withEmpty.environments());
+    Assertions.assertEquals(
+        ImmutableMap.of("spark.executor.instances", "", "spark.master", "local"),
+        ((SparkJobTemplate) withEmpty).configs());
   }
 
   @Test
-  public void testCreateRuntimeJobTemplateFailsOnEmbeddedUnresolvedConfig() throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
+  public void testCreateRuntimeJobTemplateRejectsUnresolvedRequiredFields() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
+
+    // Whole-token unresolved executable
+    assertFails(
         SparkJobTemplate.builder()
-            .withName("testSparkJobEmbeddedConfig")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
-            .withConfigs(ImmutableMap.of("spark.sql.extensions", "prefix-{{missing_ext}}"))
-            .build();
+            .withName("unresolvedExecutable")
+            .withExecutable("{{jar_uri}}")
+            .withClassName("org.apache.gravitino.Test")
+            .build(),
+        ImmutableMap.of(),
+        "{{jar_uri}}");
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(7L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir));
-    Assertions.assertTrue(thrown.getMessage().contains("prefix-{{missing_ext}}"));
-  }
-
-  @Test
-  public void testCreateRuntimeJobTemplateFailsOnDuplicateEnvironmentKeys() throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
+    // Embedded unresolved className
+    assertFails(
         SparkJobTemplate.builder()
-            .withName("testSparkJobDupEnv")
+            .withName("embeddedClass")
             .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
-            .withEnvironments(ImmutableMap.of("{{A}}", "v1", "{{B}}", "v2"))
-            .build();
+            .withClassName("org.apache.gravitino.{{missing}}")
+            .build(),
+        ImmutableMap.of(),
+        "org.apache.gravitino.{{missing}}");
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(3L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                JobManager.createRuntimeJobTemplate(
-                    entity, ImmutableMap.of("A", "SAME", "B", "SAME"), tempStagingDir));
-    Assertions.assertTrue(thrown.getMessage().contains("Duplicate key SAME"));
-  }
-
-  @Test
-  public void testRejectEmbeddedUnresolvedPlaceholder() {
-    JobManager.rejectEmbeddedUnresolvedPlaceholder(null, "test");
-    JobManager.rejectEmbeddedUnresolvedPlaceholder("literal", "test");
-    JobManager.rejectEmbeddedUnresolvedPlaceholder("{{whole}}", "test");
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("prefix-{{missing}}", "test"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("{{a}}.{{b}}", "test"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.rejectEmbeddedUnresolvedPlaceholder("hello.{{b}}", "test"));
-  }
-
-  @Test
-  public void testCreateRuntimeJobTemplateFailsOnEmbeddedUnresolvedEnvironment()
-      throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
+    // Composite unresolved argument
+    assertFails(
         SparkJobTemplate.builder()
-            .withName("testSparkJobEmbeddedEnv")
+            .withName("partialArg")
             .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
-            .withEnvironments(ImmutableMap.of("TOKEN", "prefix-{{missing_key}}"))
-            .build();
-
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(4L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir));
-    Assertions.assertTrue(thrown.getMessage().contains("prefix-{{missing_key}}"));
-  }
-
-  @Test
-  public void testCreateRuntimeJobTemplateFailsOnPartialCompositePlaceholder() throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
-        SparkJobTemplate.builder()
-            .withName("testSparkJobPartialComposite")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
+            .withClassName("org.apache.gravitino.Test")
             .withArguments(Lists.newArrayList("{{a}}.{{b}}"))
-            .build();
+            .build(),
+        ImmutableMap.of("a", "hello"),
+        "hello.{{b}}");
+  }
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(5L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
+  @Test
+  public void testCreateRuntimeJobTemplateFailsOnEmbeddedUnresolvedCallSites() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
 
-    IllegalArgumentException thrown =
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedJar")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withJars(Lists.newArrayList("file:///tmp/lib-{{missing}}.jar"))
+            .build(),
+        ImmutableMap.of(),
+        "lib-{{missing}}.jar");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedFile")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withFiles(Lists.newArrayList("file:///tmp/conf-{{missing}}.properties"))
+            .build(),
+        ImmutableMap.of(),
+        "conf-{{missing}}.properties");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedArchive")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withArchives(Lists.newArrayList("file:///tmp/data-{{missing}}.zip"))
+            .build(),
+        ImmutableMap.of(),
+        "data-{{missing}}.zip");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedEnv")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withEnvironments(ImmutableMap.of("TOKEN", "prefix-{{missing}}"))
+            .build(),
+        ImmutableMap.of(),
+        "prefix-{{missing}}");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedConfig")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withConfigs(ImmutableMap.of("spark.sql.warehouse.dir", "prefix-{{missing}}"))
+            .build(),
+        ImmutableMap.of(),
+        "prefix-{{missing}}");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("embeddedCustomField")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.Test")
+            .withCustomFields(ImmutableMap.of("version", "v-{{missing}}"))
+            .build(),
+        ImmutableMap.of(),
+        "v-{{missing}}");
+
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName("embeddedScript")
+            .withExecutable(executable.toURI().toString())
+            .withScripts(Lists.newArrayList("file:///tmp/run-{{missing}}.sh"))
+            .build();
+    JobTemplateEntity shellEntity = entityOf(shellJobTemplate, 20L);
+    IllegalArgumentException shellThrown =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 JobManager.createRuntimeJobTemplate(
-                    entity, ImmutableMap.of("a", "hello"), tempStagingDir));
-    Assertions.assertTrue(thrown.getMessage().contains("hello.{{b}}"));
+                    shellEntity, ImmutableMap.of(), tempStagingDir));
+    Assertions.assertTrue(shellThrown.getMessage().contains("run-{{missing}}.sh"));
   }
 
   @Test
@@ -779,114 +692,11 @@ public class TestJobTemplate {
   }
 
   @Test
-  public void testCreateRuntimeJobTemplateFailsOnEmbeddedUnresolvedCallSites() throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedExecutable")
-            .withExecutable("file:///tmp/prefix-{{missing}}.jar")
-            .withClassName("org.apache.gravitino.Test")
-            .build(),
-        "prefix-{{missing}}.jar");
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedClassName")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.{{missing}}")
-            .build(),
-        "org.apache.gravitino.{{missing}}");
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedJar")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.Test")
-            .withJars(Lists.newArrayList("file:///tmp/lib-{{missing}}.jar"))
-            .build(),
-        "lib-{{missing}}.jar");
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedFile")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.Test")
-            .withFiles(Lists.newArrayList("file:///tmp/conf-{{missing}}.properties"))
-            .build(),
-        "conf-{{missing}}.properties");
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedArchive")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.Test")
-            .withArchives(Lists.newArrayList("file:///tmp/data-{{missing}}.zip"))
-            .build(),
-        "data-{{missing}}.zip");
-
-    assertEmbeddedFails(
-        SparkJobTemplate.builder()
-            .withName("embeddedCustomField")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.Test")
-            .withCustomFields(ImmutableMap.of("version", "v-{{missing}}"))
-            .build(),
-        "v-{{missing}}");
-
-    ShellJobTemplate shellJobTemplate =
-        ShellJobTemplate.builder()
-            .withName("embeddedScript")
-            .withExecutable(executable.toURI().toString())
-            .withScripts(Lists.newArrayList("file:///tmp/run-{{missing}}.sh"))
-            .build();
-    JobTemplateEntity shellEntity =
-        JobTemplateEntity.builder()
-            .withId(20L)
-            .withName(shellJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-    IllegalArgumentException shellThrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                JobManager.createRuntimeJobTemplate(
-                    shellEntity, ImmutableMap.of(), tempStagingDir));
-    Assertions.assertTrue(shellThrown.getMessage().contains("run-{{missing}}.sh"));
-  }
-
-  private void assertEmbeddedFails(SparkJobTemplate template, String expectedSnippet)
-      throws IOException {
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(21L)
-            .withName(template.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir));
-    Assertions.assertTrue(
-        thrown.getMessage().contains(expectedSnippet),
-        () -> "Expected '" + expectedSnippet + "' in: " + thrown.getMessage());
-  }
-
-  @Test
   public void testCreateSparkRuntimeJobTemplateOmitsEmptyOptionalArguments() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
-
     SparkJobTemplate sparkJobTemplate =
         SparkJobTemplate.builder()
             .withName("testSparkOmitEmpty")
-            .withComment("omit empty optional args")
             .withExecutable(executable.toURI().toString())
             .withClassName("org.apache.gravitino.Test")
             .withArguments(
@@ -902,17 +712,7 @@ public class TestJobTemplate {
                     "{{stream_results}}"))
             .build();
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(1L)
-            .withName(sparkJobTemplate.name())
-            .withComment(sparkJobTemplate.comment())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
+    JobTemplateEntity entity = entityOf(sparkJobTemplate, 1L);
 
     JobTemplate omitted =
         JobManager.createRuntimeJobTemplate(
@@ -927,7 +727,6 @@ public class TestJobTemplate {
                 "spark_conf",
                 "{\"spark.master\":\"local\"}"),
             tempStagingDir);
-
     Assertions.assertEquals(
         Lists.newArrayList(
             "--catalog-name",
@@ -940,116 +739,54 @@ public class TestJobTemplate {
             "{\"spark.master\":\"local\"}",
             "{{stream_results}}"),
         omitted.arguments());
-
-    JobTemplate withOptional =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "catalog_name",
-                "iceberg",
-                "table_identifier",
-                "db.t",
-                "updater_options",
-                "{\"metalake\":\"ml\"}",
-                "spark_conf",
-                "{\"spark.master\":\"local\"}",
-                "stream_results",
-                "--stream-results"),
-            tempStagingDir);
-
-    Assertions.assertEquals(
-        Lists.newArrayList(
-            "--catalog-name",
-            "iceberg",
-            "--table-identifier",
-            "db.t",
-            "--updater-options",
-            "{\"metalake\":\"ml\"}",
-            "--spark-conf",
-            "{\"spark.master\":\"local\"}",
-            "--stream-results"),
-        withOptional.arguments());
   }
 
   @Test
-  public void testCreateRuntimeJobTemplateFailsOnDuplicateCustomFieldKeys() throws IOException {
+  public void testCreateRuntimeJobTemplateFailsOnDuplicateKeys() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
+
+    assertFails(
         SparkJobTemplate.builder()
-            .withName("testSparkJobDupCustom")
+            .withName("dupEnv")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("org.apache.gravitino.TestSparkJob")
+            .withEnvironments(ImmutableMap.of("{{A}}", "v1", "{{B}}", "v2"))
+            .build(),
+        ImmutableMap.of("A", "SAME", "B", "SAME"),
+        "Duplicate key SAME");
+
+    assertFails(
+        SparkJobTemplate.builder()
+            .withName("dupCustom")
             .withExecutable(executable.toURI().toString())
             .withClassName("org.apache.gravitino.TestSparkJob")
             .withCustomFields(ImmutableMap.of("{{A}}", "v1", "{{B}}", "v2"))
-            .build();
+            .build(),
+        ImmutableMap.of("A", "SAME", "B", "SAME"),
+        "Duplicate key SAME");
+  }
 
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(9L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
+  private static JobTemplateEntity entityOf(JobTemplate template, long id) {
+    return JobTemplateEntity.builder()
+        .withId(id)
+        .withName(template.name())
+        .withComment(template.comment())
+        .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
 
+  private void assertFails(
+      JobTemplate template, Map<String, String> jobConf, String expectedSnippet) {
+    JobTemplateEntity entity = entityOf(template, 21L);
     IllegalArgumentException thrown =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                JobManager.createRuntimeJobTemplate(
-                    entity, ImmutableMap.of("A", "SAME", "B", "SAME"), tempStagingDir));
-    Assertions.assertTrue(thrown.getMessage().contains("Duplicate key SAME"));
-  }
-
-  @Test
-  public void testOmitEmptyArgumentsDropsMismatchedLegacyPairsWhenAligned() {
-    Assertions.assertEquals(
-        Lists.newArrayList(),
-        JobManager.omitEmptyArguments(
-            Lists.newArrayList("--stream-results", "{{stream_results}}")));
-    Assertions.assertEquals(
-        Lists.newArrayList(),
-        JobManager.omitEmptyArguments(Lists.newArrayList("--where-clause", "{{where_clause}}")));
-    Assertions.assertEquals(
-        Lists.newArrayList(),
-        JobManager.omitEmptyArguments(Lists.newArrayList("--catalog-name", "{{catalog_name}}")));
-    Assertions.assertEquals(
-        Lists.newArrayList("--catalog", "{{catalog_name}}"),
-        JobManager.omitEmptyArguments(Lists.newArrayList("--catalog", "{{catalog_name}}")));
-  }
-
-  @Test
-  public void testCreateRuntimeJobTemplateOmitsConfigsWithEmbeddedCatalogPlaceholderKey()
-      throws IOException {
-    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
-    SparkJobTemplate sparkJobTemplate =
-        SparkJobTemplate.builder()
-            .withName("testSparkJobCatalogKey")
-            .withExecutable(executable.toURI().toString())
-            .withClassName("org.apache.gravitino.TestSparkJob")
-            .withConfigs(
-                ImmutableMap.of(
-                    "spark.sql.catalog.{{catalog_name}}",
-                    "org.apache.iceberg.spark.SparkCatalog",
-                    "spark.master",
-                    "local"))
-            .build();
-
-    JobTemplateEntity entity =
-        JobTemplateEntity.builder()
-            .withId(8L)
-            .withName(sparkJobTemplate.name())
-            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
-            .withTemplateContent(
-                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-
-    JobTemplate omitted =
-        JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
-    Assertions.assertEquals(
-        ImmutableMap.of("spark.master", "local"), ((SparkJobTemplate) omitted).configs());
+            () -> JobManager.createRuntimeJobTemplate(entity, jobConf, tempStagingDir));
+    Assertions.assertTrue(
+        thrown.getMessage().contains(expectedSnippet),
+        () -> "Expected '" + expectedSnippet + "' in: " + thrown.getMessage());
   }
 }

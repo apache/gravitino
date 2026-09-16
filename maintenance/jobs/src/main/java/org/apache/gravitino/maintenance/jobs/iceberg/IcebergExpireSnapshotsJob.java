@@ -98,12 +98,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    * }</pre>
    */
   public static void main(String[] args) {
-    if (args.length < 4) {
-      printUsage();
-      System.exit(1);
-    }
-
-    // Parse named arguments
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
@@ -119,23 +113,26 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
               + " are required arguments");
       printUsage();
       System.exit(1);
+      return;
     }
 
     // Optional arguments
     String olderThan = IcebergJobUtils.trimToNull(argMap.get(OPTION_OLDER_THAN));
     String retainLast = IcebergJobUtils.trimToNull(argMap.get(OPTION_RETAIN_LAST));
-    // jobConf "stream_results":"true" (or CLI --stream-results) enables streaming
-    boolean streamResults = Boolean.parseBoolean(argMap.get(OPTION_STREAM_RESULTS));
+    // jobConf "stream_results":"true" (or CLI --stream-results true) enables streaming.
+    String streamResultsRaw = argMap.get(OPTION_STREAM_RESULTS);
     String sparkConfJson =
         IcebergJobUtils.trimToNull(argMap.get(IcebergJobUtils.OPTION_SPARK_CONF));
 
-    // Validate retain-last if provided
+    boolean streamResults;
     try {
+      streamResults = resolveStreamResults(streamResultsRaw);
       validateRetainLast(retainLast);
     } catch (IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       printUsage();
       System.exit(1);
+      return;
     }
 
     // Build Spark session with custom configs if provided
@@ -154,6 +151,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         System.err.println("Error: " + e.getMessage());
         printUsage();
         System.exit(1);
+        return;
       }
     }
 
@@ -233,6 +231,31 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   /**
+   * Resolve {@code --stream-results} to a boolean.
+   *
+   * <p>Null/blank means omitted (false). Surrounding whitespace is trimmed. Only {@code true} /
+   * {@code false} (case-insensitive) are accepted; other values fail fast.
+   *
+   * @param value raw CLI / jobConf value; may be null
+   * @return whether streaming intermediate results is enabled
+   * @throws IllegalArgumentException if {@code value} is non-blank and not true/false
+   */
+  static boolean resolveStreamResults(String value) {
+    String trimmed = IcebergJobUtils.trimToNull(value);
+    if (trimmed == null) {
+      return false;
+    }
+    if ("true".equalsIgnoreCase(trimmed)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(trimmed)) {
+      return false;
+    }
+    throw new IllegalArgumentException(
+        "Invalid stream-results value '" + value + "'. Must be true or false");
+  }
+
+  /**
    * Validate the retain-last parameter value.
    *
    * @param retainLast the retain-last value to validate
@@ -281,7 +304,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
             + "                              Default: 1 (Iceberg default)\n"
             + "  --"
             + OPTION_STREAM_RESULTS
-            + "          Enable streaming of intermediate delete results\n"
+            + " <true|false> Enable streaming of intermediate delete results\n"
+            + "                              Default: false (disabled when omitted)\n"
             + "  --"
             + IcebergJobUtils.OPTION_SPARK_CONF
             + " <json>       JSON map of custom Spark configurations\n"
@@ -325,7 +349,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
             + "    --"
             + OPTION_RETAIN_LAST
             + " 3 --"
-            + OPTION_STREAM_RESULTS);
+            + OPTION_STREAM_RESULTS
+            + " true");
   }
 
   /**
