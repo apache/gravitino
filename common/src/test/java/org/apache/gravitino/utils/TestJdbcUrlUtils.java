@@ -105,6 +105,34 @@ public class TestJdbcUrlUtils {
   }
 
   @Test
+  public void doubleEncodedUnsafeParamWithPoisonedFragmentIsRejected() {
+    // Copilot's alleged bypass on PR #13239: a double-encoded parameter name combined with a
+    // malformed '#%zz' fragment. The discriminating case hides the FIRST letter of the name behind
+    // the double encoding (%2561 -> %61 -> 'a'), so no scanned form contains the literal name until
+    // the query token is fully decoded. Because a single pre-pass sanitization turns '%zz' into
+    // '%25zz' but the first decode pass regenerates '%zz', the second pass would halt at the
+    // malformed fragment before '%61' becomes 'a' -- unless malformed escapes are sanitized on
+    // every pass. MySQL Connector/J decodes query tokens independently and ignores the fragment.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561utoDeserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mariadb://h/db?%2561utoDeserialize=true#%zz");
+    // Without the poisoned fragment, recursive decoding already reveals the hidden name.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561utoDeserialize=true");
+
+    // The exact strings from the report keep the literal 'autoDeserialize' after the double
+    // encoding, so they are rejected on the cleartext substring alone (a weaker path than the one
+    // under test); kept as a regression anchor for the reported input.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561autoDeserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561autoDeserialize=true");
+  }
+
+  private static void assertUnsafeRejected(String url) {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("testDriver", url, Collections.emptyMap()),
+        () -> "Expected unsafe URL to be rejected but it was accepted: " + url);
+  }
+
+  @Test
   public void unsafeParameterBehindEncodingIsStillDetectedWithLiteralPercent() {
     // The decoded fallback must not weaken detection: an unsafe parameter that remains readable
     // after the last successful decode is still rejected even when the URL also carries a

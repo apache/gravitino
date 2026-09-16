@@ -113,8 +113,7 @@ public class JdbcUrlUtils {
     // Percent-decoding can reintroduce upper-case characters (e.g. "%4a" -> 'J'), so the
     // returned forms are lower-cased for substring and prefix matching.
     String stoppedAtMalformed = recursiveDecode(url).toLowerCase(Locale.ROOT);
-    String fullyDecoded =
-        recursiveDecode(sanitizeMalformedPercentEscapes(url)).toLowerCase(Locale.ROOT);
+    String fullyDecoded = recursiveDecodeSanitizingEachPass(url).toLowerCase(Locale.ROOT);
     if (fullyDecoded.equals(stoppedAtMalformed)) {
       return Collections.singletonList(stoppedAtMalformed);
     }
@@ -173,6 +172,31 @@ public class JdbcUrlUtils {
         // behind valid encodings was already revealed by the previous passes, and a malformed
         // escape cannot additionally hide a readable name from this check.
         return prev;
+      }
+    } while (!prev.equals(decoded) && --max > 0);
+
+    return decoded;
+  }
+
+  /**
+   * Fully decodes {@code url}, neutralizing malformed percent escapes before EVERY decode pass.
+   * Sanitizing only once is not enough: decoding "{@code %25zz}" yields "{@code %zz}" again, so a
+   * later pass would halt at the regenerated malformed escape and leave a doubly-encoded parameter
+   * name elsewhere (e.g. "{@code %2561utoDeserialize}", which needs two passes to reveal 'a') only
+   * partially decoded. Because each pass is sanitized first, {@link URLDecoder} never throws here.
+   */
+  private static String recursiveDecodeSanitizingEachPass(String url) {
+    String prev;
+    String decoded = url;
+    int max = 5;
+
+    do {
+      prev = decoded;
+      try {
+        decoded = URLDecoder.decode(sanitizeMalformedPercentEscapes(prev), "UTF-8");
+      } catch (UnsupportedEncodingException e) {
+        // UTF-8 is guaranteed to be supported by the JVM specification.
+        throw new RuntimeException(e);
       }
     } while (!prev.equals(decoded) && --max > 0);
 
