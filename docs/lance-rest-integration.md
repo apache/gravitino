@@ -71,11 +71,11 @@ location remain unchanged.
 The same boundary applies to create requests that target an existing entity through the Lance
 delegator:
 
-| Request mode | Existing non-Lance entity |
-| --- | --- |
-| `CREATE` | `409` conflict, as for any existing table name |
-| `EXIST_OK` | `400 INVALID_INPUT` |
-| `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
+| Request mode         | Existing non-Lance entity                            |
+| -------------------- | ---------------------------------------------------- |
+| `CREATE`             | `409` conflict, as for any existing table name       |
+| `EXIST_OK`           | `400 INVALID_INPUT`                                  |
+| `OVERWRITE`          | `400 INVALID_INPUT`; metadata and data are preserved |
 | Register `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
 
 The validation is performed after the normal authorization checks. It does not convert existing
