@@ -69,8 +69,10 @@ import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotParser;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
@@ -1091,6 +1093,25 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         refs.keySet(),
         refsTableResponse.tableMetadata().refs().keySet(),
         "Refs should be preserved in filtered response");
+
+    // Filtering must not alter anything other than the snapshot list
+    Assertions.assertNotNull(allTableResponse.metadataLocation());
+    Assertions.assertEquals(
+        allTableResponse.metadataLocation(),
+        refsTableResponse.metadataLocation(),
+        "snapshots=refs must keep metadata-location in the response");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().lastUpdatedMillis(),
+        refsTableResponse.tableMetadata().lastUpdatedMillis(),
+        "snapshots=refs must not change last-updated-ms");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().previousFiles(),
+        refsTableResponse.tableMetadata().previousFiles(),
+        "snapshots=refs must not add a metadata-log entry");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().snapshotLog(),
+        refsTableResponse.tableMetadata().snapshotLog(),
+        "snapshots=refs must keep the full snapshot-log for lazy loading");
   }
 
   @ParameterizedTest
@@ -1158,6 +1179,67 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         "token", filtered.credentials().get(0).config().get("s3.session-token"));
     Assertions.assertEquals("org.apache.iceberg.aws.s3.S3FileIO", filtered.config().get("io-impl"));
+  }
+
+  @Test
+  void testFilterSnapshotsByRefsPreservesMetadataLocationAndHistory() {
+    TableMetadata base =
+        TableMetadata.newTableMetadata(
+            tableSchema,
+            org.apache.iceberg.PartitionSpec.unpartitioned(),
+            "s3://bucket/db/tbl",
+            ImmutableMap.of());
+    Snapshot first = snapshot(1L, null, 1000L);
+    Snapshot second = snapshot(2L, 1L, 2000L);
+    TableMetadata withHistory =
+        TableMetadata.buildFrom(
+                TableMetadata.buildFrom(base).setBranchSnapshot(first, "main").build())
+            .setBranchSnapshot(second, "main")
+            .build();
+    String metadataLocation = "s3://bucket/db/tbl/metadata/00002-abc.metadata.json";
+    // Round-trip through the parser so the metadata looks like one loaded from a metadata file:
+    // no pending changes and a known metadata location, exactly what loadTable hands over.
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(metadataLocation, TableMetadataParser.toJson(withHistory));
+    Assertions.assertEquals(2, metadata.snapshots().size());
+    LoadTableResponse original = LoadTableResponse.builder().withTableMetadata(metadata).build();
+
+    LoadTableResponse filtered = IcebergTableOperations.filterSnapshotsByRefs(original);
+
+    Assertions.assertEquals(
+        ImmutableSet.of(2L),
+        filtered.tableMetadata().snapshots().stream()
+            .map(Snapshot::snapshotId)
+            .collect(Collectors.toSet()),
+        "only the ref-referenced snapshot should remain");
+    Assertions.assertEquals(
+        metadataLocation, filtered.metadataLocation(), "metadata-location must be preserved");
+    Assertions.assertEquals(
+        metadata.lastUpdatedMillis(),
+        filtered.tableMetadata().lastUpdatedMillis(),
+        "last-updated-ms must not be bumped by filtering");
+    Assertions.assertEquals(
+        metadata.previousFiles(),
+        filtered.tableMetadata().previousFiles(),
+        "filtering must not append a metadata-log entry");
+    Assertions.assertEquals(
+        metadata.snapshotLog(),
+        filtered.tableMetadata().snapshotLog(),
+        "snapshot-log must be kept intact for lazy snapshot loading");
+  }
+
+  private static Snapshot snapshot(long snapshotId, Long parentId, long timestampMs) {
+    String json =
+        String.format(
+            "{\"snapshot-id\":%d,%s\"timestamp-ms\":%d,\"sequence-number\":%d,"
+                + "\"summary\":{\"operation\":\"append\"},"
+                + "\"manifest-list\":\"s3://bucket/db/tbl/metadata/snap-%d.avro\",\"schema-id\":0}",
+            snapshotId,
+            parentId == null ? "" : String.format("\"parent-snapshot-id\":%d,", parentId),
+            timestampMs,
+            snapshotId,
+            snapshotId);
+    return SnapshotParser.fromJson(json);
   }
 
   @ParameterizedTest
