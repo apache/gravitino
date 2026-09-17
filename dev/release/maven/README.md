@@ -27,6 +27,9 @@ so they must not be used for individual Maven artifacts.
 Source JARs have the same notices. Javadoc omits notices for private implementations
 that are absent from the generated documentation, and points to the JDK doclet's
 own `legal/` directory for its JavaScript and CSS licenses.
+Root `LICENSE` records copied-source paths and root `NOTICE` includes their applicable
+attributions. Copying Apache-2.0 code does not by itself require an additional NOTICE
+entry: the copied Lance and Trino sources have no additional applicable upstream notice.
 
 Bundled JARs preserve dependency documents under
 `META-INF/licenses/<group>/<artifact>/<version>/`, retaining their original
@@ -38,8 +41,10 @@ its dependency documents keep that location. Connector runtimes that exclude
 SLF4J classes also exclude the corresponding dependency documents.
 
 `dependencies.txt` supplies verified texts missing from upstream binary JARs.
-The canonical LICENSE lists each resource-backed component by Maven coordinates
-and version, with exact document paths. A label after `|` supplies its license
+The canonical LICENSE lists each resource-backed component by its resolved group,
+name and version, with exact document paths. External dependencies use Maven artifact
+names; project dependencies use Gradle project names (for example, `api` rather than
+the published `gravitino-api`). A label after `|` supplies its license
 summary or additional requirements. Relevant NOTICE documents are also propagated
 into the canonical NOTICE, with their original paths to resolve companion-file
 references. Nested inventories are regenerated after dependency exclusions.
@@ -105,12 +110,20 @@ a POM license name alone does not account for embedded third-party code.
 
 ## Verification
 
+`testMavenLegalFiles`, included in the root `check` task, checks that base templates
+match the root documents and that copied-source notices recorded in `LICENSE` reach
+the modules actually compiling those sources. It checks only sources with applicable
+NOTICE templates, not every Apache-2.0 source. Small synthetic JARs exercise resource
+selection, case-sensitive companions, classifier paths, supplement precedence,
+empty compatibility JARs, nested exclusions, deterministic output and invalid mappings.
+These checks do not build cloud bundles or connector runtimes.
+
 The client-runtime tests check that its canonical LICENSE/NOTICE entries are unique,
 that dependency documents are preserved, and that verified missing license texts,
 component references and notices are present:
 
 ```shell
-./gradlew :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PskipITs
+./gradlew testMavenLegalFiles :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PskipITs
 ```
 
 These focused tests do not establish that every dependency's licensing metadata is

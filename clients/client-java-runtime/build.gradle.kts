@@ -80,7 +80,8 @@ tasks.test {
     systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
     configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
       val id = artifact.moduleVersion.id
-      systemProperty("dependencyPrefix.${artifact.file.name}", "META-INF/licenses/${id.group}/${id.name}/${id.version}/")
+      val classifier = artifact.classifier?.let { "/$it" } ?: ""
+      systemProperty("dependencyPrefix.${artifact.file.name}", "META-INF/licenses/${id.group}/${id.name}/${id.version}$classifier/")
     }
   }
 }

@@ -107,7 +107,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
   @get:InputFiles
   @get:PathSensitive(PathSensitivity.RELATIVE)
   val templateFiles: FileTree
-    get() = templates.get().asFileTree.matching { include("LICENSE*", "NOTICE*", "dependencies.txt") }
+    get() = templates.get().asFileTree
 
   @get:Input
   abstract val sourceNotices: ListProperty<String>
@@ -140,6 +140,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
     val directory = templates.get().asFile
     val ids = dependencyIds.get()
     val excluded = excludedGroups.get()
+    // ByteBuffer compares byte contents, so identical documents are retained only once.
     val documents = sortedMapOf<String, LinkedHashSet<ByteBuffer>>()
     fun add(path: String, bytes: ByteArray) {
       require(!path.startsWith('/') && path.split('/').none { it == ".." }) {
@@ -149,12 +150,13 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
       if (path.startsWith("META-INF/licenses/") && group in excluded) return
       documents.getOrPut(path) { linkedSetOf() }.add(ByteBuffer.wrap(bytes))
     }
-    val overrides = directory.resolve("dependencies.txt").readLines()
+    val overrides = mutableMapOf<String, String>()
+    directory.resolve("dependencies.txt").readLines()
       .filter { it.isNotBlank() && !it.startsWith('#') }
-      .associate { line ->
+      .forEach { line ->
         val fields = line.split('=', limit = 2)
         require(fields.size == 2) { "Invalid Maven legal supplement: $line" }
-        fields[0] to fields[1]
+        require(overrides.put(fields[0], fields[1]) == null) { "Duplicate Maven legal supplement: ${fields[0]}" }
       }
     fun supplement(id: String): String {
       val parts = id.split('/')
@@ -171,7 +173,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
       ZipFile(jar).use { archive ->
         hasContent = archive.entries().asSequence().any {
           !it.isDirectory && (
-            !it.name.startsWith("META-INF/") && !GenerateJarLegalFiles.isLegalResource(it.name) ||
+            (!it.name.startsWith("META-INF/") && !GenerateJarLegalFiles.isLegalResource(it.name)) ||
               it.name.startsWith("META-INF/native/") || it.name.startsWith("META-INF/versions/")
             )
         }
@@ -291,9 +293,6 @@ class LegalFilesTransformer(
     }
   }
 }
-
-// The CLI uses the same selector within its dependency CopySpec.
-extra["isMavenLegalResource"] = GenerateJarLegalFiles.Companion::isLegalResource
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
 
@@ -794,23 +793,17 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
+    ":catalogs:catalog-common" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
-    ":spark-connector:spark-common" to listOf("iceberg"),
+    ":spark-connector:spark-3.5" to listOf("iceberg"),
+    ":spark-connector:spark-4.0" to listOf("iceberg"),
     ":server-common" to listOf("hadoop"),
     ":iceberg:iceberg-common" to listOf("iceberg"),
     ":iceberg:iceberg-rest-server" to listOf("iceberg"),
     ":authorizations:authorization-ranger" to listOf("ranger")
-  )[project.path].orEmpty() + if (fileTree("src/main/java") {
-    // Include the notice only when this module contains the copied Glue credentials provider.
-    include("**/GravitinoGlueCredentialsProvider.java")
-  }.isEmpty
-  ) {
-    emptyList()
-  } else {
-    listOf("doris")
-  }
+  )[project.path].orEmpty()
 
   val mavenLegalFiles = tasks.register<GenerateJarLegalFiles>("generateMavenLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
@@ -822,8 +815,7 @@ subprojects {
     // These implementations are private/package-private and are absent from generated Javadoc.
     sourceNotices.set(
       when (project.path) {
-        ":catalogs:catalog-glue" -> emptyList()
-        ":spark-connector:spark-common" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }
         else -> sourceNoticeNames
       }
     )
@@ -873,6 +865,11 @@ subprojects {
   }
   if (project.path == ":clients:cli") {
     configureBundledLegalFiles(provider { listOf(configurations.runtimeClasspath.get()) }, provider { configurations.runtimeClasspath.get() })
+    tasks.named<Jar>("jar") {
+      from(provider { configurations.runtimeClasspath.get().map { zipTree(it) } }) {
+        exclude { GenerateJarLegalFiles.isLegalResource(it.relativePath.pathString) }
+      }
+    }
   }
 
   tasks.withType<Jar> {
@@ -1126,6 +1123,8 @@ tasks.rat {
 }
 
 tasks.check.get().dependsOn(tasks.rat)
+
+apply(from = "dev/release/maven/test-legal-files.gradle")
 
 tasks.cyclonedxBom {
   setIncludeConfigs(listOf("runtimeClasspath"))

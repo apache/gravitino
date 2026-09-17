@@ -66,16 +66,7 @@ tasks.jar {
   manifest {
     attributes["Main-Class"] = "org.apache.gravitino.cli.Main"
   }
-  val dependencies = configurations
-    .runtimeClasspath
-    .get()
-    .map(::zipTree)
-
-  @Suppress("UNCHECKED_CAST")
-  val isMavenLegalResource = rootProject.extra["isMavenLegalResource"] as (String) -> Boolean
-  from(dependencies) {
-    exclude { isMavenLegalResource(it.relativePath.pathString) }
-  }
+  // Dependency contents and their legal resources are configured together in the root build.
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

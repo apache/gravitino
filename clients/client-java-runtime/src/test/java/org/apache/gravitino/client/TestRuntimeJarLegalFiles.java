@@ -134,7 +134,7 @@ class TestRuntimeJarLegalFiles {
             .map(JarEntry::getName)
             .filter(name -> name.endsWith(suffix))
             .findFirst()
-            .orElseThrow();
+            .orElseThrow(() -> new AssertionError("Missing legal document ending in " + suffix));
     return readEntry(jar, path);
   }
 
