@@ -110,9 +110,9 @@ class LegalFilesTransformer(
     val entry = ZipEntry(resourcePath)
     entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, projectLegalFile.lastModified())
     output.putNextEntry(entry)
-    documents.forEach { document ->
+    documents.forEachIndexed { index, document ->
+      if (index > 0) output.write('\n'.code)
       output.write(document.array())
-      output.write('\n'.code)
     }
     output.closeEntry()
     contents.clear()
@@ -619,6 +619,10 @@ subprojects {
         val legalFile = rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
         transform(LegalFilesTransformer(legalFile, "META-INF/$name"))
       }
+      rootProject.fileTree("licenses").files.sortedBy { it.invariantSeparatorsPath }.forEach { license ->
+        val path = license.relativeTo(rootProject.file("licenses")).invariantSeparatorsPath
+        transform(LegalFilesTransformer(license, "META-INF/licenses/$path"))
+      }
     }
   }
 
@@ -634,10 +638,11 @@ subprojects {
           include("web/web/NOTICE.bin")
           rename("NOTICE.bin", "NOTICE")
         } else {
-          include("LICENSE.bin")
+          include(if (rootProject.file("LICENSE.bin").isFile) "LICENSE.bin" else "LICENSE")
           rename("LICENSE.bin", "LICENSE")
-          include("NOTICE.bin")
+          include(if (rootProject.file("NOTICE.bin").isFile) "NOTICE.bin" else "NOTICE")
           rename("NOTICE.bin", "NOTICE")
+          include("licenses/**")
         }
       }
     }

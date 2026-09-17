@@ -75,10 +75,12 @@ tasks.test {
   dependsOn(shadowJar)
   inputs.file(shadowJar.flatMap { it.archiveFile })
   inputs.files(legalFiles.values)
+  inputs.dir(rootProject.file("licenses"))
   inputs.files(configurations.runtimeClasspath)
   doFirst {
     systemProperty("shadowJarPath", shadowJar.get().archiveFile.get().asFile.absolutePath)
     legalFiles.forEach { (name, file) -> systemProperty("projectLegalFile.$name", file.absolutePath) }
+    systemProperty("projectLicenseDirectory", rootProject.file("licenses").absolutePath)
     systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
   }
 }

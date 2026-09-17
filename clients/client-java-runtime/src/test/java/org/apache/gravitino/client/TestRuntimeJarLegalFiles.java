@@ -27,12 +27,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class TestRuntimeJarLegalFiles {
@@ -59,6 +62,29 @@ class TestRuntimeJarLegalFiles {
             mergedContent.indexOf(projectContent),
             mergedContent.lastIndexOf(projectContent),
             "Duplicate Gravitino content in " + entryName);
+      }
+    }
+  }
+
+  @Test
+  void testSupplementalLicenseFilesArePackagedOnce() throws IOException {
+    Path directory = Paths.get(requiredProperty("projectLicenseDirectory"));
+    try (JarFile jar = new JarFile(requiredProperty("shadowJarPath"));
+        Stream<Path> paths = Files.walk(directory)) {
+      List<Path> licenses = paths.filter(Files::isRegularFile).collect(Collectors.toList());
+      assertTrue(!licenses.isEmpty(), "Expected supplemental license files");
+      for (Path license : licenses) {
+        String entryName =
+            "META-INF/licenses/"
+                + directory.relativize(license).toString().replace(File.separatorChar, '/');
+        assertEquals(
+            1L,
+            jar.stream().filter(entry -> entryName.equals(entry.getName())).count(),
+            "Expected exactly one " + entryName);
+        assertEquals(
+            new String(Files.readAllBytes(license), StandardCharsets.UTF_8),
+            readEntry(jar, entryName),
+            "Supplemental license text must be preserved in " + entryName);
       }
     }
   }
