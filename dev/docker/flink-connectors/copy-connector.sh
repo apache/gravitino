@@ -22,40 +22,54 @@
 # /target/.
 #
 # Environment variables:
-#   FLINK_VERSION  - Flink major version (default: 1.20)
+#   FLINK_VERSION   - Flink major version (default: 1.20)
+#   LIST_VERSIONS   - When "true", only list the available versions and exit.
+#                     Useful for `docker run --rm <image>`.
 #
 # The available versions are DISCOVERED at runtime from the directories baked
 # into /connectors (flink-<ver>). All versions are Scala 2.12 only (Flink does
 # not support Scala 2.13).
+#
+# As an init container, a missing /target volume is treated as an error so a
+# misconfigured pod fails fast instead of letting the engine start without the
+# connector. Set LIST_VERSIONS=true to only inspect the image.
 
-set -e
+set -euo pipefail
 
 FLINK_VERSION="${FLINK_VERSION:-1.20}"
-SOURCE_DIR="/connectors/flink-${FLINK_VERSION}"
+LIST_VERSIONS="${LIST_VERSIONS:-false}"
 
 list_available_versions() {
   ls -1 /connectors/ 2>/dev/null | grep "^flink-" | sed 's/flink-/  - /'
 }
 
-if [ ! -d "$SOURCE_DIR" ]; then
-  echo "ERROR: Flink version ${FLINK_VERSION} is not supported by this image."
+if [ "${LIST_VERSIONS}" = "true" ]; then
+  echo "Apache Gravitino Flink connector jars available at /connectors/ (all Scala 2.12):"
   echo ""
-  echo "Available versions (all Scala 2.12):"
   list_available_versions
+  echo ""
+  echo "Usage: mount a /target volume and set FLINK_VERSION (e.g. FLINK_VERSION=1.20)."
+  exit 0
+fi
+
+if [ ! -d "/target" ]; then
+  echo "ERROR: /target volume is not mounted." >&2
+  echo "Mount an empty volume at /target so the connector jar can be installed." >&2
+  echo "To only list versions, run with LIST_VERSIONS=true." >&2
   exit 1
 fi
 
-if [ -d "/target" ]; then
-  echo "Copying Flink ${FLINK_VERSION} connector (Scala 2.12) to /target/..."
-  cp "${SOURCE_DIR}"/*.jar /target/
-  echo "Done. Jars copied to /target/:"
-  ls -1 /target/*.jar 2>/dev/null
-else
-  echo "No /target volume mounted."
-  echo ""
-  echo "Usage: Mount /target volume and set FLINK_VERSION env var."
-  echo "  docker run -e FLINK_VERSION=1.20 -v /path:/target <image>"
-  echo ""
-  echo "Available versions (all Scala 2.12):"
-  list_available_versions
+SOURCE_DIR="/connectors/flink-${FLINK_VERSION}"
+
+if [ ! -d "$SOURCE_DIR" ]; then
+  echo "ERROR: Flink version ${FLINK_VERSION} is not supported by this image." >&2
+  echo "" >&2
+  echo "Available versions (all Scala 2.12):" >&2
+  list_available_versions >&2
+  exit 1
 fi
+
+echo "Copying Flink ${FLINK_VERSION} connector (Scala 2.12) to /target/..."
+cp "${SOURCE_DIR}"/*.jar /target/
+echo "Done. Jars copied to /target/:"
+ls -1 /target/*.jar 2>/dev/null

@@ -18,10 +18,12 @@
 #
 
 # ==============================================================================
-# Apache Gravitino Flink Connector — Red Hat UBI 10 Certified Image
-# Open source, Apache-2.0 only. Contains the Apache Gravitino Flink connector
-# runtime jars for every supported Flink version present in the source tree
-# (Scala 2.12; Flink does not support Scala 2.13).
+# Apache Gravitino Flink Connector — UBI 10-based, certification-oriented image
+# Contains the Apache Gravitino Flink connector runtime jars for every
+# supported Flink version present in the source tree (Scala 2.12; Flink does
+# not support Scala 2.13). The connector code is Apache-2.0; the shaded runtime
+# jar bundles third-party open source components (see
+# licenses/THIRD_PARTY_LICENSES.txt).
 # Used as a Kubernetes init-container to inject connector jars into Flink pods.
 #
 # The set of Flink versions is discovered at build time from the Gravitino
@@ -30,16 +32,20 @@
 #
 # The Flink version is selected at runtime via the FLINK_VERSION env var.
 #
-# Red Hat Certification Compliance:
+# Red Hat UBI / certification-oriented properties:
 #   - Based on UBI 10 (registry.access.redhat.com)
 #   - Required LABELs present
-#   - /licenses directory with the Apache License and NOTICE
-#   - Runs as non-root user (UID 1000, GID 0)
+#   - /licenses directory with LICENSE, NOTICE and THIRD_PARTY_LICENSES.txt
+#   - Runs as non-root user (UID 1000, GID 0) with a passwd entry
 #   - OpenShift arbitrary UID compatible (GID 0 group permissions)
 # ==============================================================================
 
 ARG UBI_MINIMAL_TAG=10.2
-ARG IMAGE_VERSION=1.3.0-SNAPSHOT
+# IMAGE_VERSION is injected at build time from gradle.properties by
+# build-docker.sh / the release workflow. The default below is kept in sync
+# with the current gradle.properties version as a fallback for uninjected
+# local builds.
+ARG IMAGE_VERSION=2.0.0-SNAPSHOT
 ARG IMAGE_RELEASE=1
 
 FROM registry.access.redhat.com/ubi10/ubi-minimal:${UBI_MINIMAL_TAG}
@@ -64,11 +70,15 @@ COPY packages/connectors /connectors
 # Entrypoint script for version selection
 COPY --chmod=755 copy-connector.sh /copy-connector.sh
 
-# --- Red Hat certification: licenses directory (Apache-2.0 only) ---
+# --- licenses directory (LICENSE + NOTICE + third-party summary) ---
 COPY licenses /licenses
 
-# --- OpenShift arbitrary UID compatibility ---
-RUN chgrp -R 0 /connectors && chmod -R g=u /connectors
+# --- Drop source-control artifacts, OpenShift arbitrary UID compatibility,
+#     and a passwd entry for UID 1000 ---
+RUN rm -f /licenses/.gitignore \
+    && chgrp -R 0 /connectors /licenses \
+    && chmod -R g=u /connectors /licenses \
+    && echo "gravitino:x:1000:0:Gravitino user:/:/sbin/nologin" >> /etc/passwd
 
 USER 1000
 

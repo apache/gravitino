@@ -39,19 +39,18 @@
 # Output layout:
 #   packages/connectors/spark-<major>_<scala>/gravitino-spark-connector-runtime-<major>_<scala>-*.jar
 
-set -ex
+set -euo pipefail
 
-script_dir="$(dirname "${BASH_SOURCE-$0}")"
-script_dir="$(cd "${script_dir}" >/dev/null; pwd)"
-gravitino_home="$(cd "${script_dir}/../../.." >/dev/null; pwd)"
+conn_dir="$(dirname "${BASH_SOURCE-$0}")"
+conn_dir="$(cd "${conn_dir}" >/dev/null; pwd)"
+gravitino_home="$(cd "${conn_dir}/../../.." >/dev/null; pwd)"
 
 cd "${gravitino_home}"
 
 # Discover all Spark runtime modules from the Gradle project,
-# e.g. "spark-runtime-3.5" -> major "3.5".
-runtime_modules="$(./gradlew -q projects 2>/dev/null \
-  | grep -oE "spark-runtime-[0-9]+\.[0-9]+" \
-  | sort -u)"
+# e.g. "spark-runtime-3.5" -> major "3.5". Keep stderr so a Gradle failure is
+# visible instead of being misreported as "no modules found".
+runtime_modules="$(./gradlew -q projects | grep -oE "spark-runtime-[0-9]+\.[0-9]+" | sort -u)"
 
 if [ -z "${runtime_modules}" ]; then
   echo "ERROR: no spark-runtime modules found in the Gradle project." >&2
@@ -73,9 +72,9 @@ runtime_build_file() {
 # Returns the pinned Scala version, or empty if the module reads -PscalaVersion.
 detect_locked_scala() {
   local build_file="$1"
-  [ -f "${build_file}" ] || { echo ""; return; }
+  [ -f "${build_file}" ] || { echo ""; return 0; }
   grep -oE 'val[[:space:]]+scalaVersion[[:space:]]*:[[:space:]]*String[[:space:]]*=[[:space:]]*"[0-9]+\.[0-9]+"' "${build_file}" \
-    | grep -oE '"[0-9]+\.[0-9]+"' | tr -d '"' | head -n1
+    | grep -oE '"[0-9]+\.[0-9]+"' | tr -d '"' | head -n1 || true
 }
 
 # Compare two dotted versions: returns 0 (true) if $1 >= $2.
@@ -83,7 +82,7 @@ version_ge() {
   [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n | tail -n1)" = "$1" ]
 }
 
-# Build the list of "major:scala" build targets, deriving Scala variants.
+# Build the list of "major:scala:kind" build targets, deriving Scala variants.
 targets=""
 for major in ${majors}; do
   build_file="$(runtime_build_file "${major}")"
@@ -106,13 +105,13 @@ for t in ${targets}; do echo "  - ${t%:*}"; done
 # Run the gradle builds. Group flag-driven builds by Scala to minimise passes.
 flag_212_modules=""
 flag_213_modules=""
-locked_targets=""
+locked_majors=""
 for t in ${targets}; do
   major="$(echo "$t" | cut -d: -f1)"
   scala="$(echo "$t" | cut -d: -f2)"
   kind="$(echo "$t" | cut -d: -f3)"
   case "${kind}" in
-    locked) locked_targets="${locked_targets} ${major}:${scala}" ;;
+    locked) locked_majors="${locked_majors} ${major}" ;;
     flag)
       if [ "${scala}" = "2.12" ]; then
         flag_212_modules="${flag_212_modules} :spark-connector:spark-runtime-${major}:shadowJar"
@@ -131,15 +130,14 @@ if [ -n "${flag_213_modules}" ]; then
   # shellcheck disable=SC2086
   ./gradlew ${flag_213_modules} -PscalaVersion=2.13 -x test
 fi
-for lt in ${locked_targets}; do
-  major="${lt%:*}"
+for major in ${locked_majors}; do
   # shellcheck disable=SC2086
   ./gradlew :spark-connector:spark-runtime-${major}:shadowJar -x test
 done
 
 # Clean old packages
-rm -rf "${script_dir}/packages"
-mkdir -p "${script_dir}/packages/connectors"
+rm -rf "${conn_dir}/packages"
+mkdir -p "${conn_dir}/packages/connectors"
 
 # Copy shadow jars into per-combination directories. The jar name embeds the
 # Scala suffix (…-runtime-<major>_<scala>-<ver>.jar), so we match on it and
@@ -147,7 +145,7 @@ mkdir -p "${script_dir}/packages/connectors"
 copy_variant() {
   local major="$1" scala="$2"
   local libs_dir="spark-connector/v${major}/spark-runtime/build/libs"
-  local dest="${script_dir}/packages/connectors/spark-${major}_${scala}"
+  local dest="${conn_dir}/packages/connectors/spark-${major}_${scala}"
   [ -d "${libs_dir}" ] || return 1
   local found=0
   for jar in "${libs_dir}"/*_"${scala}"-*.jar; do
@@ -169,16 +167,22 @@ for t in ${targets}; do
   if copy_variant "${major}" "${scala}"; then
     copied=$((copied + 1))
   else
-    echo "WARN: no runtime jar found for Spark ${major} Scala ${scala}" >&2
+    echo "ERROR: no runtime jar found for Spark ${major} Scala ${scala}" >&2
+    exit 1
   fi
 done
 
 if [ "${copied}" -eq 0 ]; then
-  echo "ERROR: no Spark runtime jars were produced." >&2
+  echo "ERROR: no Spark runtime jars were staged." >&2
   exit 1
 fi
 
+# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
+# the image ships the real texts (not drifting copies committed in-tree).
+cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
+cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+
 echo ""
 echo "=== Spark connectors prepared (${copied} combination(s)) ==="
-echo "Output: ${script_dir}/packages/connectors/"
-find "${script_dir}/packages/connectors/" -name "*.jar" | sort
+echo "Output: ${conn_dir}/packages/connectors/"
+find "${conn_dir}/packages/connectors/" -name "*.jar" | sort

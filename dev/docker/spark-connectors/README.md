@@ -27,8 +27,27 @@ Image: `apache/gravitino-spark-connector:{version}`
 This image is not a Spark runtime. Use it as a Kubernetes init container, or
 unpack it on a VM, to copy one versioned JAR.
 
-This image contains only open source Apache Gravitino connector code, licensed
-under the Apache License 2.0. See `/licenses` inside the image.
+## Build
+
+Build locally from the repository root with the shared image build script:
+
+```bash
+./dev/docker/build-docker.sh \
+  --platform linux/amd64 \
+  --type spark-connectors \
+  --image apache/gravitino-spark-connector \
+  --tag dev
+```
+
+The script builds the connector runtime jars (`spark-connectors-dependency.sh`),
+stages the repository-root `LICENSE`/`NOTICE` into `licenses/`, injects
+`IMAGE_VERSION` from `gradle.properties`, and runs the multi-arch buildx build.
+
+This image contains open source software only. The Apache Gravitino connector
+code is licensed under the Apache License 2.0; the shaded runtime jar also
+bundles third-party open source components under their own licenses. See the
+`LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt` files under `/licenses` in
+the image.
 
 ## Server compatibility
 
@@ -58,9 +77,9 @@ Each directory contains one shaded runtime JAR. `LICENSE` and `NOTICE` are in
 Mount `/target` and set the Spark and Scala versions. The entrypoint copies
 the matching JAR into that directory.
 
-| Variable        | Default | Description                               |
-|-----------------|---------|-------------------------------------------|
-| `SPARK_VERSION` | `3.5`   | Spark major version, e.g. `3.5`.          |
+| Variable        | Default | Description                                       |
+|-----------------|---------|---------------------------------------------------|
+| `SPARK_VERSION` | `3.5`   | Spark major version, e.g. `3.5`.                  |
 | `SCALA_VERSION` | `2.12`  | `2.12` or `2.13`, depending on the Spark version. |
 
 ### Kubernetes

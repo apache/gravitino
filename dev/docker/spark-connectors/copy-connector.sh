@@ -22,17 +22,33 @@
 # SCALA_VERSION to /target/.
 #
 # Environment variables:
-#   SPARK_VERSION  - Spark major version (default: 3.5)
-#   SCALA_VERSION  - Scala version (default: 2.12)
+#   SPARK_VERSION   - Spark major version (default: 3.5)
+#   SCALA_VERSION   - Scala version. If unset, defaults to 2.13 for Spark 4.x
+#                     (which is Scala 2.13 only) and 2.12 otherwise.
+#   LIST_VERSIONS   - When "true", only list the available combinations and
+#                     exit. Useful for `docker run --rm <image>`.
 #
 # The available combinations are DISCOVERED at runtime from the directories
 # baked into /connectors (spark-<major>_<scala>), so this script needs no edits
 # when the matrix changes between branches.
+#
+# As an init container, a missing /target volume is treated as an error so a
+# misconfigured pod fails fast instead of letting the engine start without the
+# connector. Set LIST_VERSIONS=true to only inspect the image.
 
-set -e
+set -euo pipefail
 
 SPARK_VERSION="${SPARK_VERSION:-3.5}"
-SCALA_VERSION="${SCALA_VERSION:-2.12}"
+LIST_VERSIONS="${LIST_VERSIONS:-false}"
+
+# Default Scala per Spark major: Spark 4.x is Scala 2.13 only.
+if [ -z "${SCALA_VERSION:-}" ]; then
+  case "${SPARK_VERSION}" in
+    4.*) SCALA_VERSION="2.13" ;;
+    *)   SCALA_VERSION="2.12" ;;
+  esac
+fi
+
 SOURCE_DIR="/connectors/spark-${SPARK_VERSION}_${SCALA_VERSION}"
 
 list_available_combos() {
@@ -40,25 +56,32 @@ list_available_combos() {
     | sed 's/spark-/  Spark /' | sed 's/_/ + Scala /'
 }
 
-if [ ! -d "$SOURCE_DIR" ]; then
-  echo "ERROR: Spark ${SPARK_VERSION} with Scala ${SCALA_VERSION} is not supported by this image."
+if [ "${LIST_VERSIONS}" = "true" ]; then
+  echo "Apache Gravitino Spark connector jars available at /connectors/:"
   echo ""
-  echo "Available combinations:"
   list_available_combos
+  echo ""
+  echo "Usage: mount a /target volume and set SPARK_VERSION / SCALA_VERSION"
+  echo "  (e.g. SPARK_VERSION=3.5 SCALA_VERSION=2.12)."
+  exit 0
+fi
+
+if [ ! -d "/target" ]; then
+  echo "ERROR: /target volume is not mounted." >&2
+  echo "Mount an empty volume at /target so the connector jar can be installed." >&2
+  echo "To only list versions, run with LIST_VERSIONS=true." >&2
   exit 1
 fi
 
-if [ -d "/target" ]; then
-  echo "Copying Spark ${SPARK_VERSION} connector (Scala ${SCALA_VERSION}) to /target/..."
-  cp "${SOURCE_DIR}"/*.jar /target/
-  echo "Done. Jars copied to /target/:"
-  ls -1 /target/*.jar 2>/dev/null
-else
-  echo "No /target volume mounted."
-  echo ""
-  echo "Usage: Mount /target volume and set SPARK_VERSION/SCALA_VERSION env vars."
-  echo "  docker run -e SPARK_VERSION=3.5 -e SCALA_VERSION=2.12 -v /path:/target <image>"
-  echo ""
-  echo "Available combinations:"
-  list_available_combos
+if [ ! -d "$SOURCE_DIR" ]; then
+  echo "ERROR: Spark ${SPARK_VERSION} with Scala ${SCALA_VERSION} is not supported by this image." >&2
+  echo "" >&2
+  echo "Available combinations:" >&2
+  list_available_combos >&2
+  exit 1
 fi
+
+echo "Copying Spark ${SPARK_VERSION} connector (Scala ${SCALA_VERSION}) to /target/..."
+cp "${SOURCE_DIR}"/*.jar /target/
+echo "Done. Jars copied to /target/:"
+ls -1 /target/*.jar 2>/dev/null

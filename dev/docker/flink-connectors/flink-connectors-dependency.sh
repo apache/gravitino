@@ -29,19 +29,18 @@
 # Output layout:
 #   packages/connectors/flink-<ver>/gravitino-flink-connector-runtime-<ver>_2.12-*.jar
 
-set -ex
+set -euo pipefail
 
-script_dir="$(dirname "${BASH_SOURCE-$0}")"
-script_dir="$(cd "${script_dir}" >/dev/null; pwd)"
-gravitino_home="$(cd "${script_dir}/../../.." >/dev/null; pwd)"
+conn_dir="$(dirname "${BASH_SOURCE-$0}")"
+conn_dir="$(cd "${conn_dir}" >/dev/null; pwd)"
+gravitino_home="$(cd "${conn_dir}/../../.." >/dev/null; pwd)"
 
 cd "${gravitino_home}"
 
 # Discover all Flink runtime modules from the Gradle project,
-# e.g. "flink-runtime-1.20" -> version "1.20".
-runtime_modules="$(./gradlew -q projects 2>/dev/null \
-  | grep -oE "flink-runtime-[0-9]+\.[0-9]+" \
-  | sort -u)"
+# e.g. "flink-runtime-1.20" -> version "1.20". Keep stderr so a Gradle failure
+# is visible instead of being misreported as "no modules found".
+runtime_modules="$(./gradlew -q projects | grep -oE "flink-runtime-[0-9]+\.[0-9]+" | sort -u)"
 
 if [ -z "${runtime_modules}" ]; then
   echo "ERROR: no flink-runtime modules found in the Gradle project." >&2
@@ -63,14 +62,14 @@ done
 ./gradlew ${tasks} -x test
 
 # Clean old packages
-rm -rf "${script_dir}/packages"
-mkdir -p "${script_dir}/packages/connectors"
+rm -rf "${conn_dir}/packages"
+mkdir -p "${conn_dir}/packages/connectors"
 
 # Copy shadow jars (exclude *-empty.jar artifacts) from each version's build output.
 copied=0
 for ver in ${versions}; do
   libs_dir="flink-connector/v${ver}/flink-runtime/build/libs"
-  dest="${script_dir}/packages/connectors/flink-${ver}"
+  dest="${conn_dir}/packages/connectors/flink-${ver}"
   if [ -d "${libs_dir}" ]; then
     mkdir -p "${dest}"
     found=0
@@ -85,18 +84,26 @@ for ver in ${versions}; do
     if [ "${found}" -eq 1 ]; then
       copied=$((copied + 1))
     else
-      echo "WARN: no runtime jar found under ${libs_dir}" >&2
-      rmdir "${dest}" 2>/dev/null || true
+      echo "ERROR: no runtime jar found under ${libs_dir}" >&2
+      exit 1
     fi
+  else
+    echo "ERROR: expected build output not found: ${libs_dir}" >&2
+    exit 1
   fi
 done
 
 if [ "${copied}" -eq 0 ]; then
-  echo "ERROR: no Flink runtime jars were produced." >&2
+  echo "ERROR: no Flink runtime jars were staged." >&2
   exit 1
 fi
 
+# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
+# the image ships the real texts (not drifting copies committed in-tree).
+cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
+cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+
 echo ""
 echo "=== Flink connectors prepared (${copied} version(s)) ==="
-echo "Output: ${script_dir}/packages/connectors/"
-find "${script_dir}/packages/connectors/" -name "*.jar" | sort
+echo "Output: ${conn_dir}/packages/connectors/"
+find "${conn_dir}/packages/connectors/" -name "*.jar" | sort

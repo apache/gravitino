@@ -18,10 +18,11 @@
 #
 
 # ==============================================================================
-# Apache Gravitino Spark Connector — Red Hat UBI 10 Certified Image
-# Open source, Apache-2.0 only. Contains the Apache Gravitino Spark connector
-# runtime jars for every supported Spark version and Scala variant present in
-# the source tree.
+# Apache Gravitino Spark Connector — UBI 10-based, certification-oriented image
+# Contains the Apache Gravitino Spark connector runtime jars for every
+# supported Spark version and Scala variant present in the source tree. The
+# connector code is Apache-2.0; the shaded runtime jar bundles third-party open
+# source components (see licenses/THIRD_PARTY_LICENSES.txt).
 # Used as a Kubernetes init-container to inject connector jars into Spark pods.
 #
 # The set of Spark version / Scala combinations is discovered at build time
@@ -29,18 +30,23 @@
 # image tracks whatever the checked-out branch supports without edits here.
 #
 # The Spark and Scala versions are selected at runtime via SPARK_VERSION and
-# SCALA_VERSION env vars.
+# SCALA_VERSION env vars. When SCALA_VERSION is unset, the entrypoint defaults
+# to 2.13 for Spark 4.x (Scala 2.13 only) and 2.12 otherwise.
 #
-# Red Hat Certification Compliance:
+# Red Hat UBI / certification-oriented properties:
 #   - Based on UBI 10 (registry.access.redhat.com)
 #   - Required LABELs present
-#   - /licenses directory with the Apache License and NOTICE
-#   - Runs as non-root user (UID 1000, GID 0)
+#   - /licenses directory with LICENSE, NOTICE and THIRD_PARTY_LICENSES.txt
+#   - Runs as non-root user (UID 1000, GID 0) with a passwd entry
 #   - OpenShift arbitrary UID compatible (GID 0 group permissions)
 # ==============================================================================
 
 ARG UBI_MINIMAL_TAG=10.2
-ARG IMAGE_VERSION=1.3.0-SNAPSHOT
+# IMAGE_VERSION is injected at build time from gradle.properties by
+# build-docker.sh / the release workflow. The default below is kept in sync
+# with the current gradle.properties version as a fallback for uninjected
+# local builds.
+ARG IMAGE_VERSION=2.0.0-SNAPSHOT
 ARG IMAGE_RELEASE=1
 
 FROM registry.access.redhat.com/ubi10/ubi-minimal:${UBI_MINIMAL_TAG}
@@ -56,9 +62,9 @@ LABEL name="gravitino-spark-connector" \
       description="Apache Gravitino Spark connector runtime jars for all supported Spark versions and Scala variants, for Kubernetes init-container deployment. The version is selected at runtime via the SPARK_VERSION and SCALA_VERSION environment variables." \
       maintainer="Apache Gravitino <dev@gravitino.apache.org>"
 
-# Default Spark and Scala version (can be overridden at runtime)
+# Default Spark version (can be overridden at runtime). SCALA_VERSION is left
+# unset so the entrypoint can default it per Spark major (2.13 for Spark 4.x).
 ENV SPARK_VERSION=3.5
-ENV SCALA_VERSION=2.12
 
 # Copy pre-built connector jars (prepared by spark-connectors-dependency.sh)
 COPY packages/connectors /connectors
@@ -66,11 +72,15 @@ COPY packages/connectors /connectors
 # Entrypoint script for version selection
 COPY --chmod=755 copy-connector.sh /copy-connector.sh
 
-# --- Red Hat certification: licenses directory (Apache-2.0 only) ---
+# --- licenses directory (LICENSE + NOTICE + third-party summary) ---
 COPY licenses /licenses
 
-# --- OpenShift arbitrary UID compatibility ---
-RUN chgrp -R 0 /connectors && chmod -R g=u /connectors
+# --- Drop source-control artifacts, OpenShift arbitrary UID compatibility,
+#     and a passwd entry for UID 1000 ---
+RUN rm -f /licenses/.gitignore \
+    && chgrp -R 0 /connectors /licenses \
+    && chmod -R g=u /connectors /licenses \
+    && echo "gravitino:x:1000:0:Gravitino user:/:/sbin/nologin" >> /etc/passwd
 
 USER 1000
 

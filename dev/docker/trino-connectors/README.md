@@ -28,8 +28,27 @@ This image is not a Trino server. Use it as a Kubernetes init container, or
 unpack it on a VM, to place one version band under Trino's `plugin/`
 directory.
 
-This image contains only open source Apache Gravitino connector code, licensed
-under the Apache License 2.0. See `/licenses` inside the image.
+## Build
+
+Build locally from the repository root with the shared image build script:
+
+```bash
+./dev/docker/build-docker.sh \
+  --platform linux/amd64 \
+  --type trino-connectors \
+  --image apache/gravitino-trino-connector \
+  --tag dev
+```
+
+The script builds the connector bands (`trino-connectors-dependency.sh`),
+stages the repository-root `LICENSE`/`NOTICE` into `licenses/`, injects
+`IMAGE_VERSION` from `gradle.properties`, and runs the multi-arch buildx build.
+
+This image contains open source software only. The Apache Gravitino connector
+code is licensed under the Apache License 2.0; each plugin band also bundles
+third-party open source dependency jars under their own licenses. See the
+`LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt` files under `/licenses` in
+the image.
 
 ## Server compatibility
 
