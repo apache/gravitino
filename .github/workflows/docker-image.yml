@@ -21,6 +21,9 @@ on:
           - 'gravitino-iceberg-rest-server'
           - 'gravitino-mcp-server'
           - 'gravitino-lance-rest-server'
+          - 'gravitino-trino-connector'
+          - 'gravitino-flink-connector'
+          - 'gravitino-spark-connector'
       docker_repo_name:
         description: 'Docker repository name (default is apache)'
         required: false
@@ -99,6 +102,15 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-mcp-server" ]; then
             echo "image_type=mcp-server" >> $GITHUB_ENV
             echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-mcp-server" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-trino-connector" ]; then
+            echo "image_type=trino-connectors" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-trino-connector" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-flink-connector" ]; then
+            echo "image_type=flink-connectors" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-flink-connector" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-spark-connector" ]; then
+            echo "image_type=spark-connectors" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-spark-connector" >> $GITHUB_ENV
           fi
 
           if [ "${{ github.event.inputs.publish-latest-tag }}" == "true" ]; then
