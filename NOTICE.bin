@@ -328,6 +328,69 @@ Copyright 2002-2021 The Apache Software Foundation
 Apache Commons Math
 Copyright 2001-2012 The Apache Software Foundation
 
+This product includes software developed by
+The Apache Software Foundation (http://www.apache.org/).
+
+===============================================================================
+
+The BracketFinder (package org.apache.commons.math3.optimization.univariate)
+and PowellOptimizer (package org.apache.commons.math3.optimization.general)
+classes are based on the Python code in module "optimize.py" (version 0.5)
+developed by Travis E. Oliphant for the SciPy library (http://www.scipy.org/)
+Copyright © 2003-2009 SciPy Developers.
+===============================================================================
+
+The LinearConstraint, LinearObjectiveFunction, LinearOptimizer,
+RelationShip, SimplexSolver and SimplexTableau classes in package
+org.apache.commons.math3.optimization.linear include software developed by
+Benjamin McCann (http://www.benmccann.com) and distributed with
+the following copyright: Copyright 2009 Google Inc.
+===============================================================================
+
+This product includes software developed by the
+University of Chicago, as Operator of Argonne National
+Laboratory.
+The LevenbergMarquardtOptimizer class in package
+org.apache.commons.math3.optimization.general includes software
+translated from the lmder, lmpar and qrsolv Fortran routines
+from the Minpack package
+Minpack Copyright Notice (1999) University of Chicago.  All rights reserved
+===============================================================================
+
+The GraggBulirschStoerIntegrator class in package
+org.apache.commons.math3.ode.nonstiff includes software translated
+from the odex Fortran routine developed by E. Hairer and G. Wanner.
+Original source copyright:
+Copyright (c) 2004, Ernst Hairer
+===============================================================================
+
+The EigenDecompositionImpl class in package
+org.apache.commons.math3.linear includes software translated
+from some LAPACK Fortran routines.  Original source copyright:
+Copyright (c) 1992-2008 The University of Tennessee.  All rights reserved.
+===============================================================================
+
+The MersenneTwister class in package org.apache.commons.math3.random
+includes software translated from the 2002-01-26 version of
+the Mersenne-Twister generator written in C by Makoto Matsumoto and Takuji
+Nishimura. Original source copyright:
+Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
+All rights reserved
+===============================================================================
+
+The HermiteInterpolator class and its corresponding test have been imported from
+the orekit library distributed under the terms of the Apache 2 licence. Original
+source copyright:
+Copyright 2010-2012 CS Systèmes d'Information
+===============================================================================
+
+The creation of the package "o.a.c.m.analysis.integration.gauss" was inspired
+by an original code donated by Sébastien Brisard.
+===============================================================================
+
+
+The associated license texts are in licenses/commons-math3.txt.
+
 Curator Client
 Copyright 2011-2018 The Apache Software Foundation
 
@@ -1014,3 +1077,63 @@ Yahoo Inc. (https://developer.yahoo.com).
 
 gRPC (grpc-api and grpc-context)
 Copyright 2014 The gRPC Authors
+
+Google Guava Version 18.0 included in Jersey Common
+Copyright (C) 2009 The Guava Authors
+
+Jackson JAX-RS Providers version 2.15.2 included in Jersey
+Copyright (c) 2009-2023 FasterXML, LLC. All rights reserved unless otherwise indicated.
+
+MyBatis 3.5.6 includes OGNL and the refactored SqlBuilder classes:
+
+OGNL
+Copyright (c) 2004, Drew Davidson and Luke Blanshard
+All rights reserved.
+
+Refactored SqlBuilder class (SQL, AbstractSQL)
+This product includes software developed by
+Adam Gent (https://gist.github.com/3650165)
+Copyright 2010 Adam Gent
+
+Older Jackson FastDoubleParser code shaded in paimon-format 1.2.0
+
+## FastDoubleParser
+
+jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
+That code is available under an Apache license under the following copyright.
+
+Copyright (c) Werner Randelshofer. Apache 2.0 License.
+
+FastDoubleParser code also contains code from:
+
+fast_double_parser <https://github.com/lemire/fast_double_parser>
+Copyright 2020 Daniel Lemire. Apache 2.0 License.
+
+fast_float <https://github.com/fastfloat/fast_float>
+Copyright 2021 The fast_float authors. Apache 2.0 License.
+
+bigint <https://github.com/tbuktu/bigint/tree/floatfft> (only using code from the  BSD License source files)
+Copyright 2020 Tim Buktu. 2-clause BSD License
+
+Code included in Micrometer 1.12.2
+
+This product contains a modified portion of 'io.netty.util.internal.logging',
+in the Netty/Common library distributed by The Netty Project:
+
+  * Copyright 2013 The Netty Project
+  * License: Apache License v2.0
+  * Homepage: https://netty.io
+
+This product contains a modified portion of 'StringUtils.isBlank()',
+in the Commons Lang library distributed by The Apache Software Foundation:
+
+  * Copyright 2001-2019 The Apache Software Foundation
+  * License: Apache License v2.0
+  * Homepage: https://commons.apache.org/proper/commons-lang/
+
+This product contains a modified portion of the 'org.springframework.lang'
+package in the Spring Framework library, distributed by VMware, Inc:
+
+  * Copyright 2002-2019 the original author or authors.
+  * License: Apache License v2.0
+  * Homepage: https://spring.io/projects/spring-framework

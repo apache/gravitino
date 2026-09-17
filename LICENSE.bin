@@ -208,6 +208,7 @@
 
    Apache Hive
    Apache Paimon
+   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
    Apache DataSketches Java
    Apache DataSketches Memory
    Apache Iceberg
@@ -427,6 +428,7 @@
    String Template 4
    JSch
    ASM
+   OGNL (shaded in MyBatis 3.5.6)
    bigint
    Protobuf
    ParaNamer
@@ -535,3 +537,8 @@
    Third-party license texts for code included in FastDoubleParser are in
    licenses/FastDoubleParser-thirdparty.txt.
    For the Schubfach license text, see licenses/Schubfach.txt.
+
+For the BSD license of OGNL shaded in MyBatis, see licenses/mybatis-ognl.txt.
+
+For the license texts of code included in Apache Commons Math 3.1.1,
+   see licenses/commons-math3.txt.
