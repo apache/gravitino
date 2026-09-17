@@ -103,8 +103,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
-    IcebergJobUtils.applyIcebergRestAuth(
-        sparkBuilder, catalogName, new OptimizerConfig(optimizerProperties));
 
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);

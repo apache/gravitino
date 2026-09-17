@@ -34,7 +34,6 @@ class TestGravitinoAuthSettings {
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig());
     Assertions.assertEquals(GravitinoAuthSettings.TYPE_NONE, settings.authType());
     Assertions.assertFalse(settings.hasAuth());
-    Assertions.assertTrue(settings.icebergRestCatalogConfigs("rest").isEmpty());
   }
 
   @Test
@@ -55,56 +54,18 @@ class TestGravitinoAuthSettings {
   }
 
   @Test
-  void applyToUsesOAuthClientCredentials() {
+  void applyToUsesSimpleAuth() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(OptimizerConfig.AUTH_TYPE, "oauth");
-    properties.put(OptimizerConfig.AUTH_OAUTH_SERVER_URI, "http://idp");
-    properties.put(OptimizerConfig.AUTH_OAUTH_PATH, "/oauth2/token");
-    properties.put(OptimizerConfig.AUTH_OAUTH_CREDENTIAL, "id:secret");
-    properties.put(OptimizerConfig.AUTH_OAUTH_SCOPE, "catalog");
+    properties.put(OptimizerConfig.AUTH_TYPE, "simple");
+    properties.put(OptimizerConfig.AUTH_USERNAME, "alice");
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
 
     @SuppressWarnings("unchecked")
     GravitinoClient.ClientBuilder builder = Mockito.mock(GravitinoClient.ClientBuilder.class);
-    Mockito.when(builder.withOAuth(Mockito.any())).thenReturn(builder);
+    Mockito.when(builder.withSimpleAuth(Mockito.anyString())).thenReturn(builder);
 
     settings.applyTo(builder);
-    Mockito.verify(builder).withOAuth(Mockito.any());
-  }
-
-  @Test
-  void icebergRestConfigsFromBasicAuth() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(OptimizerConfig.AUTH_TYPE, "basic");
-    properties.put(OptimizerConfig.AUTH_USERNAME, "admin");
-    properties.put(OptimizerConfig.AUTH_PASSWORD, "secret");
-    GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-
-    Map<String, String> catalogConfigs = settings.icebergRestCatalogConfigs("iceberg_s3");
-    Assertions.assertEquals(
-        "basic", catalogConfigs.get("spark.sql.catalog.iceberg_s3.rest.auth.type"));
-    Assertions.assertEquals(
-        "admin", catalogConfigs.get("spark.sql.catalog.iceberg_s3.rest.auth.basic.username"));
-    Assertions.assertEquals(
-        "secret", catalogConfigs.get("spark.sql.catalog.iceberg_s3.rest.auth.basic.password"));
-  }
-
-  @Test
-  void icebergRestConfigsFromOAuthClientCredentials() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put(OptimizerConfig.AUTH_TYPE, "oauth");
-    properties.put(OptimizerConfig.AUTH_OAUTH_SERVER_URI, "http://idp/");
-    properties.put(OptimizerConfig.AUTH_OAUTH_PATH, "/oauth2/token");
-    properties.put(OptimizerConfig.AUTH_OAUTH_CREDENTIAL, "id:secret");
-    properties.put(OptimizerConfig.AUTH_OAUTH_SCOPE, "catalog");
-    GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-
-    Map<String, String> catalogConfigs = settings.icebergRestCatalogConfigs("rest");
-    Assertions.assertEquals("oauth2", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.type"));
-    Assertions.assertEquals(
-        "http://idp/oauth2/token", catalogConfigs.get("spark.sql.catalog.rest.oauth2-server-uri"));
-    Assertions.assertEquals("id:secret", catalogConfigs.get("spark.sql.catalog.rest.credential"));
-    Assertions.assertEquals("catalog", catalogConfigs.get("spark.sql.catalog.rest.scope"));
+    Mockito.verify(builder).withSimpleAuth("alice");
   }
 
   @Test
@@ -115,23 +76,24 @@ class TestGravitinoAuthSettings {
     properties.put(OptimizerConfig.AUTH_OAUTH_CREDENTIAL, "id:secret");
     properties.put(OptimizerConfig.AUTH_OAUTH_SCOPE, "catalog");
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> settings.icebergRestCatalogConfigs("rest"));
+
+    @SuppressWarnings("unchecked")
+    GravitinoClient.ClientBuilder builder = Mockito.mock(GravitinoClient.ClientBuilder.class);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> settings.applyTo(builder));
   }
 
   @Test
-  void simpleAuthMapsToIcebergBasicDummyPassword() {
+  void oauthRequiresCredential() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(OptimizerConfig.AUTH_TYPE, "simple");
-    properties.put(OptimizerConfig.AUTH_USERNAME, "alice");
+    properties.put(OptimizerConfig.AUTH_TYPE, "oauth");
+    properties.put(OptimizerConfig.AUTH_OAUTH_SERVER_URI, "http://idp");
+    properties.put(OptimizerConfig.AUTH_OAUTH_PATH, "oauth2/token");
+    properties.put(OptimizerConfig.AUTH_OAUTH_SCOPE, "catalog");
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
 
-    Map<String, String> catalogConfigs = settings.icebergRestCatalogConfigs("rest");
-    Assertions.assertEquals("basic", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.type"));
-    Assertions.assertEquals(
-        "alice", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.basic.username"));
-    Assertions.assertEquals(
-        "dummy", catalogConfigs.get("spark.sql.catalog.rest.rest.auth.basic.password"));
+    @SuppressWarnings("unchecked")
+    GravitinoClient.ClientBuilder builder = Mockito.mock(GravitinoClient.ClientBuilder.class);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> settings.applyTo(builder));
   }
 
   @Test
@@ -140,8 +102,10 @@ class TestGravitinoAuthSettings {
     properties.put(OptimizerConfig.AUTH_TYPE, "basic");
     properties.put(OptimizerConfig.AUTH_USERNAME, "admin");
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> settings.icebergRestCatalogConfigs("rest"));
+
+    @SuppressWarnings("unchecked")
+    GravitinoClient.ClientBuilder builder = Mockito.mock(GravitinoClient.ClientBuilder.class);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> settings.applyTo(builder));
   }
 
   @Test

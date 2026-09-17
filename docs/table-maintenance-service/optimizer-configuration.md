@@ -53,22 +53,20 @@ gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
-When the Gravitino server or Iceberg REST catalog has authentication enabled,
-`builtin-iceberg-update-stats` needs credentials in `--updater-options` /
-`updater_options`:
+When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
+credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
+updater and `submit-update-stats-job` `runJob` calls):
 
 | `auth_type` | Fields |
 |-------------|--------|
 | `none` (default) | (none) |
-| `simple` | `username` (optional; Iceberg REST maps to basic auth with password `dummy`) |
+| `simple` | `username` (optional) |
 | `basic` | `username`, `password` |
 | `oauth` | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
 
-OAuth `serverUri` + `path` are joined into Iceberg REST `oauth2-server-uri`. The same
-`updater_options` auth is used by `submit-update-stats-job` when it calls Gravitino `runJob`,
-so the CLI does not need a separate auth configuration. Expire-snapshots and rewrite-data-files
-do not read these fields; if their Iceberg REST catalog requires auth, set `rest.auth.*` in
-`spark-conf`.
+Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
+job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files
+do not read `updater_options` auth fields.
 
 Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
 the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
