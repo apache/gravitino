@@ -77,7 +77,7 @@ The Gravitino server log configuration file is `conf/log4j2.properties`. Graviti
 
 ##### Log rotation and retention
 
-A log rotates when its current file reaches the roll size, and at the end of each day. Every rotation compresses the file into its own archive, `<log name>_<yyyyMMdd>.<index>.log.gz`, so no archive replaces another.
+A log rotates when its current file reaches the roll size or when the day ends. Every rotation compresses the file into its own archive, `<log name>_<yyyyMMdd>.<index>.log.gz`, so no archive replaces another.
 
 When a log rotates, an archive of that log is deleted if it is older than `logMaxAge`, or if the archives of the log exceed its total size cap. The oldest archives are deleted first. Deletion only looks at the archives of the log itself, directly in the log directory. The cap counts archives only, not the file being written.
 
@@ -96,7 +96,7 @@ property.logMaxAge = 90d
 property.serverLogMaxTotalSize = 5GB
 ```
 
-`logMaxAge` applies to every log in the same file. To change one log only, set the `ifFileName.ifAny.ifLastModified.age` of its appender. If you change the archive name in a `filePattern`, change the `ifFileName.glob` of the same appender to match, or the archives of that log are never deleted.
+`logMaxAge` applies to every log in the same file. The deletion rules are Log4j2 [Delete action](https://logging.apache.org/log4j/2.x/manual/appenders/rolling-file.html#DeleteAction) conditions, and each `if...` key is named after a condition type: `ifFileName` (`IfFileName`) selects the archives of the log by name, and `ifAny` (`IfAny`) deletes an archive when either `ifLastModified` (`IfLastModified`, older than an age) or `ifAccumulatedFileSize` (`IfAccumulatedFileSize`, beyond the size cap) matches. To change the age of one log only, set `appender.<name>.strategy.delete.ifFileName.ifAny.ifLastModified.age`. If you change the archive name in a `filePattern`, change `appender.<name>.strategy.delete.ifFileName.glob` to match, or the archives of that log are never deleted.
 
 `bin/gravitino.sh start` also writes the standard output and standard error of the process to `logs/gravitino-server.out`. Each `start` rotates this file first and keeps the previous files as `gravitino-server.out.1` (newest) to `gravitino-server.out.5`. Set `GRAVITINO_OUT_FILE_KEEP` in `conf/gravitino-env.sh` to keep a different number, or `0` to keep none.
 
