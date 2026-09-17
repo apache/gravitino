@@ -21,7 +21,7 @@ The CLI binary, its configuration file, and its configuration keys carry the old
 
 Confirm your environment matches this list before starting an evaluation against the built-ins. Anything outside it needs a custom extension, which is covered in the [Extension Guide](./optimizer-extension-guide.md).
 
-- Compaction is the only built-in strategy. There is no built-in snapshot expiration, orphan file cleanup, or sort and cluster maintenance.
+- Compaction is the only built-in strategy. Snapshot expiration and orphan file cleanup are available as directly submitted built-in jobs, but do not yet have built-in scheduling strategies. Sort and cluster maintenance also require custom strategies.
 - Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
 - The service is driven through the CLI workflow rather than running on a schedule of its own.
 
@@ -56,6 +56,19 @@ Three identifiers look interchangeable and are not.
 | Strategy type | `iceberg-data-compaction`    | The `strategy.type` field, and the strategy handler config |
 
 `--strategy-name` takes the **policy name**, despite what it is called. Passing either of the other two reports no matching identifiers rather than naming the mistake.
+
+## Direct Orphan File Cleanup
+
+Submit `builtin-iceberg-remove-orphan-files` through the jobs REST API to reclaim
+unreferenced files. Start with `dry_run: "true"` and review the candidate paths
+in the job logs before allowing deletion. The default cutoff is three days ago;
+explicit cutoffs must be at least 24 hours old, including for dry runs. A custom
+scan location must remain within the target table's storage location.
+
+This is a directly submitted job, not a new scheduling strategy. See
+[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for the
+submission example and [Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration)
+for the per-job options.
 
 ## Walkthrough
 
