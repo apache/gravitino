@@ -32,7 +32,7 @@ Gravitino needs a built-in job that operators can submit through the existing jo
 ## 2. Goals
 
 1. **Job submission**: Register `builtin-iceberg-rewrite-manifests` and submit it through the existing jobs REST API.
-2. **Procedure parameters**: Expose Iceberg parameters `table`, `use_caching`, and `spec_id`, with omitted optional values delegated to Iceberg's defaults.
+2. **Procedure parameters**: Expose `table`, `use_caching`, and `spec_id`, with omitted optional values delegated to Iceberg's defaults.
 3. **Operator guidance**: Explain how to discover spec IDs and which manifests a run can rewrite.
 4. **Validation and results**: Reject malformed arguments, escape SQL inputs, and report rewritten and added manifest counts.
 
@@ -105,7 +105,7 @@ Count comparisons are inclusive; the size comparison is strict. For example, 500
 
 #### 5.3.1 Resolve the Target Spec
 
-At the start of a collection/evaluation cycle, resolve `spec-id` from the requested ID or, if omitted, from the table's `default-spec-id`. Validate that the resolved spec exists and carry that ID through collection, evaluation, and job submission. Do not resolve the default again between these steps: partition evolution could otherwise make the job target a different spec from the one evaluated.
+At the start of a collection/evaluation cycle, resolve `spec_id` from the requested ID or, if omitted, from the table's `default-spec-id`. Validate that the resolved spec exists and carry that ID through collection, evaluation, and job submission. Do not resolve the default again between these steps: partition evolution could otherwise make the job target a different spec from the one evaluated.
 
 Collect only manifests in the current snapshot whose `partition_spec_id` equals that resolved ID:
 
@@ -143,7 +143,7 @@ The handler declares `DataRequirement.TABLE_STATISTICS` and looks up the same re
 
 ### 5.4 Layer 3 - Job Adapter (`maintenance/optimizer/`, follow-up)
 
-The adapter maps a positive strategy decision to `builtin-iceberg-rewrite-manifests`, supplying the catalog, table, caching option, and the exact resolved `spec-id` used by the collector and trigger expression. Always include that resolved ID in the submitted `jobConf`, even when the original request omitted it. This preserves the target if the table default changes after collection. Reuse existing job submission and tracking. The initial PR requires no adapter because operators submit the template directly.
+The adapter maps a positive strategy decision to `builtin-iceberg-rewrite-manifests`, supplying the catalog, table, caching option, and the exact resolved `spec_id` used by the collector and trigger expression. Always include that resolved ID in the submitted `jobConf`, even when the original request omitted it. This preserves the target if the table default changes after collection. Reuse existing job submission and tracking. The initial PR requires no adapter because operators submit the template directly.
 
 ### 5.5 Layer 4 - Spark Job (`maintenance/jobs/`)
 
@@ -162,23 +162,23 @@ The job parses and validates its inputs, builds a Spark session, calls the proce
 
 #### 5.5.2 Parameters
 
-Use `POST /api/metalakes/{metalake}/jobs/runs` with the existing `jobTemplateName` and `jobConf` fields. Each job argument key matches its CLI flag without the leading `--`. Translate `use-caching` and `spec-id` to Iceberg SQL parameters `use_caching` and `spec_id` when building the procedure call. Standard Spark configuration placeholders retain their existing names.
+Use `POST /api/metalakes/{metalake}/jobs/runs` with the existing `jobTemplateName` and `jobConf` fields.
 
 | `jobConf` key      | CLI argument    | Type                        | Required | Default                             |
 | ------------------ | --------------- | --------------------------- | -------- | ----------------------------------- |
-| `catalog`          | `--catalog`     | String                      | Yes      | None                                |
-| `table`            | `--table`       | String, such as `db.sample` | Yes      | None                                |
-| `use-caching`      | `--use-caching` | Boolean                     | No       | Installed Iceberg version's default |
-| `spec-id`          | `--spec-id`     | Non-negative integer        | No       | Table's current spec ID             |
-| `spark-conf`       | `--spark-conf`  | JSON object                 | No       | No additional overrides             |
+| `catalog_name`     | `--catalog`     | String                      | Yes      | None                                |
+| `table_identifier` | `--table`       | String, such as `db.sample` | Yes      | None                                |
+| `use_caching`      | `--use-caching` | Boolean                     | No       | Installed Iceberg version's default |
+| `spec_id`          | `--spec-id`     | Non-negative integer        | No       | Table's current spec ID             |
+| `spark_conf`       | `--spark-conf`  | JSON object                 | No       | No additional overrides             |
 
 Supply the standard Spark template configuration keys as for the other Iceberg jobs: `spark_master`, `spark_executor_instances`, `spark_executor_cores`, `spark_executor_memory`, `spark_driver_memory`, `catalog_type`, `catalog_uri`, and `warehouse_location`.
 
-`use-caching` controls caching during the rewrite. Omission delegates to the runtime; Iceberg 1.11.0's action defaults to `false`. Set it explicitly when consistent behavior across runtime versions is required.
+`use_caching` controls caching during the rewrite. Omission delegates to the runtime; Iceberg 1.11.0's action defaults to `false`. Set it explicitly when consistent behavior across runtime versions is required.
 
-##### How to find `spec-id`
+##### How to find `spec_id`
 
-Omit `spec-id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
+Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
 
 To discover which specs have manifests in the current snapshot, run:
 
@@ -189,9 +189,9 @@ FROM rest_catalog.db.t1.manifests;
 
 This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use the metadata JSON to identify the default and interpret the transforms.
 
-For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec-id` rewrites eligible manifests for spec `1`. Passing `"spec-id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
+For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec_id` rewrites eligible manifests for spec `1`. Passing `"spec_id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
 
-`spec-id` selects the existing spec whose manifests are eligible for rewriting, and replacement manifests use that same spec. Iceberg validates that the ID exists. This follows the [Iceberg 1.11.0 action implementation](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/actions/RewriteManifestsSparkAction.java), where `findMatchingManifests` compares each manifest's `partitionSpecId()` to the selected spec. It is not a partition-evolution operation.
+`spec_id` selects the existing spec whose manifests are eligible for rewriting, and replacement manifests use that same spec. Iceberg validates that the ID exists. This follows the [Iceberg 1.11.0 action implementation](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/actions/RewriteManifestsSparkAction.java), where `findMatchingManifests` compares each manifest's `partitionSpecId()` to the selected spec. It is not a partition-evolution operation.
 
 #### 5.5.3 Procedure Call and Alternatives
 
@@ -230,7 +230,7 @@ Counts concern the selected spec. A successful rewrite does not guarantee fewer 
 
    The list must contain `builtin-iceberg-rewrite-manifests`.
 
-2. Submit a run. Only `catalog` and `table` are needed beyond the standard Spark keys:
+2. Submit a run. Only `catalog_name` and `table_identifier` are needed beyond the standard Spark keys:
 
    ```bash
    job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -238,8 +238,8 @@ Counts concern the selected spec. A successful rewrite does not guarantee fewer 
      -d '{
        "jobTemplateName": "builtin-iceberg-rewrite-manifests",
        "jobConf": {
-         "catalog": "rest_catalog",
-         "table": "db.t1",
+         "catalog_name": "rest_catalog",
+         "table_identifier": "db.t1",
          "spark_master": "local[2]",
          "spark_executor_instances": "1",
          "spark_executor_cores": "1",
@@ -283,8 +283,8 @@ Pair the job with `builtin-iceberg-expire-snapshots`. The rewrite creates a snap
 
 | Input                   | Behavior                                                                    |
 | ----------------------- | --------------------------------------------------------------------------- |
-| `use-caching`           | Accept `true` or `false`, case-insensitively; reject other supplied values  |
-| `spec-id`               | Parse a non-negative 32-bit integer; reject malformed or overflowing values |
+| `use_caching`           | Accept `true` or `false`, case-insensitively; reject other supplied values  |
+| `spec_id`               | Parse a non-negative 32-bit integer; reject malformed or overflowing values |
 | Unknown spec ID         | Iceberg rejects IDs absent from table metadata                              |
 | Omitted optional values | Omit them from the SQL call and preserve runtime defaults                   |
 | Catalog and table       | Use shared identifier and string escaping when building SQL                 |
