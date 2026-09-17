@@ -316,12 +316,7 @@ public class TestMetadataAuthzHelper {
     EntityStore store = mock(EntityStore.class);
     when(gravitinoEnv.entityStore()).thenReturn(store);
     when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    Privilege.Name privilege =
-        switch (type) {
-          case USER -> Privilege.Name.MANAGE_USERS;
-          case GROUP -> Privilege.Name.MANAGE_GROUPS;
-          default -> Privilege.Name.MANAGE_GRANTS;
-        };
+    Privilege.Name privilege = principalManagementPrivilege(type);
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, privilege);
     NameIdentifier[] identifiers = principalIdentifiers(type, 10000);
@@ -341,6 +336,52 @@ public class TestMetadataAuthzHelper {
       when(gravitinoEnv.cacheEnabled()).thenReturn(false);
       when(gravitinoEnv.entityStore()).thenReturn(null);
     }
+  }
+
+  /** A possible management deny forces per-object evaluation even if the parent grants access. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListManagementGrantWithDenyFallsBack(Entity.EntityType type) {
+    Privilege.Name privilege = principalManagementPrivilege(type);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, privilege);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any()))
+        .thenReturn(true);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake", principalListExpression(type), type, identifiers);
+          // A deny elsewhere need not hide these principals, but it must disable the shortcut.
+          Assertions.assertArrayEquals(identifiers, filtered);
+          Assertions.assertNotSame(identifiers, filtered);
+          verify(authorizer).hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any());
+          verify(authorizer, times(identifiers.length + 1))
+              .authorize(any(), eq("testMetalake"), any(), eq(privilege), any());
+        });
+  }
+
+  /** A denied management privilege still permits self or role-membership visibility. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListDeniedManagementRetainsSelfVisibility(Entity.EntityType type) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    // authorize() returns false for an effective deny, as well as for an absent grant.
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    when(authorizer.isSelf(eq(type), eq(identifiers[1]), any())).thenReturn(true);
+    withAuthorizer(
+        authorizer,
+        () ->
+            Assertions.assertArrayEquals(
+                new NameIdentifier[] {identifiers[1]},
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers)));
   }
 
   /** Without a metalake grant, role ownership and role membership still filter individual roles. */
@@ -379,6 +420,7 @@ public class TestMetadataAuthzHelper {
     when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
         .thenAnswer(
             call -> ((MetadataObject) call.getArgument(2)).type() == MetadataObject.Type.METALAKE);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
     NameIdentifier[] identifiers = principalIdentifiers(type, 3);
     withAuthorizer(
         authorizer,
@@ -388,27 +430,8 @@ public class TestMetadataAuthzHelper {
               MetadataAuthzHelper.filterByExpression(
                   "testMetalake", principalListExpression(type), type, identifiers));
           verify(authorizer, times(1)).isOwner(any(), eq("testMetalake"), any(), any());
+          verify(authorizer, times(0)).hasDenyPolicy(any(), any(), anySet(), any());
         });
-  }
-
-  private static NameIdentifier[] principalIdentifiers(Entity.EntityType type, int count) {
-    return IntStream.range(0, count)
-        .mapToObj(
-            i ->
-                switch (type) {
-                  case USER -> NameIdentifierUtil.ofUser("testMetalake", "user" + i);
-                  case GROUP -> NameIdentifierUtil.ofGroup("testMetalake", "group" + i);
-                  default -> NameIdentifierUtil.ofRole("testMetalake", "role" + i);
-                })
-        .toArray(NameIdentifier[]::new);
-  }
-
-  private static String principalListExpression(Entity.EntityType type) {
-    return switch (type) {
-      case USER -> AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION;
-      case GROUP -> AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION;
-      default -> AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
-    };
   }
 
   /**
@@ -955,5 +978,34 @@ public class TestMetadataAuthzHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private static NameIdentifier[] principalIdentifiers(Entity.EntityType type, int count) {
+    return IntStream.range(0, count)
+        .mapToObj(
+            i ->
+                switch (type) {
+                  case USER -> NameIdentifierUtil.ofUser("testMetalake", "user" + i);
+                  case GROUP -> NameIdentifierUtil.ofGroup("testMetalake", "group" + i);
+                  default -> NameIdentifierUtil.ofRole("testMetalake", "role" + i);
+                })
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static String principalListExpression(Entity.EntityType type) {
+    return switch (type) {
+      case USER -> AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION;
+      case GROUP -> AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION;
+      default -> AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
+    };
+  }
+
+  private static Privilege.Name principalManagementPrivilege(Entity.EntityType type) {
+    return switch (type) {
+      case USER -> Privilege.Name.MANAGE_USERS;
+      case GROUP -> Privilege.Name.MANAGE_GROUPS;
+      case ROLE -> Privilege.Name.MANAGE_GRANTS;
+      default -> throw new IllegalArgumentException("Not a principal type: " + type);
+    };
   }
 }

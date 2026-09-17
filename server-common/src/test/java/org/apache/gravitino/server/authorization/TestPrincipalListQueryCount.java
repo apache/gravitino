@@ -42,12 +42,14 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.EntityIdResolver;
@@ -56,9 +58,6 @@ import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -78,9 +77,7 @@ class TestPrincipalListQueryCount {
     Config config = new Config(false) {};
     config.set(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
-        "jdbc:h2:file:"
-            + tempDir.resolve("metadata")
-            + ";DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=FALSE");
+        "jdbc:h2:file:" + tempDir.resolve("metadata") + ";MODE=MYSQL;AUTO_SERVER=FALSE");
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "test");
@@ -90,13 +87,11 @@ class TestPrincipalListQueryCount {
             FieldUtils.readStaticField(EntityIdService.class, "entityIdResolver", true);
     Object previousExecutor =
         FieldUtils.readStaticField(MetadataAuthzHelper.class, "executor", true);
-    JDBCBackend backend = new JDBCBackend();
     List<Executable> queryCountAssertions = new ArrayList<>();
-    Level previousLevel = LogManager.getLogger(TestPrincipalListQueryCount.class).getLevel();
-    Configurator.setLevel(TestPrincipalListQueryCount.class.getName(), Level.INFO);
     try (MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
         MockedStatic<GravitinoAuthorizerProvider> providerStatic =
-            mockStatic(GravitinoAuthorizerProvider.class)) {
+            mockStatic(GravitinoAuthorizerProvider.class);
+        JDBCBackend backend = new JDBCBackend()) {
       GravitinoEnv env = mock(GravitinoEnv.class);
       envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
       when(env.config()).thenReturn(config);
@@ -116,7 +111,16 @@ class TestPrincipalListQueryCount {
       GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
       // Isolate the storage/list-filter path: the caller has a metalake management grant.
-      when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+      when(authorizer.authorize(any(), any(), any(), any(), any()))
+          .thenAnswer(
+              call -> {
+                MetadataObject object = call.getArgument(2);
+                Privilege.Name privilege = call.getArgument(3);
+                return object.type() == MetadataObject.Type.METALAKE
+                    && (privilege == Privilege.Name.MANAGE_USERS
+                        || privilege == Privilege.Name.MANAGE_GROUPS
+                        || privilege == Privilege.Name.MANAGE_GRANTS);
+              });
       FieldUtils.writeStaticField(
           MetadataAuthzHelper.class, "executor", (Executor) Runnable::run, true);
       backend.initialize(config);
@@ -193,8 +197,6 @@ class TestPrincipalListQueryCount {
       }
       Assertions.assertAll(queryCountAssertions);
     } finally {
-      Configurator.setLevel(TestPrincipalListQueryCount.class.getName(), previousLevel);
-      backend.close();
       EntityIdService.initialize(previousResolver);
       FieldUtils.writeStaticField(MetadataAuthzHelper.class, "executor", previousExecutor, true);
     }
