@@ -58,6 +58,7 @@ import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -356,23 +357,25 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                           id,
                           SchemaEntity.class,
                           SCHEMA,
-                          schemaEntity ->
-                              SchemaEntity.builder()
-                                  .withId(schemaEntity.id())
-                                  .withName(schemaEntity.name())
-                                  .withNamespace(ident.namespace())
-                                  .withProperties(
-                                      propertiesForSchemaEntityAlter(
-                                          schemaEntity, effectiveChanges))
-                                  .withAuditInfo(
-                                      AuditInfo.builder()
-                                          .withCreator(schemaEntity.auditInfo().creator())
-                                          .withCreateTime(schemaEntity.auditInfo().createTime())
-                                          .withLastModifier(
-                                              PrincipalUtils.getCurrentPrincipal().getName())
-                                          .withLastModifiedTime(Instant.now())
-                                          .build())
-                                  .build()),
+                          requireEntityId(
+                              schemaId,
+                              schemaEntity ->
+                                  SchemaEntity.builder()
+                                      .withId(schemaEntity.id())
+                                      .withName(schemaEntity.name())
+                                      .withNamespace(ident.namespace())
+                                      .withProperties(
+                                          propertiesForSchemaEntityAlter(
+                                              schemaEntity, effectiveChanges))
+                                      .withAuditInfo(
+                                          AuditInfo.builder()
+                                              .withCreator(schemaEntity.auditInfo().creator())
+                                              .withCreateTime(schemaEntity.auditInfo().createTime())
+                                              .withLastModifier(
+                                                  PrincipalUtils.getCurrentPrincipal().getName())
+                                              .withLastModifiedTime(Instant.now())
+                                              .build())
+                                      .build())),
                   "UPDATE",
                   schemaId);
 
@@ -556,6 +559,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             schemaProperties = new HashMap<>(schemaEntity.properties());
           }
 
+          // For managed schema, we don't need to drop the schema from the store again.
+          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+          // Read the registration before the external call, so the store delete below can only
+          // remove the row this drop started with and never one re-created under the same name.
+          EntityVersion observed = isManagedSchema ? null : observeRegistration(ident, SCHEMA);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -563,8 +571,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   NonEmptySchemaException.class,
                   RuntimeException.class);
 
-          // For managed schema, we don't need to drop the schema from the store again.
-          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             if (droppedFromCatalog) {
               secretManager.deleteSecretsFromProperties(schemaProperties);
@@ -577,13 +583,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
-            try {
-              store.delete(ident, SCHEMA, true);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
+            deleteObservedRegistration(ident, SCHEMA, true, observed);
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(

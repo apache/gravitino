@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -42,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -270,9 +272,46 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
+    return deleteSchema(identifier, cascade, null);
+  }
+
+  /**
+   * Reads the id and store version of the schema under this name.
+   *
+   * @param identifier the schema identifier
+   * @return the id and version
+   * @throws NoSuchEntityException if the schema does not exist
+   */
+  public EntityVersion getSchemaVersion(NameIdentifier identifier) {
+    SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    return EntityVersion.of(schemaPO.getSchemaId(), schemaPO.getCurrentVersion());
+  }
+
+  /**
+   * Deletes the schema under this name only if it is still the observed one.
+   *
+   * @param identifier the schema identifier
+   * @param cascade whether to delete the children as well
+   * @param expected the id and version read before the operation started, or null to delete
+   *     whatever row is under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no schema exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
+  public boolean deleteSchema(
+      NameIdentifier identifier, boolean cascade, @Nullable EntityVersion expected) {
     NameIdentifierUtil.checkSchema(identifier);
 
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    if (expected != null) {
+      OccWriteSupport.checkExpectedVersion(
+          identifier,
+          Entity.EntityType.SCHEMA,
+          schemaPO.getSchemaId(),
+          schemaPO.getCurrentVersion(),
+          expected);
+    }
     Long schemaId = schemaPO.getSchemaId();
 
     if (cascade) {

@@ -34,6 +34,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.storage.EntityVersion;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend extends Closeable, SupportsRelationOperations {
@@ -139,6 +141,39 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
+
+  /**
+   * Reads the identity and store version of an entity.
+   *
+   * @param ident the identifier of the entity
+   * @param entityType the entity type
+   * @return the entity's id and version
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the store operation fails
+   */
+  default EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType)
+      throws IOException {
+    throw new UnsupportedOperationException("This backend cannot read entity versions");
+  }
+
+  /**
+   * Soft deletes the entity under the identifier only if it still carries the expected id and
+   * version.
+   *
+   * @param ident the identifier of the entity
+   * @param entityType the entity type
+   * @param cascade true to delete the children as well
+   * @param expected the id and version read before the operation started
+   * @return true if the entity was deleted
+   * @throws NoSuchEntityException if no entity exists under the identifier
+   * @throws OptimisticLockException if the entity is not the expected one
+   * @throws IOException if the store operation fails
+   */
+  default boolean delete(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
+      throws IOException {
+    throw new UnsupportedOperationException("This backend cannot delete with a version check");
+  }
 
   /**
    * Deletes an entity and returns the snapshot used by that delete.

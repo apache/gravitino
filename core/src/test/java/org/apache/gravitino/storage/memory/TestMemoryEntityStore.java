@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -57,6 +58,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
@@ -172,6 +174,31 @@ public class TestMemoryEntityStore {
                         && key.name().startsWith(descendantPrefix));
       }
       return prev != null;
+    }
+
+    @Override
+    public EntityVersion getVersion(NameIdentifier ident, EntityType entityType)
+        throws NoSuchEntityException {
+      Entity entity = entityMap.get(ident);
+      if (entity == null) {
+        throw new NoSuchEntityException("No such entity: %s", ident);
+      }
+      // The in-memory store keeps no row version; the id alone identifies an incarnation.
+      return EntityVersion.of(((HasIdentifier) entity).id(), 0L);
+    }
+
+    @Override
+    public boolean delete(
+        NameIdentifier ident, EntityType entityType, boolean cascade, EntityVersion expected)
+        throws IOException {
+      Entity current = entityMap.get(ident);
+      if (current == null) {
+        throw new NoSuchEntityException("No such entity: %s", ident);
+      }
+      if (((HasIdentifier) current).id() != expected.id()) {
+        throw new OptimisticLockException("The %s %s was modified concurrently", entityType, ident);
+      }
+      return delete(ident, entityType, cascade);
     }
 
     @Override
