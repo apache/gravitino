@@ -29,26 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
-import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteManifestsJob {
-
-  @Test
-  public void testArgumentKeysMatchFlagsAndCatalogConfig() {
-    SparkJobTemplate template = new IcebergRewriteManifestsJob().jobTemplate();
-    for (int i = 0; i < template.arguments().size(); i += 2) {
-      String key = template.arguments().get(i).substring(2);
-      assertEquals("{{" + key + "}}", template.arguments().get(i + 1));
-    }
-    assertEquals(
-        "org.apache.iceberg.spark.SparkCatalog",
-        template.configs().get("spark.sql.catalog.{{catalog}}"));
-    assertFalse(template.configs().keySet().stream().anyMatch(key -> key.contains("catalog_name")));
-    assertTrue(
-        IcebergSparkConfigUtils.buildTemplateSparkConfigs()
-            .containsKey("spark.sql.catalog.{{catalog_name}}"));
-  }
 
   @Test
   public void testJobTemplateHasCorrectName() {
@@ -98,15 +81,15 @@ public class TestIcebergRewriteManifestsJob {
 
     // Verify all expected arguments are present
     assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog}}"));
+    assertTrue(template.arguments().contains("{{catalog_name}}"));
     assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table}}"));
+    assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--use-caching"));
-    assertTrue(template.arguments().contains("{{use-caching}}"));
+    assertTrue(template.arguments().contains("{{use_caching}}"));
     assertTrue(template.arguments().contains("--spec-id"));
-    assertTrue(template.arguments().contains("{{spec-id}}"));
+    assertTrue(template.arguments().contains("{{spec_id}}"));
     assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark-conf}}"));
+    assertTrue(template.arguments().contains("{{spark_conf}}"));
   }
 
   @Test
@@ -126,10 +109,10 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(configs.containsKey("spark.driver.memory"));
 
     // Verify Iceberg catalog configs
-    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog}}"));
-    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog}}.type"));
-    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog}}.uri"));
-    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog}}.warehouse"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
   }
 
   @Test
@@ -214,12 +197,12 @@ public class TestIcebergRewriteManifestsJob {
     String[] args = {
       "--catalog", "iceberg_prod",
       "--table", "db.sample",
-      "--use-caching", "{{use-caching}}",
-      "--spark-conf", "{{spark-conf}}"
+      "--use-caching", "{{use_caching}}",
+      "--spark-conf", "{{spark_conf}}"
     };
     Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
-    assertEquals("{{use-caching}}", result.get("use-caching"));
+    assertEquals("{{use_caching}}", result.get("use-caching"));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("use-caching")));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("spark-conf")));
   }
@@ -235,12 +218,12 @@ public class TestIcebergRewriteManifestsJob {
 
   @Test
   public void testProcedureCallOmitsUseCachingWhenPlaceholderUnresolved() {
-    String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{use-caching}}");
+    String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{use_caching}}");
     String sql =
         IcebergRewriteManifestsJob.buildProcedureCall(
             "iceberg_prod", "db.sample", useCaching, null);
 
-    // Without filtering, Boolean.parseBoolean("{{use-caching}}") would silently emit
+    // Without filtering, Boolean.parseBoolean("{{use_caching}}") would silently emit
     // use_caching => false instead of leaving Iceberg's default in place.
     assertEquals("CALL `iceberg_prod`.system.rewrite_manifests(table => 'db.sample')", sql);
   }
@@ -363,7 +346,7 @@ public class TestIcebergRewriteManifestsJob {
 
   @Test
   public void testProcedureCallOmitsSpecIdWhenPlaceholderUnresolved() {
-    String specId = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{spec-id}}");
+    String specId = IcebergJobUtils.nullIfUnresolvedPlaceholder("{{spec_id}}");
     String sql =
         IcebergRewriteManifestsJob.buildProcedureCall("iceberg_prod", "db.sample", null, specId);
 

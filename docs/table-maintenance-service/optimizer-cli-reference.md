@@ -378,21 +378,21 @@ The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 
 ### Parameters
 
-`catalog` and `table` are required. The rest are optional.
+`catalog_name` and `table_identifier` are required. The rest are optional.
 
 | Key                  | Description                                                              | Default                             |
 | -------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
-| `catalog`            | Iceberg catalog name as registered in Spark                              | Required                            |
-| `table`              | Fully qualified table name, such as `db.sample`                          | Required                            |
-| `use-caching`        | Caches table metadata in Spark while rewriting; `true` or `false`        | Installed Iceberg version's default |
-| `spec-id`            | Existing partition spec whose manifests to rewrite; non-negative integer | The table's current spec            |
-| `spark-conf`         | JSON map of Spark configuration                                          | None                                |
+| `catalog_name`       | Iceberg catalog name as registered in Spark                              | Required                            |
+| `table_identifier`   | Fully qualified table name, such as `db.sample`                          | Required                            |
+| `use_caching`        | Caches table metadata in Spark while rewriting; `true` or `false`        | Installed Iceberg version's default |
+| `spec_id`            | Existing partition spec whose manifests to rewrite; non-negative integer | The table's current spec            |
+| `spark_conf`         | JSON map of Spark configuration                                          | None                                |
 
-Leave `use-caching` unset to use the installed Iceberg version's default (`false` in Iceberg 1.11.0). Set it explicitly when consistent behavior across versions is required.
+Leave `use_caching` unset to use the installed Iceberg version's default (`false` in Iceberg 1.11.0). Set it explicitly when consistent behavior across versions is required.
 
-### How to find `spec-id`
+### How to find `spec_id`
 
-Omit `spec-id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
+Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
 
 To discover which specs have manifests in the current snapshot, run:
 
@@ -403,9 +403,9 @@ FROM rest_catalog.db.t1.manifests;
 
 This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use the metadata JSON to identify the default and interpret the transforms.
 
-For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec-id` rewrites eligible manifests for spec `1`. Passing `"spec-id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
+For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec_id` rewrites eligible manifests for spec `1`. Passing `"spec_id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
 
-`spec-id` selects the existing spec whose manifests are eligible for rewriting, and replacement manifests use that same spec. Iceberg validates that the ID exists. This follows the [Iceberg 1.11.0 action implementation](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/actions/RewriteManifestsSparkAction.java), where `findMatchingManifests` compares each manifest's `partitionSpecId()` to the selected spec. It is not a partition-evolution operation.
+`spec_id` selects the existing spec whose manifests are eligible for rewriting, and replacement manifests use that same spec. Iceberg validates that the ID exists. This follows the [Iceberg 1.11.0 action implementation](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/actions/RewriteManifestsSparkAction.java), where `findMatchingManifests` compares each manifest's `partitionSpecId()` to the selected spec. It is not a partition-evolution operation.
 
 ### Submitting the Job
 
@@ -415,8 +415,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -d '{
     "jobTemplateName": "builtin-iceberg-rewrite-manifests",
     "jobConf": {
-      "catalog": "rest_catalog",
-      "table": "db.t1",
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
       "spark_master": "local[2]",
       "spark_executor_instances": "1",
       "spark_executor_cores": "1",
@@ -430,7 +430,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/jobs/runs
 ```
 
-The job builds this statement, including `use-caching` and `spec-id` only when you supply them:
+The job builds this statement, including `use_caching` and `spec_id` only when you supply them:
 
 ```sql
 CALL `rest_catalog`.system.rewrite_manifests(
