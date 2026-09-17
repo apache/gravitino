@@ -339,6 +339,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
+<<<<<<< HEAD
           // For the unmanaged schema, it could happen that the schema:
           // 1. It's not found in the catalog (dropped directly from underlying sources)
           // 2. It's found in the catalog but not in the store (not managed by Gravitino)
@@ -353,6 +354,19 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {
             throw new RuntimeException(e);
+=======
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
+            try {
+              droppedFromStore = store.delete(ident, SCHEMA, true);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+>>>>>>> dc2545f03 ([#13278] fix(core): clean up missing schemas on explicit cascading drops (#13279))
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(
@@ -364,7 +378,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
+<<<<<<< HEAD
           return droppedFromCatalog;
+=======
+          if (droppedFromCatalog || droppedFromStore) {
+            secretManager.deleteSecretsFromProperties(schemaProperties);
+          }
+          return droppedFromCatalog || droppedFromStore;
+>>>>>>> dc2545f03 ([#13278] fix(core): clean up missing schemas on explicit cascading drops (#13279))
         });
   }
 
