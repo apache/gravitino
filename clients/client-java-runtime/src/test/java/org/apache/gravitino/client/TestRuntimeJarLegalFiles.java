@@ -187,6 +187,49 @@ class TestRuntimeJarLegalFiles {
     }
   }
 
+  @Test
+  @Tag("maven-legal-audit")
+  void testAllCloudBundlesExcludeWildFly() throws IOException {
+    for (String name :
+        Arrays.asList(
+            "aws",
+            "azure",
+            "gcp",
+            "aliyun",
+            "tencent",
+            "icebergAws",
+            "icebergAzure",
+            "icebergGcp",
+            "icebergAliyun")) {
+      try (JarFile jar = artifact(name)) {
+        assertFalse(
+            jar.stream()
+                .anyMatch(
+                    entry ->
+                        entry.getName().contains("org/wildfly/openssl/")
+                            || entry.getName().contains("/org.wildfly.openssl/")),
+            jar.getName());
+      }
+    }
+  }
+
+  @Test
+  @Tag("maven-legal-audit")
+  void testWebWarsRetainTheirOwnLegalDocuments() throws IOException {
+    for (String web : Arrays.asList("web", "web-v2")) {
+      try (JarFile war = new JarFile(requiredProperty("war." + web))) {
+        for (String name : Arrays.asList("LICENSE", "NOTICE")) {
+          String path = "META-INF/" + name;
+          assertEquals(1L, war.stream().filter(entry -> path.equals(entry.getName())).count());
+          assertArrayEquals(
+              Files.readAllBytes(Paths.get(requiredProperty("webLegal." + web), name + ".bin")),
+              readBytes(war, path),
+              web + ": " + name);
+        }
+      }
+    }
+  }
+
   private static JarFile artifact(String name) throws IOException {
     return new JarFile(requiredProperty("artifact." + name));
   }

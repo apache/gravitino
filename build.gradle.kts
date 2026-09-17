@@ -769,7 +769,7 @@ subprojects {
     ":iceberg:iceberg-rest-server" to listOf("iceberg"),
     ":authorizations:authorization-ranger" to listOf("ranger")
   )[project.path].orEmpty() + if (fileTree("src/main/java") {
-    // This copied provider is present on the 1.3 release branch, but not on main.
+    // Include the notice only when this module contains the copied Glue credentials provider.
     include("**/GravitinoGlueCredentialsProvider.java")
   }.isEmpty
   ) {
@@ -843,6 +843,15 @@ subprojects {
 
   tasks.withType<Jar> {
     if (this is ShadowJar) return@withType
+    if (this is War && project.path in listOf(":web:web", ":web-v2:web")) {
+      // Web archives contain npm dependencies, not the Maven module inventory.
+      from(project.layout.projectDirectory) {
+        include("LICENSE.bin", "NOTICE.bin")
+        into("META-INF")
+        rename { it.removeSuffix(".bin") }
+      }
+      return@withType
+    }
     val legalFiles = when {
       name == "javadocJar" -> javadocLegalFiles
       name == "jar" && project.path == ":clients:cli" -> bundledLegalFiles

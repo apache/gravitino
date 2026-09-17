@@ -165,6 +165,9 @@ jobs:
       - name: Test publish to local
         run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
+      - name: Audit Maven and Web archive legal documents
+        run: ./gradlew :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PcheckMavenLegalFiles -PskipITs --max-workers=2
+
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh

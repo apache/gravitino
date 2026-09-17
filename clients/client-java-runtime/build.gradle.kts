@@ -80,7 +80,13 @@ tasks.test {
         "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar",
         "aws" to ":bundles:aws-bundle:shadowJar",
         "azure" to ":bundles:azure-bundle:shadowJar",
-        "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar"
+        "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar",
+        "gcp" to ":bundles:gcp-bundle:shadowJar",
+        "aliyun" to ":bundles:aliyun-bundle:shadowJar",
+        "tencent" to ":bundles:tencent-bundle:shadowJar",
+        "icebergAws" to ":bundles:iceberg-aws-bundle:shadowJar",
+        "icebergAzure" to ":bundles:iceberg-azure-bundle:shadowJar",
+        "icebergAliyun" to ":bundles:iceberg-aliyun-bundle:shadowJar"
       )
     )
   }
@@ -94,7 +100,23 @@ tasks.test {
     inputs.file(icebergDependency)
     doFirst { systemProperty("icebergGcpDependency", icebergDependency.get().absolutePath) }
   }
-  if (!fullAudit) useJUnitPlatform { excludeTags("maven-legal-audit") }
+  useJUnitPlatform {
+    if (!fullAudit) excludeTags("maven-legal-audit")
+  }
+  if (fullAudit) {
+    // Exercise the shared War packaging configuration without rebuilding the JavaScript applications.
+    listOf("web", "web-v2").forEach { web ->
+      val webProject = project(":$web:web")
+      val war = provider { webProject.tasks.getByName("war") as War }
+      dependsOn(":$web:web:war")
+      inputs.file(war.flatMap { it.archiveFile })
+      inputs.files(webProject.file("LICENSE.bin"), webProject.file("NOTICE.bin"))
+      doFirst {
+        systemProperty("war.$web", war.get().archiveFile.get().asFile.absolutePath)
+        systemProperty("webLegal.$web", webProject.projectDir.absolutePath)
+      }
+    }
+  }
   val artifacts = artifactTasks.mapValues { (_, path) -> provider { tasks.getByPath(path) as Jar } }
   dependsOn(artifactTasks.values)
   inputs.files(artifacts.values.map { artifact -> artifact.flatMap { it.archiveFile } })
