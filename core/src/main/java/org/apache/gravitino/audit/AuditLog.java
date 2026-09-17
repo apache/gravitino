@@ -109,6 +109,8 @@ import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
@@ -518,6 +520,8 @@ public interface AuditLog {
 
     LIST_FUNCTION_INFOS,
 
+    TEST_CONNECTION,
+
     AUTHORIZATION_DENIAL,
 
     UNKNOWN_OPERATION;
@@ -632,6 +636,9 @@ public interface AuditLog {
         return REMOVE_POLICY_FROM_TAG;
       } else if (event instanceof AuthorizationDenialFailureEvent) {
         return AUTHORIZATION_DENIAL;
+      } else if (event instanceof TestConnectionEvent
+          || event instanceof TestConnectionFailureEvent) {
+        return TEST_CONNECTION;
       } else {
         return UNKNOWN_OPERATION;
       }
