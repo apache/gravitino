@@ -148,6 +148,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
       // Build the procedure call SQL
