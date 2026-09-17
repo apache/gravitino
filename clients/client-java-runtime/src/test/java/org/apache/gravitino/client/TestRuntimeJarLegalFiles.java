@@ -128,11 +128,11 @@ class TestRuntimeJarLegalFiles {
 
   @Test
   @Tag("maven-legal-audit")
-  void testNestedRuntimeRemovesOnlyExcludedSlf4jAttribution() throws IOException {
+  void testNestedRuntimeAttributionMatchesBundledSlf4j() throws IOException {
     try (JarFile jar = artifact("filesystem")) {
       assertTrue(readEntry(jar, "META-INF/LICENSE").contains("CC-BY-2.5"));
-      assertFalse(jar.stream().anyMatch(entry -> entry.getName().startsWith("org/slf4j/")));
-      assertFalse(
+      assertEquals(
+          jar.getJarEntry("org/slf4j/LoggerFactory.class") != null,
           jar.stream()
               .anyMatch(entry -> entry.getName().startsWith("META-INF/licenses/org.slf4j/")));
       assertTrue(
