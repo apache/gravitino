@@ -31,6 +31,15 @@ Root `LICENSE` records copied-source paths and root `NOTICE` includes their appl
 attributions. Copying Apache-2.0 code does not by itself require an additional NOTICE
 entry: the copied Lance and Trino sources have no additional applicable upstream notice.
 
+The Glue credentials provider derives from Doris's
+[`CustomAwsCredentialsProvider`](https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java).
+Gravitino commit [`d81dd65d1`](https://github.com/apache/gravitino/commit/d81dd65d1c9159dbb67d5ff18bac62c24e9ba39c)
+explicitly recorded that adaptation in the source Javadoc and root `LICENSE`.
+Commit [`2c930e827`](https://github.com/apache/gravitino/commit/2c930e8276f77c150e2cc328b37f17c5acca2643)
+moved and reworked the existing class into `catalog-common`, removing the attribution
+comment and old inventory paths. The current Doris entry preserves that provenance
+at the new source location.
+
 Bundled JARs preserve dependency documents under
 `META-INF/licenses/<group>/<artifact>/<version>/`, retaining their original
 relative paths. Metadata is generated as a ZIP so case-sensitive paths such as

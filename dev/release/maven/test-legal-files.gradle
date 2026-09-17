@@ -23,6 +23,8 @@ import java.util.zip.ZipOutputStream
 import org.gradle.api.tasks.SourceSetContainer
 
 // Exercise the real generator with tiny ZIPs; no cloud bundles or connector builds are needed.
+def generatorType = project(':api').tasks.named('generateMavenLegalFiles').get().class.superclass
+def fixtureGenerator = tasks.register('mavenLegalTestFixture', generatorType)
 def legalTests = tasks.register('testMavenLegalFiles') {
   group = 'verification'
   description = 'Checks Maven legal templates, source mappings and packaging edge cases.'
@@ -69,7 +71,6 @@ def legalTests = tasks.register('testMavenLegalFiles') {
       }
     }
 
-    def generatorType = project(':api').tasks.named('generateMavenLegalFiles').get().class.superclass
     def selector = generatorType.getField('Companion').get(null)
     ['META-INF/LICENSE', 'META-INF/NOTICE.markdown', 'META-INF/FastDoubleParser-LICENSE',
      'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
@@ -112,7 +113,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     def slf4j = new File(fixtureDir, 'slf4j.jar')
     writeZip(slf4j, ['org/slf4j/Logger.class': 'fixture', 'META-INF/NOTICE': 'SLF4J fixture notice'])
     def output = new File(fixtureDir, 'legal.zip')
-    def generator = tasks.create('mavenLegalTestFixture', generatorType)
+    def generator = fixtureGenerator.get()
     generator.templates.set(fixtureTemplates)
     generator.outputArchive.set(output)
     generator.dependencyJars.from(component, slf4j)
