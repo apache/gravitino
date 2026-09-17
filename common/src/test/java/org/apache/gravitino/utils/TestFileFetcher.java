@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Tests for {@link FileFetcher}.
  *
  * <p>The hdfs happy path is exercised reflectively against minimal Hadoop test stubs (see {@code
- * org.apache.hadoop} under this test source set), which pin that the filesystem is resolved from
+ * org.apache.hadoop} under this test source set), which assert that the filesystem is resolved from
  * the fetched uri rather than fs.defaultFS; the catalog Kerberos integration tests cover the path
  * against real Hadoop. Here we also assert that an hdfs uri without a Hadoop configuration is
  * rejected.
