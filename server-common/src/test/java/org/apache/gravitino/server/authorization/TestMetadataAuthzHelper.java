@@ -17,6 +17,9 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalIdentifiers;
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalListExpression;
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalManagementPrivilege;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
@@ -25,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -35,9 +39,11 @@ import java.util.concurrent.Executor;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -274,6 +280,213 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(1, filtered.length);
       Assertions.assertEquals("testSchema", filtered[0].name());
     }
+  }
+
+  /** Users and groups have no owners, even when the entity cache is enabled. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP"})
+  public void testPrincipalListDoesNotPreloadOwners(Entity.EntityType type) {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 1003);
+    when(authorizer.isSelf(eq(type), eq(identifiers[1]), any())).thenReturn(true);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers);
+            Assertions.assertArrayEquals(new NameIdentifier[] {identifiers[1]}, filtered);
+            verifyNoInteractions(store);
+          });
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** A metalake management grant authorizes the entire list with constant work. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListManagementGrantSkipsPerObjectWork(Entity.EntityType type) {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    Privilege.Name privilege = principalManagementPrivilege(type);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, privilege);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 10000);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers);
+            Assertions.assertSame(identifiers, filtered);
+            verify(authorizer, times(1))
+                .authorize(any(), eq("testMetalake"), any(), eq(privilege), any());
+            verifyNoInteractions(store);
+          });
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** A possible management deny forces per-object evaluation even if the parent grants access. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListManagementGrantWithDenyFallsBack(Entity.EntityType type) {
+    Privilege.Name privilege = principalManagementPrivilege(type);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, privilege);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any()))
+        .thenReturn(true);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake", principalListExpression(type), type, identifiers);
+          // A deny elsewhere need not hide these principals, but it must disable the shortcut.
+          Assertions.assertArrayEquals(identifiers, filtered);
+          Assertions.assertNotSame(identifiers, filtered);
+          verify(authorizer).hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any());
+          verify(authorizer, times(identifiers.length + 1))
+              .authorize(any(), eq("testMetalake"), any(), eq(privilege), any());
+        });
+  }
+
+  /** A denied management privilege still permits self or role-membership visibility. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListDeniedManagementRetainsSelfVisibility(Entity.EntityType type) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    // authorize() returns false for an effective deny, as well as for an absent grant.
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    when(authorizer.isSelf(eq(type), eq(identifiers[1]), any())).thenReturn(true);
+    withAuthorizer(
+        authorizer,
+        () ->
+            Assertions.assertArrayEquals(
+                new NameIdentifier[] {identifiers[1]},
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers)));
+  }
+
+  /** Without a metalake grant, role ownership and role membership still filter individual roles. */
+  @Test
+  public void testRoleListRetainsPerRoleVisibility() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    when(authorizer.isSelf(eq(Entity.EntityType.ROLE), eq(identifiers[1]), any())).thenReturn(true);
+    when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            call -> {
+              MetadataObject object = call.getArgument(2);
+              return object.type() == MetadataObject.Type.ROLE && object.name().equals("role2");
+            });
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  principalListExpression(Entity.EntityType.ROLE),
+                  Entity.EntityType.ROLE,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[1], identifiers[2]}, filtered);
+        });
+  }
+
+  /** Roles still preload owners when no parent path authorizes the whole list. */
+  @Test
+  public void testRoleListFallbackPreloadsOwners() throws Exception {
+    EntityStore store = mock(EntityStore.class);
+    SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(store.relationOperations()).thenReturn(relations);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    try {
+      withAuthorizer(
+          mock(GravitinoAuthorizer.class),
+          () -> {
+            Assertions.assertEquals(
+                0,
+                MetadataAuthzHelper.filterByExpression(
+                        "testMetalake",
+                        principalListExpression(Entity.EntityType.ROLE),
+                        Entity.EntityType.ROLE,
+                        identifiers)
+                    .length);
+          });
+      verify(relations)
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.asList(identifiers),
+              Entity.EntityType.ROLE);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** A role expression without MANAGE_GRANTS must not inherit that list shortcut. */
+  @Test
+  public void testDifferentRoleExpressionDoesNotUseManagementGrant() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.MANAGE_GRANTS);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    when(authorizer.isSelf(eq(Entity.EntityType.ROLE), eq(identifiers[1]), any())).thenReturn(true);
+    withAuthorizer(
+        authorizer,
+        () ->
+            Assertions.assertArrayEquals(
+                new NameIdentifier[] {identifiers[1]},
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake",
+                    "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
+                    Entity.EntityType.ROLE,
+                    identifiers)));
+  }
+
+  /** A metalake owner sees every principal without loading per-principal relations. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListMetalakeOwner(Entity.EntityType type) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            call -> ((MetadataObject) call.getArgument(2)).type() == MetadataObject.Type.METALAKE);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          Assertions.assertSame(
+              identifiers,
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake", principalListExpression(type), type, identifiers));
+          verify(authorizer, times(1)).isOwner(any(), eq("testMetalake"), any(), any());
+          verify(authorizer, times(0)).hasDenyPolicy(any(), any(), anySet(), any());
+        });
   }
 
   /**

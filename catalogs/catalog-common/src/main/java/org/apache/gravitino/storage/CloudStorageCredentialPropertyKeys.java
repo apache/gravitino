@@ -28,27 +28,31 @@ import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 
 /**
- * Gravitino property keys for cloud static credentials.
+ * Gravitino property keys for cloud static <em>secret</em> credentials.
  *
  * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
- * responses (which may be masked). Clients may still supply credentials via local Hadoop {@code
- * Configuration} or {@code getCredentials()} when credential vending is enabled.
+ * responses (which may be masked as {@code ******}). Secret plaintext is recovered via {@code
+ * getSecrets()}. Non-secret identifiers such as {@code s3-access-key-id} / {@code
+ * gcs-service-account-file} remain in {@code properties()} and are merged normally. Clients may
+ * also supply credentials via local Hadoop {@code Configuration} or {@code getCredentials()} when
+ * credential vending is enabled.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
   /** Placeholder returned for masked hidden properties in REST responses. */
   public static final String MASKED_PROPERTY_VALUE = "******";
 
+  /**
+   * Secret-bearing static credential keys only. Access key IDs and GCS service-account file paths
+   * are intentionally excluded: they are declared non-hidden and must stay available from {@code
+   * properties()}.
+   */
   private static final Set<String> STATIC_CREDENTIAL_KEYS =
       ImmutableSet.of(
-          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
           AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
-          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
-          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
           GlueConstants.AWS_ACCESS_KEY_ID,
           GlueConstants.AWS_SECRET_ACCESS_KEY,

@@ -1,0 +1,24 @@
+THIRD-PARTY SOFTWARE NOTICE — Apache Gravitino Trino Connector image
+
+This image packages the Apache Gravitino Trino connector plugin. Each Trino
+version band under /connectors is a Trino plugin directory that contains the
+Gravitino connector jar together with its runtime dependency jars.
+
+Those dependency jars are third-party open source components, redistributed
+under their own licenses. They include, among others:
+
+  - Airlift libraries (log, etc.) ......................... Apache-2.0
+  - Google Guava ......................................... Apache-2.0
+  - Apache Commons (collections4, lang3, ...) ............ Apache-2.0
+  - Jackson (com.fasterxml.jackson.*) .................... Apache-2.0
+  - OpenTelemetry semantic conventions ................... Apache-2.0
+  - Trino JDBC client (io.trino:trino-jdbc) .............. Apache-2.0
+
+The Apache Gravitino connector jar itself is licensed under the Apache
+License, Version 2.0 (see the LICENSE and NOTICE files in this directory and
+in each plugin band directory).
+
+This list is a summary for operator convenience and is not exhaustive. The
+authoritative license and notice text for every bundled component is carried
+inside the respective jar's META-INF directory. Nothing in this summary
+modifies the license terms that apply to any individual component.

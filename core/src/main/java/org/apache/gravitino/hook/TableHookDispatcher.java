@@ -129,8 +129,12 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean dropped = dispatcher.dropTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    // A false result means the external table was renamed or dropped out of band and the
+    // registration was kept; the entity alive under another name must keep its privileges too.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return dropped;
   }
 
@@ -139,8 +143,10 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean purged = dispatcher.purgeTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    if (purged) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return purged;
   }
 

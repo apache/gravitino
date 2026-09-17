@@ -40,6 +40,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 public class TableColumnMetaService {
 
+  private static final int COLUMN_INSERT_BATCH_SIZE = 1000;
   private static final TableColumnMetaService INSTANCE = new TableColumnMetaService();
 
   private TableColumnMetaService() {}
@@ -107,9 +108,7 @@ public class TableColumnMetaService {
     List<ColumnPO> columnPOs =
         POConverters.initializeColumnPOs(tablePO, columnEntities, ColumnPO.ColumnOpType.CREATE);
 
-    // insertColumnPOs will be done in insertTable transaction, so we don't do commit here.
-    SessionUtils.doWithoutCommit(
-        TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOs));
+    insertColumnPOsInBatches(columnPOs);
   }
 
   @Monitored(
@@ -194,8 +193,15 @@ public class TableColumnMetaService {
       return;
     }
 
-    // updateColumns will be done in updateTable transaction, so we don't do commit here.
-    SessionUtils.doWithoutCommit(
-        TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOsToInsert));
+    insertColumnPOsInBatches(columnPOsToInsert);
+  }
+
+  private void insertColumnPOsInBatches(List<ColumnPO> columnPOs) {
+    // Column inserts run inside the table transaction, so no batch commits independently.
+    Lists.partition(columnPOs, COLUMN_INSERT_BATCH_SIZE)
+        .forEach(
+            batch ->
+                SessionUtils.doWithoutCommit(
+                    TableColumnMapper.class, mapper -> mapper.insertColumnPOs(batch)));
   }
 }

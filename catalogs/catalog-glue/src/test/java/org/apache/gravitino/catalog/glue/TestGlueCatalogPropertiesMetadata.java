@@ -70,9 +70,12 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testCredentialsAreOptional() {
+  void testCredentialsAreOptionalAndAccessKeyIdIsVisible() {
     assertFalse(metadata.isRequiredProperty(AWS_ACCESS_KEY_ID));
     assertFalse(metadata.isRequiredProperty(AWS_SECRET_ACCESS_KEY));
+    // Access key ID is an identifier, same as s3-access-key-id; only the secret is hidden.
+    assertFalse(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(AWS_SECRET_ACCESS_KEY));
   }
 
   @Test

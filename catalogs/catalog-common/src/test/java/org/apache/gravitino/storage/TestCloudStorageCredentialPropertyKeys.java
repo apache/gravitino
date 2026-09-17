@@ -36,19 +36,23 @@ public class TestCloudStorageCredentialPropertyKeys {
             S3Properties.GRAVITINO_S3_ENDPOINT,
             "https://s3.amazonaws.com",
             S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-            CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+            "AKIATEST",
             S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
             "secret",
             OSSProperties.GRAVITINO_OSS_REGION,
-            "cn-hangzhou");
+            "cn-hangzhou",
+            "masked-any-key",
+            CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE);
 
     Map<String, String> filtered =
         CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
 
     assertEquals("https://s3.amazonaws.com", filtered.get(S3Properties.GRAVITINO_S3_ENDPOINT));
     assertEquals("cn-hangzhou", filtered.get(OSSProperties.GRAVITINO_OSS_REGION));
-    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    // Access key ID is non-hidden plaintext in properties(); GVFS keeps it.
+    assertEquals("AKIATEST", filtered.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertFalse(filtered.containsKey("masked-any-key"));
   }
 
   @Test
@@ -56,6 +60,9 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertTrue(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
+    assertFalse(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_REGION));
