@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -32,9 +33,11 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.stream.IntStream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -274,6 +277,138 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(1, filtered.length);
       Assertions.assertEquals("testSchema", filtered[0].name());
     }
+  }
+
+  /** Users and groups have no owners, even when the entity cache is enabled. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP"})
+  public void testPrincipalListDoesNotPreloadOwners(Entity.EntityType type) {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 1003);
+    when(authorizer.isSelf(eq(type), eq(identifiers[1]), any())).thenReturn(true);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers);
+            Assertions.assertArrayEquals(new NameIdentifier[] {identifiers[1]}, filtered);
+            verifyNoInteractions(store);
+          });
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** A metalake management grant authorizes the entire list with constant work. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListManagementGrantSkipsPerObjectWork(Entity.EntityType type) {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    Privilege.Name privilege =
+        switch (type) {
+          case USER -> Privilege.Name.MANAGE_USERS;
+          case GROUP -> Privilege.Name.MANAGE_GROUPS;
+          default -> Privilege.Name.MANAGE_GRANTS;
+        };
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, privilege);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 10000);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake", principalListExpression(type), type, identifiers);
+            Assertions.assertSame(identifiers, filtered);
+            verify(authorizer, times(1))
+                .authorize(any(), eq("testMetalake"), any(), eq(privilege), any());
+            verifyNoInteractions(store);
+          });
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** Without a metalake grant, role ownership and role membership still filter individual roles. */
+  @Test
+  public void testRoleListRetainsPerRoleVisibility() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    when(authorizer.isSelf(eq(Entity.EntityType.ROLE), eq(identifiers[1]), any())).thenReturn(true);
+    when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            call -> {
+              MetadataObject object = call.getArgument(2);
+              return object.type() == MetadataObject.Type.ROLE && object.name().equals("role2");
+            });
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  principalListExpression(Entity.EntityType.ROLE),
+                  Entity.EntityType.ROLE,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[1], identifiers[2]}, filtered);
+        });
+  }
+
+  /** A metalake owner sees every principal without loading per-principal relations. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"USER", "GROUP", "ROLE"})
+  public void testPrincipalListMetalakeOwner(Entity.EntityType type) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            call -> ((MetadataObject) call.getArgument(2)).type() == MetadataObject.Type.METALAKE);
+    NameIdentifier[] identifiers = principalIdentifiers(type, 3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          Assertions.assertSame(
+              identifiers,
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake", principalListExpression(type), type, identifiers));
+          verify(authorizer, times(1)).isOwner(any(), eq("testMetalake"), any(), any());
+        });
+  }
+
+  private static NameIdentifier[] principalIdentifiers(Entity.EntityType type, int count) {
+    return IntStream.range(0, count)
+        .mapToObj(
+            i ->
+                switch (type) {
+                  case USER -> NameIdentifierUtil.ofUser("testMetalake", "user" + i);
+                  case GROUP -> NameIdentifierUtil.ofGroup("testMetalake", "group" + i);
+                  default -> NameIdentifierUtil.ofRole("testMetalake", "role" + i);
+                })
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static String principalListExpression(Entity.EntityType type) {
+    return switch (type) {
+      case USER -> AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION;
+      case GROUP -> AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION;
+      default -> AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
+    };
   }
 
   /**

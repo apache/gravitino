@@ -108,6 +108,24 @@ public class MetadataAuthzHelper {
   private static final Map<Entity.EntityType, Map<String, List<ParentScopeAccessPath>>>
       LIST_SHORT_CIRCUITS =
           Map.of(
+              Entity.EntityType.USER,
+              Map.of(
+                  AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(CATALOG_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.MANAGE_USERS, CATALOG_PARENT_SCOPES))),
+              Entity.EntityType.GROUP,
+              Map.of(
+                  AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(CATALOG_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.MANAGE_GROUPS, CATALOG_PARENT_SCOPES))),
+              Entity.EntityType.ROLE,
+              Map.of(
+                  AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(CATALOG_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.MANAGE_GRANTS, CATALOG_PARENT_SCOPES))),
               Entity.EntityType.TABLE,
               Map.of(
                   AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
@@ -597,7 +615,10 @@ public class MetadataAuthzHelper {
   }
 
   private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (!GravitinoEnv.getInstance().cacheEnabled()) {
+    // Only metadata objects can have owners. Resolving every user/group ID here adds two store
+    // lookups per entry even though their visibility expressions never consult an object owner.
+    if (!METADATA_OBJECT_ENTITY_TYPES.contains(entityType)
+        || !GravitinoEnv.getInstance().cacheEnabled()) {
       return;
     }
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
