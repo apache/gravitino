@@ -1,0 +1,47 @@
+Apache Gravitino
+Copyright 2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+The initial code for the Gravitino project was donated
+to the ASF by Datastrato (https://datastrato.ai/) copyright 2023-2024.
+
+The Web UI also has a NOTICE file please see web/web/NOTICE
+for it's contents.
+
+Apache Iceberg
+Copyright 2017-2022 The Apache Software Foundation
+
+Apache Paimon
+Copyright 2023-2026 The Apache Software Foundation
+
+Apache Doris
+Copyright 2018-2026 The Apache Software Foundation
+
+Apache Spark
+Copyright 2014 and onwards The Apache Software Foundation.
+
+Apache Hive
+Copyright 2008-2023 The Apache Software Foundation
+
+Apache Zeppelin
+Copyright 2016-2023 The Apache Software Foundation
+
+Apache Hadoop
+Copyright 2006 and onwards The Apache Software Foundation.
+
+Apache Kafka
+Copyright 2011-2023 The Apache Software Foundation
+
+Apache Submarine
+Copyright 2019 and onwards The Apache Software Foundation.
+
+Apache Arrow
+Copyright 2016-2024 The Apache Software Foundation
+
+AWS SDK for Java 2.0
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+This product includes software developed by
+Amazon Technologies, Inc (http://www.amazon.com/).
