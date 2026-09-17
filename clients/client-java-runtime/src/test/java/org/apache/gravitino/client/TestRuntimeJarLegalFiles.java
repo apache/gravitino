@@ -143,7 +143,8 @@ class TestRuntimeJarLegalFiles {
   @Test
   @Tag("maven-legal-audit")
   void testCaseSensitiveDependencyLicensePathsArePreserved() throws IOException {
-    try (JarFile jar = artifact("icebergGcp")) {
+    try (JarFile jar = artifact("icebergGcp");
+        JarFile dependency = new JarFile(requiredProperty("icebergGcpDependency"))) {
       String prefix =
           jar.stream()
               .map(JarEntry::getName)
@@ -152,8 +153,9 @@ class TestRuntimeJarLegalFiles {
               .findFirst()
               .orElseThrow()
               .replace("/META-INF/LICENSE", "/META-INF/");
-      assertTrue(readEntry(jar, prefix + "LICENSE").contains("Apache License"));
-      assertTrue(readEntry(jar, prefix + "license/LICENSE.boringssl.txt").contains("OpenSSL"));
+      for (String name : Arrays.asList("LICENSE", "license/LICENSE.boringssl.txt")) {
+        assertArrayEquals(readBytes(dependency, "META-INF/" + name), readBytes(jar, prefix + name));
+      }
     }
   }
 

@@ -84,6 +84,16 @@ tasks.test {
       )
     )
   }
+  if (fullAudit) {
+    val icebergDependency = provider {
+      project(":bundles:iceberg-gcp-bundle").configurations.getByName("runtimeClasspath")
+        .resolvedConfiguration.resolvedArtifacts.single {
+          it.moduleVersion.id.group == "org.apache.iceberg" && it.name == "iceberg-gcp-bundle"
+        }.file
+    }
+    inputs.file(icebergDependency)
+    doFirst { systemProperty("icebergGcpDependency", icebergDependency.get().absolutePath) }
+  }
   if (!fullAudit) useJUnitPlatform { excludeTags("maven-legal-audit") }
   val artifacts = artifactTasks.mapValues { (_, path) -> provider { tasks.getByPath(path) as Jar } }
   dependsOn(artifactTasks.values)
