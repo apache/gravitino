@@ -123,8 +123,8 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
   @get:PathSensitive(PathSensitivity.RELATIVE)
   abstract val javadocFiles: ConfigurableFileCollection
 
-  @get:OutputDirectory
-  abstract val outputDirectory: DirectoryProperty
+  @get:OutputFile
+  abstract val outputArchive: RegularFileProperty
 
   init {
     sourceNotices.convention(emptyList())
@@ -209,16 +209,19 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
     }
     add("META-INF/LICENSE", license.toByteArray(Charsets.UTF_8))
     add("META-INF/NOTICE", notice.toByteArray(Charsets.UTF_8))
-    val output = outputDirectory.get().asFile
-    output.deleteRecursively()
-    documents.forEach { (path, contents) ->
-      val file = output.resolve(path)
-      file.parentFile.mkdirs()
-      file.outputStream().use { stream ->
+    val output = outputArchive.get().asFile
+    output.parentFile.mkdirs()
+    // ZIP paths remain case-sensitive even on hosts where LICENSE and license/ would collide.
+    ZipOutputStream(output).use { stream ->
+      documents.forEach { (path, contents) ->
+        val entry = ZipEntry(path)
+        entry.time = 0L
+        stream.putNextEntry(entry)
         contents.forEachIndexed { index, content ->
           if (index > 0) stream.write('\n'.code)
           stream.write(content.array())
         }
+        stream.closeEntry()
       }
     }
   }
@@ -227,9 +230,9 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
 /** Replaces dependency legal resources with the artifact-specific documents generated above. */
 @CacheableTransformer
 class LegalFilesTransformer(
-  @get:InputDirectory
-  @get:PathSensitive(PathSensitivity.RELATIVE)
-  val legalDirectory: File
+  @get:InputFile
+  @get:PathSensitive(PathSensitivity.NONE)
+  val legalArchive: File
 ) : Transformer {
   @Internal
   override fun getName(): String = javaClass.simpleName
@@ -243,16 +246,20 @@ class LegalFilesTransformer(
   override fun hasTransformedResource(): Boolean = true
 
   override fun modifyOutputStream(output: ZipOutputStream, preserveFileTimestamps: Boolean) {
-    legalDirectory.walkTopDown().filter { it.isFile }.sortedBy { it.relativeTo(legalDirectory).invariantSeparatorsPath }
-      .forEach { file ->
-        val entry = ZipEntry(file.relativeTo(legalDirectory).invariantSeparatorsPath)
-        entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, file.lastModified())
+    ZipFile(legalArchive).use { archive ->
+      archive.entries().asSequence().forEach { resource ->
+        val entry = ZipEntry(resource.name)
+        entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, resource.time)
         output.putNextEntry(entry)
-        file.inputStream().use { it.copyTo(output) }
+        archive.getInputStream(resource).use { it.copyTo(output) }
         output.closeEntry()
       }
+    }
   }
 }
+
+// The CLI uses the same selector within its dependency CopySpec.
+extra["isMavenLegalResource"] = GenerateJarLegalFiles.Companion::isLegalResource
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
 
@@ -774,7 +781,7 @@ subprojects {
   val mavenLegalFiles = tasks.register<GenerateJarLegalFiles>("generateMavenLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
     sourceNotices.set(sourceNoticeNames)
-    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/main"))
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/main.zip"))
   }
   val javadocLegalFiles = tasks.register<GenerateJarLegalFiles>("generateJavadocLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
@@ -787,12 +794,12 @@ subprojects {
       }
     )
     javadocFiles.from(tasks.named<Javadoc>("javadoc").map { it.outputs.files.asFileTree.matching { include("legal/**") } })
-    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/javadoc"))
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/javadoc.zip"))
   }
   val bundledLegalFiles = tasks.register<GenerateJarLegalFiles>("generateBundledLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
     sourceNotices.set(sourceNoticeNames)
-    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/bundled"))
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/bundled.zip"))
   }
 
   fun configureBundledLegalFiles(configurations: Provider<List<Configuration>>, jars: Provider<FileCollection>) {
@@ -827,7 +834,7 @@ subprojects {
     }
     shadowJar.configure {
       dependsOn(bundledLegalFiles)
-      transform(LegalFilesTransformer(bundledLegalFiles.get().outputDirectory.get().asFile))
+      transform(LegalFilesTransformer(bundledLegalFiles.get().outputArchive.get().asFile))
     }
   }
   if (project.path == ":clients:cli") {
@@ -841,14 +848,8 @@ subprojects {
       name == "jar" && project.path == ":clients:cli" -> bundledLegalFiles
       else -> mavenLegalFiles
     }
-    from(legalFiles.flatMap { it.outputDirectory })
-    if (name == "jar" && project.path == ":clients:cli") {
-      // Keep the CLI's existing class/resource packaging and replace only its legal resources.
-      val generatedDirectory = legalFiles.get().outputDirectory.get().asFile.toPath()
-      eachFile {
-        if (GenerateJarLegalFiles.isLegalResource(path) && !file.toPath().startsWith(generatedDirectory)) exclude()
-      }
-    }
+    dependsOn(legalFiles)
+    from(provider { zipTree(legalFiles.get().outputArchive.get().asFile) })
   }
 
   if (project.name in listOf("web", "web-v2", "docs")) {

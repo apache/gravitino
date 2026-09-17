@@ -79,7 +79,8 @@ tasks.test {
         "cli" to ":clients:cli:jar",
         "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar",
         "aws" to ":bundles:aws-bundle:shadowJar",
-        "azure" to ":bundles:azure-bundle:shadowJar"
+        "azure" to ":bundles:azure-bundle:shadowJar",
+        "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar"
       )
     )
   }

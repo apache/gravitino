@@ -70,7 +70,12 @@ tasks.jar {
     .runtimeClasspath
     .get()
     .map(::zipTree)
-  from(dependencies)
+
+  @Suppress("UNCHECKED_CAST")
+  val isMavenLegalResource = rootProject.extra["isMavenLegalResource"] as (String) -> Boolean
+  from(dependencies) {
+    exclude { isMavenLegalResource(it.relativePath.pathString) }
+  }
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

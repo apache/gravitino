@@ -142,6 +142,23 @@ class TestRuntimeJarLegalFiles {
 
   @Test
   @Tag("maven-legal-audit")
+  void testCaseSensitiveDependencyLicensePathsArePreserved() throws IOException {
+    try (JarFile jar = artifact("icebergGcp")) {
+      String prefix =
+          jar.stream()
+              .map(JarEntry::getName)
+              .filter(name -> name.contains("/org.apache.iceberg/iceberg-gcp-bundle/"))
+              .filter(name -> name.endsWith("/META-INF/LICENSE"))
+              .findFirst()
+              .orElseThrow()
+              .replace("/META-INF/LICENSE", "/META-INF/");
+      assertTrue(readEntry(jar, prefix + "LICENSE").contains("Apache License"));
+      assertTrue(readEntry(jar, prefix + "license/LICENSE.boringssl.txt").contains("OpenSSL"));
+    }
+  }
+
+  @Test
+  @Tag("maven-legal-audit")
   void testCloudBundlesUseJsseWithoutTheOptionalLgplProvider() throws Exception {
     for (String name : Arrays.asList("aws", "azure")) {
       try (JarFile jar = artifact(name)) {

@@ -30,7 +30,9 @@ own `legal/` directory for its JavaScript and CSS licenses.
 
 Bundled JARs preserve dependency documents under
 `META-INF/licenses/<group>/<artifact>/<version>/`, retaining their original
-relative paths. This avoids collisions between different `LICENSE`, `NOTICE`,
+relative paths. Metadata is generated as a ZIP so case-sensitive paths such as
+`META-INF/LICENSE` and `META-INF/license/` survive on every host filesystem.
+This avoids collisions between different `LICENSE`, `NOTICE`,
 `LICENSE.txt`, and companion files. When a Gravitino runtime is bundled again,
 its dependency documents keep that location. Connector runtimes that exclude
 SLF4J classes also exclude the corresponding dependency documents.
@@ -79,6 +81,7 @@ a POM license name alone does not account for embedded third-party code.
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver. Optional external
   dependencies from Netty's omnibus NOTICE are not copied indiscriminately.
+  The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 
 ## Optional OpenSSL provider
