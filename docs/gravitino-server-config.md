@@ -434,16 +434,26 @@ frequently — this can measurably increase audit log volume; size log rotation 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
-`gravitino_audit.log` under the log directory, rotates daily and at 256 MB, gzips what it rotates,
-and deletes anything older than 30 days. Change the path or the retention there:
+`gravitino_audit.log` under the log directory and rotates it daily and at 256 MB into numbered gzip
+archives. It deletes archives older than 30 days and, oldest first, archives beyond 10 GB in total.
+Change the retention or the path there:
 
 ```properties
 # conf/log4j2.properties
+property.auditLogMaxTotalSize = 30GB
+appender.audit_file.strategy.delete.ifFileName.ifAny.ifLastModified.age = 90d
+
 appender.audit_file.fileName    = /var/log/gravitino/my_audit.log
 appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
-
-appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 90d
+# Deletion must look in the new directory and match the new archive names.
+appender.audit_file.strategy.delete.basePath = /var/log/gravitino
+appender.audit_file.strategy.delete.ifFileName.glob = my_audit_*.log.gz
 ```
+
+Earlier releases set the audit retention with
+`appender.audit_file.strategy.delete.ifAll.ifLastModified.age`. That key no longer exists. Log4j2
+rejects a configuration file that still sets it, and the server then writes no log files. See
+[Log rotation and retention](./how-to-install.md#log-rotation-and-retention) for all logs.
 
 Earlier releases configured the writer directly through `gravitino.audit.writer.file.*`. Those
 properties now do nothing, and `FileAuditWriter` logs a warning at startup if it finds any of them.
