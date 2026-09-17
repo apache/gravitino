@@ -46,6 +46,7 @@ import org.junit.jupiter.api.TestTemplate;
 
 public class TestTableColumnMetaService extends TestJDBCBackend {
 
+  private static final int WIDE_TABLE_COLUMN_COUNT = 5000;
   private static final String METALAKE_NAME = "metalake_for_table_column_test";
 
   @TestTemplate
@@ -147,6 +148,42 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertEquals(createdTable3.auditInfo(), retrievedTable3.auditInfo());
     Assertions.assertEquals(createdTable3.columns().size(), retrievedTable3.columns().size());
     compareTwoColumns(createdTable3.columns(), retrievedTable3.columns());
+  }
+
+  @TestTemplate
+  public void testInsertWideTableColumnsInBatches() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    List<ColumnEntity> columns = new ArrayList<>(WIDE_TABLE_COLUMN_COUNT);
+    for (int i = 0; i < WIDE_TABLE_COLUMN_COUNT; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("column_" + i)
+              .withPosition(i)
+              .withDataType(Types.IntegerType.get())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withAuditInfo(AUDIT_INFO)
+              .build());
+    }
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("wide_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    compareTwoColumns(createdTable.columns(), retrievedTable.columns());
   }
 
   @TestTemplate
