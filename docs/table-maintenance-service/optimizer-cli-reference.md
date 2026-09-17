@@ -244,6 +244,22 @@ Three job templates ship with the service, and they are complementary rather tha
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
+These templates set Iceberg Spark session and catalog classes, but they do not list an Iceberg Spark
+runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
+that runs with your Spark cluster is yours to supply. Provide a matching
+`iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
+commonly through `spark.jars` in `spark_conf`, or by installing it into `SPARK_HOME`. Align the
+artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
+in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
+Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
+Iceberg support.
+
+Optional template arguments are still listed as `--flag` + `{{placeholder}}` pairs. If `jobConf`
+omits a key (or leaves the placeholder unresolved), the flag remains on the process command line as
+a dangling argument (for example `--updater-options` with no value before `--spark-conf`). Callers
+and UIs should supply every placeholder they care about with an explicit value, including optional
+ones they intentionally disable or leave at a documented default, rather than omitting the key.
+
 ## Update Statistics
 
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.

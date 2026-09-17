@@ -67,6 +67,17 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 
 - A running Gravitino server with a metalake. The examples use `test`.
 - Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
+  `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
+  Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
+  stay under your control. A stock Spark distribution is not enough. Put a matching
+  `iceberg-spark-runtime-*` JAR on the job classpath — for example with `spark.jars` in
+  `spark_conf`, or by installing it into your Spark environment. Pick the artifact that matches
+  your Spark, Scala, and Iceberg versions. The jobs module is built and tested against Spark 3.5.x
+  and Iceberg 1.11.0 (for example
+  `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
+  Spark starts with an error naming the missing Iceberg classes. See
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.

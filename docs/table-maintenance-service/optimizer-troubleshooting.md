@@ -72,6 +72,22 @@ spark.hadoop.fs.defaultFS=file:///
 }
 ```
 
+**Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
+Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
+classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
+runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
+`gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
+Put a version-matched Iceberg Spark runtime on the job classpath, for example:
+
+```json
+{
+  "spark.jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+}
+```
+
+Use the Spark, Scala, and Iceberg versions that match your cluster. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+
 **Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
 
 ```text
