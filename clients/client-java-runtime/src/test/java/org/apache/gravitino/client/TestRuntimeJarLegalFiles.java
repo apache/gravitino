@@ -190,17 +190,7 @@ class TestRuntimeJarLegalFiles {
   @Test
   @Tag("maven-legal-audit")
   void testAllCloudBundlesExcludeWildFly() throws IOException {
-    for (String name :
-        Arrays.asList(
-            "aws",
-            "azure",
-            "gcp",
-            "aliyun",
-            "tencent",
-            "icebergAws",
-            "icebergAzure",
-            "icebergGcp",
-            "icebergAliyun")) {
+    for (String name : requiredProperty("cloudArtifacts").split(",")) {
       try (JarFile jar = artifact(name)) {
         assertFalse(
             jar.stream()

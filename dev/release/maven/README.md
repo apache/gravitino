@@ -116,8 +116,9 @@ JSSE fallback using the actual shaded bundles.
 
 The default client-runtime tests check its canonical documents and preservation
 of dependency legal resources, including Jackson's companion texts. The broader
-audit builds thin/source/Javadoc, CLI, nested filesystem runtime and all nine cloud
-bundle JARs. The build workflow runs this audit after publishing to Maven Local.
+audit builds thin/source/Javadoc, CLI, nested filesystem runtime and cloud bundle
+JARs present on the branch (nine on main; eight on 1.3, which has no Tencent bundle).
+The build workflow runs this audit after publishing to Maven Local.
 It also verifies both Web modules' own LICENSE.bin/NOTICE.bin in their WARs using
 the standard `war` tasks. These exercise the same legal-document configuration as
 `buildWar` without rebuilding JavaScript; they do not validate the Web application

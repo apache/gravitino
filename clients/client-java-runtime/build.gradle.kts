@@ -70,6 +70,18 @@ tasks.jar {
 tasks.test {
   val fullAudit = project.hasProperty("checkMavenLegalFiles")
   val artifactTasks = mutableMapOf("runtime" to ":clients:client-java-runtime:shadowJar")
+  // Older release branches may not contain every cloud module.
+  val cloudArtifactTasks = mapOf(
+    "aws" to ":bundles:aws-bundle:shadowJar",
+    "azure" to ":bundles:azure-bundle:shadowJar",
+    "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar",
+    "gcp" to ":bundles:gcp-bundle:shadowJar",
+    "aliyun" to ":bundles:aliyun-bundle:shadowJar",
+    "tencent" to ":bundles:tencent-bundle:shadowJar",
+    "icebergAws" to ":bundles:iceberg-aws-bundle:shadowJar",
+    "icebergAzure" to ":bundles:iceberg-azure-bundle:shadowJar",
+    "icebergAliyun" to ":bundles:iceberg-aliyun-bundle:shadowJar"
+  ).filterValues { findProject(it.substringBeforeLast(':')) != null }
   if (fullAudit) {
     artifactTasks.putAll(
       mapOf(
@@ -77,18 +89,10 @@ tasks.test {
         "sources" to ":api:sourcesJar",
         "javadoc" to ":api:javadocJar",
         "cli" to ":clients:cli:jar",
-        "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar",
-        "aws" to ":bundles:aws-bundle:shadowJar",
-        "azure" to ":bundles:azure-bundle:shadowJar",
-        "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar",
-        "gcp" to ":bundles:gcp-bundle:shadowJar",
-        "aliyun" to ":bundles:aliyun-bundle:shadowJar",
-        "tencent" to ":bundles:tencent-bundle:shadowJar",
-        "icebergAws" to ":bundles:iceberg-aws-bundle:shadowJar",
-        "icebergAzure" to ":bundles:iceberg-azure-bundle:shadowJar",
-        "icebergAliyun" to ":bundles:iceberg-aliyun-bundle:shadowJar"
+        "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar"
       )
     )
+    artifactTasks.putAll(cloudArtifactTasks)
   }
   if (fullAudit) {
     val icebergDependency = provider {
@@ -124,6 +128,7 @@ tasks.test {
   inputs.files(configurations.runtimeClasspath)
   doFirst {
     systemProperty("artifacts", artifacts.keys.joinToString(","))
+    systemProperty("cloudArtifacts", cloudArtifactTasks.keys.joinToString(","))
     artifacts.forEach { (name, artifact) ->
       systemProperty("artifact.$name", artifact.get().archiveFile.get().asFile.absolutePath)
     }
