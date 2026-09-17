@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Resolves policies for a metadata object from its effective tag assignments.
  *
- * <p>The resolver evaluates relation selectors, rejects mixed match results for the same policy,
- * filters disabled policies, and deduplicates repeated matches by policy entity ID.
+ * <p>The resolver evaluates relation selectors, filters disabled policies, and deduplicates
+ * repeated matches by policy entity ID.
  */
 public class ObjectPolicyResolver {
 
@@ -120,12 +120,6 @@ public class ObjectPolicyResolver {
       MatchState state =
           matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
       state.record(matches, tag.inherited().orElse(false));
-      if (state.hasConflict()) {
-        throw new IllegalStateException(
-            String.format(
-                "Policy %s has conflicting selector results for metadata object %s",
-                policy.name(), metadataObject));
-      }
     }
 
     return matchStates.values().stream()
@@ -151,7 +145,6 @@ public class ObjectPolicyResolver {
 
     private final PolicyEntity policy;
     private boolean matched;
-    private boolean unmatched;
     private boolean directMatch;
 
     private MatchState(PolicyEntity policy) {
@@ -160,12 +153,7 @@ public class ObjectPolicyResolver {
 
     private void record(boolean matches, boolean inherited) {
       matched |= matches;
-      unmatched |= !matches;
       directMatch |= matches && !inherited;
-    }
-
-    private boolean hasConflict() {
-      return matched && unmatched;
     }
 
     private boolean matched() {

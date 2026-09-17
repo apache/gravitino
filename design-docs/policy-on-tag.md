@@ -578,8 +578,9 @@ modify policy objects or object-policy relationships. The caller must be authori
 metadata object. Resolved policies for which the caller lacks `VIEW_POLICY` are filtered from both
 response shapes. `APPLY_POLICY` implies `VIEW_POLICY` for backward compatibility.
 With `details=true`, `inherited` is `true` when the policy is selected only through effective tags
-inherited from ancestor metadata objects. It is `false` when at least one matching policy-tag
-relation uses a tag assigned directly to the requested object.
+or legacy direct policy relations inherited from ancestor metadata objects. It is `false` when at
+least one matching policy-tag relation uses a tag assigned directly to the requested object, or
+when the legacy direct policy relation is on the requested object.
 
 A single policy can be associated with multiple effective tags on the same object. The resolver
 deduplicates by policy entity and current version, not by equivalent policy content. Different
@@ -601,21 +602,25 @@ the requested metadata object; if no direct relation exists, it searches parent 
 marks a parent result as inherited. The current post API atomically adds and removes direct policy
 relations on the requested metadata object using `policiesToAdd` and `policiesToRemove`.
 
-**New behavior:** `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies` becomes a
-read-only derived object policy lookup API. It does not read direct policy relations and does not
-modify policy objects or object-policy relationships.
+**Compatibility behavior:** During the compatibility window, object-policy GET APIs merge policies
+resolved from the requested object's effective tags with legacy direct policy relations on the
+requested object and its ancestors. Tag-derived policies are resolved exactly once for the
+requested object. Results are deduplicated by policy entity ID, and a direct result on the requested
+object takes precedence over an inherited result. The deprecated POST remains readable through the
+same GET APIs, so an acknowledged legacy write is not silently ignored.
 
-Direct object policy mutation and direct object-policy-detail APIs are removed from the target
-model:
+Direct object policy mutation and direct object-policy-detail APIs will be removed after the
+compatibility window:
 
 ```http
 GET  /api/metalakes/{metalake}/objects/{type}/{fullName}/policies/{policy}
 POST /api/metalakes/{metalake}/objects/{type}/{fullName}/policies
 ```
 
-**Migration impact:** Callers must use policy-to-tag association APIs and read object policies from
-`GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`. Object-side policy association
-calls must be replaced with tag assignment calls.
+**Migration impact:** Callers should move to policy-to-tag association APIs and read object policies
+from `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`. Object-side policy
+association calls must be replaced with tag assignment calls before the compatibility APIs are
+removed.
 
 ### Client API Changes
 
@@ -733,9 +738,9 @@ may still be covered by normal REST access logs or audit logs if the project rec
 deduplication. It does not make allow or deny decisions for row filters, column masks, or other
 engine-enforced policy types.
 
-The resolver must also detect mixed selector results for the same policy. This conflict exists when
-one metadata object has multiple effective tags associated with the same policy and evaluation of
-those policy-to-tag relation selectors produces at least one match and at least one non-match.
+When one policy is associated with multiple effective tags, each relation selector independently
+determines whether that relation selects the policy. The policy is selected if at least one relation
+matches. Non-matching relations do not negate matching relations.
 
 For example:
 
@@ -748,10 +753,9 @@ object effective tags:
   data_domain = ["risk"]       -> not match
 ```
 
-For this object, `mask_policy` is both selected and not selected through different effective tag
-relations, so the resolver detects a selector conflict. Relations for tags that are not in the
-object's effective tag set do not participate in this detection. This design identifies the
-conflict but does not define a precedence or merge rule for it.
+For this object, the `classification` relation selects `mask_policy`; the non-matching
+`data_domain` relation is ignored. Relations for tags that are not in the object's effective tag
+set do not participate in selection.
 
 For row filter and column mask policies, enforcement consumers must fail closed if multiple
 distinct effective policies of the same kind apply to the same evaluation target. The system should
@@ -781,7 +785,9 @@ Rules:
 2. If a system iceberg compaction policy appears in the object policy result, TMS uses its content.
 3. A system iceberg compaction policy uses `ALL_VALUES` for tag-presence behavior or a simple
    `TAG_VALUE` selector when maintenance behavior should depend on assignment values.
-4. TMS does not read direct object policy relations.
+4. During the compatibility window, TMS may receive legacy direct object policies through the
+   merged object-policy result. After direct policy APIs are retired, only tag-derived policies
+   remain.
 
 ### User Process
 
@@ -829,8 +835,8 @@ tag handling, direct-assignment override behavior, value grouping, and determini
 
 ### Migration Process
 
-This design is a breaking model change. The target runtime does not read direct object policy
-relations.
+This design is a breaking model change. The compatibility runtime reads direct object policy
+relations together with tag-derived policies; the target runtime does not read direct relations.
 
 1. Inventory existing direct policy relations from `policy_relation_meta`, including inherited
    relations that users depend on through parent metadata objects.

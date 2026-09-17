@@ -732,28 +732,30 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Direct object-policy relations are ignored by derived object-policy lookup.
+    // Legacy direct object-policy relations remain readable during the compatibility window.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policy3.name()}, null);
 
     String[] policies = policyManager.listPoliciesForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(1, policies.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies));
+    Assertions.assertEquals(2, policies.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies));
 
     PolicyEntity[] policiesInfo =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(1, policiesInfo.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1), ImmutableSet.copyOf(policiesInfo));
+    Assertions.assertEquals(2, policiesInfo.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1, policy3), ImmutableSet.copyOf(policiesInfo));
 
     String[] policies1 = policyManager.listPoliciesForMetadataObject(METALAKE, schemaObject);
-    Assertions.assertEquals(2, policies1.length);
+    Assertions.assertEquals(3, policies1.length);
     Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName2), ImmutableSet.copyOf(policies1));
+        ImmutableSet.of(policyName1, policyName2, policyName3), ImmutableSet.copyOf(policies1));
 
     PolicyEntity[] policiesInfo1 =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject);
-    Assertions.assertEquals(2, policiesInfo1.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo1));
+    Assertions.assertEquals(3, policiesInfo1.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policy1, policy2, policy3), ImmutableSet.copyOf(policiesInfo1));
 
     String[] policies2 = policyManager.listPoliciesForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(3, policies2.length);
@@ -837,7 +839,8 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Keep one legacy direct relation to verify derived object-policy lookup ignores it.
+    // Keep one legacy direct relation to verify it remains readable during the compatibility
+    // window.
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, catalogObject, new String[] {policyName3}, null);
 
@@ -875,9 +878,10 @@ public class TestPolicyManager {
                     METALAKE, catalogObject, "non_existent_policy"));
     Assertions.assertTrue(e.getMessage().contains("Policy non_existent_policy does not exist"));
 
-    Assertions.assertThrows(
-        NoSuchPolicyException.class,
-        () -> policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name()));
+    PolicyEntity directResult =
+        policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name());
+    Assertions.assertEquals(policy3, directResult);
+    Assertions.assertFalse(directResult.inherited().orElseThrow());
 
     Throwable e2 =
         Assertions.assertThrows(

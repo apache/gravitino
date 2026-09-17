@@ -130,7 +130,7 @@ public class TestObjectPolicyResolver {
   }
 
   @Test
-  public void testRejectMixedSelectorResults() throws Exception {
+  public void testSelectPolicyWhenAnySelectorMatches() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
     TagEntity classified = tag(2L, "classified", TagAssignment.ofValues("public"));
     PolicyEntity policy = policy(10L, "policy", true);
@@ -147,10 +147,7 @@ public class TestObjectPolicyResolver {
                 relation(domain, policy, TagValueSelector.of("finance")),
                 relation(classified, policy, TagValueSelector.of("pii"))));
 
-    IllegalStateException exception =
-        Assertions.assertThrows(
-            IllegalStateException.class, () -> resolver.resolve(METALAKE, OBJECT));
-    Assertions.assertTrue(exception.getMessage().contains("conflicting selector results"));
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
   }
 
   private static RelationalEntity<PolicyEntity> relation(
