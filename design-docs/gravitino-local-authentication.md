@@ -358,7 +358,7 @@ The password verification flow is:
 
 1. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
 2. If the user is disabled or has no `password_hash`, reject the request with **401**.
-3. If `gravitino.idp.basic.verifiedCredentialCacheEnabled` is true, check the in-process
+3. If `gravitino.authenticator.basic.credentialCacheEnabled` is true, check the in-process
    verified-credential cache for this username and password. On a hit whose cached password-hash
    fingerprint still matches the stored hash, skip re-derivation and accept the request. Failed
    authentications are never cached. When the cache is disabled (default), every request continues
@@ -373,9 +373,9 @@ The password verification flow is:
 
 Configuration:
 
-- `gravitino.idp.basic.verifiedCredentialCacheEnabled` (default `false`)
-- `gravitino.idp.basic.verifiedCredentialCacheExpirationSecs` (default `60`, used when enabled)
-- `gravitino.idp.basic.verifiedCredentialCacheMaxSize` (default `10000`, used when enabled)
+- `gravitino.authenticator.basic.credentialCacheEnabled` (default `false`)
+- `gravitino.authenticator.basic.credentialCacheExpirationSecs` (default `60`, used when enabled)
+- `gravitino.authenticator.basic.credentialCacheMaxSize` (default `10000`, used when enabled)
 
 ### 7.3 Group Resolution
 

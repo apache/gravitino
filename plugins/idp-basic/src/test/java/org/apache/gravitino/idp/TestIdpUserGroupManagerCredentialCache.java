@@ -63,9 +63,9 @@ public class TestIdpUserGroupManagerCredentialCache {
     h2Path = Files.createTempDirectory("gravitino_idp_cred_cache_h2_");
     passwordHasher = new CountingPasswordHasher(new Sha3512PasswordHasher());
     Config config = createH2Config(h2Path);
-    config.set(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_ENABLED, true);
-    config.set(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_EXPIRATION_SECS, 60L);
-    config.set(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_MAX_SIZE, 1000L);
+    config.set(IdpBasicConfigs.CREDENTIAL_CACHE_ENABLED, true);
+    config.set(IdpBasicConfigs.CREDENTIAL_CACHE_EXPIRATION_SECS, 60L);
+    config.set(IdpBasicConfigs.CREDENTIAL_CACHE_MAX_SIZE, 1000L);
     manager =
         IdpUserGroupManagerTestHelper.newManager(
             config, RandomIdGenerator.INSTANCE, passwordHasher);
@@ -150,7 +150,7 @@ public class TestIdpUserGroupManagerCredentialCache {
 
     Path disabledCachePath = Files.createTempDirectory("gravitino_idp_cred_cache_disabled_h2_");
     Config config = createH2Config(disabledCachePath);
-    config.set(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_ENABLED, false);
+    config.set(IdpBasicConfigs.CREDENTIAL_CACHE_ENABLED, false);
     CountingPasswordHasher hasher = new CountingPasswordHasher(new Sha3512PasswordHasher());
     try (IdpUserGroupManager noCacheManager =
         IdpUserGroupManagerTestHelper.newManager(config, RandomIdGenerator.INSTANCE, hasher)) {

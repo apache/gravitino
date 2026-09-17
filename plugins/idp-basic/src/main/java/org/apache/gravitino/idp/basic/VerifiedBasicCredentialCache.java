@@ -57,9 +57,9 @@ public final class VerifiedBasicCredentialCache implements Closeable {
    */
   public VerifiedBasicCredentialCache(Config config) {
     this(
-        config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_ENABLED),
-        config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_EXPIRATION_SECS),
-        config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_MAX_SIZE));
+        config.get(IdpBasicConfigs.CREDENTIAL_CACHE_ENABLED),
+        config.get(IdpBasicConfigs.CREDENTIAL_CACHE_EXPIRATION_SECS),
+        config.get(IdpBasicConfigs.CREDENTIAL_CACHE_MAX_SIZE));
   }
 
   @VisibleForTesting
