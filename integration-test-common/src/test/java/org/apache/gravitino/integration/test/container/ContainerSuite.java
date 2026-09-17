@@ -27,6 +27,7 @@ import com.github.dockerjava.api.model.Network.Ipam.Config;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
@@ -288,6 +289,27 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /**
+   * Files copied into the Gravitino plugin directory of the Trino container: the connector lib
+   * directory, plus every jar in the directory named by {@code
+   * GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS}, which lets a build add plugin jars that are not part of
+   * the connector itself.
+   */
+  private static Map<String, String> trinoPluginFilesToMount(String trinoConnectorLibDir) {
+    ImmutableMap.Builder<String, String> files = ImmutableMap.builder();
+    files.put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir);
+    String extraLibDir = System.getenv("GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS");
+    if (extraLibDir != null && !extraLibDir.isEmpty()) {
+      File[] jars = new File(extraLibDir).listFiles((dir, name) -> name.endsWith(".jar"));
+      for (File jar : jars == null ? new File[0] : jars) {
+        files.put(
+            TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR + "/" + jar.getName(),
+            jar.getAbsolutePath());
+      }
+    }
+    return files.build();
+  }
+
   public void startTrinoContainer(
       String trinoConfDir,
       String trinoConnectorLibDir,
@@ -315,12 +337,7 @@ public class ContainerSuite implements Closeable {
                           .put("host.docker.internal", "host-gateway")
                           .put(HiveContainer.HOST_NAME, hiveContainerIp)
                           .build())
-                  .withFilesToMount(
-                      ImmutableMap.<String, String>builder()
-                          .put(
-                              TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR,
-                              trinoConnectorLibDir)
-                          .build())
+                  .withFilesToMount(trinoPluginFilesToMount(trinoConnectorLibDir))
                   .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
                   .withTrinoConfDir(trinoConfDir)
                   .withMetalakeName(metalakeName)
