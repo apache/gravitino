@@ -31,6 +31,7 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
 
+  implementation(libs.caffeine)
   implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)

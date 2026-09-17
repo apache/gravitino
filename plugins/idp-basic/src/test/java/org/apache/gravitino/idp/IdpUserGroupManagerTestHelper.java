@@ -20,6 +20,7 @@ package org.apache.gravitino.idp;
 
 import java.lang.reflect.Constructor;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.storage.IdGenerator;
 
 /** Test-only helpers for {@link IdpUserGroupManager}. */
@@ -40,5 +41,23 @@ public final class IdpUserGroupManagerTestHelper {
         IdpUserGroupManager.class.getDeclaredConstructor(Config.class, IdGenerator.class);
     constructor.setAccessible(true);
     return constructor.newInstance(config, idGenerator);
+  }
+
+  /**
+   * Creates an isolated manager with a custom password hasher for verifying cache behavior.
+   *
+   * @param config The server configuration.
+   * @param idGenerator The id generator.
+   * @param passwordHasher The password hasher to use.
+   * @return A new manager instance.
+   */
+  public static IdpUserGroupManager newManager(
+      Config config, IdGenerator idGenerator, PasswordHasher passwordHasher)
+      throws ReflectiveOperationException {
+    Constructor<IdpUserGroupManager> constructor =
+        IdpUserGroupManager.class.getDeclaredConstructor(
+            Config.class, IdGenerator.class, PasswordHasher.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(config, idGenerator, passwordHasher);
   }
 }

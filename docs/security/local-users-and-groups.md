@@ -59,6 +59,8 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 | `gravitino.authenticators`                | Must be `basic`, and must not include `simple`                       | `basic`                                     |
 | `gravitino.server.rest.extensionPackages` | Registers the user and group management endpoints                    | `org.apache.gravitino.idp.web.rest.feature` |
 | `gravitino.authorization.serviceAdmins`   | Comma-separated usernames allowed to manage all IdP users and groups | `admin`                                     |
+| `gravitino.idp.basic.verifiedCredentialCacheExpirationSecs` | How long a successfully verified Basic credential may skip password re-derivation. `0` disables the cache. Failed logins are never cached. Password changes and disables take effect on the next request because authentication always reloads the user from storage. | `60` |
+| `gravitino.idp.basic.verifiedCredentialCacheMaxSize` | Maximum number of successfully verified Basic credentials retained in memory | `10000` |
 
 The local user store is incompatible with the `simple` authenticator, which is the server default and accepts the username a client supplies without checking a password. Both authenticators claim the same `Basic` authorization header, and the server uses the first one listed that claims it, so listing `simple` ahead of `basic` means passwords are never checked. Replace `simple` rather than adding to it.
 

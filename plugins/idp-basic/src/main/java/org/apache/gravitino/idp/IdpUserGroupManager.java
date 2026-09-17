@@ -32,6 +32,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
+import org.apache.gravitino.idp.basic.VerifiedBasicCredentialCache;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -62,6 +63,7 @@ public class IdpUserGroupManager implements Closeable {
   private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
+  private final VerifiedBasicCredentialCache verifiedCredentialCache;
 
   /**
    * Returns the shared built-in IdP user and group manager for the server process.
@@ -82,10 +84,16 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+    this(config, idGenerator, PasswordHasherFactory.create());
+  }
+
+  private IdpUserGroupManager(
+      Config config, IdGenerator idGenerator, PasswordHasher passwordHasher) {
     this.config = config;
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
-    this.passwordHasher = PasswordHasherFactory.create();
+    this.passwordHasher = passwordHasher;
+    this.verifiedCredentialCache = new VerifiedBasicCredentialCache(config);
     this.garbageCollector = new IdpGarbageCollector(config);
     this.garbageCollector.start();
   }
@@ -145,6 +153,7 @@ public class IdpUserGroupManager implements Closeable {
     checkCanDisableUser(username, enabled);
     String passwordHash = passwordHasher.hash(password);
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash, enabled));
+    verifiedCredentialCache.invalidateUser(username);
     return USER_SERVICE.getIdpUser(username);
   }
 
@@ -155,7 +164,11 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the user was removed, false if it did not exist.
    */
   public boolean removeUser(String username) {
-    return USER_SERVICE.deleteIdpUser(username);
+    boolean removed = USER_SERVICE.deleteIdpUser(username);
+    if (removed) {
+      verifiedCredentialCache.invalidateUser(username);
+    }
+    return removed;
   }
 
   /**
@@ -171,13 +184,22 @@ public class IdpUserGroupManager implements Closeable {
   public IdpUser authenticate(String username, String password) {
     try {
       IdpUser user = USER_SERVICE.getIdpUser(username);
-      if (!user.enabled()
-          || user.passwordHash() == null
-          || !passwordHasher.verify(password, user.passwordHash())) {
+      if (!user.enabled() || user.passwordHash() == null) {
+        verifiedCredentialCache.invalidateUser(username);
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
+      if (verifiedCredentialCache.isVerified(username, password, user.passwordHash())) {
+        return user;
+      }
+      if (!passwordHasher.verify(password, user.passwordHash())) {
+        throw new UnauthorizedException(
+            "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
+      }
+      verifiedCredentialCache.rememberSuccess(username, password, user.passwordHash());
       return user;
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
@@ -193,7 +215,11 @@ public class IdpUserGroupManager implements Closeable {
    * @throws NotFoundException if the user does not exist
    */
   public boolean changePassword(String username, String password) {
-    return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
+    boolean updated = USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
+    if (updated) {
+      verifiedCredentialCache.invalidateUser(username);
+    }
+    return updated;
   }
 
   /**
@@ -208,7 +234,11 @@ public class IdpUserGroupManager implements Closeable {
    */
   public boolean updateEnabled(String username, boolean enabled) {
     checkCanDisableUser(username, enabled);
-    return USER_SERVICE.updateIdpUserEnabled(username, enabled);
+    boolean updated = USER_SERVICE.updateIdpUserEnabled(username, enabled);
+    if (updated) {
+      verifiedCredentialCache.invalidateUser(username);
+    }
+    return updated;
   }
 
   /**
@@ -278,6 +308,7 @@ public class IdpUserGroupManager implements Closeable {
 
   @Override
   public void close() throws IOException {
+    verifiedCredentialCache.close();
     garbageCollector.close();
     relationalStorage.close();
   }

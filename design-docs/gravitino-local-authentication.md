@@ -357,9 +357,22 @@ The user verification flow is:
 The password verification flow is:
 
 1. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
-2. Read the stored `password_hash`.
-3. Verify the submitted password against `password_hash` using the configured hashing algorithm.
-4. If verification succeeds, authenticate the request; otherwise reject it.
+2. If the user is disabled or has no `password_hash`, reject the request with **401**.
+3. Check the in-process verified-credential cache for this username and password. On a hit whose
+   cached password-hash fingerprint still matches the stored hash, skip re-derivation and accept the
+   request. Failed authentications are never cached.
+4. Otherwise verify the submitted password against `password_hash` using the configured hashing
+   algorithm (SHA3-512 with `i=100000` by default). On success, remember the credential in the cache
+   for a short TTL so repeat Basic requests from the same client do not pay the full derivation cost
+   again. On failure, reject with **401**.
+5. Password changes, disables, and user removal invalidate that username's cache entry immediately
+   on the local node. Authentication always reloads the user from storage, so a changed hash or
+   disabled flag also fails closed on other nodes before TTL expiry.
+
+Configuration:
+
+- `gravitino.idp.basic.verifiedCredentialCacheExpirationSecs` (default `60`, `0` disables)
+- `gravitino.idp.basic.verifiedCredentialCacheMaxSize` (default `10000`)
 
 ### 7.3 Group Resolution
 
