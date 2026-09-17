@@ -260,6 +260,7 @@
    Checker Framework
    FastDoubleParser
    fast_float
+   Schubfach
    SLF4J API Module
 
    This product bundles various third-party components also under the
@@ -338,5 +339,6 @@
 
 
    For the FastDoubleParser license text, see licenses/FastDoubleParser.txt.
+   For the Schubfach license text, see licenses/Schubfach.txt.
    Third-party license texts for code included in FastDoubleParser are in
    licenses/FastDoubleParser-thirdparty.txt.
