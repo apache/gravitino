@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +28,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestLancePropertiesUtils {
+
+  /** Verifies the binary Lance format predicate's case and null handling. */
+  @Test
+  public void testIsLanceTableFormatIsCaseInsensitiveAndNullSafe() {
+    Assertions.assertTrue(LancePropertiesUtils.isLanceTableFormat(LANCE_TABLE_FORMAT));
+    Assertions.assertTrue(LancePropertiesUtils.isLanceTableFormat("LANCE"));
+    Assertions.assertFalse(LancePropertiesUtils.isLanceTableFormat("delta"));
+    Assertions.assertFalse(LancePropertiesUtils.isLanceTableFormat(null));
+  }
 
   @Test
   public void testGetLanceStorageOptions() {

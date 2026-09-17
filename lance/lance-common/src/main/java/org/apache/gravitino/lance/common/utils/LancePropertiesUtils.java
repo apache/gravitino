@@ -20,6 +20,7 @@
 package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
@@ -31,6 +32,16 @@ public final class LancePropertiesUtils {
 
   private LancePropertiesUtils() {
     // Utility class.
+  }
+
+  /**
+   * Returns whether the supplied table format identifies a Lance table.
+   *
+   * @param tableFormat the table format, which may be null
+   * @return true when the format is Lance, ignoring case
+   */
+  public static boolean isLanceTableFormat(String tableFormat) {
+    return LANCE_TABLE_FORMAT.equalsIgnoreCase(tableFormat);
   }
 
   /**
