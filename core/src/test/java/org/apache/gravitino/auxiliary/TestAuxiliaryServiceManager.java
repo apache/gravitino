@@ -113,6 +113,72 @@ public class TestAuxiliaryServiceManager {
   }
 
   @Test
+  public void testIsAuxServiceRegistered() throws Exception {
+    GravitinoAuxiliaryService auxService = mock(GravitinoAuxiliaryService.class);
+    IsolatedClassLoader isolatedClassLoader =
+        new IsolatedClassLoader(
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+
+    AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
+    AuxiliaryServiceManager spyAuxManager = spy(auxServiceManager);
+    doReturn(isolatedClassLoader).when(spyAuxManager).getIsolatedClassLoader(anyList());
+    doReturn(auxService).when(spyAuxManager).loadAuxService("iceberg-rest", isolatedClassLoader);
+
+    Assertions.assertFalse(spyAuxManager.isAuxServiceRegistered("iceberg-rest"));
+
+    spyAuxManager.serviceInit(
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                "gravitino.iceberg-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+                "/tmp")));
+
+    Assertions.assertTrue(spyAuxManager.isAuxServiceRegistered("iceberg-rest"));
+    Assertions.assertFalse(spyAuxManager.isAuxServiceRegistered("lance-rest"));
+  }
+
+  @Test
+  void testGetAuxServiceConfig() {
+    DummyConfig config =
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                "gravitino.iceberg-rest.host",
+                "irc-host",
+                "gravitino.iceberg-rest.httpPort",
+                "9001"));
+
+    Map<String, String> resolved =
+        AuxiliaryServiceManager.getAuxServiceConfig(config, "iceberg-rest");
+
+    Assertions.assertEquals("irc-host", resolved.get("host"));
+    Assertions.assertEquals("9001", resolved.get("httpPort"));
+  }
+
+  @Test
+  void testGetAuxServiceConfigHonorsDeprecatedPrefix() {
+    // gravitino.auxService.<name>.<key> is deprecated but still honored; the effective config a
+    // caller reads through this method must match what the service itself receives.
+    DummyConfig config =
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.host",
+                "irc-host"));
+
+    Map<String, String> resolved =
+        AuxiliaryServiceManager.getAuxServiceConfig(config, "iceberg-rest");
+
+    Assertions.assertEquals("irc-host", resolved.get("host"));
+  }
+
+  @Test
   void testAuxiliaryServiceConfigs() {
     Map<String, String> m =
         ImmutableMap.of(

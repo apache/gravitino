@@ -60,6 +60,14 @@ public class TestJcasbinAuthorizationCacheKeys {
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "COLUMN", "col1"),
         columnKey);
 
+    MetadataObject modelVersion =
+        MetadataObjects.of(
+            Arrays.asList("cat1", "sch1", "model1", "0"), MetadataObject.Type.MODEL_VERSION);
+    String modelVersionKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", modelVersion);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "MODEL", "model1", "MODEL_VERSION", "0"),
+        modelVersionKey);
+
     MetadataObject view =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.VIEW);
     String viewKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", view);

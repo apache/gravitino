@@ -91,20 +91,51 @@ public class TestSQLScripts extends TestJDBCBackend {
     for (List<File> scripts : versionScrips.values()) {
       dropAllTables();
       for (File scriptFile : scripts) {
-        List<String> ddls = extractStatements(scriptFile.toPath());
+        executeScript(scriptFile);
+      }
+    }
+  }
 
-        try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-          try (Connection connection = sqlSession.getConnection()) {
-            try (Statement statement = connection.createStatement()) {
-              for (String ddl : ddls) {
-                Assertions.assertDoesNotThrow(
-                    () -> statement.execute(ddl),
-                    "Failed to execute DDL in file " + scriptFile.getName() + "ddl: " + ddl);
-              }
-            }
-          }
-        }
+  @TestTemplate
+  public void testUpgradeSQLScripts() throws SQLException, IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
+    Path scriptDir = Path.of(gravitinoHome, "scripts", backendType.toLowerCase());
+    File[] scriptFiles = scriptDir.toFile().listFiles();
+    Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
+    Arrays.sort(scriptFiles, Comparator.comparing(File::getName));
+
+    Pattern upgradePattern =
+        Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
+    for (File upgradeScript : scriptFiles) {
+      Matcher upgradeMatcher = upgradePattern.matcher(upgradeScript.getName());
+      if (!upgradeMatcher.matches()) {
+        continue;
+      }
+
+      String fromVersion = upgradeMatcher.group(1);
+      File sourceSchema =
+          scriptDir
+              .resolve("schema-" + fromVersion + "-" + backendType.toLowerCase() + ".sql")
+              .toFile();
+      Assertions.assertTrue(
+          sourceSchema.isFile(), "No source schema found for " + upgradeScript.getName());
+      dropAllTables();
+      executeScript(sourceSchema);
+      executeScript(upgradeScript);
+    }
+  }
+
+  private void executeScript(File scriptFile) throws IOException, SQLException {
+    List<String> ddls = extractStatements(scriptFile.toPath());
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String ddl : ddls) {
+        Assertions.assertDoesNotThrow(
+            () -> statement.execute(ddl),
+            "Failed to execute DDL in file " + scriptFile.getName() + " ddl: " + ddl);
       }
     }
   }

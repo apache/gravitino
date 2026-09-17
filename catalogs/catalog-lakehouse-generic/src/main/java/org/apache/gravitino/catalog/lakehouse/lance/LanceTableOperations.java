@@ -50,6 +50,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
@@ -65,7 +66,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.service.TableMetaService;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
@@ -177,64 +178,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    Table table = super.loadTable(ident);
-    // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
-    // Gravitino metadata when the stored table is declared-only, empty, or configured to track
-    // Lance dataset versions.
-    boolean declaredOnly = isDeclaredOnly(table);
-    boolean emptySchema = table.columns().length == 0;
-    SchemaRefreshMode refreshMode = schemaRefreshMode();
-    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
-      return table;
-    }
-    // Empty-schema table that was already confirmed against a stored version: skip the dataset
-    // open. The stored lance.version acts as a "checked at this version" marker written on the
-    // first confirmation. VERSION_CHECK mode does not take this shortcut — it opens the dataset
-    // every time to compare the current version.
-    if (!declaredOnly
-        && emptySchema
-        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
-        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
-      return table;
-    }
-
-    String location = table.properties().get(Table.PROPERTY_LOCATION);
-    if (StringUtils.isBlank(location)) {
-      return table;
-    }
-
-    Map<String, String> storageOptions =
-        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
-    Column[] columns;
-    long datasetVersion;
-    try (Dataset dataset = openDataset(location, storageOptions)) {
-      datasetVersion = dataset.version();
-      if (refreshMode == SchemaRefreshMode.VERSION_CHECK
-          && !declaredOnly
-          && !isDatasetVersionChanged(table, datasetVersion)) {
-        return table;
-      }
-      columns = extractColumns(dataset.getSchema());
-    } catch (Exception e) {
-      LOG.debug(
-          "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
-          location,
-          ident,
-          e);
-      return table;
-    }
-
-    if (columns.length == 0) {
-      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
-      // can skip the dataset open (see the early-return above). Declared tables are excluded
-      // because their lance.declared flag is the authoritative "not yet written" signal.
-      if (!declaredOnly) {
-        return recordCheckedEmptyVersion(ident, datasetVersion);
-      }
-      return table;
-    }
-
-    return repairTableMetadata(ident, columns, datasetVersion);
+    return loadTableInternal(ident, false);
   }
 
   @Override
@@ -302,7 +246,21 @@ public class LanceTableOperations extends ManagedTableOperations {
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
-    Table loadedTable = super.loadTable(ident);
+    // Hydrate an empty stored schema before changing the dataset. Otherwise this method can write
+    // the latest lance.version while leaving columns empty, making that incomplete metadata look
+    // like a zero-column schema already confirmed at the same version.
+    Table loadedTable = loadTableInternal(ident, true);
+    boolean unhydratedSchema =
+        isDeclaredOnly(loadedTable)
+            || (loadedTable.columns().length == 0
+                && StringUtils.isBlank(
+                    loadedTable.properties().get(LanceConstants.LANCE_TABLE_VERSION)));
+    if (unhydratedSchema) {
+      throw new IllegalStateException(
+          "Cannot alter Lance table "
+              + ident
+              + " because its dataset schema is not initialized or could not be loaded");
+    }
     long version = handleLanceTableChange(loadedTable, changes);
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
@@ -346,7 +304,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to purge Lance dataset for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
   }
 
@@ -380,7 +338,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to drop Lance dataset for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
     }
   }
 
@@ -398,7 +356,7 @@ public class LanceTableOperations extends ManagedTableOperations {
           && e.getMessage().contains("Not found:")) {
         LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
       } else {
-        throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
+        throw ExceptionMessages.wrap("Failed to delete Lance dataset at " + location, e);
       }
     }
   }
@@ -476,7 +434,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create Lance dataset at location " + location, e);
+      throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
   }
 
@@ -489,6 +447,74 @@ public class LanceTableOperations extends ManagedTableOperations {
                         col.name(), col.dataType(), col.nullable()))
             .collect(Collectors.toList());
     return new Schema(fields);
+  }
+
+  private Table loadTableInternal(NameIdentifier ident, boolean forAlter) {
+    Table table = super.loadTable(ident);
+    // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
+    // Gravitino metadata when the stored table is declared-only, empty, or configured to track
+    // Lance dataset versions.
+    boolean declaredOnly = isDeclaredOnly(table);
+    boolean emptySchema = table.columns().length == 0;
+    SchemaRefreshMode refreshMode = schemaRefreshMode();
+    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+      return table;
+    }
+    // Empty-schema table that was already confirmed against a stored version: skip the dataset
+    // open during ordinary loads. An alter must recheck it so an externally initialized schema is
+    // hydrated before the latest dataset version is persisted.
+    if (!forAlter
+        && !declaredOnly
+        && emptySchema
+        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
+        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+      return table;
+    }
+
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(location)) {
+      return table;
+    }
+
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    Column[] columns;
+    long datasetVersion;
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      datasetVersion = dataset.version();
+      if (refreshMode == SchemaRefreshMode.VERSION_CHECK
+          && !declaredOnly
+          && !(forAlter && emptySchema)
+          && !isDatasetVersionChanged(table, datasetVersion)) {
+        return table;
+      }
+      columns = extractColumns(dataset.getSchema());
+    } catch (Exception e) {
+      if (forAlter) {
+        throw new IllegalStateException(
+            ExceptionMessages.withCause(
+                "Failed to load Lance schema before altering table " + ident, e),
+            e);
+      }
+      LOG.debug(
+          "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
+          location,
+          ident,
+          e);
+      return table;
+    }
+
+    if (columns.length == 0) {
+      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
+      // can skip the dataset open (see the early-return above). Declared tables are excluded
+      // because their lance.declared flag is the authoritative "not yet written" signal.
+      if (!declaredOnly) {
+        return recordCheckedEmptyVersion(ident, datasetVersion);
+      }
+      return table;
+    }
+
+    return repairTableMetadata(ident, columns, datasetVersion);
   }
 
   private SchemaRefreshMode schemaRefreshMode() {
@@ -554,37 +580,27 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException("Failed to repair table " + ident, e);
+      throw ExceptionMessages.illegalArgument("Failed to repair table " + ident, e);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to repair table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to repair table " + ident, e);
     }
   }
 
   /**
-   * Applies an idempotent update to the stored table, retrying when the optimistic-lock CAS is lost
-   * to a concurrent update. The repair-on-load path runs on every {@code loadTable}, so concurrent
-   * loads of the same table race on the version CAS; {@code store.update} surfaces the lost race as
-   * an {@link IOException} whose message starts with {@link
-   * TableMetaService#UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX}. Because the updater is idempotent, the
-   * loser sleeps a short randomized backoff (to avoid re-colliding), re-reads the latest (already
-   * repaired) entity, and retries instead of failing the whole load with a fatal error. Other IO
-   * failures (DB outage, serialization errors, etc.) are not conflicts and fail fast.
+   * Repairs stored table metadata and retries only when another repair wins the same race.
+   *
+   * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
+   * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
+   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
+   * retry here and are returned immediately.
    */
   private TableEntity updateTableWithCasRetry(
       NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
-    IOException lastConflict = null;
+    OptimisticLockException lastConflict = null;
     for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
-      } catch (IOException e) {
-        // Only retry when the update matched 0 rows (lost optimistic-lock CAS). Other IO failures
-        // (DB outage, serialization errors, etc.) should fail fast.
-        String message = e.getMessage();
-        if (message == null
-            || !message.startsWith(TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX)) {
-          throw e;
-        }
-
+      } catch (OptimisticLockException e) {
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
@@ -599,11 +615,13 @@ public class LanceTableOperations extends ManagedTableOperations {
         }
       }
     }
-    throw new IOException(
-        String.format(
-            "Failed to update table %s after %d optimistic-lock retries",
-            ident, REPAIR_UPDATE_MAX_ATTEMPTS),
-        lastConflict);
+    // Reaching here means every attempt lost to another writer. Keep the exception type so the
+    // caller still knows this is an OCC conflict, and add the attempt count for diagnosis.
+    throw new OptimisticLockException(
+        lastConflict,
+        "Failed to repair table %s after %d optimistic-lock attempts",
+        ident,
+        REPAIR_UPDATE_MAX_ATTEMPTS);
   }
 
   /**
@@ -665,9 +683,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException("Failed to record empty version for table " + ident, e);
+      throw ExceptionMessages.illegalArgument(
+          "Failed to record empty version for table " + ident, e);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to record empty version for table " + ident, e);
+      throw ExceptionMessages.wrap("Failed to record empty version for table " + ident, e);
     }
   }
 
@@ -792,7 +811,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException(
+      throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
     }
   }

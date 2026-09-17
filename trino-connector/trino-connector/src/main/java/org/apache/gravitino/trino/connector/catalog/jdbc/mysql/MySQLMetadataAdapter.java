@@ -56,7 +56,6 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import org.apache.logging.log4j.util.Strings;
 
 /** Transforming Apache Gravitino MySQL metadata to Trino. */
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -281,7 +280,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                 Arrays.stream(index.fieldNames())
                     .flatMap(Arrays::stream)
                     .collect(Collectors.toUnmodifiableList());
-            uniqueKeys.add(String.format("%s:%s", index.name(), Strings.join(columns, ',')));
+            uniqueKeys.add(String.format("%s:%s", index.name(), StringUtils.join(columns, ',')));
             break;
           default:
             throw new UnsupportedOperationException("Unsupported index type: " + index.type());

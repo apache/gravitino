@@ -27,6 +27,7 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.dto.responses.AuthMeResponse;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
@@ -39,6 +40,8 @@ import org.junit.jupiter.api.Test;
 public class TestAuthnOperations extends BaseOperationsTest {
 
   private static final String TEST_PRINCIPAL = "test-user";
+  private static final AccessControlDispatcher ACCESS_CONTROL_DISPATCHER =
+      mock(AccessControlDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -61,7 +64,8 @@ public class TestAuthnOperations extends BaseOperationsTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(AuthnOperations.class);
+    when(ACCESS_CONTROL_DISPATCHER.isServiceAdmin(TEST_PRINCIPAL)).thenReturn(true);
+    resourceConfig.register(new AuthnOperations(ACCESS_CONTROL_DISPATCHER));
     resourceConfig.register(ObjectMapperProvider.class);
     resourceConfig.register(
         new AbstractBinder() {
@@ -76,6 +80,8 @@ public class TestAuthnOperations extends BaseOperationsTest {
 
   @Test
   public void testGetAuthnMe() {
+    when(ACCESS_CONTROL_DISPATCHER.isServiceAdmin(TEST_PRINCIPAL)).thenReturn(true);
+
     Response resp = target("/authn/me").request().accept("application/vnd.gravitino.v1+json").get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -83,5 +89,19 @@ public class TestAuthnOperations extends BaseOperationsTest {
     AuthMeResponse authMeResponse = resp.readEntity(AuthMeResponse.class);
     Assertions.assertEquals(0, authMeResponse.getCode());
     Assertions.assertEquals(TEST_PRINCIPAL, authMeResponse.getPrincipal());
+    Assertions.assertTrue(authMeResponse.isServiceAdmin());
+  }
+
+  @Test
+  public void testGetAuthnMeForNonServiceAdmin() {
+    when(ACCESS_CONTROL_DISPATCHER.isServiceAdmin(TEST_PRINCIPAL)).thenReturn(false);
+
+    Response resp = target("/authn/me").request().accept("application/vnd.gravitino.v1+json").get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    AuthMeResponse authMeResponse = resp.readEntity(AuthMeResponse.class);
+    Assertions.assertEquals(TEST_PRINCIPAL, authMeResponse.getPrincipal());
+    Assertions.assertFalse(authMeResponse.isServiceAdmin());
   }
 }

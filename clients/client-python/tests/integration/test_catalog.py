@@ -87,12 +87,12 @@ class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
     def test_create_catalog(self):
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
-        self.assertEqual(
-            catalog.properties(),
+        self.assert_properties_equal(
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
             },
+            catalog.properties(),
         )
 
     def test_failed_create_catalog(self):
@@ -169,12 +169,12 @@ class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
         self.assertIsNotNone(catalog)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(catalog.comment(), self.catalog_comment)
-        self.assertEqual(
-            catalog.properties(),
+        self.assert_properties_equal(
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
             },
+            catalog.properties(),
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 

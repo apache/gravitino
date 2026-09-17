@@ -38,6 +38,7 @@ jetty = "9.4.58.v20250814"
 jersey = "2.41"
 mockito = "4.11.0"
 airlift-json = "237"
+airlift-log = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hive3 = "3.1.3"
@@ -67,14 +68,17 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
-# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
+# Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
-iceberg4spark34 = "1.11.0"
 iceberg4spark35 = "1.11.0"
+iceberg4spark40 = "1.11.0"
 paimon = '1.2.0'
+# spark33 and spark34 are pinned by modules other than the Spark connector for their own tests, so
+# they stay after the connector dropped 3.3 and 3.4; they say nothing about connector support.
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
+spark40 = "4.0.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
@@ -155,6 +159,7 @@ hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
 aliyun-sdk-oss = "3.10.2"
+tencentcloud-sdk-sts = "3.1.1239"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
@@ -196,7 +201,7 @@ junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-para
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
-slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
+slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version.ref = "slf4j" }
 log4j-slf4j2-impl = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
 log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
 log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
@@ -246,6 +251,7 @@ hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-
 hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
+airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log" }
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
@@ -353,6 +359,7 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
+tencentcloud-sdk-sts = { group = "com.tencentcloudapi", name = "tencentcloud-sdk-java-sts", version.ref = "tencentcloud-sdk-sts" }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 flinkjdbc18 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc18'}
 flinkjdbc119 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc119'}

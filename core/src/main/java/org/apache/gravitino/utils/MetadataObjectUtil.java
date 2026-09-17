@@ -58,11 +58,13 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
+          .put(MetadataObject.Type.MODEL_VERSION, Entity.EntityType.MODEL_VERSION)
           .put(MetadataObject.Type.TAG, Entity.EntityType.TAG)
           .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
           .put(MetadataObject.Type.JOB, Entity.EntityType.JOB)
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
+          .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
           .build();
 
@@ -126,12 +128,14 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
       case VIEW:
+      case SEMANTIC_MODEL:
       case CATALOG:
       case SCHEMA:
       case TABLE:
       case TOPIC:
       case FILESET:
       case COLUMN:
+      case MODEL_VERSION:
       case MODEL:
       case FUNCTION:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
@@ -231,59 +235,77 @@ public class MetadataObjectUtil {
           throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
         }
         NameIdentifierUtil.checkMetalake(identifier);
-        check(env.metalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.internalMetalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
         break;
 
       case CATALOG:
         NameIdentifierUtil.checkCatalog(identifier);
-        check(env.catalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
+        check(env.internalCatalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
         break;
 
       case SCHEMA:
         NameIdentifierUtil.checkSchema(identifier);
-        check(env.schemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
+        check(env.internalSchemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
         break;
 
       case FILESET:
         NameIdentifierUtil.checkFileset(identifier);
-        check(env.filesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
+        check(env.internalFilesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
         break;
 
       case TABLE:
         NameIdentifierUtil.checkTable(identifier);
-        check(env.tableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
+        check(env.internalTableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
         break;
 
       case COLUMN:
         NameIdentifierUtil.checkColumn(identifier);
         NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.tableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        check(env.internalTableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        break;
+
+      case MODEL_VERSION:
+        NameIdentifierUtil.checkModelVersion(identifier);
+        NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
+        check(env.internalModelDispatcher().modelExists(modelIdent), exceptionToThrowSupplier);
+        try {
+          int version = Integer.parseInt(object.name());
+          check(
+              env.internalModelDispatcher().modelVersionExists(modelIdent, version),
+              exceptionToThrowSupplier);
+        } catch (NumberFormatException e) {
+          check(
+              env.internalModelDispatcher().modelVersionExists(modelIdent, object.name()),
+              exceptionToThrowSupplier);
+        }
         break;
 
       case TOPIC:
         NameIdentifierUtil.checkTopic(identifier);
-        check(env.topicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
+        check(env.internalTopicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
         break;
 
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
-        check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        check(env.internalModelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
         break;
 
       case FUNCTION:
         NameIdentifierUtil.checkFunction(identifier);
-        check(env.functionDispatcher().functionExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.internalFunctionDispatcher().functionExists(identifier), exceptionToThrowSupplier);
         break;
 
       case VIEW:
         NameIdentifierUtil.checkView(identifier);
-        check(env.viewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
         break;
 
       case ROLE:
         AuthorizationUtils.checkRole(identifier);
         try {
-          env.accessControlDispatcher().getRole(metalake, object.fullName());
+          env.internalAccessControlDispatcher().getRole(metalake, object.fullName());
         } catch (NoSuchRoleException nsr) {
           throw exceptionToThrowSupplier.get();
         }
@@ -292,7 +314,7 @@ public class MetadataObjectUtil {
       case TAG:
         NameIdentifierUtil.checkTag(identifier);
         try {
-          env.tagDispatcher().getTag(metalake, object.fullName());
+          env.internalTagDispatcher().getTag(metalake, object.fullName());
         } catch (NoSuchTagException nsr) {
           throw exceptionToThrowSupplier.get();
         }
@@ -301,7 +323,7 @@ public class MetadataObjectUtil {
       case POLICY:
         NameIdentifierUtil.checkPolicy(identifier);
         try {
-          env.policyDispatcher().getPolicy(metalake, object.fullName());
+          env.internalPolicyDispatcher().getPolicy(metalake, object.fullName());
         } catch (NoSuchPolicyException nsr) {
           throw checkNotNull(exceptionToThrowSupplier).get();
         }
@@ -310,7 +332,7 @@ public class MetadataObjectUtil {
       case JOB:
         NameIdentifierUtil.checkJob(identifier);
         try {
-          env.jobOperationDispatcher().getJob(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJob(metalake, object.fullName());
         } catch (NoSuchJobException e) {
           throw exceptionToThrowSupplier.get();
         }
@@ -319,7 +341,7 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         NameIdentifierUtil.checkJobTemplate(identifier);
         try {
-          env.jobOperationDispatcher().getJobTemplate(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
           throw exceptionToThrowSupplier.get();
         }

@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -44,8 +45,6 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
-import org.apache.gravitino.SupportsExternalIdOperations;
-import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -65,11 +64,7 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore
-    implements EntityStore,
-        SupportsRelationOperations,
-        SupportsExternalIdOperations,
-        SupportsIdOperations,
-        SupportsEntityChangeLog {
+    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -178,7 +173,14 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
-    cache.put(e);
+    if (overwritten) {
+      // An overwrite is resolved by the database, which may keep the identity and version of the
+      // row it already had. Caching the copy handed in here would publish values the stored row
+      // does not carry, so the next read is served from the backend instead.
+      cache.invalidate(e.nameIdentifier(), e.type());
+    } else {
+      cache.put(e);
+    }
   }
 
   @Override
@@ -206,84 +208,6 @@ public class RelationalEntityStore
           cache.put(entity);
           return entity;
         });
-  }
-
-  @Override
-  public SupportsExternalIdOperations externalIdOperations() {
-    return this;
-  }
-
-  @Override
-  public SupportsIdOperations idOperations() {
-    return this;
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E getByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
-      throws NoSuchEntityException, IOException {
-    return backend.getByExternalId(ident, entityType);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
-    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
-    return updatedEntity;
-  }
-
-  @Override
-  public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
-      throws IOException {
-    NameIdentifier nameIdent = null;
-    try {
-      HasIdentifier entity = backend.getByExternalId(ident, entityType);
-      nameIdent = entity.nameIdentifier();
-      return backend.delete(nameIdent, entityType, false);
-    } catch (NoSuchEntityException e) {
-      LOGGER.warn(
-          "The entity to be deleted by external id does not exist in the store: {}", ident, e);
-      return false;
-    } finally {
-      if (nameIdent != null) {
-        cache.invalidate(nameIdent, entityType);
-      }
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E getById(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
-      throws NoSuchEntityException, IOException {
-    return backend.getById(ident, entityType);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E updateById(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    E updatedEntity = backend.updateById(ident, entityType, updater);
-    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
-    return updatedEntity;
-  }
-
-  @Override
-  public boolean deleteById(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    NameIdentifier nameIdent = null;
-    try {
-      HasIdentifier entity = backend.getById(ident, entityType);
-      nameIdent = entity.nameIdentifier();
-      return backend.delete(nameIdent, entityType, false);
-    } catch (NoSuchEntityException e) {
-      LOGGER.warn("The entity to be deleted by id does not exist in the store: {}", ident, e);
-      return false;
-    } finally {
-      if (nameIdent != null) {
-        cache.invalidate(nameIdent, entityType);
-      }
-    }
   }
 
   @Override
@@ -315,6 +239,20 @@ public class RelationalEntityStore
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Class<E> clazz,
+      Consumer<E> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } finally {
       cache.invalidate(ident, entityType);
     }
@@ -565,6 +503,8 @@ public class RelationalEntityStore
         return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
+      case POLICY_TAG_REL:
+        return Entity.EntityType.POLICY;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

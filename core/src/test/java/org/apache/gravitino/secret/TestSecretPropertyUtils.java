@@ -35,7 +35,8 @@ public class TestSecretPropertyUtils {
       Map<String, String> properties = Map.of("jdbc-user", "root");
       Map<String, SecretBinding> bindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      Map<String, String> entityProps = SecretPropertyUtils.copyEntityProperties(properties);
+      Map<String, String> entityProps =
+          SecretPropertyUtils.copyEntityProperties(properties, bindings, Map.of());
       List<SecretMaterial> writes =
           sm.assembleSecretMaterials(properties, entityProps, "catalog", 42L, bindings, Map.of());
       sm.writeSecrets(writes);
@@ -50,9 +51,17 @@ public class TestSecretPropertyUtils {
 
   @Test
   void testCopyEntityProperties() {
-    Assertions.assertTrue(SecretPropertyUtils.copyEntityProperties(null).isEmpty());
+    Assertions.assertNull(SecretPropertyUtils.copyEntityProperties(null, null, null));
+    Assertions.assertNull(SecretPropertyUtils.copyEntityProperties(null, Map.of(), Map.of()));
+
+    Map<String, SecretBinding> bindings =
+        Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+    Map<String, String> forSecrets = SecretPropertyUtils.copyEntityProperties(null, bindings, null);
+    Assertions.assertNotNull(forSecrets);
+    Assertions.assertTrue(forSecrets.isEmpty());
+
     Map<String, String> original = Map.of("a", "b");
-    Map<String, String> copy = SecretPropertyUtils.copyEntityProperties(original);
+    Map<String, String> copy = SecretPropertyUtils.copyEntityProperties(original, null, null);
     Assertions.assertEquals(original, copy);
     copy.put("c", "d");
     Assertions.assertFalse(original.containsKey("c"));
@@ -99,14 +108,54 @@ public class TestSecretPropertyUtils {
 
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
-      // All secret-URN entries, including keys also used by credential vending
+      // Secret-URN entries, including keys also used by credential vending
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
       Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
       Assertions.assertEquals("s3-secret-value", secrets.get("s3-secret-access-key"));
+      // Inline sensitive-named plaintext is also returned for getSecrets clients
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
       Assertions.assertFalse(secrets.containsKey("jdbc-user"));
       Assertions.assertFalse(secrets.containsKey("jdbc-url"));
       Assertions.assertFalse(secrets.containsKey("visible"));
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+    }
+  }
+
+  @Test
+  void testIsSensitivePropertyKey() {
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("s3-secret-access-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("S3_SECRET_ACCESS_KEY"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("oauth2.token"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("aws-access-key-id"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("credential-provider"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-name"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("gcs-service-account-file"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-user"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("warehouse"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(null));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(""));
+  }
+
+  @Test
+  void testBuildSecretsIncludesInlineSensitivePlaintext() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps =
+          Map.of(
+              "warehouse",
+              "s3://bucket/prefix",
+              "aws-region",
+              "us-east-2",
+              "s3-access-key-id",
+              "AKIA...",
+              "s3-secret-access-key",
+              "super-secret");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
+      Assertions.assertFalse(secrets.containsKey("warehouse"));
+      Assertions.assertFalse(secrets.containsKey("aws-region"));
     }
   }
 
@@ -125,6 +174,15 @@ public class TestSecretPropertyUtils {
     Assertions.assertEquals("override", merged.get("a"));
     Assertions.assertEquals("2", merged.get("b"));
     Assertions.assertTrue(SecretPropertyUtils.mergeProperties(null, null).isEmpty());
+  }
+
+  @Test
+  void testAssembleWithNullTargetWhenNoSecrets() {
+    try (SecretManager sm = memorySecretManager()) {
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(null, null, "schema", 1L, null, null);
+      Assertions.assertTrue(writes.isEmpty());
+    }
   }
 
   private static SecretManager memorySecretManager() {

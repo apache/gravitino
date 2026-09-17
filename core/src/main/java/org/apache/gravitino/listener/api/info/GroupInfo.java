@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.info;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Group;
 
@@ -30,7 +29,6 @@ import org.apache.gravitino.authorization.Group;
 public class GroupInfo {
   private final Long id;
   private final String name;
-  private final Optional<String> externalId;
   private List<String> roles;
 
   /**
@@ -41,7 +39,6 @@ public class GroupInfo {
   public GroupInfo(Group group) {
     this.id = Preconditions.checkNotNull(group.id(), "group id");
     this.name = group.name();
-    this.externalId = Optional.ofNullable(group.externalId());
     this.roles = group.roles();
   }
 
@@ -61,15 +58,6 @@ public class GroupInfo {
    */
   public String name() {
     return name;
-  }
-
-  /**
-   * Returns the external identifier of the group.
-   *
-   * @return The external identifier of the group, or empty if not set.
-   */
-  public Optional<String> externalId() {
-    return externalId;
   }
 
   /**

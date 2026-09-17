@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
 import java.util.Set;
@@ -31,12 +32,10 @@ import org.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLCo
 import org.apache.gravitino.trino.connector.catalog.jdbc.trino.TrinoClusterConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** This class use to create CatalogConnectorContext instance by given catalog. */
 public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
-  private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogConnectorFactory.class);
+  private static final Logger LOG = Logger.get(DefaultCatalogConnectorFactory.class);
 
   private static final String GLUE_CONNECTOR_PROVIDER_NAME = "glue";
   private static final String HIVE_CONNECTOR_PROVIDER_NAME = "hive";
@@ -72,7 +71,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
     catalogBuilders.put(
         ICEBERG_CONNECTOR_PROVIDER_NAME,
-        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
+        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter(config)));
     catalogBuilders.put(
         MYSQL_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));

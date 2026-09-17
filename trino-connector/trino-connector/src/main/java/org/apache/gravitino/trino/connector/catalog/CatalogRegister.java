@@ -22,7 +22,9 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
 import java.io.File;
@@ -35,12 +37,14 @@ import java.sql.Statement;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class dynamically register the Catalog managed by Apache Gravitino into Trino using Trino
@@ -48,7 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CatalogRegister {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogRegister.class);
+  private static final Logger LOG = Logger.get(CatalogRegister.class);
 
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
@@ -58,25 +62,64 @@ public class CatalogRegister {
   private static final String SSL_VERIFICATION_NONE = "NONE";
   private static final Set<String> SSL_VERIFICATION_MODES =
       ImmutableSet.of(SSL_VERIFICATION_FULL, SSL_VERIFICATION_CA, SSL_VERIFICATION_NONE);
+  // Best-effort keyword match on the property key; it cannot catch a sensitive value under a name
+  // that doesn't contain one of these words. Kept as a single constant so the SQL and JSON
+  // variants below can't drift apart when a keyword is added.
+  private static final String SECRET_KEY_NAME_PATTERN =
+      "credential|token|secret|password|passphrase|passcode";
+
+  private static final Pattern SECRET_PROPERTY_PATTERN =
+      Pattern.compile(
+          "\"([^\"]*(?:" + SECRET_KEY_NAME_PATTERN + ")[^\"]*)\"\\s*=\\s*'([^']*)'",
+          Pattern.CASE_INSENSITIVE);
+
+  // Matches "key":"value" style secret assignments inside the serialized GravitinoCatalog JSON
+  // that GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG carries (e.g. "jdbc-password":"..." or
+  // "s3-secret-key":"..."), which SECRET_PROPERTY_PATTERN's SQL-assignment shape does not match.
+  private static final Pattern SECRET_JSON_PROPERTY_PATTERN =
+      Pattern.compile(
+          "\"([^\"]*(?:" + SECRET_KEY_NAME_PATTERN + ")[^\"]*)\"\\s*:\\s*\"([^\"]*)\"",
+          Pattern.CASE_INSENSITIVE);
 
   private Connection connection;
-  private boolean isStarted = false;
+  private volatile String lastConnectionError;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
 
-  boolean isTrinoStarted() {
-    if (isStarted) {
-      return true;
-    }
-
+  /**
+   * Whether the Trino server currently answers over the connector's own JDBC connection.
+   *
+   * <p>Probed on every call rather than latched once: this gates a load cycle, and the connection
+   * is created lazily, so a coordinator that was reachable when the connector started can be gone
+   * by the next cycle. Answering from a past probe would keep the loop issuing statements over a
+   * connection that no longer works, and would report each catalog failing separately instead of
+   * the one reason they all did.
+   *
+   * @return true if the Trino server answered
+   */
+  boolean isTrinoReachable() {
     String command = "SELECT 1";
     try (Statement statement = connection.createStatement()) {
-      isStarted = statement.execute(command);
-      return isStarted;
+      boolean reachable = statement.execute(command);
+      lastConnectionError = null;
+      return reachable;
     } catch (Exception e) {
-      LOG.warn("Trino server is not started: {}", e.getMessage());
+      // Keep the reason: wrong credentials, a wrong port and a coordinator that is still booting
+      // are indistinguishable to the caller otherwise, and only the first two are actionable.
+      lastConnectionError = e.getMessage() == null ? e.getClass().getName() : e.getMessage();
+      LOG.warn("The Trino server is not reachable: %s", lastConnectionError);
       return false;
     }
+  }
+
+  /**
+   * Retrieves the error from the last failed attempt to reach the Trino server.
+   *
+   * @return the error message, null if the Trino server was reached
+   */
+  @Nullable
+  String getLastConnectionError() {
+    return lastConnectionError;
   }
 
   /**
@@ -182,13 +225,13 @@ public class CatalogRegister {
     Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
     if (!extraProperties.isEmpty()) {
       // Log the names only, the values may contain credentials.
-      LOG.debug("Applying extra Trino JDBC properties: {}", extraProperties.keySet());
+      LOG.debug("Applying extra Trino JDBC properties: %s", extraProperties.keySet());
       extraProperties.keySet().stream()
           .filter(key -> key.startsWith("SSL") && properties.containsKey(key))
           .forEach(
               key ->
                   LOG.warn(
-                      "Extra Trino JDBC property '{}' overrides the TLS setting derived from the "
+                      "Extra Trino JDBC property '%s' overrides the TLS setting derived from the "
                           + "dedicated configuration and is applied without validation",
                       key));
       properties.putAll(extraProperties);
@@ -302,15 +345,74 @@ public class CatalogRegister {
     }
   }
 
-  private String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
+  @VisibleForTesting
+  void setConfigForTesting(GravitinoConfig config) {
+    this.config = config;
+  }
+
+  @VisibleForTesting
+  String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
       throws Exception {
+    GravitinoCatalog catalogToRegister =
+        IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(gravitinoCatalog, config);
     return String.format(
         "CREATE CATALOG %s USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s', %s)",
         name,
         GRAVITINO_DYNAMIC_CONNECTOR,
         GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG,
-        GravitinoCatalog.toJson(gravitinoCatalog),
+        GravitinoCatalog.toJson(catalogToRegister),
         config.toCatalogConfig());
+  }
+
+  /**
+   * Renders a throwable, stack trace and cause chain included, with every secret it carries masked.
+   *
+   * <p>Logging a throwable directly would print the driver's own message, which for a failed CREATE
+   * CATALOG can hold the credentials the statement embedded. Rendering it here first is what makes
+   * that impossible, and it leaves the exception itself untouched. Cause cycles are handled by the
+   * JDK's own stack trace printer.
+   *
+   * @param e the throwable to render
+   * @return the rendered throwable with every secret value replaced
+   */
+  public static String describe(Throwable e) {
+    return redactSecrets(Throwables.getStackTraceAsString(e));
+  }
+
+  /**
+   * Masks the values of the secret bearing properties of a CREATE CATALOG statement, in both its
+   * SQL assignments and the catalog JSON it carries.
+   *
+   * <p>Applied where a message is rendered for a user or a log rather than to the exceptions
+   * themselves, so that the original failure keeps its type and its cause chain.
+   *
+   * @param createCatalogCommand the text to redact
+   * @return the text with every secret value replaced
+   */
+  public static String redactSecrets(String createCatalogCommand) {
+    return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
+  }
+
+  private static String redactSqlSecrets(String createCatalogCommand) {
+    Matcher matcher = SECRET_PROPERTY_PATTERN.matcher(createCatalogCommand);
+    StringBuffer redacted = new StringBuffer();
+    while (matcher.find()) {
+      matcher.appendReplacement(
+          redacted, Matcher.quoteReplacement("\"" + matcher.group(1) + "\"='***'"));
+    }
+    matcher.appendTail(redacted);
+    return redacted.toString();
+  }
+
+  private static String redactJsonSecrets(String createCatalogCommand) {
+    Matcher matcher = SECRET_JSON_PROPERTY_PATTERN.matcher(createCatalogCommand);
+    StringBuffer redacted = new StringBuffer();
+    while (matcher.find()) {
+      matcher.appendReplacement(
+          redacted, Matcher.quoteReplacement("\"" + matcher.group(1) + "\":\"***\""));
+    }
+    matcher.appendTail(redacted);
+    return redacted.toString();
   }
 
   private String generateDropCatalogCommand(String name) {
@@ -349,12 +451,16 @@ public class CatalogRegister {
       }
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
       executeSql(createCatalogCommand);
-      LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
+      LOG.info("Register catalog %s successfully: %s", name, redactSecrets(createCatalogCommand));
     } catch (SQLException e) {
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
+      // Some JDBC drivers echo the failing statement back in their error message; redact it the
+      // same way the retry-loop log does, so a syntax or duplicate-catalog error on a CREATE
+      // CATALOG statement never surfaces its embedded credentials to the caller.
+      String message = e.getMessage() == null ? e.toString() : redactSecrets(e.getMessage());
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
-      LOG.error(message);
+      LOG.error("%s%n%s", message, describe(e));
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -384,7 +490,7 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Failed to execute command: {}", showCatalogCommand, e);
+          LOG.warn(e, "Failed to execute command: %s", showCatalogCommand);
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
@@ -407,17 +513,20 @@ public class CatalogRegister {
           statement.execute(sql);
           return;
         } catch (SQLException e) {
+          // Fail fast: the statement was rejected, so retrying it would only repeat the same
+          // rejection. The exception is passed on untouched, and the redaction happens where its
+          // message is rendered.
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Failed to execute command: {}", sql, e);
+          LOG.warn("Failed to execute command: %s%n%s", redactSecrets(sql), describe(e));
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
       throw failedException;
     } catch (Exception e) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to execute query: " + sql, e);
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to execute query", e);
     }
   }
 
@@ -429,15 +538,15 @@ public class CatalogRegister {
   public void unregisterCatalog(String name) {
     try {
       if (!checkCatalogExist(name)) {
-        LOG.warn("Catalog {} does not exist", name);
+        LOG.warn("Catalog %s does not exist", name);
         return;
       }
       String dropCatalogCommand = generateDropCatalogCommand(name);
       executeSql(dropCatalogCommand);
-      LOG.info("Unregister catalog {} successfully: {}", name, dropCatalogCommand);
+      LOG.info("Unregister catalog %s successfully: %s", name, dropCatalogCommand);
     } catch (Exception e) {
       String message = String.format("Failed to unregister catalog %s", name);
-      LOG.error(message);
+      LOG.error(e, message);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -449,7 +558,7 @@ public class CatalogRegister {
         connection.close();
       }
     } catch (SQLException e) {
-      LOG.error("Failed to close connection", e);
+      LOG.error(e, "Failed to close connection");
     }
   }
 }

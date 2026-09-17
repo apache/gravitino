@@ -422,4 +422,29 @@ public class TestDataSourceUrlValidation {
       dataSource.close();
     }
   }
+
+  @Test
+  public void testMissingDriverGivesClearError() {
+    // A driver that is not on the classpath must fail fast at catalog creation with an actionable
+    // message naming the driver, not a raw ClassNotFoundException surfaced later on first use.
+    // Use a driver class that is guaranteed absent so the assertion does not depend on which
+    // vendor jars happen to be present.
+    String missingDriver = "com.example.NonExistentJdbcDriver";
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), missingDriver);
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertTrue(
+        gre.getMessage().contains(missingDriver),
+        "message should name the missing driver: " + gre.getMessage());
+    Assertions.assertTrue(
+        gre.getMessage().contains("was not found"),
+        "message should state the driver was not found: " + gre.getMessage());
+    Assertions.assertInstanceOf(ClassNotFoundException.class, gre.getCause());
+  }
 }

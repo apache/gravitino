@@ -22,11 +22,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,7 +48,10 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.lock.LockManager;
@@ -64,7 +69,7 @@ public class TestSchemaHookDispatcher {
   private SchemaDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
-  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  private BaseCatalog<?> mockCatalog;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
@@ -76,10 +81,10 @@ public class TestSchemaHookDispatcher {
     mockDispatcher = mock(SchemaDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
-    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
-    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    mockCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Tests in this class that rely on the singleton catalogManager always go through
     // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
     // because it Preconditions-checks for non-null and would fail when GravitinoEnv has not been
@@ -88,7 +93,8 @@ public class TestSchemaHookDispatcher {
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     savedLockManager =
         (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     // createSchema now acquires a catalog-level tree lock, so wire up a real LockManager.
     FieldUtils.writeField(
@@ -99,7 +105,7 @@ public class TestSchemaHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", savedLockManager, true);
   }
@@ -116,7 +122,7 @@ public class TestSchemaHookDispatcher {
   public void testCreateSchemaThrowsWhenSetOwnerFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -127,20 +133,24 @@ public class TestSchemaHookDispatcher {
             RuntimeException.class,
             () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).createSchema(any(), any(), any());
+    verify(mockDispatcher).createSchema(any(), any(), any(), any(), any());
+    // Align with FilesetHookDispatcher / #12366: do not drop the schema when setOwner fails.
+    verify(mockDispatcher, never()).dropSchema(any(), anyBoolean());
   }
 
   @Test
   public void testCreateSchemaSetsOwnerWithNormalizedIdentifier() throws Exception {
     // Use a case-insensitive capability so the schema name is normalized to lower case before
     // setOwners is called, mirroring what NormalizeDispatcher would do for the manager.
-    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+    SchemaDispatcher normalizedDispatcher =
+        new SchemaNormalizeDispatcher(hookDispatcher, mockCatalogManager);
+    normalizedDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
     List<MetadataObject> owned = captureOwnedObjects();
     Assertions.assertEquals(1, owned.size(), "A flat schema only assigns ownership to the leaf");
@@ -163,11 +173,11 @@ public class TestSchemaHookDispatcher {
   public void testCreateHierarchicalSchemaOwnsNewAncestors() throws Exception {
     // A capability that permits hierarchical (":"-separated) schema names so the hierarchical name
     // is not rejected during normalization.
-    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+    when(mockCatalog.capability()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // No ancestor exists yet, so creating "A:B:C" auto-creates "A" and "A:B".
     when(mockDispatcher.schemaExists(any())).thenReturn(false);
 
@@ -183,11 +193,11 @@ public class TestSchemaHookDispatcher {
 
   @Test
   public void testCreateHierarchicalSchemaKeepsExistingAncestorOwner() throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+    when(mockCatalog.capability()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // "A" already exists (and has its own owner); only "A:B" and the leaf are newly created.
     NameIdentifier existingA = NameIdentifier.of("test_metalake", "test_catalog", "A");
     when(mockDispatcher.schemaExists(any())).thenReturn(false);
@@ -201,6 +211,28 @@ public class TestSchemaHookDispatcher {
         Arrays.asList("A:B", "A:B:C"),
         ownedNames,
         "Pre-existing ancestor 'A' must keep its owner; only newly-created schemas are claimed");
+  }
+
+  @Test
+  public void testDropSchemaKeepsPrivilegesWhenExternalDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      any(NameIdentifier.class), any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hookDispatcher.dropSchema(ident, false));
+
+      // Nothing was dropped, so the schema that is still registered keeps its privileges.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
   }
 
   @Test

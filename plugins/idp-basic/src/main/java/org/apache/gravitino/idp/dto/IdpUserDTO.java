@@ -31,6 +31,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.AuditDTO;
 
 /** Represents a built-in IdP user Data Transfer Object (DTO). */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -41,18 +42,26 @@ public class IdpUserDTO {
   @JsonProperty("name")
   private String name;
 
+  @JsonProperty("enabled")
+  private boolean enabled = true;
+
   @JsonProperty("groups")
   @JsonSetter(nulls = Nulls.AS_EMPTY)
   private List<String> groups = Collections.emptyList();
+
+  @JsonProperty("audit")
+  private AuditDTO audit;
 
   /**
    * Creates a new instance of IdpUserDTO.
    *
    * @param name The name of the built-in IdP user DTO.
+   * @param enabled Whether the built-in IdP user is enabled.
    * @param groups The groups of the built-in IdP user DTO.
+   * @param audit The audit information of the built-in IdP user DTO.
    */
   @Builder(setterPrefix = "with")
-  protected IdpUserDTO(String name, List<String> groups) {
+  protected IdpUserDTO(String name, Boolean enabled, List<String> groups, AuditDTO audit) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     if (groups != null) {
       groups.forEach(
@@ -62,7 +71,9 @@ public class IdpUserDTO {
                   "groups cannot contain null or empty group names"));
     }
     this.name = name;
+    this.enabled = enabled == null || enabled;
     this.groups = groups == null ? Collections.emptyList() : groups;
+    this.audit = audit;
   }
 
   /**
@@ -73,11 +84,25 @@ public class IdpUserDTO {
   }
 
   /**
+   * @return Whether the built-in IdP user is enabled.
+   */
+  public boolean enabled() {
+    return enabled;
+  }
+
+  /**
    * The groups of the built-in IdP user. A user can belong to multiple groups.
    *
    * @return The groups of the built-in IdP user.
    */
   public List<String> groups() {
     return groups;
+  }
+
+  /**
+   * @return The audit information of the built-in IdP user DTO.
+   */
+  public AuditDTO audit() {
+    return audit;
   }
 }

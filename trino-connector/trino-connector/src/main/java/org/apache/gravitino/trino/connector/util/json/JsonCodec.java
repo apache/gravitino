@@ -32,6 +32,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.google.common.annotations.VisibleForTesting;
 import io.airlift.json.RecordAutoDetectModule;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockEncodingSerde;
@@ -54,8 +55,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for JSON serialization and deserialization in the Gravitino Trino connector.
@@ -63,7 +62,7 @@ import org.slf4j.LoggerFactory;
  */
 public class JsonCodec {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonCodec.class);
+  private static final Logger LOG = Logger.get(JsonCodec.class);
   private static volatile ObjectMapper mapper;
   private static volatile Type jsonType;
 
@@ -191,7 +190,7 @@ public class JsonCodec {
 
       try {
         Object instance = ctor.newInstance(args);
-        LOG.debug("Instantiated BlockEncodingManager with fallback constructor {}", ctor);
+        LOG.debug("Instantiated BlockEncodingManager with fallback constructor %s", ctor);
         return instance;
       } catch (ReflectiveOperationException | RuntimeException e) {
         lastError =

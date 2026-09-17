@@ -25,8 +25,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
-/** Utility identifier parser for Lance namespace/table string IDs. */
-class ObjectIdentifier {
+/**
+ * Utility identifier parser for Lance namespace/table string IDs.
+ *
+ * <p>A Lance identifier is a single string whose levels are joined by a delimiter, for example
+ * {@code catalog$schema}. An empty string denotes the root namespace.
+ */
+public class ObjectIdentifier {
 
   private final List<String> levels;
 
@@ -34,7 +39,14 @@ class ObjectIdentifier {
     this.levels = levels;
   }
 
-  static ObjectIdentifier of(String id, String delimiterRegex) {
+  /**
+   * Parses a Lance identifier.
+   *
+   * @param id the identifier, an empty string denotes the root namespace.
+   * @param delimiterRegex the regular expression matching the level delimiter.
+   * @return the parsed identifier.
+   */
+  public static ObjectIdentifier of(String id, String delimiterRegex) {
     Preconditions.checkArgument(id != null, "Identifier cannot be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(delimiterRegex), "Delimiter regex cannot be blank");
@@ -50,15 +62,31 @@ class ObjectIdentifier {
     return new ObjectIdentifier(parsedLevels);
   }
 
-  int levels() {
+  /**
+   * Returns the number of levels in the identifier.
+   *
+   * @return the number of levels, {@code 0} for the root namespace.
+   */
+  public int levels() {
     return levels.size();
   }
 
-  String levelAtListPos(int index) {
+  /**
+   * Returns the level at the given position.
+   *
+   * @param index the zero-based position of the level.
+   * @return the level name at the given position.
+   */
+  public String levelAtListPos(int index) {
     return levels.get(index);
   }
 
-  List<String> listStyleId() {
+  /**
+   * Returns the identifier levels as an immutable list.
+   *
+   * @return the identifier levels, from the outermost to the innermost.
+   */
+  public List<String> listStyleId() {
     return Collections.unmodifiableList(levels);
   }
 }

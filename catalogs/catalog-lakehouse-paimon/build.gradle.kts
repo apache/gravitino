@@ -28,6 +28,14 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
+val s3aTestRuntime by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
+configurations.testRuntimeOnly {
+  extendsFrom(s3aTestRuntime)
+}
 
 dependencies {
   compileOnly(project(":api"))
@@ -210,8 +218,42 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
+  // Keep optional Hadoop S3A dependencies available only to tests.
+  s3aTestRuntime(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+val s3aTestLibDirectory =
+  "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
+val copyS3ATestDependencies =
+  tasks.register("copyS3ATestDependencies") {
+    inputs.files(s3aTestRuntime)
+    outputs.files(
+      provider {
+        s3aTestRuntime.files.filter {
+          it.name.startsWith("hadoop-aws-") || it.name.startsWith("aws-java-sdk-bundle-")
+        }.map { file("$s3aTestLibDirectory/${it.name}") }
+      }
+    )
+    // Copy tasks targeting the distribution depend on cleanDistributionPackage. Test setup
+    // must preserve the existing deployment, so copy the optional jars in a regular task.
+    doLast {
+      copy {
+        from(s3aTestRuntime) {
+          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+        }
+        into(s3aTestLibDirectory)
+      }
+    }
+  }
+val cleanS3ATestDependencies =
+  tasks.register<Delete>("cleanS3ATestDependencies") {
+    delete(
+      fileTree(s3aTestLibDirectory) {
+        include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+      }
+    )
+  }
 
 tasks {
   register("runtimeJars", Copy::class) {
@@ -265,6 +307,11 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+  }
+
+  if (project.properties["testMode"] == "deploy") {
+    dependsOn(copyS3ATestDependencies)
+    finalizedBy(cleanS3ATestDependencies)
   }
 }
 

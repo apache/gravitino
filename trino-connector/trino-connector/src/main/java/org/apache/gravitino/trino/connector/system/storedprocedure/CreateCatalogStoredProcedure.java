@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.system.storedprocedure;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.type.MapType;
@@ -36,9 +37,8 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stored procedure implementation for creating a new catalog in Gravitino.
@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * <p>This procedure allows creating a new catalog with specified properties and provider.
  */
 public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
-  private static final Logger LOG = LoggerFactory.getLogger(CreateCatalogStoredProcedure.class);
+  private static final Logger LOG = Logger.get(CreateCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -115,14 +115,15 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
               catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
       catalogConnectorManager.loadMetalakeSync();
-      if (!catalogConnectorManager.catalogConnectorExist(
-          catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+      String trinoCatalogName = catalogConnectorManager.getTrinoCatalogName(metalake, catalogName);
+      if (!catalogConnectorManager.catalogConnectorExist(trinoCatalogName)) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-            "Create catalog failed due to the loading process fails");
+            "Create catalog failed due to the loading process fails. "
+                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
 
-      LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
+      LOG.info("Create catalog %s in metalake %s successfully.", catalogName, metalake);
 
     } catch (NoSuchMetalakeException e) {
       throw new TrinoException(
@@ -133,9 +134,14 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
           GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS,
           "Catalog " + NameIdentifier.of(metalake, catalogName) + " already exists in the server.");
     } catch (Exception e) {
+      // The failure can come from a CREATE CATALOG the load loop ran, whose message may carry the
+      // credentials the statement embedded, so it is masked before reaching the caller.
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Create catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
+          "Create catalog failed. "
+              + (StringUtils.isEmpty(e.getMessage())
+                  ? ""
+                  : CatalogRegister.redactSecrets(e.getMessage())),
           e);
     }
   }

@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.system.storedprocedure;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
 import java.lang.invoke.MethodHandle;
@@ -32,9 +33,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stored procedure implementation for dropping an existing catalog in Gravitino.
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * <p>This procedure allows dropping a catalog with optional ignoreNotExist flag.
  */
 public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
-  private static final Logger LOG = LoggerFactory.getLogger(DropCatalogStoredProcedure.class);
+  private static final Logger LOG = Logger.get(DropCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -102,10 +102,21 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
               GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
               "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
         }
+        // Refresh before returning: the catalog left a state row behind when its registration
+        // failed, and catalog_status would keep reporting a catalog that no longer exists until
+        // the next poll of the load loop. The drop itself has already succeeded, so a refresh
+        // that does not complete must not be reported as its failure; the scheduled poll will
+        // catch up.
+        try {
+          catalogConnectorManager.loadMetalakeSync();
+        } catch (Exception e) {
+          LOG.warn(
+              "Dropped catalog %s in metalake %s, but refreshing the registration state failed: %s",
+              catalogName, metalake, CatalogRegister.describe(e));
+        }
         LOG.info(
-            "Drop catalog {} in metalake {} from server (no local connector) successfully.",
-            catalogName,
-            metalake);
+            "Drop catalog %s in metalake %s from server (no local connector) successfully.",
+            catalogName, metalake);
         return;
       }
 
@@ -122,7 +133,7 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
             "Drop catalog failed due to the reloading process fails");
       }
 
-      LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
+      LOG.info("Drop catalog %s in metalake %s successfully.", catalogName, metalake);
 
     } catch (NoSuchMetalakeException e) {
       throw new TrinoException(

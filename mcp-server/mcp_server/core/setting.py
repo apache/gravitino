@@ -18,6 +18,11 @@
 from dataclasses import dataclass, field
 from typing import Set
 
+# Tag carried by the metalake discovery tools. Defined here because
+# Setting is what interprets --include-tool-tags; tools/metalake.py
+# imports it so the tag and the check below cannot drift apart.
+METALAKE_TOOL_TAG = "metalake"
+
 
 @dataclass
 class DefaultSetting:
@@ -28,7 +33,10 @@ class DefaultSetting:
 
 @dataclass
 class Setting:  # pylint: disable=too-many-instance-attributes
-    metalake: str
+    # Default metalake, used by any tool call that does not name one itself
+    # via the `metalake` argument. Optional on every transport: a deployment
+    # serving several metalakes can leave it unset and let each call choose.
+    metalake: str = ""
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
@@ -45,14 +53,81 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     # Both must be set to enable TLS; empty means plain HTTP.
     tls_cert: str = ""
     tls_key: str = ""
+    # OAuth2 client-credentials for the service hop to Gravitino. All three of
+    # endpoint / client id / client secret must be set together. Ignored when
+    # ``token`` is also set (--token wins).
+    oauth_token_endpoint: str = ""
+    oauth_client_id: str = ""
+    oauth_client_secret: str = field(default="", repr=False)
+    oauth_scope: str = ""
+    # HTTP only: reject requests with no Authorization when service OAuth or
+    # --token is configured instead of falling back to the service identity.
+    no_service_identity_fallback: bool = False
+
+    def __post_init__(self) -> None:
+        # A whitespace-only --metalake (e.g. a shell-quoting mistake) must be
+        # treated as "no default configured", the same as an empty string,
+        # rather than silently used as a nonsensical metalake name.
+        self.metalake = self.metalake.strip()
+
+    def has_oauth_client(self) -> bool:
+        """Return True when client-credentials is fully configured."""
+        return bool(
+            self.oauth_token_endpoint.strip()
+            and self.oauth_client_id.strip()
+            and self.oauth_client_secret.strip()
+        )
+
+    def exposes_metalake_discovery(self) -> bool:
+        """Whether the `list_metalakes` tool is reachable in this deployment.
+
+        --include-tool-tags is an allowlist, so a tag filter that omits
+        "metalake" hides the discovery tool. Callers use this to avoid telling
+        an agent to call a tool it cannot see.
+        """
+        return not self.tags or METALAKE_TOOL_TAG in self.tags
+
+    def has_service_identity(self) -> bool:
+        """Return True when a static token or OAuth client-credentials is set."""
+        return bool(self.token.strip()) or self.has_oauth_client()
+
+    def validate_oauth(self) -> None:
+        """Reject a partial OAuth client-credentials configuration."""
+        filled = [
+            bool(self.oauth_token_endpoint.strip()),
+            bool(self.oauth_client_id.strip()),
+            bool(self.oauth_client_secret.strip()),
+        ]
+        if any(filled) and not all(filled):
+            raise ValueError(
+                "OAuth client credentials requires "
+                "--oauth-token-endpoint, --oauth-client-id, and "
+                "--oauth-client-secret together "
+                "(or GRAVITINO_OAUTH_TOKEN_ENDPOINT / "
+                "GRAVITINO_OAUTH_CLIENT_ID / GRAVITINO_OAUTH_CLIENT_SECRET)."
+            )
+        if self.oauth_scope.strip() and not all(filled):
+            raise ValueError(
+                "OAuth scope (--oauth-scope / GRAVITINO_OAUTH_SCOPE) requires "
+                "a complete client-credentials configuration "
+                "(--oauth-token-endpoint, --oauth-client-id, and "
+                "--oauth-client-secret)."
+            )
 
     def __str__(self) -> str:
         # Mirror startup_authorization: a whitespace-only token is anonymous on
         # the wire, so it must not be logged as a configured identity.
         token_display = "***" if self.token.strip() else ""
+        secret_display = "***" if self.oauth_client_secret.strip() else ""
         return (
             f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
             f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "
             f"token={token_display}, tls_cert={self.tls_cert}, "
-            f"tls_key={self.tls_key})"
+            f"tls_key={self.tls_key}, "
+            f"oauth_token_endpoint={self.oauth_token_endpoint}, "
+            f"oauth_client_id={self.oauth_client_id}, "
+            f"oauth_client_secret={secret_display}, "
+            f"oauth_scope={self.oauth_scope}, "
+            f"no_service_identity_fallback="
+            f"{self.no_service_identity_fallback})"
         )

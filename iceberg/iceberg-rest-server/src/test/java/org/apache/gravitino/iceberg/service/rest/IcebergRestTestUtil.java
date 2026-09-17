@@ -87,6 +87,16 @@ public class IcebergRestTestUtil {
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
+  /** Factory for creating {@link IcebergCatalogWrapperManager} instances in tests. */
+  @FunctionalInterface
+  public interface WrapperManagerFactory {
+    IcebergCatalogWrapperManager create(
+        Map<String, String> properties,
+        IcebergConfigProvider configProvider,
+        boolean auxMode,
+        String metalakeName);
+  }
+
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
 
   public static ResourceConfig getIcebergResourceConfig(Class c) {
@@ -95,6 +105,15 @@ public class IcebergRestTestUtil {
 
   public static ResourceConfig getIcebergResourceConfig(
       Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
+    return getIcebergResourceConfig(
+        c, bindIcebergTableOps, eventListenerPlugins, IcebergCatalogWrapperManagerForTest::new);
+  }
+
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      WrapperManagerFactory wrapperManagerFactory) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
@@ -140,7 +159,7 @@ public class IcebergRestTestUtil {
       configProvider.initialize(catalogConf);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManagerForTest(
+          wrapperManagerFactory.create(
               catalogConf, configProvider, false, configProvider.getMetalakeName());
       IcebergRESTServerContext.create(
           configProvider, false, false, true, icebergCatalogWrapperManager);

@@ -420,8 +420,16 @@ public class Configs {
   public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
   public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
-          .doc("The seconds of Gravitino metrics time sliding window")
+          .doc(
+              "The seconds of Gravitino metrics time sliding window. No longer used: timers and "
+                  + "histograms use an ExponentiallyDecayingReservoir, which decays samples "
+                  + "instead of expiring them on a fixed window, so infrequently-invoked "
+                  + "operations keep reporting a real duration for far longer (on the order of "
+                  + "half a day with the default decay rate) instead of reading zero after 60 "
+                  + "seconds of inactivity. An operation idle for longer than that will still "
+                  + "eventually report a duration of zero.")
           .version(ConfigConstants.VERSION_0_5_1)
+          .deprecated()
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 
@@ -610,7 +618,7 @@ public class Configs {
   public static final ConfigEntry<Boolean> CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES =
       new ConfigBuilder("gravitino.catalog.credential.backfillToProperties")
           .doc(
-              "If true, the server exposes hidden catalog credentials (such as jdbc-user and "
+              "If true, the server exposes hidden catalog credentials (such as "
                   + "jdbc-password) in the catalog properties response. Enable only during a "
                   + "rolling upgrade while old connectors that do not support credential vending "
                   + "are still in use. Enabling this is a security risk because credentials "

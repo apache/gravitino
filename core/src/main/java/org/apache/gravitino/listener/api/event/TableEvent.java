@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
@@ -33,6 +35,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public abstract class TableEvent extends Event {
+  private final Map<String, String> customInfo;
+
   /**
    * Constructs a new {@code TableEvent} with the specified user and table identifier.
    *
@@ -41,11 +45,32 @@ public abstract class TableEvent extends Event {
    *     details such as the metalake, catalog, schema, and table name.
    */
   protected TableEvent(String user, NameIdentifier identifier) {
+    this(user, identifier, ImmutableMap.of());
+  }
+
+  /**
+   * Constructs a new {@code TableEvent} with optional audit extras.
+   *
+   * @param user The user responsible for triggering the table operation.
+   * @param identifier The identifier of the table involved in the operation.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  protected TableEvent(String user, NameIdentifier identifier, Map<String, String> customInfo) {
     super(user, identifier);
+    this.customInfo =
+        customInfo == null || customInfo.isEmpty()
+            ? ImmutableMap.of()
+            : ImmutableMap.copyOf(customInfo);
   }
 
   @Override
   public OperationStatus operationStatus() {
     return OperationStatus.SUCCESS;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return customInfo;
   }
 }

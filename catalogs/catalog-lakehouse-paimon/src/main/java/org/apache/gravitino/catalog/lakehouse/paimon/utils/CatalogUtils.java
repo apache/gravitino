@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authenticati
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -88,7 +89,7 @@ public class CatalogUtils {
         Catalog catalog = loadCatalogBackendWithKerberosAuth(paimonConfig, configuration);
         return new PaimonBackendCatalogWrapper(catalog, kerberosClient);
       } catch (Exception e) {
-        throw new RuntimeException("Failed to login with kerberos", e);
+        throw ExceptionMessages.wrap("Failed to login with kerberos", e);
       }
     } else {
       throw new UnsupportedOperationException(

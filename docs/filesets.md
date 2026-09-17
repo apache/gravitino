@@ -25,6 +25,11 @@ interface, so anything that already speaks HDFS paths works, and it requires Had
 The Python one is built on fsspec, so it works with pandas, PyArrow, and anything else in that
 ecosystem. There is also a FUSE implementation for mounting a fileset as a local directory.
 
+:::note
+The FUSE implementation (`gvfs-fuse`) is deprecated. It is excluded from the Gradle build and
+receives no further development or support; use the Java or Python GVFS implementation instead.
+:::
+
 Credentials are the other half of it. A caller reaching storage through GVFS can be given
 short-lived credentials vended by Gravitino rather than holding long-lived cloud keys of its own,
 which is what makes the indirection a governance boundary rather than only a convenience. See

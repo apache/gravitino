@@ -230,6 +230,11 @@ class TestErrorHandler(unittest.TestCase):
                 )
             )
 
+        with self.assertRaises(ForbiddenException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
         with self.assertRaises(InternalError):
             CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(InternalError, "mock error")
