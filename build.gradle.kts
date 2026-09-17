@@ -612,16 +612,25 @@ subprojects {
     from(tasks["javadoc"])
   }
 
+  // Source release archives omit the binary distribution's legal files.
+  val binaryLegalFiles = listOf("LICENSE", "NOTICE").associateWith { name ->
+    rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
+  }
+  val licenseReference = Regex("""(?<![A-Za-z0-9_./:-])(?:\./)?licenses/[A-Za-z0-9_./-]+""")
+  val supplementalLicensePaths = binaryLegalFiles.values.flatMap { file ->
+    licenseReference.findAll(file.readText()).map { it.value.removePrefix("./").trimEnd('.') }.toList()
+  }.distinct().sorted()
+  supplementalLicensePaths.forEach { path ->
+    require(rootProject.file(path).isFile) { "Missing companion license referenced by LICENSE/NOTICE: $path" }
+  }
+
   plugins.withId("com.github.johnrengelman.shadow") {
     tasks.withType<ShadowJar>().configureEach {
-      listOf("LICENSE", "NOTICE").forEach { name ->
-        // Source release archives omit the binary distribution's legal files.
-        val legalFile = rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
-        transform(LegalFilesTransformer(legalFile, "META-INF/$name"))
+      binaryLegalFiles.forEach { (name, file) ->
+        transform(LegalFilesTransformer(file, "META-INF/$name"))
       }
-      rootProject.fileTree("licenses").files.sortedBy { it.invariantSeparatorsPath }.forEach { license ->
-        val path = license.relativeTo(rootProject.file("licenses")).invariantSeparatorsPath
-        transform(LegalFilesTransformer(license, "META-INF/licenses/$path"))
+      supplementalLicensePaths.forEach { path ->
+        transform(LegalFilesTransformer(rootProject.file(path), "META-INF/$path"))
       }
     }
   }
@@ -642,7 +651,7 @@ subprojects {
           rename("LICENSE.bin", "LICENSE")
           include(if (rootProject.file("NOTICE.bin").isFile) "NOTICE.bin" else "NOTICE")
           rename("NOTICE.bin", "NOTICE")
-          include("licenses/**")
+          include(supplementalLicensePaths)
         }
       }
     }

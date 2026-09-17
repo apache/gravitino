@@ -31,11 +31,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class TestRuntimeJarLegalFiles {
@@ -67,16 +68,24 @@ class TestRuntimeJarLegalFiles {
   }
 
   @Test
-  void testSupplementalLicenseFilesArePackagedOnce() throws IOException {
+  void testReferencedSupplementalLicensesArePackagedOnce() throws IOException {
     Path directory = Paths.get(requiredProperty("projectLicenseDirectory"));
-    try (JarFile jar = new JarFile(requiredProperty("shadowJarPath"));
-        Stream<Path> paths = Files.walk(directory)) {
-      List<Path> licenses = paths.filter(Files::isRegularFile).collect(Collectors.toList());
-      assertTrue(!licenses.isEmpty(), "Expected supplemental license files");
-      for (Path license : licenses) {
-        String entryName =
-            "META-INF/licenses/"
-                + directory.relativize(license).toString().replace(File.separatorChar, '/');
+    Pattern reference =
+        Pattern.compile("(?<![A-Za-z0-9_./:-])(?:\\./)?licenses/([A-Za-z0-9_./-]+)");
+    Set<String> expectedEntries = new TreeSet<>();
+    for (String name : LEGAL_FILES) {
+      String document =
+          new String(
+              Files.readAllBytes(Paths.get(requiredProperty("projectLegalFile." + name))),
+              StandardCharsets.UTF_8);
+      Matcher matches = reference.matcher(document);
+      while (matches.find()) {
+        expectedEntries.add("META-INF/licenses/" + matches.group(1).replaceAll("\\.+$", ""));
+      }
+    }
+    try (JarFile jar = new JarFile(requiredProperty("shadowJarPath"))) {
+      for (String entryName : expectedEntries) {
+        Path license = directory.resolve(entryName.substring("META-INF/licenses/".length()));
         assertEquals(
             1L,
             jar.stream().filter(entry -> entryName.equals(entry.getName())).count(),
