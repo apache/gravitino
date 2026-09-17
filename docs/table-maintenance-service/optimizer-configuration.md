@@ -53,6 +53,25 @@ gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
+When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
+credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
+updater and `submit-update-stats-job` `runJob` calls):
+
+| `auth_type`      | Fields                                                                                         |
+|------------------|------------------------------------------------------------------------------------------------|
+| `none` (default) | (none)                                                                                         |
+| `simple`         | `username` (optional)                                                                          |
+| `basic`          | `username`, `password`                                                                         |
+| `oauth`          | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
+
+Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
+job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files
+do not read `updater_options` auth fields.
+
+Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
+the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
+redacts them in DRY-RUN / SUBMIT output).
+
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
 ## Job Submission Configuration
@@ -64,7 +83,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "catalog_name": "rest_catalog",
   "table_identifier": "db.t1",
   "update_mode": "all",
-  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\"}",
+  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
   "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",
