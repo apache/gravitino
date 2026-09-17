@@ -53,3 +53,35 @@ class ViewOperation(ABC):
             str: JSON-formatted string containing full view metadata
         """
         pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def create_view(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        representations: list,
+        properties: dict,
+        default_catalog: str = None,
+        default_schema: str = None,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_view(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        view_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        pass
