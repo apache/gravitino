@@ -107,23 +107,16 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
     if (propertyEntries == null) {
       synchronized (this) {
         if (propertyEntries == null) {
+          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add
+          // catalog-only entries.
+          Map<String, PropertyEntry<?>> base = buildBasePropertyEntries();
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-          Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
-          builder.putAll(properties);
+          builder.putAll(base);
 
-          // put the basic property entries
-          BASIC_PROPERTY_ENTRIES.forEach(
-              (name, entry) -> {
-                Preconditions.checkArgument(
-                    !properties.containsKey(name), "Property metadata already exists: " + name);
-                builder.put(name, entry);
-              });
-
-          // put the basic catalog property entries
           BASIC_CATALOG_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
-                    !properties.containsKey(name), "Property metadata already exists: " + name);
+                    !base.containsKey(name), "Property metadata already exists: " + name);
                 builder.put(name, entry);
               });
           propertyEntries = builder.build();

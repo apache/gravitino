@@ -20,6 +20,7 @@ package org.apache.gravitino.secret;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -39,6 +41,7 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
+import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -169,5 +172,30 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     Map<String, String> secrets = secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL);
     Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
     Assertions.assertFalse(secrets.containsKey("visible"));
+  }
+
+  @Test
+  public void testResolvePropertiesMetadataFallsBackOnUnsupportedOperation() {
+    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
+    try {
+      when(wrapper.doWithPropertiesMeta(org.mockito.ArgumentMatchers.any()))
+          .thenThrow(new UnsupportedOperationException("no metadata"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    org.apache.gravitino.connector.PropertiesMetadata metadata =
+        SecretPropertyOperationDispatcher.resolvePropertiesMetadata(
+            wrapper, HasPropertyMetadata::catalogPropertiesMetadata);
+    Assertions.assertSame(FallbackPropertiesMetadata.INSTANCE, metadata);
+    // Official non-hidden keys stay out of getSecrets.
+    Assertions.assertFalse(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
+    Assertions.assertFalse(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
+    // Declared hidden secrets and undeclared sensitive names still fuzzy-recover.
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
   }
 }
