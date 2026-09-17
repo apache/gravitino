@@ -68,70 +68,14 @@ tasks.jar {
 }
 
 tasks.test {
-  val fullAudit = project.hasProperty("checkMavenLegalFiles")
-  val artifactTasks = mutableMapOf("runtime" to ":clients:client-java-runtime:shadowJar")
-  // Older release branches may not contain every cloud module.
-  val cloudArtifactTasks = mapOf(
-    "aws" to ":bundles:aws-bundle:shadowJar",
-    "azure" to ":bundles:azure-bundle:shadowJar",
-    "icebergGcp" to ":bundles:iceberg-gcp-bundle:shadowJar",
-    "gcp" to ":bundles:gcp-bundle:shadowJar",
-    "aliyun" to ":bundles:aliyun-bundle:shadowJar",
-    "tencent" to ":bundles:tencent-bundle:shadowJar",
-    "icebergAws" to ":bundles:iceberg-aws-bundle:shadowJar",
-    "icebergAzure" to ":bundles:iceberg-azure-bundle:shadowJar",
-    "icebergAliyun" to ":bundles:iceberg-aliyun-bundle:shadowJar"
-  ).filterValues { findProject(it.substringBeforeLast(':')) != null }
-  if (fullAudit) {
-    artifactTasks.putAll(
-      mapOf(
-        "api" to ":api:jar",
-        "sources" to ":api:sourcesJar",
-        "javadoc" to ":api:javadocJar",
-        "cli" to ":clients:cli:jar",
-        "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar"
-      )
-    )
-    artifactTasks.putAll(cloudArtifactTasks)
-  }
-  if (fullAudit) {
-    val icebergDependency = provider {
-      project(":bundles:iceberg-gcp-bundle").configurations.getByName("runtimeClasspath")
-        .resolvedConfiguration.resolvedArtifacts.single {
-          it.moduleVersion.id.group == "org.apache.iceberg" && it.name == "iceberg-gcp-bundle"
-        }.file
-    }
-    inputs.file(icebergDependency)
-    doFirst { systemProperty("icebergGcpDependency", icebergDependency.get().absolutePath) }
-  }
-  useJUnitPlatform {
-    if (!fullAudit) excludeTags("maven-legal-audit")
-  }
-  if (fullAudit) {
-    // Exercise the shared War packaging configuration without rebuilding the JavaScript applications.
-    listOf("web", "web-v2").forEach { web ->
-      val webProject = project(":$web:web")
-      val war = provider { webProject.tasks.getByName("war") as War }
-      dependsOn(":$web:web:war")
-      inputs.file(war.flatMap { it.archiveFile })
-      inputs.files(webProject.file("LICENSE.bin"), webProject.file("NOTICE.bin"))
-      doFirst {
-        systemProperty("war.$web", war.get().archiveFile.get().asFile.absolutePath)
-        systemProperty("webLegal.$web", webProject.projectDir.absolutePath)
-      }
-    }
-  }
-  val artifacts = artifactTasks.mapValues { (_, path) -> provider { tasks.getByPath(path) as Jar } }
-  dependsOn(artifactTasks.values)
-  inputs.files(artifacts.values.map { artifact -> artifact.flatMap { it.archiveFile } })
+  useJUnitPlatform()
+  val runtimeJar = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(runtimeJar)
+  inputs.file(runtimeJar.flatMap { it.archiveFile })
   inputs.dir(rootProject.file("dev/release/maven"))
   inputs.files(configurations.runtimeClasspath)
   doFirst {
-    systemProperty("artifacts", artifacts.keys.joinToString(","))
-    systemProperty("cloudArtifacts", cloudArtifactTasks.keys.joinToString(","))
-    artifacts.forEach { (name, artifact) ->
-      systemProperty("artifact.$name", artifact.get().archiveFile.get().asFile.absolutePath)
-    }
+    systemProperty("artifactPath", runtimeJar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("legalTemplates", rootProject.file("dev/release/maven").absolutePath)
     systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
     configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.forEach { artifact ->

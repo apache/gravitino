@@ -45,8 +45,6 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
-    // The optional OpenSSL provider contains LGPL code. Hadoop's default mode falls back to JSSE.
-    exclude(dependency("org.wildfly.openssl:wildfly-openssl"))
 
     // Exclude Gravitino modules to prevent class duplication and "Split Packages" issues.
     // These modules (api, common, catalogs) are already provided by the Gravitino server and gravitino-filesystem-hadoop3-runtime.

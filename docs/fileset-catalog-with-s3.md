@@ -32,10 +32,6 @@ The catalog automatically loads the Amazon S3 filesystem provider once the bundl
 classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
 properties do not need to be set.
 
-The bundle uses JSSE for TLS and does not include the optional WildFly OpenSSL provider.
-If you explicitly set Hadoop's `fs.s3a.ssl.channel.mode` to `OpenSSL`, install a compatible
-provider separately on the catalog or client classpath. The default mode does not require it.
-
 ## Amazon S3 Properties
 
 These properties are needed in addition to the shared

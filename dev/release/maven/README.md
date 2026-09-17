@@ -103,36 +103,20 @@ a POM license name alone does not account for embedded third-party code.
   The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 
-## Optional OpenSSL provider
-
-The AWS and Azure bundles exclude WildFly OpenSSL 1.1.3.Final. Its
-`DirectByteBufferDeallocator` implementation is LGPL-2.1-or-later despite the
-artifact's Apache-only POM. Hadoop's default modes use JSSE or fall back to JSSE
-when this optional provider is unavailable. Explicit OpenSSL mode requires a
-separately installed provider. The artifact regression test exercises Hadoop's
-JSSE fallback using the actual shaded bundles.
-
 ## Verification
 
-The default client-runtime tests check its canonical documents and preservation
-of dependency legal resources, including Jackson's companion texts. The broader
-audit builds thin/source/Javadoc, CLI, nested filesystem runtime and cloud bundle
-JARs present on the branch (nine on main; eight on 1.3, which has no Tencent bundle).
-The build workflow runs this audit after publishing to Maven Local.
-It also verifies both Web modules' own LICENSE.bin/NOTICE.bin in their WARs using
-the standard `war` tasks. These exercise the same legal-document configuration as
-`buildWar` without rebuilding JavaScript; they do not validate the Web application
-payload. No additional Web license texts are introduced.
-
-Run the same audit locally:
+The client-runtime tests check that its canonical LICENSE/NOTICE entries are unique,
+that dependency documents are preserved, and that verified missing license texts,
+component references and notices are present:
 
 ```shell
-./gradlew :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PcheckMavenLegalFiles -PskipITs
+./gradlew :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PskipITs
 ```
 
-The cloud check verifies JSSE factory initialization without WildFly, not a
-network handshake or cloud operation. Final staged artifacts still require the
-usual release verification.
+These focused tests do not establish that every dependency's licensing metadata is
+complete. Check the actual Maven artifacts selected for a release, including nested
+runtimes, thin/source/Javadoc JARs and cloud bundles. Review this mapping whenever
+bundled dependencies change. Web WARs retain their existing legal documents.
 
 Supplements are limited to missing material. Identical Microsoft texts are reused
 across SDK/keyvault and MSAL/persistence components. JCTools and Netty's Apache-only

@@ -156,6 +156,11 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
         require(fields.size == 2) { "Invalid Maven legal supplement: $line" }
         fields[0] to fields[1]
       }
+    fun supplement(id: String): String {
+      val parts = id.split('/')
+      val coordinate = "${parts[0]}:${parts[1]}"
+      return overrides["$coordinate:${parts[2]}"] ?: overrides[coordinate] ?: overrides["${parts[0]}:*"] ?: ""
+    }
     dependencyJars.files.sortedBy { ids.getValue(it.name) }.forEach { jar ->
       val id = ids.getValue(jar.name)
       val coordinate = id.split('/').take(2).joinToString(":")
@@ -193,7 +198,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
           }
       }
       if (hasContent) {
-        val selected = overrides["$coordinate:${id.split('/')[2]}"] ?: overrides[coordinate] ?: overrides["$group:*"] ?: ""
+        val selected = supplement(id)
         selected.substringBefore('|').split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
           val supplement = directory.resolve(name)
           require(supplement.isFile) { "Missing Maven legal supplement for $coordinate: $name" }
@@ -211,7 +216,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
       components.forEach { (prefix, paths) ->
         val parts = prefix.split('/')
         val coordinate = "${parts[2]}:${parts[3]}"
-        val selected = overrides["$coordinate:${parts[4]}"] ?: overrides[coordinate] ?: overrides["${parts[2]}:*"] ?: ""
+        val selected = supplement(parts.drop(2).joinToString("/"))
         val label = selected.substringAfter('|', "").trim()
         license += "\n$coordinate:${parts[4]}" + if (label.isEmpty()) "\n" else " — $label\n"
         license += "Licensing and attribution documents:\n" + paths.joinToString("\n") { "  $it" } + "\n"
