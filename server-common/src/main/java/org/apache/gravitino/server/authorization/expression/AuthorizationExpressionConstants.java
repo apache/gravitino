@@ -20,6 +20,15 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_CATALOG_AUTHORIZATION_EXPRESSION =
       "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
+  /**
+   * Authorizes testing an existing catalog connection with proposed changes. The caller chooses the
+   * configuration the server connects to, so this matches the authorization for altering the
+   * catalog. Testing with the stored configuration uses {@link
+   * #LOAD_CATALOG_AUTHORIZATION_EXPRESSION} instead.
+   */
+  public static final String TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG)";
+
   public static final String LOAD_SCHEMA_AUTHORIZATION_EXPRESSION =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
@@ -98,6 +107,18 @@ public class AuthorizationExpressionConstants {
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                  """;
+
+  /**
+   * Authorizes removing a table, whether the stored data is deleted with it or only the Gravitino
+   * metadata is. Removal requires ownership of the table or of one of its ancestors: MODIFY_TABLE
+   * alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER
                   """;
 
   public static final String LOAD_TOPICS_AUTHORIZATION_EXPRESSION =
@@ -255,6 +276,17 @@ public class AuthorizationExpressionConstants {
                   ANY_WRITE_FILESET
                   """;
 
+  /**
+   * Soft check for retrieving plaintext secrets or vend credentials. Only the metalake owner or a
+   * principal with {@code USE_SECRET} may receive non-empty results; others get an empty response
+   * rather than a forbidden error.
+   */
+  public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_USE_SECRET
+                  """;
+
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
@@ -282,6 +314,12 @@ public class AuthorizationExpressionConstants {
           METALAKE::OWNER ||
           ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
           """;
+
+  public static final String LOAD_USER_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
+
+  public static final String LOAD_GROUP_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
 
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";

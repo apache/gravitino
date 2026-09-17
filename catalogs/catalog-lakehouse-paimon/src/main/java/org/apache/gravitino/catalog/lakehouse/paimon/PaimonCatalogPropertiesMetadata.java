@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authenticati
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
@@ -136,7 +137,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The access key ID for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(
@@ -199,7 +200,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */),
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
@@ -220,6 +221,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES);
+    result.putAll(COSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(REST_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }

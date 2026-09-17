@@ -48,6 +48,12 @@ as part of that catalog's own definition — the same way Trino replicates any o
 cluster-wide. A catalog that could not be registered before the IRC started is registered
 automatically after a later discovery poll succeeds; no Trino restart is required.
 
+The Gravitino server derives the discovered endpoint from the IRC's listener configuration, so
+behind a reverse proxy it may report an endpoint clients cannot reach. In that case, set
+`gravitino.iceberg-rest.advertised-uri` on the Gravitino server to the public endpoint (see
+[Iceberg REST service](../iceberg-rest-service.md#http-server)); discovery then reports that URI
+instead.
+
 Set `gravitino.iceberg.rest-uri` to override the discovered endpoint, and it is required — not just
 an override — for a standalone IRC (its own process, not the Gravitino server's auxiliary service):
 the Gravitino server has no way to know a standalone IRC exists, so discovery never finds one. See
@@ -111,10 +117,18 @@ Four keys are reserved: `iceberg.rest-catalog.uri`, `.warehouse`, `.prefix` and
 `gravitino.iceberg.rest-catalog.` or a catalog's `trino.bypass.` has no effect — the connector logs
 when it ignores one.
 
-When `gravitino.client.session.forwardUser=true`, the connector also sets
-`iceberg.rest-catalog.session=USER` so that each query carries the end user's identity to the IRC,
-keeping per-user credential vending and per-user authorization intact. Set
-`gravitino.iceberg.rest-catalog.session` explicitly to override it. See
+The connector sets `iceberg.rest-catalog.session=USER` automatically when both hold:
+
+- `gravitino.client.session.forwardUser=true`
+- the IRC authenticates with OAuth2, through any one of:
+  - `gravitino.client.authType=oauth2`
+  - `gravitino.iceberg.rest-catalog.security=OAUTH2`
+  - `trino.bypass.iceberg.rest-catalog.security=OAUTH2`, on a catalog with its own REST backend
+
+Each query then carries the end user's identity to the IRC, keeping per-user credential vending and
+per-user authorization intact. Otherwise the session mode is deliberately left off: the forwarded
+token cannot be exchanged, so it would carry no identity to the IRC. Set
+`gravitino.iceberg.rest-catalog.session` explicitly to override either way. See
 [Authentication](./authentication.md) for the full setup.
 
 ### Limitations

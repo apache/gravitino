@@ -46,6 +46,30 @@ public class AzurePropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+                  "Azure Active Directory tenant ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+                  "Azure Active Directory client ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+                  "Azure Active Directory client secret",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
           .build();
 
   private AzurePropertiesMetadata() {}

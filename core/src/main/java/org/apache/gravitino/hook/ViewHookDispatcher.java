@@ -27,10 +27,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.ViewDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
@@ -48,7 +45,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class ViewHookDispatcher implements ViewDispatcher {
   private final ViewDispatcher dispatcher;
   private final Supplier<OwnerDispatcher> ownerDispatcher;
-  private final CatalogManager catalogManager;
 
   /**
    * Creates a view hook dispatcher.
@@ -56,15 +52,10 @@ public class ViewHookDispatcher implements ViewDispatcher {
    * @param dispatcher the underlying view dispatcher
    * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
    *     disabled
-   * @param catalogManager the catalog manager used to apply catalog capabilities
    */
-  public ViewHookDispatcher(
-      ViewDispatcher dispatcher,
-      Supplier<OwnerDispatcher> ownerDispatcher,
-      CatalogManager catalogManager) {
+  public ViewHookDispatcher(ViewDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
     this.ownerDispatcher = ownerDispatcher;
-    this.catalogManager = catalogManager;
   }
 
   @Override
@@ -98,11 +89,9 @@ public class ViewHookDispatcher implements ViewDispatcher {
 
     OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(ident, Capability.Scope.VIEW, catalogManager);
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.VIEW),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.VIEW),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }

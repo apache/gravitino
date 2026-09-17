@@ -40,7 +40,6 @@ import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -228,7 +227,7 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
-          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
+          // CREDENTIAL_PROPERTY_ENTRIES are registered in BaseCatalogPropertiesMetadata.
           .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)

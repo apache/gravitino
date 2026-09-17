@@ -65,7 +65,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                       + " When omitted the default credential chain is used.",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               AWS_SECRET_ACCESS_KEY,
               stringOptionalPropertyEntry(
@@ -105,8 +105,9 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               stringRequiredPropertyEntry(
                   WAREHOUSE,
                   "Base storage path used as warehouse when no explicit location is set"
-                      + " at table creation time (e.g. s3://my-bucket/warehouse)."
-                      + " Table location is derived as warehouse/database/table.",
+                      + " at table creation time and the database declares no LocationUri"
+                      + " (e.g. s3://my-bucket/warehouse)."
+                      + " Table location is then derived as warehouse/database/table.",
                   false /* immutable */,
                   false /* hidden */))
           .build();

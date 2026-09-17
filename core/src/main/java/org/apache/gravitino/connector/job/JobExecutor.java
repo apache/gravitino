@@ -80,4 +80,36 @@ public interface JobExecutor extends Closeable {
    * @throws NoSuchJobException If the job with the given identifier does not exist.
    */
   void cancelJob(String jobId) throws NoSuchJobException;
+
+  /**
+   * Whether the job with the given identifier is owned by this job executor instance, which means
+   * this instance is able to query and cancel it.
+   *
+   * <p>In a multi-node deployment every Gravitino server has its own job executor instance, and all
+   * of them see the same jobs from the shared metadata store. Gravitino only queries the status of,
+   * or cancels, a job through the executor instance that owns it. The default implementation
+   * returns {@code true}, which fits job executors backed by an external job runner that any
+   * Gravitino server can reach.
+   *
+   * @param jobId The unique identifier of the job.
+   * @return {@code true} if this executor instance owns the job, {@code false} otherwise.
+   */
+  default boolean ownsJob(String jobId) {
+    return true;
+  }
+
+  /**
+   * Whether the job state is only kept by the executor instance that owns the job, for example the
+   * processes launched on the local node. If so, only the owning instance can cancel the job, so a
+   * cancellation requested on another Gravitino server is carried out by the owner when it pulls
+   * the job status.
+   *
+   * <p>The default implementation returns {@code false}.
+   *
+   * @return {@code true} if the job state is local to the owning executor instance, {@code false}
+   *     otherwise.
+   */
+  default boolean isJobStateNodeLocal() {
+    return false;
+  }
 }

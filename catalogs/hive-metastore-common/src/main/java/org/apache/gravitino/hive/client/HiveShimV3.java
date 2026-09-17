@@ -36,6 +36,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 class HiveShimV3 extends HiveShimV2 {
@@ -50,6 +51,7 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method getTableMethod;
   private final Method createTableMethod;
   private final Method alterTableMethod;
+  private final Method alterTableWithEnvironmentContextMethod;
   private final Method dropTableMethod;
   private final Method getAllTablesMethod;
   private final Method getTablesByTypeMethod;
@@ -107,6 +109,14 @@ class HiveShimV3 extends HiveShimV2 {
               String.class,
               String.class,
               org.apache.hadoop.hive.metastore.api.Table.class);
+      this.alterTableWithEnvironmentContextMethod =
+          IMetaStoreClient.class.getMethod(
+              "alter_table",
+              String.class,
+              String.class,
+              String.class,
+              Table.class,
+              EnvironmentContext.class);
       this.dropTableMethod =
           IMetaStoreClient.class.getMethod(
               "dropTable", String.class, String.class, String.class, boolean.class, boolean.class);
@@ -293,17 +303,35 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate) {
     var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
     invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
-    invoke(
-        ExceptionTarget.table(tableName),
-        client,
-        alterTableMethod,
-        catalogName,
-        databaseName,
-        tableName,
-        tb);
+    if (skipStatsUpdate) {
+      // Instruct the metastore not to recompute statistics for this alter, so it does not access
+      // the table's storage location.
+      invoke(
+          ExceptionTarget.table(tableName),
+          client,
+          alterTableWithEnvironmentContextMethod,
+          catalogName,
+          databaseName,
+          tableName,
+          tb,
+          doNotUpdateStatsContext());
+    } else {
+      invoke(
+          ExceptionTarget.table(tableName),
+          client,
+          alterTableMethod,
+          catalogName,
+          databaseName,
+          tableName,
+          tb);
+    }
   }
 
   @Override

@@ -288,6 +288,11 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\."
             + ".*unknown-direct-key.*");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
+    // Failed registration still leaves a Gravitino catalog entry visible to catalog_status /
+    // system.catalog; drop it so later tests that assume only the seed "memory" catalog stay
+    // deterministic on the shared QueryRunner.
+    assertUpdate(
+        "call gravitino.system.drop_catalog(catalog => 'memory1', ignore_not_exist => true)");
 
     assertUpdate(
         "call gravitino.system.create_catalog("
@@ -301,7 +306,10 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
 
   @Test
   public void testSystemTable() throws Exception {
-    MaterializedResult expectedResult = computeActual("select * from gravitino.system.catalog");
+    // Scope to the seed catalog: other tests may briefly leave FAILED registrations in the shared
+    // QueryRunner (see testCreateCatalog / testCatalogStatusReportsARegistrationFailure).
+    MaterializedResult expectedResult =
+        computeActual("select * from gravitino.system.catalog where name = 'memory'");
     assertEquals(expectedResult.getRowCount(), 1);
     List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
     MaterializedRow row = expectedRows.get(0);
@@ -315,7 +323,8 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     MaterializedResult result =
         computeActual(
             "select metalake, catalog_name, trino_catalog_name, provider, status, last_error,"
-                + " failure_count from gravitino.system.catalog_status");
+                + " failure_count from gravitino.system.catalog_status"
+                + " where catalog_name = 'memory'");
     assertEquals(result.getRowCount(), 1);
     MaterializedRow row = result.getMaterializedRows().get(0);
     assertEquals(row.getField(1), "memory");
@@ -331,7 +340,9 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     // page.getColumns() honors the requested order; a projection that sorted or de-duplicated
     // channels would return correct looking data in the wrong columns.
     MaterializedResult result =
-        computeActual("select status, catalog_name, status from gravitino.system.catalog_status");
+        computeActual(
+            "select status, catalog_name, status from gravitino.system.catalog_status"
+                + " where catalog_name = 'memory'");
     assertEquals(result.getRowCount(), 1);
     MaterializedRow row = result.getMaterializedRows().get(0);
     assertEquals(row.getField(0), "REGISTERED");
@@ -344,9 +355,14 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     // count(*) projects no column at all, so the page is built with zero channels and only its
     // position count carries the answer. A table that sized its page from the projected columns
     // would report no rows here while returning them for every other query.
-    assertEquals(computeScalar("select count(*) from gravitino.system.catalog_status"), 1L);
+    // Filter to the seed catalog so leftover FAILED registrations from other tests do not flake.
+    assertEquals(
+        computeScalar(
+            "select count(*) from gravitino.system.catalog_status where catalog_name = 'memory'"),
+        1L);
     assertEquals(computeScalar("select count(*) from gravitino.system.load_status"), 1L);
-    assertEquals(computeScalar("select count(*) from gravitino.system.catalog"), 1L);
+    assertEquals(
+        computeScalar("select count(*) from gravitino.system.catalog where name = 'memory'"), 1L);
   }
 
   @Test
@@ -354,27 +370,30 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     // An unknown bypass key makes the inner connector reject its configuration, so the catalog
     // exists in Gravitino but its CREATE CATALOG in Trino fails: a real registration failure
     // rather than a simulated state.
-    assertQueryFails(
-        "call gravitino.system.create_catalog("
-            + "catalog=>'memory_failed', provider=>'memory',"
-            + " properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
-        "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\..*");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory_failed");
+    try {
+      assertQueryFails(
+          "call gravitino.system.create_catalog("
+              + "catalog=>'memory_failed', provider=>'memory',"
+              + " properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
+          "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\..*");
+      assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+          .doesNotContain("memory_failed");
 
-    MaterializedResult result =
-        computeActual(
-            "select status, last_error, failure_count from gravitino.system.catalog_status"
-                + " where catalog_name = 'memory_failed'");
-    assertEquals(result.getRowCount(), 1);
-    MaterializedRow row = result.getMaterializedRows().get(0);
-    assertEquals(row.getField(0), "FAILED");
-    assertThat((String) row.getField(1)).contains("unknown-direct-key");
-    assertEquals(row.getField(2), 1L);
-
-    // Leave the shared query runner as it was found, or the load loop keeps retrying this catalog
-    // and the other status table tests see an extra row.
-    assertUpdate(
-        "call gravitino.system.drop_catalog(catalog => 'memory_failed', ignore_not_exist => true)");
+      MaterializedResult result =
+          computeActual(
+              "select status, last_error, failure_count from gravitino.system.catalog_status"
+                  + " where catalog_name = 'memory_failed'");
+      assertEquals(result.getRowCount(), 1);
+      MaterializedRow row = result.getMaterializedRows().get(0);
+      assertEquals(row.getField(0), "FAILED");
+      assertThat((String) row.getField(1)).contains("unknown-direct-key");
+      assertEquals(row.getField(2), 1L);
+    } finally {
+      // Leave the shared query runner as it was found, or the load loop keeps retrying this catalog
+      // and the other status table tests see an extra row.
+      assertUpdate(
+          "call gravitino.system.drop_catalog(catalog => 'memory_failed', ignore_not_exist => true)");
+    }
     assertEquals(
         computeActual(
                 "select 1 from gravitino.system.catalog_status"

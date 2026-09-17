@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -89,8 +90,14 @@ public class MetadataAuthzHelper {
   private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
+  private static final Set<Entity.EntityType> METADATA_OBJECT_ENTITY_TYPES =
+      Arrays.stream(MetadataObject.Type.values())
+          .map(MetadataObjectUtil::toEntityType)
+          .collect(Collectors.toUnmodifiableSet());
+
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
+  private static final String METALAKE_ONLY_SCOPE = "METALAKE";
   private static final String CATALOG_PARENT_SCOPES = "METALAKE";
 
   /**
@@ -102,6 +109,18 @@ public class MetadataAuthzHelper {
   private static final Map<Entity.EntityType, Map<String, List<ParentScopeAccessPath>>>
       LIST_SHORT_CIRCUITS =
           Map.of(
+              Entity.EntityType.USER,
+              principalListPaths(
+                  AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION,
+                  Privilege.Name.MANAGE_USERS),
+              Entity.EntityType.GROUP,
+              principalListPaths(
+                  AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION,
+                  Privilege.Name.MANAGE_GROUPS),
+              Entity.EntityType.ROLE,
+              principalListPaths(
+                  AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
+                  Privilege.Name.MANAGE_GRANTS),
               Entity.EntityType.TABLE,
               Map.of(
                   AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
@@ -142,6 +161,15 @@ public class MetadataAuthzHelper {
   }
 
   private MetadataAuthzHelper() {}
+
+  private static Map<String, List<ParentScopeAccessPath>> principalListPaths(
+      String expression, Privilege.Name managementPrivilege) {
+    return Map.of(
+        expression,
+        List.of(
+            parentOwnerPath(METALAKE_ONLY_SCOPE),
+            parentPrivilegePath(managementPrivilege, METALAKE_ONLY_SCOPE)));
+  }
 
   private static ParentScopeAccessPath parentOwnerPath(String parentScopes) {
     return new ParentScopeAccessPath("ANY(OWNER, " + parentScopes + ")", Set.of());
@@ -375,7 +403,14 @@ public class MetadataAuthzHelper {
     // per-object loop over every catalog in the metalake.
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
+    boolean isMetadataObject = METADATA_OBJECT_ENTITY_TYPES.contains(entityType);
     if (enableAuthorization() && nameIdentifiers.length > 0) {
+      if (isMetadataObject) {
+        Arrays.stream(nameIdentifiers)
+            .forEach(
+                identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
+      }
+
       String principalName = PrincipalUtils.getCurrentPrincipal().getName();
       if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
         // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
@@ -400,7 +435,13 @@ public class MetadataAuthzHelper {
           nameIdentifiers.length);
     }
     preloadToCache(entityType, nameIdentifiers);
-    preloadOwner(entityType, nameIdentifiers);
+    // Ownership is defined on metadata objects, independently of the filter expression.
+    // Users/groups are not metadata objects. OwnerMetaService.batchGetOwner resolves IDs per
+    // identifier, so calling it for users/groups would still perform two SELECTs per entry
+    // before the batched owner-relation queries.
+    if (isMetadataObject) {
+      preloadOwner(entityType, nameIdentifiers);
+    }
 
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
@@ -551,7 +592,7 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
     if (!GravitinoEnv.getInstance().cacheEnabled()
-        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || GravitinoEnv.getInstance().internalAccessControlDispatcher() == null
         || nameIdentifiers.length == 0) {
       return;
     }
@@ -570,7 +611,7 @@ public class MetadataAuthzHelper {
           "All identifiers must have the same schema");
 
       if (!GravitinoEnv.getInstance()
-          .schemaDispatcher()
+          .internalSchemaDispatcher()
           .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
         return;
       }

@@ -135,8 +135,31 @@ public class TestIcebergTableEventDispatcher {
 
     Event event = listener.popPostEvent();
     Assertions.assertEquals(IcebergCreateTableEvent.class, event.getClass());
-    Assertions.assertSame(context.httpHeaders(), event.customInfo());
+    // Content equality, not identity: Event.customInfo() now merges in the request's
+    // automatically captured query parameters, so the result is always a freshly built map even
+    // when that automatic contribution is empty.
+    Assertions.assertEquals(context.httpHeaders(), event.customInfo());
     Assertions.assertFalse(event.customInfo().containsKey(EXTRA_KEY));
+  }
+
+  /**
+   * {@code IcebergEvent}/{@code IcebergFailureEvent} used to override {@code customInfo()} to
+   * return only the request-context's own facts (headers ∪ extras), silently discarding {@link
+   * Event}'s automatically captured query parameters. Pins that the two are now merged, for both
+   * the success and failure event.
+   */
+  @Test
+  void testCustomInfoMergesAutomaticQueryParamsWithRequestContextFacts() {
+    RecordingListener listener = new RecordingListener();
+    IcebergTableEventDispatcher dispatcher = dispatcher(listener, succeedingInner());
+    RequestContext.setRequestQueryParams(ImmutableMap.of("details", "true"));
+
+    createTable(dispatcher);
+
+    Event event = listener.popPostEvent();
+    Assertions.assertEquals(IcebergCreateTableEvent.class, event.getClass());
+    Assertions.assertEquals("true", event.customInfo().get("details"));
+    Assertions.assertEquals(REQUEST_HEADER_VALUE, event.customInfo().get(REQUEST_HEADER));
   }
 
   /**
@@ -232,7 +255,10 @@ public class TestIcebergTableEventDispatcher {
     Assertions.assertFalse(
         second.customInfo().containsKey(EXTRA_KEY),
         "Extras must not survive into a later operation");
-    Assertions.assertSame(
+    // Content equality, not identity: Event.customInfo() now merges in the request's
+    // automatically captured query parameters, so the result is always a freshly built map even
+    // when that automatic contribution is empty.
+    Assertions.assertEquals(
         ((IcebergEvent) second).icebergRequestContext().httpHeaders(), second.customInfo());
   }
 

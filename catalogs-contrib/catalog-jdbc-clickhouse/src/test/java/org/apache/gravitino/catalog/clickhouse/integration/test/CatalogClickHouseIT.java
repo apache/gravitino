@@ -515,6 +515,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertEquals(Transforms.NAME_OF_MONTH, partitioning[0].name());
     Assertions.assertArrayEquals(
         new String[] {"event_time"}, ((NamedReference) partitioning[0].arguments()[0]).fieldName());
+    Assertions.assertEquals(
+        "toYYYYMM(event_time)", loaded.properties().get(TableConstants.PARTITION_KEY));
 
     Index[] indexes = loaded.index();
     Assertions.assertTrue(
@@ -529,6 +531,108 @@ public class CatalogClickHouseIT extends BaseIT {
                 idx ->
                     idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+  }
+
+  @Test
+  void testLoadExpressionIndexDoesNotFabricateColumnIndex() {
+    String sourceTableName = GravitinoITUtils.genRandomName("expression_index_source");
+    String recreatedTableName = GravitinoITUtils.genRandomName("expression_index_recreated");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "id UInt64, "
+                + "name String, "
+                + "INDEX idx_name name TYPE minmax GRANULARITY 1, "
+                + "INDEX idx_lower lower(name) TYPE minmax GRANULARITY 1"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, sourceTableName));
+
+    String sourceCreateSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, sourceTableName));
+    String normalizedSourceCreateSql = sourceCreateSql.replace("`", "").replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        StringUtils.containsIgnoreCase(
+            normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
+        "Source table should retain its expression index: " + sourceCreateSql);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table loaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, sourceTableName));
+    Index[] loadedIndexes = loaded.index();
+    Index loadedSimpleIndex =
+        Arrays.stream(loadedIndexes)
+            .filter(index -> "idx_name".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, loadedSimpleIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"name"}}, loadedSimpleIndex.fieldNames());
+    Assertions.assertFalse(
+        Arrays.stream(loadedIndexes).anyMatch(index -> "idx_lower".equals(index.name())));
+
+    tableCatalog.createTable(
+        NameIdentifier.of(schemaName, recreatedTableName),
+        loaded.columns(),
+        loaded.comment(),
+        loaded.properties(),
+        loaded.partitioning(),
+        loaded.distribution(),
+        loaded.sortOrder(),
+        loaded.index());
+
+    String recreatedCreateSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, recreatedTableName));
+    String normalizedRecreatedCreateSql =
+        recreatedCreateSql.replace("`", "").replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
+        "Recreated table should retain the simple index: " + recreatedCreateSql);
+    Assertions.assertFalse(
+        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "idx_lower"),
+        "Recreated table must not contain a fabricated replacement index: " + recreatedCreateSql);
+  }
+
+  @Test
+  void testLoadTableWithNativePartitionExpression() {
+    // A valid MergeTree table whose PARTITION BY uses a native expression outside the structured
+    // identity/year/month/day subset must still be loadable. partitioning() stays empty, and the
+    // canonical native expression is exposed through the read-only partition-key property.
+    String name = GravitinoITUtils.genRandomName("native_partition_expr");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64,\n"
+                + "  `sm4_cipher_msg` String\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY cityHash64(toString(sm4_cipher_msg)) %% 7\n"
+                + "ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(0, loaded.partitioning().length);
+    Assertions.assertEquals(
+        "cityHash64(toString(sm4_cipher_msg)) % 7",
+        loaded.properties().get(TableConstants.PARTITION_KEY));
+  }
+
+  @Test
+  void testLoadTableWithoutPartition() {
+    // An unpartitioned table exposes an empty partition-key property so the key is always present,
+    // and partitioning() stays empty.
+    String name = GravitinoITUtils.genRandomName("no_partition");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(0, loaded.partitioning().length);
+    Assertions.assertEquals("", loaded.properties().get(TableConstants.PARTITION_KEY));
   }
 
   @Test

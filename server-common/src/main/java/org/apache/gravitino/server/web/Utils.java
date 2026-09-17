@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Parameter;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +38,9 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class Utils {
@@ -100,6 +103,7 @@ public class Utils {
   }
 
   public static Response internalError(String message, Throwable throwable) {
+    ServerHealth.getInstance().recordFailure(throwable);
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
         .entity(ErrorResponse.internalError(message, throwable))
         .type(MediaType.APPLICATION_JSON)
@@ -189,13 +193,59 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Returns an HTTP 501 response for functionality that the server does not implement.
+   *
+   * @param message the error message
+   * @return the HTTP response
+   */
   public static Response unsupportedOperation(String message) {
     return unsupportedOperation(message, null);
   }
 
+  /**
+   * Returns an HTTP 501 response for functionality that the server does not implement.
+   *
+   * @param message the error message
+   * @param throwable the exception that caused the error
+   * @return the HTTP response
+   */
   public static Response unsupportedOperation(String message, Throwable throwable) {
-    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
+    return Response.status(Response.Status.NOT_IMPLEMENTED)
         .entity(ErrorResponse.unsupportedOperation(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Returns an HTTP 409 response when an operation conflicts with the target object's state.
+   *
+   * <p>The unsupported-operation error payload is retained so existing clients can reconstruct
+   * domain exceptions such as {@code UnmodifiableStatisticException}.
+   *
+   * @param message the error message
+   * @param throwable the exception that caused the error
+   * @return the HTTP response
+   */
+  public static Response operationConflict(String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(ErrorResponse.unsupportedOperation(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Returns an HTTP 405 response when the target resource does not allow the request method.
+   *
+   * <p>The unsupported-operation error payload is retained for compatibility with clients that
+   * identify this response by its application error code.
+   *
+   * @param message the error message
+   * @return the HTTP response
+   */
+  public static Response methodNotAllowed(String message) {
+    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
+        .entity(ErrorResponse.unsupportedOperation(message))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
@@ -214,6 +264,21 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Returns the health response used after an observed out-of-memory failure.
+   *
+   * @return HTTP 503 with a JVM failure requiring process restart
+   */
+  public static Response outOfMemoryResponse() {
+    HealthCheckDTO check =
+        new HealthCheckDTO(
+            "jvm",
+            HealthCheckDTO.Status.DOWN,
+            Collections.singletonMap("reason", "OutOfMemoryError; restart required"));
+    return serviceUnavailable(
+        new HealthResponse(HealthCheckDTO.Status.DOWN, Collections.singletonList(check)));
+  }
+
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
@@ -222,7 +287,13 @@ public class Utils {
     if (principal == null) {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
-    return PrincipalUtils.doAs(principal, action);
+    try {
+      return PrincipalUtils.doAs(principal, action);
+    } catch (Exception | Error failure) {
+      // Record before a resource converts a wrapped failure into an ordinary error response.
+      ServerHealth.getInstance().recordFailure(failure);
+      throw failure;
+    }
   }
 
   public static Map<String, String> filterFilesetAuditHeaders(HttpServletRequest httpRequest) {

@@ -30,6 +30,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -108,6 +110,8 @@ import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
@@ -130,6 +134,7 @@ import org.apache.gravitino.listener.api.info.ViewInfo;
 import org.apache.gravitino.listener.api.info.partitions.IdentityPartitionInfo;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -605,6 +610,45 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.AUTHORIZATION_DENIAL,
         AuditLog.Operation.fromEvent(authzDenialNullIdentifier));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testPolicyTagOperation() {
+    Event addEvent =
+        new AddPolicyForTagEvent(USER, "metalake", "tag", "policy", AllValuesSelector.get());
+    Event addFailureEvent =
+        new AddPolicyForTagFailureEvent(
+            USER,
+            "metalake",
+            "tag",
+            "policy",
+            AllValuesSelector.get(),
+            new Exception("add failed"));
+    Event removeEvent = new RemovePolicyFromTagEvent(USER, "metalake", "tag", "policy");
+    Event removeFailureEvent =
+        new RemovePolicyFromTagFailureEvent(
+            USER, "metalake", "tag", "policy", new Exception("remove failed"));
+
+    Assertions.assertEquals(
+        AuditLog.Operation.ADD_POLICY_FOR_TAG, AuditLog.Operation.fromEvent(addEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.ADD_POLICY_FOR_TAG, AuditLog.Operation.fromEvent(addFailureEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.REMOVE_POLICY_FROM_TAG, AuditLog.Operation.fromEvent(removeEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.REMOVE_POLICY_FROM_TAG,
+        AuditLog.Operation.fromEvent(removeFailureEvent));
+
+    // The deprecated v1 schema records the tag identifier but has no custom-info field for policy
+    // or selector details. The v2 formatter covers those relation-specific fields.
+    SimpleFormatter formatter = new SimpleFormatter();
+    SimpleAuditLog addLog = formatter.format(addEvent);
+    SimpleAuditLog removeLog = formatter.format(removeEvent);
+    Assertions.assertEquals(AuditLog.Operation.ADD_POLICY_FOR_TAG, addLog.operation());
+    Assertions.assertEquals(AuditLog.Operation.REMOVE_POLICY_FROM_TAG, removeLog.operation());
+    Assertions.assertEquals("metalake.system.tag.tag", addLog.identifier());
+    Assertions.assertEquals("metalake.system.tag.tag", removeLog.identifier());
   }
 
   /**

@@ -107,6 +107,14 @@ public class MetadataObjectCredentialOperations {
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+            Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
+            if (!MetadataAuthzHelper.checkAccess(
+                identifier,
+                entityType,
+                AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)) {
+              return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
+            }
+
             Map<String, String> filteredFilesetHeaders =
                 Utils.filterFilesetCredentialHeaders(httpRequest);
             // set the fileset info into the thread local context
@@ -120,7 +128,7 @@ public class MetadataObjectCredentialOperations {
             CredentialPrivilege privilege =
                 MetadataAuthzHelper.checkAccess(
                         identifier,
-                        MetadataObjectUtil.toEntityType(object),
+                        entityType,
                         AuthorizationExpressionConstants
                             .FILTER_WRITE_FILESET_AUTHORIZATION_EXPRESSION)
                     ? CredentialPrivilege.WRITE

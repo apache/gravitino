@@ -32,6 +32,7 @@ public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
         + " COALESCE(g.group_comment, '') as comment,"
+        + " g.audit_info as auditInfo,"
         + " '['"
         + " || COALESCE(GROUP_CONCAT('\"' || u.user_name || '\"'), '')"
         + " || ']' as usernames"
@@ -44,7 +45,7 @@ public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
         + " WHERE g.group_name = #{groupName} AND g.deleted_at = 0"
-        + " GROUP BY g.group_id, g.group_name, g.group_comment";
+        + " GROUP BY g.group_id, g.group_name, g.group_comment, g.audit_info";
   }
 
   @Override

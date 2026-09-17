@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -195,6 +196,20 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     JobEntity jobEntity2 =
         newJobEntity("job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
     backend.insert(jobEntity2, false);
+
+    Assertions.assertThrows(
+        NonEmptyEntityException.class,
+        () ->
+            jobTemplateMetaService.deleteJobTemplate(
+                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs")));
+    Assertions.assertEquals(
+        2,
+        JobMetaService.getInstance()
+            .listJobsByNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .size());
+    Assertions.assertTrue(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, jobEntity1.name())));
 
     boolean deleted =
         jobTemplateMetaService.deleteJobTemplate(

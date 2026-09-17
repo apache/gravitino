@@ -52,53 +52,11 @@ jobs:
   access-control-IT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     strategy:
       matrix:
-        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 17 ]
-
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        run: |
-          ./gradlew compileDistribution -PskipWeb=true -x test
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Authorization Integration Test (JDK${{ matrix.java-version }})
-        id: integrationTest
-        run: |
-          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PskipDockerTests=false -PskipWeb=true :authorizations:test
-          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PskipDockerTests=false -PskipWeb=true :authorizations:test
-          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PskipDockerTests=false -PskipWeb=true :authorizations:test
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v7
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: authorizations-integrate-test-reports-${{ matrix.java-version }}
-          path: |
-            build/reports
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
+    uses: ./.github/workflows/access-control-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}

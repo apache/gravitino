@@ -109,7 +109,8 @@ public class TestStatisticOperations extends BaseOperationsTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
   }
 
   @Override
@@ -235,6 +236,93 @@ public class TestStatisticOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnsupportedOperationException
+    doThrow(new UnsupportedOperationException("mock error"))
+        .when(manager)
+        .listStatistics(any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp3.getStatus());
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  /** Tests that every statistics endpoint rejects non-table object types as invalid arguments. */
+  @Test
+  public void testStatisticsEndpointsRejectNonTableObject() {
+    MetadataObject catalogObject = MetadataObjects.parse(catalog, MetadataObject.Type.CATALOG);
+    String path =
+        "/metalakes/"
+            + metalake
+            + "/objects/"
+            + catalogObject.type()
+            + "/"
+            + catalogObject.fullName()
+            + "/statistics";
+    Map<String, StatisticValue<?>> statistics =
+        Map.of(Statistic.CUSTOM_PREFIX + "test", StatisticValues.longValue(1L));
+    StatisticsUpdateRequest updateRequest = new StatisticsUpdateRequest(statistics);
+    StatisticsDropRequest dropRequest =
+        new StatisticsDropRequest(new String[] {Statistic.CUSTOM_PREFIX + "test"});
+    PartitionStatisticsUpdateRequest partitionUpdateRequest =
+        new PartitionStatisticsUpdateRequest(
+            List.of(PartitionStatisticsUpdateDTO.of("partition", statistics)));
+    PartitionStatisticsDropRequest partitionDropRequest =
+        new PartitionStatisticsDropRequest(
+            List.of(
+                PartitionStatisticsDropDTO.of(
+                    "partition", List.of(Statistic.CUSTOM_PREFIX + "test"))));
+
+    List<Response> responses =
+        List.of(
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .get(),
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(entity(updateRequest, MediaType.APPLICATION_JSON_TYPE)),
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .post(entity(dropRequest, MediaType.APPLICATION_JSON_TYPE)),
+            target(path + "/partitions")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .get(),
+            target(path + "/partitions")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(entity(partitionUpdateRequest, MediaType.APPLICATION_JSON_TYPE)),
+            target(path + "/partitions")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .post(entity(partitionDropRequest, MediaType.APPLICATION_JSON_TYPE)));
+
+    responses.forEach(
+        response -> {
+          Assertions.assertEquals(
+              Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+          ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+          Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+          Assertions.assertEquals(
+              IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+        });
   }
 
   @Test
@@ -362,7 +450,7 @@ public class TestStatisticOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp4.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
 
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
@@ -618,7 +706,7 @@ public class TestStatisticOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
@@ -877,7 +965,7 @@ public class TestStatisticOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp4.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
 
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
@@ -1049,7 +1137,7 @@ public class TestStatisticOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);

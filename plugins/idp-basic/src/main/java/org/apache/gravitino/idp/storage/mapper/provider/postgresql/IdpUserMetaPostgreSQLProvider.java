@@ -31,7 +31,7 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
   @Override
   public String selectIdpUserWithGroups(@Param("username") String username) {
     return "SELECT u.user_name as name, u.password_hash as passwordHash,"
-        + " u.enabled as enabled,"
+        + " u.enabled as enabled, u.audit_info as auditInfo,"
         + " COALESCE(JSON_AGG(g.group_name), '[]'::json) as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -42,7 +42,7 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled, u.audit_info";
   }
 
   @Override

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.List;
@@ -30,7 +29,7 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserMetaBaseSQLProvider {
   public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
-        + " enabled as enabled,"
+        + " enabled as enabled, audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -40,7 +39,7 @@ public class IdpUserMetaBaseSQLProvider {
 
   public String selectIdpUserWithGroups(@Param("username") String username) {
     return "SELECT u.user_name as name, u.password_hash as passwordHash,"
-        + " u.enabled as enabled,"
+        + " u.enabled as enabled, u.audit_info as auditInfo,"
         + " COALESCE(JSON_ARRAYAGG(g.group_name), JSON_ARRAY()) as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -51,13 +50,13 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled, u.audit_info";
   }
 
   public String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {
     return "<script>"
         + "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
-        + " enabled as enabled,"
+        + " enabled as enabled, audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -73,12 +72,14 @@ public class IdpUserMetaBaseSQLProvider {
   public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
     return "INSERT INTO "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " (user_id, user_name, password_hash, enabled, current_version, last_version, deleted_at)"
+        + " (user_id, user_name, password_hash, enabled, audit_info, current_version,"
+        + " last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.username},"
         + " #{userMeta.passwordHash},"
         + " #{userMeta.enabled},"
+        + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
         + " #{userMeta.deletedAt}"
@@ -86,19 +87,23 @@ public class IdpUserMetaBaseSQLProvider {
   }
 
   public String updateIdpUserPassword(
-      @Param("username") String username, @Param("passwordHash") String passwordHash) {
+      @Param("username") String username,
+      @Param("passwordHash") String passwordHash,
+      @Param("auditInfo") String auditInfo) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET password_hash = #{passwordHash}"
+        + " SET password_hash = #{passwordHash}, audit_info = #{auditInfo}"
         + " WHERE user_name = #{username}"
         + " AND deleted_at = 0";
   }
 
   public String updateIdpUserEnabled(
-      @Param("username") String username, @Param("enabled") boolean enabled) {
+      @Param("username") String username,
+      @Param("enabled") boolean enabled,
+      @Param("auditInfo") String auditInfo) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET enabled = #{enabled}"
+        + " SET enabled = #{enabled}, audit_info = #{auditInfo}"
         + " WHERE user_name = #{username}"
         + " AND deleted_at = 0";
   }

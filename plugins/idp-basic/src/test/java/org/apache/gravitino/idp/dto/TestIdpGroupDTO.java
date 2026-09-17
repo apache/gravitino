@@ -20,8 +20,10 @@
 package org.apache.gravitino.idp.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,10 +32,13 @@ public class TestIdpGroupDTO {
 
   @Test
   public void testIdpGroupDTOSerDe() throws JsonProcessingException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build();
     IdpGroupDTO groupDTO =
         IdpGroupDTO.builder()
             .withName("test_group")
             .withUsers(Arrays.asList("user1", "user2"))
+            .withAudit(audit)
             .build();
 
     String json = JsonUtils.objectMapper().writeValueAsString(groupDTO);
@@ -42,6 +47,7 @@ public class TestIdpGroupDTO {
     Assertions.assertEquals(groupDTO, deserialized);
     Assertions.assertEquals("test_group", deserialized.name());
     Assertions.assertEquals(Arrays.asList("user1", "user2"), deserialized.users());
+    Assertions.assertEquals(audit, deserialized.audit());
 
     // Test with default users
     IdpGroupDTO groupDTO1 = IdpGroupDTO.builder().withName("test_group").build();
@@ -53,8 +59,9 @@ public class TestIdpGroupDTO {
     Assertions.assertEquals("test_group", deserialized1.name());
     Assertions.assertTrue(deserialized1.users().isEmpty());
     Assertions.assertEquals("", deserialized1.comment());
+    Assertions.assertNull(deserialized1.audit());
     Assertions.assertEquals(
-        "IdpGroupDTO(name=test_group, comment=, users=[])", deserialized1.toString());
+        "IdpGroupDTO(name=test_group, comment=, users=[], audit=null)", deserialized1.toString());
 
     IdpGroupDTO deserializedWithNullUsers =
         JsonUtils.objectMapper()
@@ -62,7 +69,8 @@ public class TestIdpGroupDTO {
     Assertions.assertTrue(deserializedWithNullUsers.users().isEmpty());
     Assertions.assertEquals("", deserializedWithNullUsers.comment());
     Assertions.assertEquals(
-        "IdpGroupDTO(name=test_group, comment=, users=[])", deserializedWithNullUsers.toString());
+        "IdpGroupDTO(name=test_group, comment=, users=[], audit=null)",
+        deserializedWithNullUsers.toString());
 
     IdpGroupDTO deserializedNullComment =
         JsonUtils.objectMapper()
