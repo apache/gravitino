@@ -22,7 +22,7 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import org.gradle.api.tasks.SourceSetContainer
 
-// Exercise the real generator with tiny ZIPs; no cloud bundles or connector builds are needed.
+// Synthetic JARs keep generator checks independent of dependency downloads.
 def generatorType = project(':api').tasks.named('generateMavenLegalFiles').get().class.superclass
 def fixtureGenerator = tasks.register('mavenLegalTestFixture', generatorType)
 def legalTests = tasks.register('testMavenLegalFiles') {
@@ -55,7 +55,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
       def lines = section.readLines().collect { it.trim() }
       def sources = lines.findAll { it.startsWith('./') && it.contains('/src/main/java/') }.collect { file(it).canonicalFile }
       if (sources.isEmpty()) return
-      // Apache-2.0 copying alone does not imply an upstream NOTICE (e.g. Lance and Trino).
+      // Only copied sources with applicable upstream notices require a template.
       def notice = templates.listFiles().find { it.name.startsWith('NOTICE.') && it.readLines().first().startsWith(lines.first()) }
       if (notice == null) return
       def name = notice.name.substring('NOTICE.'.length())
@@ -73,7 +73,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
 
     def selector = generatorType.getField('Companion').get(null)
     ['META-INF/LICENSE', 'META-INF/NOTICE.markdown', 'META-INF/FastDoubleParser-LICENSE',
-     'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
+     'THIRD-PARTY-NOTICES', 'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
       assert selector.isLegalResource(it): "Missed legal resource: ${it}"
     }
     ['models/license-manager-2018-08-01.json', 'org/example/License.class',
@@ -109,7 +109,8 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     mapping.text = rules
     def component = new File(fixtureDir, 'component.jar')
     writeZip(component, ['pkg/Type.class': 'fixture', 'META-INF/LICENSE': 'Dependency terms',
-      'META-INF/license/companion.txt': 'Case-sensitive companion', 'META-INF/NOTICE': 'Dependency notice'])
+      'META-INF/license/companion.txt': 'Case-sensitive companion', 'META-INF/NOTICE': 'Dependency notice',
+      'THIRD-PARTY-NOTICES': 'Embedded component notice'])
     def slf4j = new File(fixtureDir, 'slf4j.jar')
     writeZip(slf4j, ['org/slf4j/Logger.class': 'fixture', 'META-INF/NOTICE': 'SLF4J fixture notice'])
     def output = new File(fixtureDir, 'legal.zip')
@@ -125,9 +126,11 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     assert initial[prefix + 'META-INF/LICENSE'] == 'Dependency terms'
     assert initial[prefix + 'META-INF/license/companion.txt'] == 'Case-sensitive companion'
     assert initial[prefix + 'LICENSE.exact'] == 'Exact version terms'
+    assert initial[prefix + 'THIRD-PARTY-NOTICES'] == 'Embedded component notice'
     assert !initial.containsKey(prefix + 'terms.txt')
     assert initial['META-INF/LICENSE'].contains('example:component:1')
     assert initial['META-INF/NOTICE'].contains('Dependency notice')
+    assert initial['META-INF/NOTICE'].contains('Embedded component notice')
     def firstBytes = output.bytes
     generator.generate()
     assert Arrays.equals(firstBytes, output.bytes): 'Legal ZIP must be deterministic'
@@ -145,6 +148,17 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     generator.dependencyIds.set(['empty.jar': 'example/component/1'])
     generator.generate()
     assert readZip(output).keySet() == ['META-INF/LICENSE', 'META-INF/NOTICE'].toSet(): 'Empty compatibility JAR received supplements'
+
+    new File(fixtureTemplates, 'NOTICE.source').text = 'Copied source notice'
+    def jqueryLicense = new File(fixtureDir, 'jquery.md')
+    jqueryLicense.text = 'Javadoc asset license'
+    generator.sourceNotices.set(['source'])
+    generator.javadocFiles.from(jqueryLicense)
+    generator.generate()
+    assert readZip(output)['META-INF/NOTICE'].contains('Copied source notice')
+    assert readZip(output)['META-INF/LICENSE'].contains('legal/ directory at the root of this JAR')
+    generator.sourceNotices.set([])
+    generator.javadocFiles.setFrom([])
 
     def nested = new File(fixtureDir, 'nested.jar')
     writeZip(nested, initial + ['pkg/Nested.class': 'fixture'])
@@ -176,7 +190,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     generator.dependencyIds.set(['component.jar': 'example/component/1'])
     new File(fixtureTemplates, 'LICENSE.exact').delete()
     expectFailure('Missing Maven legal supplement for example:component: LICENSE.exact') { generator.generate() }
-    logger.lifecycle('Maven legal checks passed: template consistency, source mappings, resource selection, supplements, nested exclusions and invalid mappings')
+    logger.lifecycle('Maven legal checks passed')
   }
 }
 tasks.named('check') { dependsOn(legalTests) }

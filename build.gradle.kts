@@ -87,9 +87,9 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
   companion object {
     private const val LICENSE_INVENTORY = "\nBundled component licensing:\n"
     private const val NOTICE_INVENTORY = "\nBundled component notices:\n"
-    private val noticeFileName = Regex("(?i)([A-Za-z0-9_]+-)?NOTICE([.-].*)?")
+    private val noticeFileName = Regex("(?i)([A-Za-z0-9_]+-)*NOTICES?([.-].*)?")
     private val legalFileName = Regex(
-      "(?i)([A-Za-z0-9_]+-)?(LICENSE|LICENCE|NOTICE|COPYING|COPYRIGHT)(-[A-Za-z0-9_-]+)?(\\.(txt|md|markdown|adoc))?"
+      "(?i)([A-Za-z0-9_]+-)*(LICENSE|LICENCE|NOTICES?|COPYING|COPYRIGHT)(-[A-Za-z0-9_-]+)?(\\.(txt|md|markdown|adoc))?"
     )
 
     /** Selects legal resources without mistaking SDK models such as license-manager.json for licenses. */
@@ -812,7 +812,7 @@ subprojects {
   }
   val javadocLegalFiles = tasks.register<GenerateJarLegalFiles>("generateJavadocLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
-    // These implementations are private/package-private and are absent from generated Javadoc.
+    // The copied Spark transform implementation is private and absent from Javadoc.
     sourceNotices.set(
       when (project.path) {
         ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }

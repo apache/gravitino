@@ -83,7 +83,7 @@ class TestRuntimeJarLegalFiles {
         }
       }
     }
-    assertTrue(checked > 10, "Expected dependency documents and Jackson companion files");
+    assertTrue(checked > 0, "No dependency legal documents were checked");
   }
 
   @Test

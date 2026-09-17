@@ -19,51 +19,26 @@
 
 # Legal documents for Maven artifacts
 
-Maven JARs use the Apache 2.0 license and Gravitino notice in this directory.
-The root `LICENSE.bin` and `NOTICE.bin` describe an entire server distribution,
-so they must not be used for individual Maven artifacts.
+`LICENSE` and `NOTICE` contain the base text for Maven artifacts. Thin and source
+JARs add applicable notices for copied production code. Javadoc JARs include notices
+for material present in the documentation and reference the doclet's asset licenses.
+Web WARs use their own legal documents.
 
-`GenerateJarLegalFiles` adds notices for each module's copied production sources.
-Source JARs have the same notices. Javadoc omits notices for private implementations
-that are absent from the generated documentation, and points to the JDK doclet's
-own `legal/` directory for its JavaScript and CSS licenses.
-Root `LICENSE` records copied-source paths and root `NOTICE` includes their applicable
-attributions. Copying Apache-2.0 code does not by itself require an additional NOTICE
-entry: the copied Lance and Trino sources have no additional applicable upstream notice.
+Shaded and CLI JARs collect legal documents from their bundled dependencies under
+`META-INF/licenses/<group>/<artifact>/<version>/`, preserving original relative
+paths and optional classifiers. External dependencies use Maven artifact names;
+project dependencies use Gradle project names. The main LICENSE lists these document
+paths, and the main NOTICE includes upstream notices. Nested inventories are
+regenerated after exclusions. A ZIP intermediate preserves case-sensitive paths.
 
-The Glue credentials provider derives from Doris's
-[`CustomAwsCredentialsProvider`](https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java).
-Gravitino commit [`d81dd65d1`](https://github.com/apache/gravitino/commit/d81dd65d1c9159dbb67d5ff18bac62c24e9ba39c)
-explicitly recorded that adaptation in the source Javadoc and root `LICENSE`.
-Commit [`2c930e827`](https://github.com/apache/gravitino/commit/2c930e8276f77c150e2cc328b37f17c5acca2643)
-moved and reworked the existing class into `catalog-common`, removing the attribution
-comment and old inventory paths. The current Doris entry preserves that provenance
-at the new source location.
+`dependencies.txt` supplies missing upstream texts and license labels. Rules are
+selected by `group:artifact:version`, then `group:artifact`, then `group:*`.
+Comma-separated filenames precede an optional `|` license label. Rules apply only
+to bundled dependencies with content; declarations in a POM do not trigger them.
 
-Bundled JARs preserve dependency documents under
-`META-INF/licenses/<group>/<artifact>/<version>/`, retaining their original
-relative paths. Metadata is generated as a ZIP so case-sensitive paths such as
-`META-INF/LICENSE` and `META-INF/license/` survive on every host filesystem.
-This avoids collisions between different `LICENSE`, `NOTICE`,
-`LICENSE.txt`, and companion files. When a Gravitino runtime is bundled again,
-its dependency documents keep that location. Connector runtimes that exclude
-SLF4J classes also exclude the corresponding dependency documents.
-
-`dependencies.txt` supplies verified texts missing from upstream binary JARs.
-The canonical LICENSE lists each resource-backed component by its resolved group,
-name and version, with exact document paths. External dependencies use Maven artifact
-names; project dependencies use Gradle project names (for example, `api` rather than
-the published `gravitino-api`). A label after `|` supplies its license
-summary or additional requirements. Relevant NOTICE documents are also propagated
-into the canonical NOTICE, with their original paths to resolve companion-file
-references. Nested inventories are regenerated after dependency exclusions.
-A version-specific `group:artifact:version` entry takes precedence over an
-unversioned coordinate or group wildcard; this is necessary for Jackson's changing
-embedded parser licenses.
-The mapping applies only to dependencies included by Shadow's dependency filter, or the
-CLI's runtime classpath. Ordinary thin, source and Javadoc JARs do not inherit
-these dependencies' inventories. Review the entries when updating dependencies;
-a POM license name alone does not account for embedded third-party code.
+When changing dependencies or copied sources, inspect the actual included code and
+upstream legal documents. Update the relevant templates, mappings and root source
+inventory. A dependency's POM license declaration may omit embedded third-party code.
 
 ## Sources for supplements
 
@@ -71,7 +46,7 @@ a POM license name alone does not account for embedded third-party code.
   Only the gRPC attribution applies to `grpc-api`; the okhttp/xds portions are
   not bundled. `grpc-context` is an empty compatibility JAR.
 - Azure SDK: [Microsoft MIT license](https://github.com/Azure/azure-sdk-for-java/blob/azure-core_1.50.0/LICENSE.txt),
-  verified for the Azure SDK dependencies in the Azure bundle.
+  shared by the Azure SDK components in the Azure bundle.
 - MSAL 1.16.1: [LICENSE](https://github.com/AzureAD/microsoft-authentication-library-for-java/blob/v1.16.1/LICENSE);
   persistence extension 1.3.0: [LICENSE](https://github.com/AzureAD/microsoft-authentication-extensions-for-java/blob/master/LICENSE).
 - Legacy Azure keyvault-core 1.0.0: the exact Maven Central sources' `IKey.java`
@@ -94,8 +69,7 @@ a POM license name alone does not account for embedded third-party code.
   the [0.9.0 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v0.9.0/LICENSE)
   and [1.0.90 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v1.0.90/LICENSE)
   respectively. Jackson 2.18.3 also needs the Boost text identified by its parser
-  NOTICE. Existing fast_float and bigint texts are preserved. Newer Jackson
-  versions with complete metadata do not receive these version-specific additions.
+  NOTICE. Existing fast_float and bigint texts are preserved.
 - Reactive Streams 1.0.4: [MIT-0 LICENSE](https://github.com/reactive-streams/reactive-streams-jvm/blob/v1.0.4/LICENSE).
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
   embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD
@@ -109,39 +83,31 @@ a POM license name alone does not account for embedded third-party code.
   The selected companions match across these versions. They cover embedded
   SLF4J/Harmony/JCTools in common, Webbit and Hoehrmann UTF-8 validation in HTTP,
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
-  and Apple's dnsinfo header in the macOS native resolver. Optional external
-  dependencies from Netty's omnibus NOTICE are not copied indiscriminately.
-  Netty tcnative classes 2.0.65.Final use their own [2016 notice](https://github.com/netty/netty-tcnative/blob/netty-tcnative-parent-2.0.65.Final/NOTICE.txt) and Tomcat Native
-  provenance, not Netty 4.1's 2014 notice. Build-wrapper and unbundled native-library
-  sections are excluded from this Java-only artifact's supplement.
+  and Apple's dnsinfo header in the macOS native resolver.
+  Netty tcnative classes 2.0.65.Final use the Java artifact's Netty and Tomcat Native
+  attributions from its [NOTICE](https://github.com/netty/netty-tcnative/blob/netty-tcnative-parent-2.0.65.Final/NOTICE.txt).
   The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 
+## Copied-source provenance
+
+Root `LICENSE` records copied-source paths; root `NOTICE` and the module mappings
+identify applicable notices. The Glue provider in `catalog-common` derives from
+[Doris's provider](https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java),
+with provenance recorded in [the original attribution](https://github.com/apache/gravitino/commit/d81dd65d1c9159dbb67d5ff18bac62c24e9ba39c).
+The Ranger reference classes use the attribution from [Ranger 2.4.0](https://github.com/apache/ranger/blob/release-ranger-2.4.0/NOTICE.txt).
+
 ## Verification
 
-`testMavenLegalFiles`, included in the root `check` task, checks that base templates
-match the root documents and that copied-source notices recorded in `LICENSE` reach
-the modules actually compiling those sources. It checks only sources with applicable
-NOTICE templates, not every Apache-2.0 source. Small synthetic JARs exercise resource
-selection, case-sensitive companions, classifier paths, supplement precedence,
-empty compatibility JARs, nested exclusions, deterministic output and invalid mappings.
-These checks do not build cloud bundles or connector runtimes.
-
-The client-runtime tests check that its canonical LICENSE/NOTICE entries are unique,
-that dependency documents are preserved, and that verified missing license texts,
-component references and notices are present:
+The root `check` task includes `testMavenLegalFiles`, which checks template and source
+mapping consistency and exercises the generator with synthetic JARs. Client-runtime
+tests check the actual shaded JAR's canonical entries, dependency documents,
+supplements and references.
 
 ```shell
 ./gradlew testMavenLegalFiles :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PskipITs
 ```
 
-These focused tests do not establish that every dependency's licensing metadata is
-complete. Check the actual Maven artifacts selected for a release, including nested
-runtimes, thin/source/Javadoc JARs and cloud bundles. Review this mapping whenever
-bundled dependencies change. Web WARs retain their existing legal documents.
-
-Supplements are limited to missing material. Identical Microsoft texts are reused
-across SDK/keyvault and MSAL/persistence components. JCTools and Netty's Apache-only
-HPACK text are covered by the base Apache 2.0 license; no duplicate copies are added.
-MIT-0 is retained to document the bundled component's license under ASF release
-policy, even though MIT-0 itself has no attribution-retention condition.
+Before a release, inspect the final Maven artifacts and review metadata for changed
+dependencies. These tests check packaging behavior, not completeness of upstream
+licensing information.
