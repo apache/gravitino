@@ -234,6 +234,7 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 | `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*     | No       | No        |
 | `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*     | No       | No        |
 | `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No         | No       | No        |
+| `partition-key`           | ClickHouse's canonical native partition expression (from `system.tables.partition_key`). Read-only; always present on load, empty string means unpartitioned. | `""`          | No         | Yes      | Yes       |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
@@ -268,6 +269,8 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
    - Identity: `PARTITION BY column_name`
    - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
+
+   The patterns above apply when creating a table. When loading a table, Gravitino preserves ClickHouse's canonical native partition expression (as returned by `system.tables.partition_key`) in the read-only `partition-key` property. An arbitrary native expression is therefore retained on load even when it cannot be mapped to one of the supported `Transform`s; in that case `Table.partitioning()` is empty and the full expression is exposed through `partition-key`.
 
 - Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
 
