@@ -40,6 +40,7 @@ import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Locale
+import java.util.zip.ZipFile
 
 Locale.setDefault(Locale.US)
 
@@ -80,42 +81,176 @@ val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
   maxParallelUsages.set(1)
 }
 
-/** Combines distinct legal documents, keeping Gravitino's document first. */
+/** Packages the legal documents for one Maven artifact, retaining dependency provenance. */
+@CacheableTask
+abstract class GenerateJarLegalFiles : DefaultTask() {
+  companion object {
+    private val legalFileName = Regex(
+      "(?i)([A-Za-z0-9_]+-)?(LICENSE|LICENCE|NOTICE|COPYING|COPYRIGHT)(-[A-Za-z0-9_-]+)?(\\.(txt|md|markdown|adoc))?"
+    )
+
+    /** Selects legal resources without mistaking SDK models such as license-manager.json for licenses. */
+    fun isLegalResource(path: String): Boolean =
+      path == "about.html" || path.startsWith("about_files/") ||
+        path.startsWith("licenses/") || path.startsWith("license/") ||
+        path.startsWith("META-INF/licenses/") || path.startsWith("META-INF/license/") ||
+        path.startsWith("META-INF/licenses-binary/") ||
+        legalFileName.matches(path.substringAfterLast('/'))
+  }
+
+  @get:Internal
+  abstract val templates: DirectoryProperty
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  val templateFiles: FileTree
+    get() = templates.get().asFileTree.matching { include("LICENSE*", "NOTICE*", "dependencies.txt") }
+
+  @get:Input
+  abstract val sourceNotices: ListProperty<String>
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.NONE)
+  abstract val dependencyJars: ConfigurableFileCollection
+
+  @get:Input
+  abstract val dependencyIds: MapProperty<String, String>
+
+  @get:Input
+  abstract val excludedGroups: SetProperty<String>
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val javadocFiles: ConfigurableFileCollection
+
+  @get:OutputDirectory
+  abstract val outputDirectory: DirectoryProperty
+
+  init {
+    sourceNotices.convention(emptyList())
+    dependencyIds.convention(emptyMap())
+    excludedGroups.convention(emptySet())
+  }
+
+  @TaskAction
+  fun generate() {
+    val directory = templates.get().asFile
+    val ids = dependencyIds.get()
+    val excluded = excludedGroups.get()
+    val documents = sortedMapOf<String, LinkedHashSet<ByteBuffer>>()
+    fun add(path: String, bytes: ByteArray) {
+      require(!path.startsWith('/') && path.split('/').none { it == ".." }) {
+        "Invalid legal resource path: $path"
+      }
+      val group = path.removePrefix("META-INF/licenses/").substringBefore('/')
+      if (path.startsWith("META-INF/licenses/") && group in excluded) return
+      documents.getOrPut(path) { linkedSetOf() }.add(ByteBuffer.wrap(bytes))
+    }
+    val overrides = directory.resolve("dependencies.txt").readLines()
+      .filter { it.isNotBlank() && !it.startsWith('#') }
+      .associate { line ->
+        val fields = line.split('=', limit = 2)
+        require(fields.size == 2) { "Invalid Maven legal supplement: $line" }
+        fields[0] to fields[1]
+      }
+    dependencyJars.files.sortedBy { ids.getValue(it.name) }.forEach { jar ->
+      val id = ids.getValue(jar.name)
+      val coordinate = id.split('/').take(2).joinToString(":")
+      val group = id.substringBefore('/')
+      if (group in excluded) return@forEach
+      val prefix = "META-INF/licenses/$id/"
+      var hasContent = false
+      ZipFile(jar).use { archive ->
+        hasContent = archive.entries().asSequence().any {
+          !it.isDirectory && (
+            !it.name.startsWith("META-INF/") && !GenerateJarLegalFiles.isLegalResource(it.name) ||
+              it.name.startsWith("META-INF/native/") || it.name.startsWith("META-INF/versions/")
+            )
+        }
+        archive.entries().asSequence().filter { !it.isDirectory && GenerateJarLegalFiles.isLegalResource(it.name) }
+          .sortedBy { it.name }.forEach { entry ->
+            // Do not nest documents again when shading an already assembled Gravitino runtime.
+            val path = if (group == "org.apache.gravitino" && entry.name.startsWith("META-INF/licenses/")) {
+              entry.name
+            } else {
+              prefix + entry.name
+            }
+            archive.getInputStream(entry).use { add(path, it.readBytes()) }
+          }
+      }
+      if (hasContent) {
+        val selected = overrides[coordinate] ?: overrides["$group:*"] ?: ""
+        selected.substringBefore('|').split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
+          val supplement = directory.resolve(name)
+          require(supplement.isFile) { "Missing Maven legal supplement for $coordinate: $name" }
+          add(prefix + name, supplement.readBytes())
+        }
+      }
+    }
+    var license = directory.resolve("LICENSE").readText()
+    var notice = directory.resolve("NOTICE").readText()
+    sourceNotices.get().forEach { name -> notice += "\n" + directory.resolve("NOTICE.$name").readText() }
+    if (documents.isNotEmpty()) {
+      val reference = "\nLegal documents for bundled dependencies are in META-INF/licenses/, grouped by Maven coordinates.\n"
+      license += reference
+      notice += reference
+    }
+    // Label additional licensing requirements prominently, including dependencies of a nested runtime.
+    val labels = documents.keys.filter { it.startsWith("META-INF/licenses/") }
+      .map { it.split('/').take(5) }.filter { it.size == 5 }.distinct().mapNotNull { parts ->
+        val coordinate = "${parts[2]}:${parts[3]}"
+        val label = overrides[coordinate]?.substringAfter('|', "")?.trim().orEmpty()
+        if (label.isEmpty()) null else "- $label\n  Version ${parts[4]}; legal documents: ${parts.joinToString("/")}/"
+      }
+    if (labels.isNotEmpty()) license += "\nAdditional dependency license requirements:\n\n" + labels.joinToString("\n\n") + "\n"
+    // The JDK doclet supplies its own legal/ directory alongside the generated JavaScript/CSS.
+    if (javadocFiles.files.any { it.name == "jquery.md" || it.name == "jqueryUI.md" }) {
+      license += "\nLicense texts for generated Javadoc assets are in the legal/ directory at the root of this JAR.\n"
+    }
+    add("META-INF/LICENSE", license.toByteArray(Charsets.UTF_8))
+    add("META-INF/NOTICE", notice.toByteArray(Charsets.UTF_8))
+    val output = outputDirectory.get().asFile
+    output.deleteRecursively()
+    documents.forEach { (path, contents) ->
+      val file = output.resolve(path)
+      file.parentFile.mkdirs()
+      file.outputStream().use { stream ->
+        contents.forEachIndexed { index, content ->
+          if (index > 0) stream.write('\n'.code)
+          stream.write(content.array())
+        }
+      }
+    }
+  }
+}
+
+/** Replaces dependency legal resources with the artifact-specific documents generated above. */
 @CacheableTransformer
 class LegalFilesTransformer(
-  @get:InputFile
-  @get:PathSensitive(PathSensitivity.NONE)
-  val projectLegalFile: File,
-  @get:Input
-  val resourcePath: String
+  @get:InputDirectory
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  val legalDirectory: File
 ) : Transformer {
-  private val contents = linkedSetOf<ByteBuffer>()
-
   @Internal
   override fun getName(): String = javaClass.simpleName
 
-  override fun canTransformResource(element: FileTreeElement): Boolean =
-    element.relativePath.pathString == resourcePath
+  override fun canTransformResource(element: FileTreeElement): Boolean = GenerateJarLegalFiles.isLegalResource(element.relativePath.pathString)
 
   override fun transform(context: TransformerContext) {
-    contents.add(ByteBuffer.wrap(context.`is`.use { it.readBytes() }))
+    context.`is`.close()
   }
 
   override fun hasTransformedResource(): Boolean = true
 
   override fun modifyOutputStream(output: ZipOutputStream, preserveFileTimestamps: Boolean) {
-    // ByteBuffer equality compares bytes, so only identical documents are removed.
-    val documents = linkedSetOf(ByteBuffer.wrap(projectLegalFile.readBytes()))
-    documents.addAll(contents)
-    val entry = ZipEntry(resourcePath)
-    entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, projectLegalFile.lastModified())
-    output.putNextEntry(entry)
-    documents.forEachIndexed { index, document ->
-      if (index > 0) output.write('\n'.code)
-      output.write(document.array())
-    }
-    output.closeEntry()
-    contents.clear()
+    legalDirectory.walkTopDown().filter { it.isFile }.sortedBy { it.relativeTo(legalDirectory).invariantSeparatorsPath }
+      .forEach { file ->
+        val entry = ZipEntry(file.relativeTo(legalDirectory).invariantSeparatorsPath)
+        entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, file.lastModified())
+        output.putNextEntry(entry)
+        file.inputStream().use { it.copyTo(output) }
+        output.closeEntry()
+      }
   }
 }
 
@@ -612,47 +747,106 @@ subprojects {
     from(tasks["javadoc"])
   }
 
-  // Source release archives omit the binary distribution's legal files.
-  val binaryLegalFiles = listOf("LICENSE", "NOTICE").associateWith { name ->
-    rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
-  }
-  val licenseReference = Regex("""(?<![A-Za-z0-9_./:-])(?:\./)?licenses/[A-Za-z0-9_./-]+""")
-  val supplementalLicensePaths = binaryLegalFiles.values.flatMap { file ->
-    licenseReference.findAll(file.readText()).map { it.value.removePrefix("./").trimEnd('.') }.toList()
-  }.distinct().sorted()
-  supplementalLicensePaths.forEach { path ->
-    require(rootProject.file(path).isFile) { "Missing companion license referenced by LICENSE/NOTICE: $path" }
+  // These notices cover copied production sources, not dependencies declared only in the POM.
+  val sourceNoticeNames = mapOf(
+    ":api" to listOf("spark", "iceberg"),
+    ":common" to listOf("iceberg", "hadoop"),
+    ":core" to listOf("spark", "iceberg", "kafka", "aws"),
+    ":clients:client-java" to listOf("iceberg"),
+    ":catalogs:hive-metastore-common" to listOf("iceberg"),
+    ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
+    ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
+    ":spark-connector:spark-common" to listOf("iceberg"),
+    ":server-common" to listOf("hadoop"),
+    ":iceberg:iceberg-common" to listOf("iceberg"),
+    ":iceberg:iceberg-rest-server" to listOf("iceberg"),
+    ":authorizations:authorization-ranger" to listOf("ranger")
+  )[project.path].orEmpty() + if (fileTree("src/main/java") {
+    // This copied provider is present on the 1.3 release branch, but not on main.
+    include("**/GravitinoGlueCredentialsProvider.java")
+  }.isEmpty
+  ) {
+    emptyList()
+  } else {
+    listOf("doris")
   }
 
-  plugins.withId("com.github.johnrengelman.shadow") {
-    tasks.withType<ShadowJar>().configureEach {
-      binaryLegalFiles.forEach { (name, file) ->
-        transform(LegalFilesTransformer(file, "META-INF/$name"))
+  val mavenLegalFiles = tasks.register<GenerateJarLegalFiles>("generateMavenLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    sourceNotices.set(sourceNoticeNames)
+    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/main"))
+  }
+  val javadocLegalFiles = tasks.register<GenerateJarLegalFiles>("generateJavadocLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    // These implementations are private/package-private and are absent from generated Javadoc.
+    sourceNotices.set(
+      when (project.path) {
+        ":catalogs:catalog-glue" -> emptyList()
+        ":spark-connector:spark-common" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        else -> sourceNoticeNames
       }
-      supplementalLicensePaths.forEach { path ->
-        transform(LegalFilesTransformer(rootProject.file(path), "META-INF/$path"))
-      }
+    )
+    javadocFiles.from(tasks.named<Javadoc>("javadoc").map { it.outputs.files.asFileTree.matching { include("legal/**") } })
+    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/javadoc"))
+  }
+  val bundledLegalFiles = tasks.register<GenerateJarLegalFiles>("generateBundledLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    sourceNotices.set(sourceNoticeNames)
+    outputDirectory.set(layout.buildDirectory.dir("generated/maven-legal/bundled"))
+  }
+
+  fun configureBundledLegalFiles(configurations: Provider<List<Configuration>>, jars: Provider<FileCollection>) {
+    bundledLegalFiles.configure {
+      dependencyJars.from(jars)
+      dependencyJars.builtBy(configurations)
+      dependencyIds.set(
+        configurations.map { configs ->
+          val artifacts = configs.flatMap { it.resolvedConfiguration.resolvedArtifacts }.groupBy { it.file.name }
+          artifacts.mapValues { (name, entries) ->
+            val coordinates = entries.map { artifact ->
+              val id = artifact.moduleVersion.id
+              "${id.group}/${id.name}/${id.version}${artifact.classifier?.let { "/$it" } ?: ""}"
+            }.distinct()
+            require(coordinates.size == 1) { "Ambiguous Maven artifact filename $name: $coordinates" }
+            coordinates.single()
+          }
+        }
+      )
     }
   }
 
+  plugins.withId("com.github.johnrengelman.shadow") {
+    val shadowJar = tasks.named<ShadowJar>("shadowJar")
+    configureBundledLegalFiles(
+      provider { shadowJar.get().configurations.map { it as Configuration } },
+      provider { shadowJar.get().includedDependencies }
+    )
+    bundledLegalFiles.configure {
+      // Connector runtimes strip the unrelocated SLF4J classes from client-java-runtime.
+      excludedGroups.set(provider { if ("org/slf4j/**" in shadowJar.get().excludes) setOf("org.slf4j") else emptySet() })
+    }
+    shadowJar.configure {
+      dependsOn(bundledLegalFiles)
+      transform(LegalFilesTransformer(bundledLegalFiles.get().outputDirectory.get().asFile))
+    }
+  }
+  if (project.path == ":clients:cli") {
+    configureBundledLegalFiles(provider { listOf(configurations.runtimeClasspath.get()) }, provider { configurations.runtimeClasspath.get() })
+  }
+
   tasks.withType<Jar> {
-    into("META-INF") {
-      from(rootDir) {
-        if (name == "sourcesJar") {
-          include("LICENSE")
-          include("NOTICE")
-        } else if (project.name == "web") {
-          include("web/web/LICENSE.bin")
-          rename("LICENSE.bin", "LICENSE")
-          include("web/web/NOTICE.bin")
-          rename("NOTICE.bin", "NOTICE")
-        } else {
-          include(if (rootProject.file("LICENSE.bin").isFile) "LICENSE.bin" else "LICENSE")
-          rename("LICENSE.bin", "LICENSE")
-          include(if (rootProject.file("NOTICE.bin").isFile) "NOTICE.bin" else "NOTICE")
-          rename("NOTICE.bin", "NOTICE")
-          include(supplementalLicensePaths)
-        }
+    if (this is ShadowJar) return@withType
+    val legalFiles = when {
+      name == "javadocJar" -> javadocLegalFiles
+      name == "jar" && project.path == ":clients:cli" -> bundledLegalFiles
+      else -> mavenLegalFiles
+    }
+    from(legalFiles.flatMap { it.outputDirectory })
+    if (name == "jar" && project.path == ":clients:cli") {
+      // Keep the CLI's existing class/resource packaging and replace only its legal resources.
+      val generatedDirectory = legalFiles.get().outputDirectory.get().asFile.toPath()
+      eachFile {
+        if (GenerateJarLegalFiles.isLegalResource(path) && !file.toPath().startsWith(generatedDirectory)) exclude()
       }
     }
   }

@@ -68,19 +68,37 @@ tasks.jar {
 }
 
 tasks.test {
-  val shadowJar = tasks.named<ShadowJar>("shadowJar")
-  val legalFiles = listOf("LICENSE", "NOTICE").associateWith { name ->
-    rootProject.file("$name.bin").takeIf { it.isFile } ?: rootProject.file(name)
+  val fullAudit = project.hasProperty("checkMavenLegalFiles")
+  val artifactTasks = mutableMapOf("runtime" to ":clients:client-java-runtime:shadowJar")
+  if (fullAudit) {
+    artifactTasks.putAll(
+      mapOf(
+        "api" to ":api:jar",
+        "sources" to ":api:sourcesJar",
+        "javadoc" to ":api:javadocJar",
+        "cli" to ":clients:cli:jar",
+        "filesystem" to ":clients:filesystem-hadoop3-runtime:shadowJar",
+        "aws" to ":bundles:aws-bundle:shadowJar",
+        "azure" to ":bundles:azure-bundle:shadowJar"
+      )
+    )
   }
-  dependsOn(shadowJar)
-  inputs.file(shadowJar.flatMap { it.archiveFile })
-  inputs.files(legalFiles.values)
-  inputs.dir(rootProject.file("licenses"))
+  if (!fullAudit) useJUnitPlatform { excludeTags("maven-legal-audit") }
+  val artifacts = artifactTasks.mapValues { (_, path) -> provider { tasks.getByPath(path) as Jar } }
+  dependsOn(artifactTasks.values)
+  inputs.files(artifacts.values.map { artifact -> artifact.flatMap { it.archiveFile } })
+  inputs.dir(rootProject.file("dev/release/maven"))
   inputs.files(configurations.runtimeClasspath)
   doFirst {
-    systemProperty("shadowJarPath", shadowJar.get().archiveFile.get().asFile.absolutePath)
-    legalFiles.forEach { (name, file) -> systemProperty("projectLegalFile.$name", file.absolutePath) }
-    systemProperty("projectLicenseDirectory", rootProject.file("licenses").absolutePath)
+    systemProperty("artifacts", artifacts.keys.joinToString(","))
+    artifacts.forEach { (name, artifact) ->
+      systemProperty("artifact.$name", artifact.get().archiveFile.get().asFile.absolutePath)
+    }
+    systemProperty("legalTemplates", rootProject.file("dev/release/maven").absolutePath)
     systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
+    configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
+      val id = artifact.moduleVersion.id
+      systemProperty("dependencyPrefix.${artifact.file.name}", "META-INF/licenses/${id.group}/${id.name}/${id.version}/")
+    }
   }
 }

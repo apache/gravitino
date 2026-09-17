@@ -1,0 +1,42 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements. See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership. The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Supplement only dependencies actually included in the artifact.
+# Sources and audited versions are documented in README.md.
+com.azure:*=LICENSE.azure
+com.microsoft.azure:msal4j=LICENSE.msal
+com.microsoft.azure:msal4j-persistence-extension=LICENSE.msal-persistence
+com.microsoft.azure:azure-keyvault-core=LICENSE.azure-keyvault
+com.sun.xml.bind:jaxb-core=LICENSE.jaxb | JAXB Reference Implementation (CDDL-1.1); https://github.com/javaee/jaxb-v2
+com.sun.xml.bind:jaxb-impl=LICENSE.jaxb | JAXB Reference Implementation (CDDL-1.1); https://github.com/javaee/jaxb-v2
+com.h2database:h2=LICENSE.h2 | H2 Database Engine (MPL-2.0); https://h2database.com
+com.google.code.findbugs:jsr305=LICENSE.jsr305,LICENSE.jsr305-concurrent | JSR305 concurrency annotations by Brian Goetz (CC-BY-2.5); http://www.jcip.net
+io.grpc:grpc-api=NOTICE.grpc
+io.netty:*=NOTICE.netty
+io.netty:netty-common=NOTICE.netty,NOTICE.netty-harmony,LICENSE.netty-slf4j,LICENSE.netty-jctools
+io.netty:netty-codec=NOTICE.netty,LICENSE.netty-jbzip2,LICENSE.netty-libdivsufsort,LICENSE.netty-jfastlz,LICENSE.netty-protobuf
+io.netty:netty-codec-http=NOTICE.netty,LICENSE.netty-webbit,LICENSE.netty-utf8
+io.netty:netty-codec-http2=NOTICE.netty,LICENSE.netty-hpack,LICENSE.netty-hyper-hpack,LICENSE.netty-nghttp2-hpack
+io.netty:netty-resolver-dns-native-macos=NOTICE.netty,LICENSE.netty-dnsinfo | Netty macOS DNS resolver, including Apple dnsinfo (APSL-2.0, for Apple hardware); https://github.com/apple-oss-distributions/configd
+jakarta.transaction:jakarta.transaction-api=LICENSE.transaction,NOTICE.transaction | Jakarta Transactions API (EPL-2.0); https://github.com/jakartaee/transactions
+org.jetbrains.kotlin:*=NOTICE.kotlin
+org.ow2.asm:asm=LICENSE.asm
+org.reactivestreams:reactive-streams=LICENSE.reactive-streams
+org.xerial.snappy:snappy-java=NOTICE.snappy,LICENSE.snappy,LICENSE.bitshuffle
+org.jacoco:org.jacoco.agent=LICENSE.EPL-2.0,LICENSE.asm | JaCoCo runtime (EPL-2.0); https://www.jacoco.org
+com.sun.activation:javax.activation= | JavaBeans Activation Framework (CDDL-1.1); https://github.com/javaee/activation
+javax.xml.bind:jaxb-api= | JAXB API (CDDL-1.1); https://github.com/javaee/jaxb-spec
