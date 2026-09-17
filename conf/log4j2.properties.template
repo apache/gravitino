@@ -106,6 +106,10 @@ logger.rest.level = warn
 logger.rest.appenderRef.rolling.ref = fileLogger
 logger.rest.additivity = false
 
+# Suppress verbose JCasbin authorization decision logs by default
+logger.jcasbin.name = org.casbin.jcasbin
+logger.jcasbin.level = warn
+
 # Configure root logger
 rootLogger.level = info
 rootLogger.appenderRef.rolling.ref = fileLogger
