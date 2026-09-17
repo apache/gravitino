@@ -17,6 +17,8 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalListExpression;
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalNamespace;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,21 +49,20 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.EntityIdResolver;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,8 +73,9 @@ class TestPrincipalListQueryCount {
 
   @TempDir Path tempDir;
 
-  @Test
-  void testManagementListsHaveBoundedQueries() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testPrincipalListsHaveBoundedQueries(boolean managementGrant) throws Exception {
     Config config = new Config(false) {};
     config.set(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
@@ -110,17 +112,20 @@ class TestPrincipalListQueryCount {
       providerStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
-      // Isolate the storage/list-filter path: the caller has a metalake management grant.
+      // Isolate storage queries while exercising both parent grants and per-object self filtering.
       when(authorizer.authorize(any(), any(), any(), any(), any()))
           .thenAnswer(
               call -> {
                 MetadataObject object = call.getArgument(2);
                 Privilege.Name privilege = call.getArgument(3);
-                return object.type() == MetadataObject.Type.METALAKE
+                return managementGrant
+                    && object.type() == MetadataObject.Type.METALAKE
                     && (privilege == Privilege.Name.MANAGE_USERS
                         || privilege == Privilege.Name.MANAGE_GROUPS
                         || privilege == Privilege.Name.MANAGE_GRANTS);
               });
+      when(authorizer.isSelf(any(), any(), any()))
+          .thenAnswer(call -> ((NameIdentifier) call.getArgument(1)).name().endsWith("0"));
       FieldUtils.writeStaticField(
           MetadataAuthzHelper.class, "executor", (Executor) Runnable::run, true);
       backend.initialize(config);
@@ -133,27 +138,20 @@ class TestPrincipalListQueryCount {
           insertPrincipals(connection, size, metalake);
           for (Entity.EntityType type :
               List.of(Entity.EntityType.USER, Entity.EntityType.GROUP, Entity.EntityType.ROLE)) {
+            // Ordinary role membership still performs real per-role lookups in JcasbinAuthorizer;
+            // this test only claims bounded fallback storage queries for users and groups.
+            if (!managementGrant && type == Entity.EntityType.ROLE) {
+              continue;
+            }
             for (boolean details : new boolean[] {false, true}) {
               try (Statement statement = connection.createStatement()) {
                 statement.execute("SET QUERY_STATISTICS FALSE");
                 statement.execute("SET QUERY_STATISTICS TRUE");
               }
               long start = System.nanoTime();
-              Namespace namespace =
-                  switch (type) {
-                    case USER -> AuthorizationUtils.ofUserNamespace(metalake);
-                    case GROUP -> AuthorizationUtils.ofGroupNamespace(metalake);
-                    default -> AuthorizationUtils.ofRoleNamespace(metalake);
-                  };
+              Namespace namespace = principalNamespace(type, metalake);
               List<? extends HasIdentifier> entities = backend.list(namespace, type, details);
-              String expression =
-                  switch (type) {
-                    case USER -> AuthorizationExpressionConstants
-                        .LOAD_USER_AUTHORIZATION_EXPRESSION;
-                    case GROUP -> AuthorizationExpressionConstants
-                        .LOAD_GROUP_AUTHORIZATION_EXPRESSION;
-                    default -> AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
-                  };
+              String expression = principalListExpression(type);
               int returned =
                   PrincipalUtils.doAs(
                       new UserPrincipal("manager"),
@@ -178,19 +176,26 @@ class TestPrincipalListQueryCount {
               long millis = (System.nanoTime() - start) / 1_000_000;
               long selects = countSelects(connection);
               LOG.info(
-                  "Principal list: type={}, size={}, details={}, SELECTs={}, elapsedMs={}",
+                  "Principal list: managementGrant={}, type={}, size={}, details={}, SELECTs={}, elapsedMs={}",
+                  managementGrant,
                   type,
                   size,
                   details,
                   selects,
                   millis);
-              Assertions.assertEquals(size, returned);
+              Assertions.assertEquals(managementGrant ? size : (size + 9) / 10, returned);
               queryCountAssertions.add(
                   () ->
                       Assertions.assertEquals(
                           type == Entity.EntityType.ROLE || !details ? 1 : 2,
                           selects,
-                          type + " size=" + size + " details=" + details));
+                          type
+                              + " size="
+                              + size
+                              + " details="
+                              + details
+                              + " managementGrant="
+                              + managementGrant));
             }
           }
         }

@@ -17,6 +17,9 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalIdentifiers;
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalListExpression;
+import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalManagementPrivilege;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,7 +36,6 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.stream.IntStream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -41,6 +43,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -408,6 +411,58 @@ public class TestMetadataAuthzHelper {
           Assertions.assertArrayEquals(
               new NameIdentifier[] {identifiers[1], identifiers[2]}, filtered);
         });
+  }
+
+  /** Roles still preload owners when no parent path authorizes the whole list. */
+  @Test
+  public void testRoleListFallbackPreloadsOwners() throws Exception {
+    EntityStore store = mock(EntityStore.class);
+    SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(store.relationOperations()).thenReturn(relations);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    try {
+      withAuthorizer(
+          mock(GravitinoAuthorizer.class),
+          () -> {
+            Assertions.assertEquals(
+                0,
+                MetadataAuthzHelper.filterByExpression(
+                        "testMetalake",
+                        principalListExpression(Entity.EntityType.ROLE),
+                        Entity.EntityType.ROLE,
+                        identifiers)
+                    .length);
+          });
+      verify(relations)
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.asList(identifiers),
+              Entity.EntityType.ROLE);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /** A role expression without MANAGE_GRANTS must not inherit that list shortcut. */
+  @Test
+  public void testDifferentRoleExpressionDoesNotUseManagementGrant() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.MANAGE_GRANTS);
+    NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    when(authorizer.isSelf(eq(Entity.EntityType.ROLE), eq(identifiers[1]), any())).thenReturn(true);
+    withAuthorizer(
+        authorizer,
+        () ->
+            Assertions.assertArrayEquals(
+                new NameIdentifier[] {identifiers[1]},
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake",
+                    "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
+                    Entity.EntityType.ROLE,
+                    identifiers)));
   }
 
   /** A metalake owner sees every principal without loading per-principal relations. */
@@ -978,34 +1033,5 @@ public class TestMetadataAuthzHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private static NameIdentifier[] principalIdentifiers(Entity.EntityType type, int count) {
-    return IntStream.range(0, count)
-        .mapToObj(
-            i ->
-                switch (type) {
-                  case USER -> NameIdentifierUtil.ofUser("testMetalake", "user" + i);
-                  case GROUP -> NameIdentifierUtil.ofGroup("testMetalake", "group" + i);
-                  default -> NameIdentifierUtil.ofRole("testMetalake", "role" + i);
-                })
-        .toArray(NameIdentifier[]::new);
-  }
-
-  private static String principalListExpression(Entity.EntityType type) {
-    return switch (type) {
-      case USER -> AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION;
-      case GROUP -> AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION;
-      default -> AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
-    };
-  }
-
-  private static Privilege.Name principalManagementPrivilege(Entity.EntityType type) {
-    return switch (type) {
-      case USER -> Privilege.Name.MANAGE_USERS;
-      case GROUP -> Privilege.Name.MANAGE_GROUPS;
-      case ROLE -> Privilege.Name.MANAGE_GRANTS;
-      default -> throw new IllegalArgumentException("Not a principal type: " + type);
-    };
   }
 }

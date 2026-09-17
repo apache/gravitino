@@ -92,11 +92,12 @@ public class MetadataAuthzHelper {
 
   private static final Set<Entity.EntityType> METADATA_OBJECT_ENTITY_TYPES =
       Arrays.stream(MetadataObject.Type.values())
-          .map(type -> Entity.EntityType.valueOf(type.name()))
+          .map(MetadataObjectUtil::toEntityType)
           .collect(Collectors.toUnmodifiableSet());
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
+  private static final String METALAKE_ONLY_SCOPE = "METALAKE";
   private static final String CATALOG_PARENT_SCOPES = "METALAKE";
 
   /**
@@ -109,23 +110,17 @@ public class MetadataAuthzHelper {
       LIST_SHORT_CIRCUITS =
           Map.of(
               Entity.EntityType.USER,
-              Map.of(
+              principalListPaths(
                   AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(CATALOG_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MANAGE_USERS, CATALOG_PARENT_SCOPES))),
+                  Privilege.Name.MANAGE_USERS),
               Entity.EntityType.GROUP,
-              Map.of(
+              principalListPaths(
                   AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(CATALOG_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MANAGE_GROUPS, CATALOG_PARENT_SCOPES))),
+                  Privilege.Name.MANAGE_GROUPS),
               Entity.EntityType.ROLE,
-              Map.of(
+              principalListPaths(
                   AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(CATALOG_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MANAGE_GRANTS, CATALOG_PARENT_SCOPES))),
+                  Privilege.Name.MANAGE_GRANTS),
               Entity.EntityType.TABLE,
               Map.of(
                   AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
@@ -166,6 +161,15 @@ public class MetadataAuthzHelper {
   }
 
   private MetadataAuthzHelper() {}
+
+  private static Map<String, List<ParentScopeAccessPath>> principalListPaths(
+      String expression, Privilege.Name managementPrivilege) {
+    return Map.of(
+        expression,
+        List.of(
+            parentOwnerPath(METALAKE_ONLY_SCOPE),
+            parentPrivilegePath(managementPrivilege, METALAKE_ONLY_SCOPE)));
+  }
 
   private static ParentScopeAccessPath parentOwnerPath(String parentScopes) {
     return new ParentScopeAccessPath("ANY(OWNER, " + parentScopes + ")", Set.of());
@@ -399,8 +403,9 @@ public class MetadataAuthzHelper {
     // per-object loop over every catalog in the metalake.
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
+    boolean isMetadataObject = METADATA_OBJECT_ENTITY_TYPES.contains(entityType);
     if (enableAuthorization() && nameIdentifiers.length > 0) {
-      if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
+      if (isMetadataObject) {
         Arrays.stream(nameIdentifiers)
             .forEach(
                 identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
@@ -430,7 +435,13 @@ public class MetadataAuthzHelper {
           nameIdentifiers.length);
     }
     preloadToCache(entityType, nameIdentifiers);
-    preloadOwner(entityType, nameIdentifiers);
+    // Ownership is defined on metadata objects, independently of the filter expression.
+    // Users/groups are not metadata objects. OwnerMetaService.batchGetOwner resolves IDs per
+    // identifier, so calling it for users/groups would still perform two SELECTs per entry
+    // before the batched owner-relation queries.
+    if (isMetadataObject) {
+      preloadOwner(entityType, nameIdentifiers);
+    }
 
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
@@ -615,10 +626,7 @@ public class MetadataAuthzHelper {
   }
 
   private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    // Only metadata objects can have owners. Resolving every user/group ID here adds two store
-    // lookups per entry even though their visibility expressions never consult an object owner.
-    if (!METADATA_OBJECT_ENTITY_TYPES.contains(entityType)
-        || !GravitinoEnv.getInstance().cacheEnabled()) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
       return;
     }
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
