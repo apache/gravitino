@@ -49,17 +49,6 @@ public final class IcebergSparkConfigUtils {
 
   /** Build default Spark template configs for Iceberg jobs. */
   public static Map<String, String> buildTemplateSparkConfigs() {
-    return buildTemplateSparkConfigs("catalog_name");
-  }
-
-  /**
-   * Build Spark template configs using the given catalog job configuration key.
-   *
-   * @param catalogKey job configuration key identifying the Spark catalog
-   * @return immutable Spark configuration template
-   */
-  public static Map<String, String> buildTemplateSparkConfigs(String catalogKey) {
-    String catalogPlaceholder = "{{" + catalogKey + "}}";
     Map<String, String> configs = new HashMap<>();
     configs.put("spark.master", "{{spark_master}}");
     configs.put("spark.executor.instances", "{{spark_executor_instances}}");
@@ -67,11 +56,10 @@ public final class IcebergSparkConfigUtils {
     configs.put("spark.executor.memory", "{{spark_executor_memory}}");
     configs.put("spark.driver.memory", "{{spark_driver_memory}}");
     configs.put(
-        SPARK_SQL_CATALOG_PREFIX + catalogPlaceholder, "org.apache.iceberg.spark.SparkCatalog");
-    configs.put(SPARK_SQL_CATALOG_PREFIX + catalogPlaceholder + ".type", "{{catalog_type}}");
-    configs.put(SPARK_SQL_CATALOG_PREFIX + catalogPlaceholder + ".uri", "{{catalog_uri}}");
-    configs.put(
-        SPARK_SQL_CATALOG_PREFIX + catalogPlaceholder + ".warehouse", "{{warehouse_location}}");
+        SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}", "org.apache.iceberg.spark.SparkCatalog");
+    configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.type", "{{catalog_type}}");
+    configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.uri", "{{catalog_uri}}");
+    configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.warehouse", "{{warehouse_location}}");
     configs.put(SPARK_SQL_EXTENSIONS_KEY, ICEBERG_SPARK_EXTENSIONS);
     return Collections.unmodifiableMap(configs);
   }

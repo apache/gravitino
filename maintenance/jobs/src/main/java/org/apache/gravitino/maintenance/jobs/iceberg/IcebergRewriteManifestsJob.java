@@ -85,9 +85,9 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    *
    * <pre>{@code
    * Map<String, String> jobConf = new HashMap<>();
-   * jobConf.put("catalog", "iceberg_catalog");
-   * jobConf.put("table", "db.sample");
-   * jobConf.put("use-caching", "false");
+   * jobConf.put("catalog_name", "iceberg_catalog");
+   * jobConf.put("table_identifier", "db.sample");
+   * jobConf.put("use_caching", "false");
    * metalake.runJob("builtin-iceberg-rewrite-manifests", jobConf);
    * }</pre>
    */
@@ -290,15 +290,15 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   private static List<String> buildArguments() {
     return Arrays.asList(
         "--catalog",
-        "{{catalog}}",
+        "{{catalog_name}}",
         "--table",
-        "{{table}}",
+        "{{table_identifier}}",
         "--use-caching",
-        "{{use-caching}}",
+        "{{use_caching}}",
         "--spec-id",
-        "{{spec-id}}",
+        "{{spec_id}}",
         "--spark-conf",
-        "{{spark-conf}}");
+        "{{spark_conf}}");
   }
 
   /**
@@ -307,6 +307,6 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @return map of Spark configuration keys to template values
    */
   private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs("catalog");
+    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 }
