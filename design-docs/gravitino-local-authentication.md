@@ -354,6 +354,10 @@ The user verification flow is:
 
 ### 7.2 Password Verification
 
+See [Design of Verified Basic Credential Cache in Gravitino](gravitino-basic-credential-cache.md)
+for the full cache design (key/value layout, invalidation, industry comparison, and security
+trade-offs).
+
 The password verification flow is:
 
 1. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
