@@ -339,20 +339,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // For the unmanaged schema, it could happen that the schema:
-          // 1. It's not found in the catalog (dropped directly from underlying sources)
-          // 2. It's found in the catalog but not in the store (not managed by Gravitino)
-          // 3. It's found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, SCHEMA, true);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
+            try {
+              droppedFromStore = store.delete(ident, SCHEMA, true);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(
@@ -364,7 +361,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 

@@ -370,6 +370,40 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testDropMissingSchemaPreservesStoredEntity() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_renamed_out_of_band");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+
+    boolean droppedFromSource =
+        catalogManager.doWithCatalogWrapper(
+            NameIdentifier.of(metalake, catalog),
+            wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(schemaIdent, false)));
+    Assertions.assertTrue(droppedFromSource);
+
+    Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
+    Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+  }
+
+  @Test
+  void testDropSchemaRemovedFromSourceReportsMetadataCleanup() throws Exception {
+    reset(entityStore);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "externally_dropped_schema");
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    boolean droppedFromSource =
+        catalogManager.doWithCatalogWrapper(
+            NameIdentifier.of(metalake, catalog),
+            wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+    Assertions.assertTrue(droppedFromSource);
+    Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
+
+    Assertions.assertTrue(dispatcher.dropSchema(ident, true));
+    Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+    Assertions.assertFalse(dispatcher.dropSchema(ident, true));
+  }
+
+  @Test
   public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);
