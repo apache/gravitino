@@ -72,6 +72,8 @@ spark.hadoop.fs.defaultFS=file:///
 }
 ```
 
+**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
+
 **Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
 Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
 classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark

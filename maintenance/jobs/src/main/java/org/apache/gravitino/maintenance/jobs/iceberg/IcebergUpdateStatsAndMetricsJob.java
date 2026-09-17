@@ -43,6 +43,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
@@ -434,6 +435,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
     metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
+    GravitinoAuthSettings.copyAliases(optimizerProperties);
     return optimizerProperties;
   }
 
@@ -582,7 +584,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "  --updater-options <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\\n"
+            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\",\\n"
+            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}'\\n"
             + "  --spark-conf <json>                JSON map of custom Spark configs\\n"
             + "                                     Must include Iceberg catalog configs for --catalog\\n"
             + "                                     Example: '{\"spark.master\":\"local[2]\","
