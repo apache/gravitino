@@ -22,6 +22,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
+import org.apache.spark.sql.SparkSession;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -128,6 +131,22 @@ public final class IcebergJobUtils {
               + ". Error: "
               + e.getMessage(),
           e);
+    }
+  }
+
+  /**
+   * Applies Iceberg REST catalog authentication from optimizer / updater-options config.
+   *
+   * @param sparkBuilder Spark session builder
+   * @param catalogName Spark catalog name
+   * @param config optimizer configuration built from updater-options
+   */
+  public static void applyIcebergRestAuth(
+      SparkSession.Builder sparkBuilder, String catalogName, OptimizerConfig config) {
+    Map<String, String> authConfigs =
+        GravitinoAuthSettings.from(config).icebergRestCatalogConfigs(catalogName);
+    for (Map.Entry<String, String> entry : authConfigs.entrySet()) {
+      sparkBuilder.config(entry.getKey(), entry.getValue());
     }
   }
 }

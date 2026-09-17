@@ -19,13 +19,16 @@
 
 package org.apache.gravitino.maintenance.optimizer.command;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoClient;
@@ -56,6 +59,15 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String SPARK_DRIVER_MEMORY_KEY = "spark.driver.memory";
   private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String ICEBERG_SPARK_CATALOG_IMPL = "org.apache.iceberg.spark.SparkCatalog";
+  private static final String REDACTED = "***";
+  private static final Set<String> SENSITIVE_UPDATER_OPTION_KEYS =
+      new HashSet<>(
+          List.of(
+              "password",
+              "oauth_credential",
+              "oauth_token",
+              OptimizerConfig.AUTH_PASSWORD,
+              OptimizerConfig.AUTH_OAUTH_CREDENTIAL));
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -95,7 +107,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
             .output()
             .printf(
                 "DRY-RUN: identifier=%s jobTemplate=%s jobConfig=%s%n",
-                tableTarget.fullIdentifier, JOB_TEMPLATE_NAME, jobConfig);
+                tableTarget.fullIdentifier, JOB_TEMPLATE_NAME, redactJobConfigForLog(jobConfig));
       }
       context
           .output()
@@ -103,7 +115,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       return;
     }
 
-    try (GravitinoClient client = GravitinoClientUtils.createClient(context.optimizerEnv())) {
+    try (GravitinoClient client =
+        GravitinoClientUtils.createClient(context.optimizerEnv(), updaterOptions)) {
       int submitted = 0;
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
@@ -114,7 +127,10 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
             .output()
             .printf(
                 "SUBMIT: identifier=%s jobTemplate=%s jobId=%s jobConfig=%s%n",
-                tableTarget.fullIdentifier, JOB_TEMPLATE_NAME, jobHandle.jobId(), jobConfig);
+                tableTarget.fullIdentifier,
+                JOB_TEMPLATE_NAME,
+                jobHandle.jobId(),
+                redactJobConfigForLog(jobConfig));
       }
       context
           .output()
@@ -139,6 +155,59 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     jobConfig.put("updater_options", toCanonicalJson(updaterOptions));
     jobConfig.put("spark_conf", toCanonicalJson(sparkConfigs));
     return jobConfig;
+  }
+
+  /**
+   * Returns a copy of {@code jobConfig} safe for logging. Sensitive fields inside {@code
+   * updater_options} and {@code spark_conf} JSON maps are replaced with {@code ***}.
+   */
+  static Map<String, String> redactJobConfigForLog(Map<String, String> jobConfig) {
+    if (jobConfig == null || jobConfig.isEmpty()) {
+      return jobConfig;
+    }
+    Map<String, String> redacted = new LinkedHashMap<>(jobConfig);
+    redactJsonMapField(redacted, "updater_options");
+    redactJsonMapField(redacted, "spark_conf");
+    return redacted;
+  }
+
+  private static void redactJsonMapField(Map<String, String> jobConfig, String fieldName) {
+    String json = jobConfig.get(fieldName);
+    if (StringUtils.isBlank(json)) {
+      return;
+    }
+    try {
+      Map<String, String> parsed =
+          MAPPER.readValue(json, new TypeReference<Map<String, String>>() {});
+      Map<String, String> safe = new LinkedHashMap<>();
+      for (Map.Entry<String, String> entry : parsed.entrySet()) {
+        if (isSensitiveConfigKey(entry.getKey())) {
+          safe.put(entry.getKey(), REDACTED);
+        } else {
+          safe.put(entry.getKey(), entry.getValue());
+        }
+      }
+      jobConfig.put(fieldName, toCanonicalJson(safe));
+    } catch (Exception ignored) {
+      // Keep the original value if JSON cannot be parsed for display.
+    }
+  }
+
+  private static boolean isSensitiveConfigKey(String key) {
+    if (StringUtils.isBlank(key)) {
+      return false;
+    }
+    String normalized = key.trim().toLowerCase(Locale.ROOT);
+    return SENSITIVE_UPDATER_OPTION_KEYS.contains(key)
+        || SENSITIVE_UPDATER_OPTION_KEYS.contains(normalized)
+        || normalized.endsWith("password")
+        || normalized.endsWith("credential")
+        || normalized.endsWith("secret")
+        || normalized.endsWith("token")
+        || normalized.contains(".password")
+        || normalized.contains(".credential")
+        || normalized.contains(".token")
+        || normalized.contains(".secret");
   }
 
   private static String resolveScalarOption(String cliValue, String confValue) {

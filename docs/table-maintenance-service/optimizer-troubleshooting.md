@@ -72,6 +72,8 @@ spark.hadoop.fs.defaultFS=file:///
 }
 ```
 
+**`The provided credentials did not support` or Iceberg `Not authorized`** — `builtin-iceberg-update-stats` is talking to a secured Gravitino / Iceberg REST endpoint without credentials. Put `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options`. For expire/rewrite against a secured Iceberg REST catalog, set `rest.auth.*` in `spark-conf`. See [Configuration](./optimizer-configuration.md).
+
 **Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
 
 ```text

@@ -181,6 +181,21 @@ public class TestIcebergUpdateStatsJob {
   }
 
   @Test
+  public void testBuildOptimizerPropertiesCopiesAuthAliases() {
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "ml");
+    options.put("auth_type", "basic");
+    options.put("username", "admin");
+    options.put("password", "secret");
+    Map<String, String> optimizerProperties =
+        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+    assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
+    assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
+    assertEquals("secret", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
+  }
+
+  @Test
   public void testRequireGravitinoConfig() {
     Map<String, String> optimizerProperties = new HashMap<>();
     optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, "http://localhost:8090");
