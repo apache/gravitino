@@ -38,9 +38,14 @@ its dependency documents keep that location. Connector runtimes that exclude
 SLF4J classes also exclude the corresponding dependency documents.
 
 `dependencies.txt` supplies verified texts missing from upstream binary JARs.
-An optional label after `|` identifies the product, selected license and homepage
-for dependencies with additional requirements. These labels appear prominently
-in the artifact's canonical LICENSE, including when inherited from a nested runtime.
+The canonical LICENSE lists each resource-backed component by Maven coordinates
+and version, with exact document paths. A label after `|` supplies its license
+summary or additional requirements. Relevant NOTICE documents are also propagated
+into the canonical NOTICE, with their original paths to resolve companion-file
+references. Nested inventories are regenerated after dependency exclusions.
+A version-specific `group:artifact:version` entry takes precedence over an
+unversioned coordinate or group wildcard; this is necessary for Jackson's changing
+embedded parser licenses.
 The mapping applies only to dependencies included by Shadow's dependency filter, or the
 CLI's runtime classpath. Ordinary thin, source and Javadoc JARs do not inherit
 these dependencies' inventories. Review the entries when updating dependencies;
@@ -67,9 +72,20 @@ a POM license name alone does not account for embedded third-party code.
 - H2 2.2.224: [LICENSE](https://github.com/h2database/h2database/blob/version-2.2.224/LICENSE.txt).
 - Jakarta Transactions 1.3.3: [LICENSE](https://github.com/jakartaee/transactions/blob/1.3.3/LICENSE.md)
   and [NOTICE](https://github.com/jakartaee/transactions/blob/1.3.3/NOTICE.md).
+- Jackson Core 2.15.2 and 2.18.3: their exact source JARs contain Schubfach under
+  MIT ([2.15.2 source](https://github.com/FasterXML/jackson-core/blob/jackson-core-2.15.2/src/main/java/com/fasterxml/jackson/core/io/schubfach/DoubleToDecimal.java),
+  [2.18.3 source](https://github.com/FasterXML/jackson-core/blob/jackson-core-2.18.3/src/main/java/com/fasterxml/jackson/core/io/schubfach/DoubleToDecimal.java)),
+  while the binary JARs omit that text. Their FastDoubleParser NOTICE declares
+  MIT but the companion LICENSE incorrectly contains Apache 2.0. Supplements use
+  the [0.9.0 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v0.9.0/LICENSE)
+  and [1.0.90 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v1.0.90/LICENSE)
+  respectively. Jackson 2.18.3 also needs the Boost text identified by its parser
+  NOTICE. Existing fast_float and bigint texts are preserved. Newer Jackson
+  versions with complete metadata do not receive these version-specific additions.
 - Reactive Streams 1.0.4: [MIT-0 LICENSE](https://github.com/reactive-streams/reactive-streams-jvm/blob/v1.0.4/LICENSE).
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
-  embedded ASM 9.2 BSD code; retain that file as well as the full license texts.
+  embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD
+  text) and supplement only the missing full EPL-2.0 text.
 - Snappy Java 1.1.10.8: [NOTICE](https://github.com/xerial/snappy-java/blob/v1.1.10.8/NOTICE).
   Its native libraries include [Snappy 1.1.10](https://github.com/google/snappy/blob/1.1.10/COPYING)
   and [Bitshuffle 0.3.4](https://github.com/kiyo-masui/bitshuffle/blob/0.3.4/LICENSE),
@@ -81,6 +97,9 @@ a POM license name alone does not account for embedded third-party code.
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver. Optional external
   dependencies from Netty's omnibus NOTICE are not copied indiscriminately.
+  Netty tcnative classes 2.0.65.Final use their own [2016 notice](https://github.com/netty/netty-tcnative/blob/netty-tcnative-parent-2.0.65.Final/NOTICE.txt) and Tomcat Native
+  provenance, not Netty 4.1's 2014 notice. Build-wrapper and unbundled native-library
+  sections are excluded from this Java-only artifact's supplement.
   The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 
@@ -113,3 +132,9 @@ Run the same audit locally:
 The cloud check verifies JSSE factory initialization without WildFly, not a
 network handshake or cloud operation. Final staged artifacts still require the
 usual release verification.
+
+Supplements are limited to missing material. Identical Microsoft texts are reused
+across SDK/keyvault and MSAL/persistence components. JCTools and Netty's Apache-only
+HPACK text are covered by the base Apache 2.0 license; no duplicate copies are added.
+MIT-0 is retained to document the bundled component's license under ASF release
+policy, even though MIT-0 itself has no attribution-retention condition.

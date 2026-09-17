@@ -17,26 +17,33 @@
 #
 # Supplement only dependencies actually included in the artifact.
 # Sources and audited versions are documented in README.md.
-com.azure:*=LICENSE.azure
-com.microsoft.azure:msal4j=LICENSE.msal
-com.microsoft.azure:msal4j-persistence-extension=LICENSE.msal-persistence
-com.microsoft.azure:azure-keyvault-core=LICENSE.azure-keyvault
+com.azure:*=LICENSE.azure | Microsoft Azure SDK (MIT)
+com.microsoft.azure:msal4j=LICENSE.msal | Microsoft Authentication Library (MIT)
+com.microsoft.azure:msal4j-persistence-extension=LICENSE.msal | Microsoft Authentication persistence extension (MIT)
+com.microsoft.azure:azure-keyvault-core=LICENSE.azure | Azure Key Vault core (MIT and Apache-2.0)
 com.sun.xml.bind:jaxb-core=LICENSE.jaxb | JAXB Reference Implementation (CDDL-1.1); https://github.com/javaee/jaxb-v2
 com.sun.xml.bind:jaxb-impl=LICENSE.jaxb | JAXB Reference Implementation (CDDL-1.1); https://github.com/javaee/jaxb-v2
 com.h2database:h2=LICENSE.h2 | H2 Database Engine (MPL-2.0); https://h2database.com
 com.google.code.findbugs:jsr305=LICENSE.jsr305,LICENSE.jsr305-concurrent | JSR305 concurrency annotations by Brian Goetz (CC-BY-2.5); http://www.jcip.net
 io.grpc:grpc-api=NOTICE.grpc
 io.netty:*=NOTICE.netty
-io.netty:netty-common=NOTICE.netty,NOTICE.netty-harmony,LICENSE.netty-slf4j,LICENSE.netty-jctools
-io.netty:netty-codec=NOTICE.netty,LICENSE.netty-jbzip2,LICENSE.netty-libdivsufsort,LICENSE.netty-jfastlz,LICENSE.netty-protobuf
-io.netty:netty-codec-http=NOTICE.netty,LICENSE.netty-webbit,LICENSE.netty-utf8
-io.netty:netty-codec-http2=NOTICE.netty,LICENSE.netty-hpack,LICENSE.netty-hyper-hpack,LICENSE.netty-nghttp2-hpack
+io.netty:netty-tcnative-classes=NOTICE.netty-tcnative
+io.netty:netty-common=NOTICE.netty,NOTICE.netty-harmony,LICENSE.netty-slf4j | Netty Common (Apache-2.0), including SLF4J code (MIT)
+io.netty:netty-codec=NOTICE.netty,LICENSE.netty-jbzip2,LICENSE.netty-libdivsufsort,LICENSE.netty-jfastlz,LICENSE.netty-protobuf | Netty Codec (Apache-2.0), including BSD and MIT components identified in the accompanying license texts
+io.netty:netty-codec-http=NOTICE.netty,LICENSE.netty-webbit,LICENSE.netty-utf8 | Netty HTTP codec (Apache-2.0), including Webbit (BSD) and UTF-8 validation (MIT)
+io.netty:netty-codec-http2=NOTICE.netty,LICENSE.netty-hyper-hpack,LICENSE.netty-nghttp2-hpack | Netty HTTP/2 codec (Apache-2.0), including hyper-hpack and nghttp2 (MIT)
 io.netty:netty-resolver-dns-native-macos=NOTICE.netty,LICENSE.netty-dnsinfo | Netty macOS DNS resolver, including Apple dnsinfo (APSL-2.0, for Apple hardware); https://github.com/apple-oss-distributions/configd; covered source is available under APSL-2.0 at https://github.com/netty/netty/blob/netty-4.1.109.Final/resolver-dns-native-macos/src/main/c/dnsinfo.h
 jakarta.transaction:jakarta.transaction-api=LICENSE.transaction,NOTICE.transaction | Jakarta Transactions API (EPL-2.0); https://github.com/jakartaee/transactions
 org.jetbrains.kotlin:*=NOTICE.kotlin
-org.ow2.asm:asm=LICENSE.asm
-org.reactivestreams:reactive-streams=LICENSE.reactive-streams
-org.xerial.snappy:snappy-java=NOTICE.snappy,LICENSE.snappy,LICENSE.bitshuffle
-org.jacoco:org.jacoco.agent=LICENSE.EPL-2.0,LICENSE.asm | JaCoCo runtime (EPL-2.0); https://www.jacoco.org
+org.ow2.asm:asm=LICENSE.asm | ASM (BSD-3-Clause)
+org.reactivestreams:reactive-streams=LICENSE.reactive-streams | Reactive Streams (MIT-0)
+org.xerial.snappy:snappy-java=NOTICE.snappy,LICENSE.snappy,LICENSE.bitshuffle | Snappy Java (Apache-2.0), with Snappy (BSD-3-Clause) and Bitshuffle (MIT)
+org.jacoco:org.jacoco.agent=LICENSE.EPL-2.0 | JaCoCo runtime (EPL-2.0); https://www.jacoco.org
 com.sun.activation:javax.activation= | JavaBeans Activation Framework (CDDL-1.1); https://github.com/javaee/activation
 javax.xml.bind:jaxb-api= | JAXB API (CDDL-1.1); https://github.com/javaee/jaxb-spec
+org.checkerframework:checker-qual= | Checker Framework qualifiers (MIT)
+org.codehaus.woodstox:stax2-api= | StAX2 API (BSD-2-Clause)
+org.slf4j:*= | SLF4J (MIT)
+net.java.dev.jna:*= | Java Native Access (Apache-2.0 selected from dual license)
+com.fasterxml.jackson.core:jackson-core:2.15.2=LICENSE.fastdoubleparser-0.9.0,LICENSE.schubfach | Jackson Core (Apache-2.0), including FastDoubleParser 0.9.0 and Schubfach (MIT), bigint (BSD-2-Clause)
+com.fasterxml.jackson.core:jackson-core:2.18.3=LICENSE.fastdoubleparser-1.0.90,LICENSE.schubfach,LICENSE.fastdoubleparser-boost | Jackson Core (Apache-2.0), including FastDoubleParser 1.0.90 and Schubfach (MIT), fast_double_parser (BSL-1.0), fast_float (MIT), bigint (BSD-2-Clause)

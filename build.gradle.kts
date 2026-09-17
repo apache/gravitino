@@ -85,6 +85,9 @@ val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
 @CacheableTask
 abstract class GenerateJarLegalFiles : DefaultTask() {
   companion object {
+    private const val LICENSE_INVENTORY = "\nBundled component licensing:\n"
+    private const val NOTICE_INVENTORY = "\nBundled component notices:\n"
+    private val noticeFileName = Regex("(?i)([A-Za-z0-9_]+-)?NOTICE([.-].*)?")
     private val legalFileName = Regex(
       "(?i)([A-Za-z0-9_]+-)?(LICENSE|LICENCE|NOTICE|COPYING|COPYRIGHT)(-[A-Za-z0-9_-]+)?(\\.(txt|md|markdown|adoc))?"
     )
@@ -175,11 +178,22 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
             } else {
               prefix + entry.name
             }
-            archive.getInputStream(entry).use { add(path, it.readBytes()) }
+            archive.getInputStream(entry).use { input ->
+              val bytes = input.readBytes()
+              // Regenerate nested inventories after exclusions instead of propagating stale entries.
+              val content = when {
+                group == "org.apache.gravitino" && entry.name == "META-INF/LICENSE" ->
+                  bytes.toString(Charsets.UTF_8).substringBefore(LICENSE_INVENTORY).toByteArray(Charsets.UTF_8)
+                group == "org.apache.gravitino" && entry.name == "META-INF/NOTICE" ->
+                  bytes.toString(Charsets.UTF_8).substringBefore(NOTICE_INVENTORY).toByteArray(Charsets.UTF_8)
+                else -> bytes
+              }
+              add(path, content)
+            }
           }
       }
       if (hasContent) {
-        val selected = overrides[coordinate] ?: overrides["$group:*"] ?: ""
+        val selected = overrides["$coordinate:${id.split('/')[2]}"] ?: overrides[coordinate] ?: overrides["$group:*"] ?: ""
         selected.substringBefore('|').split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
           val supplement = directory.resolve(name)
           require(supplement.isFile) { "Missing Maven legal supplement for $coordinate: $name" }
@@ -190,19 +204,34 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
     var license = directory.resolve("LICENSE").readText()
     var notice = directory.resolve("NOTICE").readText()
     sourceNotices.get().forEach { name -> notice += "\n" + directory.resolve("NOTICE.$name").readText() }
-    if (documents.isNotEmpty()) {
-      val reference = "\nLegal documents for bundled dependencies are in META-INF/licenses/, grouped by Maven coordinates.\n"
-      license += reference
-      notice += reference
-    }
-    // Label additional licensing requirements prominently, including dependencies of a nested runtime.
-    val labels = documents.keys.filter { it.startsWith("META-INF/licenses/") }
-      .map { it.split('/').take(5) }.filter { it.size == 5 }.distinct().mapNotNull { parts ->
+    // Each entry names the bundled component/version and its exact license locations.
+    val components = documents.keys.groupBy { it.split('/').take(5).joinToString("/") }
+    if (components.isNotEmpty()) {
+      license += LICENSE_INVENTORY
+      components.forEach { (prefix, paths) ->
+        val parts = prefix.split('/')
         val coordinate = "${parts[2]}:${parts[3]}"
-        val label = overrides[coordinate]?.substringAfter('|', "")?.trim().orEmpty()
-        if (label.isEmpty()) null else "- $label\n  Version ${parts[4]}; legal documents: ${parts.joinToString("/")}/"
+        val selected = overrides["$coordinate:${parts[4]}"] ?: overrides[coordinate] ?: overrides["${parts[2]}:*"] ?: ""
+        val label = selected.substringAfter('|', "").trim()
+        license += "\n$coordinate:${parts[4]}" + if (label.isEmpty()) "\n" else " — $label\n"
+        license += "Licensing and attribution documents:\n" + paths.joinToString("\n") { "  $it" } + "\n"
       }
-    if (labels.isNotEmpty()) license += "\nAdditional dependency license requirements:\n\n" + labels.joinToString("\n\n") + "\n"
+    }
+    // Preserve leaf notices once; a nested runtime's generated inventory was stripped above.
+    val dependencyNotices = linkedMapOf<String, MutableList<String>>()
+    documents.forEach { (path, contents) ->
+      if (noticeFileName.matches(path.substringAfterLast('/'))) {
+        contents.forEach {
+          dependencyNotices.getOrPut(it.array().toString(Charsets.UTF_8).trim()) { mutableListOf() }.add(path)
+        }
+      }
+    }
+    if (dependencyNotices.isNotEmpty()) {
+      notice += NOTICE_INVENTORY + "\n" + dependencyNotices.entries.joinToString("\n\n-----\n\n") { (text, paths) ->
+        "From: " + paths.joinToString("\n      ") +
+          "\nRelative file references below refer to the original document's directory.\n\n$text"
+      } + "\n"
+    }
     // The JDK doclet supplies its own legal/ directory alongside the generated JavaScript/CSS.
     if (javadocFiles.files.any { it.name == "jquery.md" || it.name == "jqueryUI.md" }) {
       license += "\nLicense texts for generated Javadoc assets are in the legal/ directory at the root of this JAR.\n"

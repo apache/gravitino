@@ -230,6 +230,91 @@ class TestRuntimeJarLegalFiles {
     }
   }
 
+  @Test
+  void testMainLicenseIdentifiesBundledComponentsAndDocumentPaths() throws IOException {
+    for (String name : requiredProperty("artifacts").split(",")) {
+      try (JarFile jar = artifact(name)) {
+        String license = readEntry(jar, "META-INF/LICENSE");
+        for (JarEntry entry : Collections.list(jar.entries())) {
+          if (!entry.isDirectory() && entry.getName().startsWith("META-INF/licenses/")) {
+            String[] parts = entry.getName().split("/");
+            assertTrue(
+                license.contains(parts[2] + ":" + parts[3] + ":" + parts[4]), entry.getName());
+            assertTrue(license.contains("  " + entry.getName() + "\n"), entry.getName());
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void testDependencyNoticesAppearInMainNotice() throws IOException {
+    try (JarFile jar = artifact("runtime")) {
+      String notice = readEntry(jar, "META-INF/NOTICE");
+      for (JarEntry entry : Collections.list(jar.entries())) {
+        String path = entry.getName();
+        if (path.contains("/com.fasterxml.jackson.core/") && path.endsWith("/META-INF/NOTICE")) {
+          assertTrue(notice.contains(readEntry(jar, path).trim()));
+          assertTrue(notice.contains(path));
+        }
+      }
+      assertEquals(1, notice.split("Bundled component notices:", -1).length - 1);
+    }
+  }
+
+  @Test
+  @Tag("maven-legal-audit")
+  void testNestedNoticeDoesNotRepeatGeneratedInventories() throws IOException {
+    try (JarFile jar = artifact("filesystem")) {
+      String notice = readEntry(jar, "META-INF/NOTICE");
+      assertEquals(1, notice.split("Bundled component notices:", -1).length - 1);
+      boolean includesSlf4j = jar.getJarEntry("org/slf4j/LoggerFactory.class") != null;
+      assertEquals(
+          includesSlf4j, readEntry(jar, "META-INF/LICENSE").contains("org.slf4j:slf4j-api:"));
+    }
+    try (JarFile jar = artifact("azure")) {
+      String license = readEntry(jar, "META-INF/LICENSE");
+      assertTrue(license.contains("Microsoft Azure SDK (MIT)"));
+      assertTrue(license.contains("Reactive Streams (MIT-0)"));
+    }
+    try (JarFile jar = artifact("aliyun")) {
+      assertFalse(
+          jar.stream()
+              .anyMatch(
+                  entry ->
+                      entry.getName().contains("/org.jacoco/")
+                          && entry.getName().endsWith("/LICENSE.asm")));
+      assertTrue(
+          jar.stream()
+              .anyMatch(
+                  entry ->
+                      entry.getName().contains("/org.jacoco/")
+                          && entry.getName().endsWith("/about.html")));
+    }
+  }
+
+  @Test
+  void testOlderJacksonIncludesMissingParserLicenseTexts() throws IOException {
+    for (String name : requiredProperty("artifacts").split(",")) {
+      try (JarFile jar = artifact(name)) {
+        for (JarEntry entry : Collections.list(jar.entries())) {
+          String path = entry.getName();
+          if (path.contains("/com.fasterxml.jackson.core/jackson-core/2.15.2/")
+              && path.endsWith("/META-INF/FastDoubleParser-NOTICE")) {
+            String prefix = path.substring(0, path.indexOf("/META-INF/FastDoubleParser-NOTICE"));
+            assertTrue(
+                readEntry(jar, prefix + "/LICENSE.fastdoubleparser-0.9.0")
+                    .contains("Copyright (c) 2023 Werner"));
+            assertTrue(
+                readEntry(jar, prefix + "/LICENSE.schubfach")
+                    .contains("Copyright 2018-2020 Raffaello Giulietti"));
+            assertTrue(readEntry(jar, "META-INF/LICENSE").contains(prefix + "/LICENSE.schubfach"));
+          }
+        }
+      }
+    }
+  }
+
   private static JarFile artifact(String name) throws IOException {
     return new JarFile(requiredProperty("artifact." + name));
   }
