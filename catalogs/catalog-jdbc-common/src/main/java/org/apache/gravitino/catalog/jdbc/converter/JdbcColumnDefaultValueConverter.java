@@ -34,7 +34,9 @@ import org.apache.gravitino.rel.types.Types;
 
 public class JdbcColumnDefaultValueConverter {
 
-  protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+  /** The DDL rendering of the current timestamp default value function. */
+  public static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
       new DateTimeFormatterBuilder()

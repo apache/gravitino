@@ -189,6 +189,18 @@ public class GeneralDataTypeTransformer {
   }
 
   /**
+   * Returns the Trino type a column of the requested type is created with when it differs from the
+   * requested one. Trino coerces the values written by CREATE TABLE AS SELECT to this type, so the
+   * pages written by the engine match the column the internal connector reads and writes.
+   *
+   * @param type the type requested by the user.
+   * @return the type the column is created with, or empty when the requested type is used as is.
+   */
+  public Optional<Type> getSupportedType(Type type) {
+    return Optional.empty();
+  }
+
+  /**
    * Transforms a Trino datatype to a Gravitino datatype.
    *
    * @param type the Trino datatype
