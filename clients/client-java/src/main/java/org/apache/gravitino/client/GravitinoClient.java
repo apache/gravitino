@@ -114,7 +114,7 @@ public class GravitinoClient extends GravitinoClientBase
       Map<String, String> properties,
       TLSConfigurer tlsConfigurer) {
     super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
-    this.metalake = loadMetalake(metalakeName);
+    this.metalakeName = metalakeName;
   }
 
   /**
