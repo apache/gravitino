@@ -472,6 +472,9 @@ log4j2Properties: {}
   ## Delete all files older than 30 days
   # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
 
+  ## JCasbin logger
+  # jcasbinLoggerLevel: warn
+
   ## Configure root logger
   # rootLoggerLevel: info
   # rootLoggerAppenderRefRollingRef: fileLogger
