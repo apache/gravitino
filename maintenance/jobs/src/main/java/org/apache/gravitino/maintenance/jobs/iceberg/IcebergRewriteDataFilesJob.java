@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -160,6 +158,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
       // Build the procedure call SQL
@@ -360,30 +359,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
-      return new HashMap<>();
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
-
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        configs.put(key, value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse Spark configurations JSON: "
-              + sparkConfJson
-              + ". Error: "
-              + e.getMessage(),
-          e);
-    }
+    return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
   /** Print usage information. */
@@ -426,47 +402,15 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   }
 
   /**
-   * Parse options from JSON string using Jackson for robust parsing.
+   * Parse options from a flat JSON map.
    *
-   * <p>Expected format: {"key1": "value1", "key2": "value2"}
-   *
-   * <p>This method uses Jackson ObjectMapper to properly handle:
-   *
-   * <ul>
-   *   <li>Escaped quotes in values
-   *   <li>Colons and commas in values
-   *   <li>Complex JSON structures
-   *   <li>Various data types (strings, numbers, booleans)
-   * </ul>
+   * <p>Parse errors name the real CLI flag {@code --options}. Nested objects/arrays are rejected.
    *
    * @param optionsJson JSON string
    * @return map of option keys to values
    */
   static Map<String, String> parseOptionsJson(String optionsJson) {
-    Map<String, String> options = new HashMap<>();
-    if (optionsJson == null || optionsJson.isEmpty()) {
-      return options;
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      // Parse JSON into a Map<String, Object> to handle various value types
-      Map<String, Object> parsedMap =
-          mapper.readValue(optionsJson, new TypeReference<Map<String, Object>>() {});
-
-      // Convert all values to strings
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        // Convert value to string - handles strings, numbers, booleans, etc.
-        options.put(key, value == null ? "" : value.toString());
-      }
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse options JSON: " + optionsJson + ". Error: " + e.getMessage(), e);
-    }
-
-    return options;
+    return IcebergSparkConfigUtils.parseFlatJsonMap(optionsJson, "options");
   }
 
   /**
