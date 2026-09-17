@@ -59,7 +59,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String SPARK_DRIVER_MEMORY_KEY = "spark.driver.memory";
   private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String ICEBERG_SPARK_CATALOG_IMPL = "org.apache.iceberg.spark.SparkCatalog";
-  private static final String REDACTED = "***";
+  private static final String REDACTED = "******";
   private static final Set<String> SENSITIVE_UPDATER_OPTION_KEYS =
       new HashSet<>(
           List.of(
@@ -199,15 +199,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     }
     String normalized = key.trim().toLowerCase(Locale.ROOT);
     return SENSITIVE_UPDATER_OPTION_KEYS.contains(key)
-        || SENSITIVE_UPDATER_OPTION_KEYS.contains(normalized)
-        || normalized.endsWith("password")
-        || normalized.endsWith("credential")
-        || normalized.endsWith("secret")
-        || normalized.endsWith("token")
-        || normalized.contains(".password")
-        || normalized.contains(".credential")
-        || normalized.contains(".token")
-        || normalized.contains(".secret");
+        || SENSITIVE_UPDATER_OPTION_KEYS.contains(normalized);
   }
 
   private static String resolveScalarOption(String cliValue, String confValue) {

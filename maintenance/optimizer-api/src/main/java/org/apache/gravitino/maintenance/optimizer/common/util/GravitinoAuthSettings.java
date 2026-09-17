@@ -93,7 +93,7 @@ public final class GravitinoAuthSettings {
       return;
     }
     copyAlias(properties, OptimizerConfig.AUTH_TYPE, "auth_type");
-    copyAlias(properties, OptimizerConfig.AUTH_USERNAME, "username", "user");
+    copyAlias(properties, OptimizerConfig.AUTH_USERNAME, "username");
     copyAlias(properties, OptimizerConfig.AUTH_PASSWORD, "password");
     copyAlias(properties, OptimizerConfig.AUTH_OAUTH_SERVER_URI, "oauth_server_uri");
     copyAlias(properties, OptimizerConfig.AUTH_OAUTH_PATH, "oauth_path");

@@ -41,7 +41,7 @@ class TestGravitinoAuthSettings {
     Map<String, String> properties = new HashMap<>();
     properties.put(OptimizerConfig.AUTH_TYPE, "basic");
     properties.put(OptimizerConfig.AUTH_USERNAME, "admin");
-    properties.put(OptimizerConfig.AUTH_PASSWORD, "secret");
+    properties.put(OptimizerConfig.AUTH_PASSWORD, "YourSecureGravitinoPassword");
     GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
 
     @SuppressWarnings("unchecked")
@@ -50,7 +50,7 @@ class TestGravitinoAuthSettings {
         .thenReturn(builder);
 
     settings.applyTo(builder);
-    Mockito.verify(builder).withBasicAuth("admin", "secret");
+    Mockito.verify(builder).withBasicAuth("admin", "YourSecureGravitinoPassword");
   }
 
   @Test
@@ -113,10 +113,11 @@ class TestGravitinoAuthSettings {
     Map<String, String> properties = new HashMap<>();
     properties.put("auth_type", "basic");
     properties.put("username", "admin");
-    properties.put("password", "secret");
+    properties.put("password", "YourSecureGravitinoPassword");
     GravitinoAuthSettings.copyAliases(properties);
     Assertions.assertEquals("basic", properties.get(OptimizerConfig.AUTH_TYPE));
     Assertions.assertEquals("admin", properties.get(OptimizerConfig.AUTH_USERNAME));
-    Assertions.assertEquals("secret", properties.get(OptimizerConfig.AUTH_PASSWORD));
+    Assertions.assertEquals(
+        "YourSecureGravitinoPassword", properties.get(OptimizerConfig.AUTH_PASSWORD));
   }
 }

@@ -57,12 +57,12 @@ When the Gravitino server has authentication enabled, `builtin-iceberg-update-st
 credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
 updater and `submit-update-stats-job` `runJob` calls):
 
-| `auth_type` | Fields |
-|-------------|--------|
-| `none` (default) | (none) |
-| `simple` | `username` (optional) |
-| `basic` | `username`, `password` |
-| `oauth` | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
+| `auth_type`      | Fields                                                                                         |
+|------------------|------------------------------------------------------------------------------------------------|
+| `none` (default) | (none)                                                                                         |
+| `simple`         | `username` (optional)                                                                          |
+| `basic`          | `username`, `password`                                                                         |
+| `oauth`          | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
 
 Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
 job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files

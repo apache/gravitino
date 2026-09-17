@@ -99,7 +99,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
     String sparkConfJson = argMap.get("spark-conf");
-    Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
 
     SparkSession.Builder sparkBuilder =
         SparkSession.builder().appName("Gravitino Built-in Iceberg Update Stats");
@@ -115,6 +114,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
+      Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
       if (updateMode.updateStats) {
         String statisticsUpdaterName =
             updaterOptions.getOrDefault("statistics_updater", DEFAULT_STATISTICS_UPDATER).trim();

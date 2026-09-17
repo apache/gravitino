@@ -187,12 +187,13 @@ public class TestIcebergUpdateStatsJob {
     options.put("metalake", "ml");
     options.put("auth_type", "basic");
     options.put("username", "admin");
-    options.put("password", "secret");
+    options.put("password", "YourSecureGravitinoPassword");
     Map<String, String> optimizerProperties =
         IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
     assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
     assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
-    assertEquals("secret", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
+    assertEquals(
+        "YourSecureGravitinoPassword", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
   }
 
   @Test

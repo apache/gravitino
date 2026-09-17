@@ -32,7 +32,8 @@ class TestSubmitUpdateStatsJobCommand {
     jobConfig.put(
         "updater_options",
         "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\","
-            + "\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"secret\","
+            + "\"auth_type\":\"basic\",\"username\":\"admin\","
+            + "\"password\":\"YourSecureGravitinoPassword\","
             + "\"oauth_credential\":\"id:secret\"}");
     jobConfig.put(
         "spark_conf",
@@ -41,13 +42,15 @@ class TestSubmitUpdateStatsJobCommand {
 
     Map<String, String> redacted = SubmitUpdateStatsJobCommand.redactJobConfigForLog(jobConfig);
     String updaterOptions = redacted.get("updater_options");
-    Assertions.assertTrue(updaterOptions.contains("\"password\":\"***\""));
-    Assertions.assertTrue(updaterOptions.contains("\"oauth_credential\":\"***\""));
+    Assertions.assertTrue(updaterOptions.contains("\"password\":\"******\""));
+    Assertions.assertTrue(updaterOptions.contains("\"oauth_credential\":\"******\""));
     Assertions.assertTrue(updaterOptions.contains("\"username\":\"admin\""));
-    Assertions.assertTrue(jobConfig.get("updater_options").contains("\"password\":\"secret\""));
-    Assertions.assertTrue(redacted.get("spark_conf").contains("\"***\""));
     Assertions.assertTrue(
-        jobConfig
+        jobConfig.get("updater_options").contains("\"password\":\"YourSecureGravitinoPassword\""));
+    // spark_conf keys are catalog-scoped (e.g. rest.auth.basic.password); only exact sensitive
+    // updater-option keys are redacted.
+    Assertions.assertTrue(
+        redacted
             .get("spark_conf")
             .contains("\"spark.sql.catalog.rest.rest.auth.basic.password\":\"spark-secret\""));
   }
