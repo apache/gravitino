@@ -767,3 +767,6 @@ Metrics code included in Jersey Server
 org.glassfish.jersey.server.internal.monitoring.core
 Copyright (c) 2015-2018 Oracle and/or its affiliates. All rights reserved.
 Copyright 2010-2013 Coda Hale and Yammer, Inc.
+
+gRPC (grpc-api and grpc-context)
+Copyright 2014 The gRPC Authors

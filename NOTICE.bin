@@ -1011,3 +1011,6 @@ Copyright 2021 Yahoo Inc.
 
 Prior to moving to ASF, the software for this project was developed at
 Yahoo Inc. (https://developer.yahoo.com).
+
+gRPC (grpc-api and grpc-context)
+Copyright 2014 The gRPC Authors
