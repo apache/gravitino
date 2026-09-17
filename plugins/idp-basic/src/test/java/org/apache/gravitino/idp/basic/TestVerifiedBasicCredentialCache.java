@@ -29,7 +29,7 @@ public class TestVerifiedBasicCredentialCache {
 
   @Test
   public void testDisabledCacheNeverRemembers() {
-    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(0, 100);
+    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(false, 60, 100);
     assertFalse(cache.isEnabled());
     cache.rememberSuccess("alice", "Passw0rd-1234", "hash-1");
     assertFalse(cache.isVerified("alice", "Passw0rd-1234", "hash-1"));
@@ -38,7 +38,7 @@ public class TestVerifiedBasicCredentialCache {
 
   @Test
   public void testRememberAndVerifySuccess() {
-    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(60, 100);
+    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(true, 60, 100);
     assertTrue(cache.isEnabled());
     cache.rememberSuccess("alice", "Passw0rd-1234", "hash-1");
     assertTrue(cache.isVerified("alice", "Passw0rd-1234", "hash-1"));
@@ -49,7 +49,7 @@ public class TestVerifiedBasicCredentialCache {
 
   @Test
   public void testInvalidateUserDropsCachedCredential() {
-    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(60, 100);
+    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(true, 60, 100);
     cache.rememberSuccess("alice", "Passw0rd-1234", "hash-1");
     cache.invalidateUser("alice");
     assertFalse(cache.isVerified("alice", "Passw0rd-1234", "hash-1"));
@@ -57,7 +57,7 @@ public class TestVerifiedBasicCredentialCache {
 
   @Test
   public void testPasswordChangeReplacesPreviousCredentialKey() {
-    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(60, 100);
+    VerifiedBasicCredentialCache cache = new VerifiedBasicCredentialCache(true, 60, 100);
     cache.rememberSuccess("alice", "Passw0rd-1234", "hash-1");
     cache.rememberSuccess("alice", "New-Password1!", "hash-2");
     assertFalse(cache.isVerified("alice", "Passw0rd-1234", "hash-1"));

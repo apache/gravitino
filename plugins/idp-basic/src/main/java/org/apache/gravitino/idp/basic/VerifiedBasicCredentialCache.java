@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.basic;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
@@ -45,7 +46,7 @@ public final class VerifiedBasicCredentialCache implements Closeable {
 
   private static final HexFormat HEX = HexFormat.of();
 
-  @Nullable private final Cache<String, String> credentialToPasswordHash;
+  @Nullable private final Cache<String, CachedEntry> credentialToEntry;
   private final ConcurrentHashMap<String, String> usernameToCredentialKey =
       new ConcurrentHashMap<>();
 
@@ -56,22 +57,29 @@ public final class VerifiedBasicCredentialCache implements Closeable {
    */
   public VerifiedBasicCredentialCache(Config config) {
     this(
+        config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_ENABLED),
         config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_EXPIRATION_SECS),
         config.get(IdpBasicConfigs.VERIFIED_CREDENTIAL_CACHE_MAX_SIZE));
   }
 
   @VisibleForTesting
-  VerifiedBasicCredentialCache(long expirationSecs, long maxSize) {
-    Preconditions.checkArgument(expirationSecs >= 0, "expirationSecs must be >= 0");
+  VerifiedBasicCredentialCache(boolean enabled, long expirationSecs, long maxSize) {
+    Preconditions.checkArgument(expirationSecs > 0, "expirationSecs must be > 0");
     Preconditions.checkArgument(maxSize > 0, "maxSize must be > 0");
-    if (expirationSecs == 0) {
-      this.credentialToPasswordHash = null;
+    if (!enabled) {
+      this.credentialToEntry = null;
       return;
     }
-    this.credentialToPasswordHash =
+    this.credentialToEntry =
         Caffeine.newBuilder()
             .expireAfterWrite(expirationSecs, TimeUnit.SECONDS)
             .maximumSize(maxSize)
+            .removalListener(
+                (String key, CachedEntry value, RemovalCause cause) -> {
+                  if (key != null && value != null) {
+                    usernameToCredentialKey.remove(value.username(), key);
+                  }
+                })
             .build();
   }
 
@@ -84,13 +92,12 @@ public final class VerifiedBasicCredentialCache implements Closeable {
    * @return {@code true} when the credential was verified recently against the same hash
    */
   public boolean isVerified(String username, String password, String passwordHash) {
-    if (credentialToPasswordHash == null
-        || StringUtils.isAnyBlank(username, password, passwordHash)) {
+    if (credentialToEntry == null || StringUtils.isAnyBlank(username, password, passwordHash)) {
       return false;
     }
     String credentialKey = credentialKey(username, password);
-    String cachedHash = credentialToPasswordHash.getIfPresent(credentialKey);
-    return Objects.equals(cachedHash, passwordHash);
+    CachedEntry cached = credentialToEntry.getIfPresent(credentialKey);
+    return cached != null && Objects.equals(cached.passwordHash(), passwordHash);
   }
 
   /**
@@ -101,16 +108,15 @@ public final class VerifiedBasicCredentialCache implements Closeable {
    * @param passwordHash stored password hash that was just verified
    */
   public void rememberSuccess(String username, String password, String passwordHash) {
-    if (credentialToPasswordHash == null
-        || StringUtils.isAnyBlank(username, password, passwordHash)) {
+    if (credentialToEntry == null || StringUtils.isAnyBlank(username, password, passwordHash)) {
       return;
     }
     String credentialKey = credentialKey(username, password);
     String previousKey = usernameToCredentialKey.put(username, credentialKey);
     if (previousKey != null && !previousKey.equals(credentialKey)) {
-      credentialToPasswordHash.invalidate(previousKey);
+      credentialToEntry.invalidate(previousKey);
     }
-    credentialToPasswordHash.put(credentialKey, passwordHash);
+    credentialToEntry.put(credentialKey, new CachedEntry(username, passwordHash));
   }
 
   /**
@@ -119,30 +125,30 @@ public final class VerifiedBasicCredentialCache implements Closeable {
    * @param username username whose cached credentials should be removed
    */
   public void invalidateUser(String username) {
-    if (credentialToPasswordHash == null || StringUtils.isBlank(username)) {
+    if (credentialToEntry == null || StringUtils.isBlank(username)) {
       return;
     }
     String credentialKey = usernameToCredentialKey.remove(username);
     if (credentialKey != null) {
-      credentialToPasswordHash.invalidate(credentialKey);
+      credentialToEntry.invalidate(credentialKey);
     }
   }
 
   /** Returns whether caching is enabled. */
   public boolean isEnabled() {
-    return credentialToPasswordHash != null;
+    return credentialToEntry != null;
   }
 
   @VisibleForTesting
   long estimatedSize() {
-    return credentialToPasswordHash == null ? 0L : credentialToPasswordHash.estimatedSize();
+    return credentialToEntry == null ? 0L : credentialToEntry.estimatedSize();
   }
 
   @Override
   public void close() {
-    if (credentialToPasswordHash != null) {
-      credentialToPasswordHash.invalidateAll();
-      credentialToPasswordHash.cleanUp();
+    if (credentialToEntry != null) {
+      credentialToEntry.invalidateAll();
+      credentialToEntry.cleanUp();
     }
     usernameToCredentialKey.clear();
   }
@@ -156,6 +162,24 @@ public final class VerifiedBasicCredentialCache implements Closeable {
       return HEX.formatHex(digest.digest());
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 is required for Basic credential caching", e);
+    }
+  }
+
+  private static final class CachedEntry {
+    private final String username;
+    private final String passwordHash;
+
+    private CachedEntry(String username, String passwordHash) {
+      this.username = username;
+      this.passwordHash = passwordHash;
+    }
+
+    private String username() {
+      return username;
+    }
+
+    private String passwordHash() {
+      return passwordHash;
     }
   }
 }
