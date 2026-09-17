@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATAL
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
@@ -131,6 +132,7 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 

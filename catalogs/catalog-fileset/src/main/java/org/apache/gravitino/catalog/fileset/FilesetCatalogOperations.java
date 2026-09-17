@@ -69,6 +69,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -612,7 +613,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(filesetEntity, true /* overwrite */);
+      // The existence check is advisory; the strict insert decides concurrent creates.
+      store.put(filesetEntity, false /* overwrite */);
+    } catch (EntityAlreadyExistsException exception) {
+      throw new FilesetAlreadyExistsException(exception, "Fileset %s already exists", ident);
     } catch (NoSuchEntityException exception) {
       // The schema can disappear after the check near the start of this method. The relational
       // store detects that race while taking the parent-schema lock; translate its storage-level
