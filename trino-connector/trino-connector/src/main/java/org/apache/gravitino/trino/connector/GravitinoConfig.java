@@ -701,15 +701,17 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX and
-    // GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX
+    // Copy configuration with prefixes that are not represented by exact entries in
+    // CONFIG_DEFINITIONS. In particular, scoped Iceberg REST URIs must reach dynamic catalogs so
+    // that workers use the same per-metalake endpoint as the coordinator.
     config.entrySet().stream()
         .filter(
             entry ->
                 (entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
                         || entry
                             .getKey()
-                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
+                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key)
+                        || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_URI.key + "."))
                     && !GravitinoConnectorFactory.isSecuritySensitivePropertyName(entry.getKey()))
         .forEach(
             entry ->

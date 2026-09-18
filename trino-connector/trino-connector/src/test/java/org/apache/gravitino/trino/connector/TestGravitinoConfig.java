@@ -255,6 +255,28 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void testToCatalogConfigIncludesScopedIcebergRestUris() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.iceberg.rest-uri",
+                "http://default-irc:9001/iceberg",
+                "gravitino.iceberg.rest-uri.prod",
+                "http://prod-irc:9001/iceberg",
+                "gravitino.iceberg.rest-uri.dev",
+                "http://dev-irc:9001/iceberg"));
+
+    String catalogConfig = config.toCatalogConfig();
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri\"='http://default-irc:9001/iceberg'"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.iceberg.rest-uri.prod\"='http://prod-irc:9001/iceberg'"));
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri.dev\"='http://dev-irc:9001/iceberg'"));
+  }
+
+  @Test
   public void testTrinoJdbcConfigDefaults() {
     GravitinoConfig config =
         new GravitinoConfig(
