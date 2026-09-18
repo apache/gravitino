@@ -53,9 +53,7 @@ public final class SecretPropertyUtils {
    *
    * <p>A key matches when it contains the built-in credential-like keywords ({@code secret}, {@code
    * password}, {@code token}, {@code credential}, {@code access}, or {@code account}), a configured
-   * typo pattern ({@link Configs#SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS}), or a token that
-   * fuzzy-matches those references within {@link
-   * Configs#SENSITIVE_PROPERTY_KEY_FUZZY_MATCH_MAX_DISTANCE}.
+   * typo pattern ({@link Configs#SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS}).
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern

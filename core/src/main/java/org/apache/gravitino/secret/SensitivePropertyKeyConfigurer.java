@@ -32,8 +32,6 @@ public final class SensitivePropertyKeyConfigurer {
    * @param config server configuration
    */
   public static void configure(Config config) {
-    SensitivePropertyKeyMatcher.configure(
-        config.get(Configs.SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS),
-        config.get(Configs.SENSITIVE_PROPERTY_KEY_FUZZY_MATCH_MAX_DISTANCE));
+    SensitivePropertyKeyMatcher.configure(config.get(Configs.SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS));
   }
 }

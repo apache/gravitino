@@ -144,6 +144,3 @@ gravitino.lance-rest.namespace-backend = gravitino
 # THE CONFIGURATION FOR sensitive property key matching
 # Additional typo substrings for credential-like property keys (comma-separated).
 # gravitino.properties.sensitive-key-typo-patterns = passwrod,secert,tokne
-# Maximum Damerau-Levenshtein distance for fuzzy matching property key tokens against
-# credential keywords and configured typo patterns. Set to 0 to disable fuzzy matching.
-# gravitino.properties.sensitive-key-fuzzy-match-max-distance = 1

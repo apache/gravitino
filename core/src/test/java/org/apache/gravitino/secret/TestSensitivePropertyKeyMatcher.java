@@ -39,36 +39,23 @@ public class TestSensitivePropertyKeyMatcher {
 
   @Test
   void testConfiguredTypoSubstringMatches() {
-    SensitivePropertyKeyMatcher.configure(List.of("passwrod", "secert"), 0);
+    SensitivePropertyKeyMatcher.configure(List.of("passwrod", "secert", "tokne"));
     Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("jdbc-passwrod"));
     Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("catalog.secert"));
+    Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("oauth2.tokne"));
     Assertions.assertFalse(SensitivePropertyKeyMatcher.isSensitive("jdbc-passord"));
   }
 
   @Test
-  void testFuzzyMatchesCommonPasswordTypoWithoutExplicitConfig() {
-    SensitivePropertyKeyMatcher.configure(List.of(), 1);
+  void testTypoPatternsAreCaseInsensitive() {
+    SensitivePropertyKeyMatcher.configure(List.of("PASSWROD"));
     Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("jdbc-passwrod"));
-    Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("oauth2.tokne"));
   }
 
   @Test
-  void testFuzzyCanBeDisabled() {
-    SensitivePropertyKeyMatcher.configure(List.of(), 0);
+  void testUnconfiguredTypoDoesNotMatch() {
+    SensitivePropertyKeyMatcher.resetToDefaults();
     Assertions.assertFalse(SensitivePropertyKeyMatcher.isSensitive("jdbc-passwrod"));
     Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("jdbc-password"));
-  }
-
-  @Test
-  void testConfiguredTypoExpandsFuzzyReferences() {
-    SensitivePropertyKeyMatcher.configure(List.of("passwd"), 1);
-    Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("jdbc-passwd"));
-    Assertions.assertTrue(SensitivePropertyKeyMatcher.isSensitive("jdbc-passwrd"));
-  }
-
-  @Test
-  void testShortTokensAreNotFuzzyMatched() {
-    SensitivePropertyKeyMatcher.configure(List.of(), 1);
-    Assertions.assertFalse(SensitivePropertyKeyMatcher.isSensitive("db-key"));
   }
 }

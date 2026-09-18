@@ -134,7 +134,7 @@ public class TestSecretPropertyUtils {
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-key"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-name"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("gcs-service-account-file"));
-    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-user"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("warehouse"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
