@@ -746,22 +746,24 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
+    // Create and initialize Catalog related modules first so MetalakeManager can force-drop
+    // child catalogs through CatalogManager. The operation chain is:
+    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
+    // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
     // MetalakeManager
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator, catalogManager);
     this.internalMetalakeDispatcher = new MetalakeNormalizeDispatcher(metalakeManager);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
-    // Create and initialize Catalog related modules, the operation chain is:
-    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
-    // CatalogManager
-    // CatalogManager registers its own change-log listener with the entity store (when the store
-    // supports it), so no poller wiring is needed here.
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.internalCatalogDispatcher = new CatalogNormalizeDispatcher(catalogManager);
     CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
