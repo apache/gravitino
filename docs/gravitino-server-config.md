@@ -348,6 +348,23 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
 | `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
 
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. By default, a key matches when its name contains `secret`,
+`password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+`gravitino.secret.sensitiveKeyKeywords` **replaces** that default list. Use it to drop a default
+keyword that masks unrelated properties (for example omit `access` and `account`), to add a typo
+or extra word (for example `passwrod` or `private`), or set it to empty to disable name-based
+matching. The value is a comma-separated list. Each entry is a case-insensitive literal substring
+of the property key, not a regular expression. Keep entries specific; overly broad values such as
+`key` can mask unrelated properties.
+
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
+
 ### Securing the Server
 
 #### Authentication
