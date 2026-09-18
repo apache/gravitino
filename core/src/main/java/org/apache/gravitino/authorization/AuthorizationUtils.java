@@ -367,18 +367,36 @@ public class AuthorizationUtils {
 
   public static void authorizationPluginRenamePrivileges(
       NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
+    authorizationPluginRenamePrivileges(
+        ident, type, NameIdentifier.of(ident.namespace(), newName), locations);
+  }
+
+  /**
+   * Renames the privileges of an entity in the authorization plugins, when the new identifier may
+   * be under a different parent, e.g. a table moved to another schema.
+   *
+   * @param ident the identifier of the entity before the rename
+   * @param type the entity type
+   * @param newIdent the identifier of the entity after the rename
+   * @param locations the storage locations of the entity, or {@code null}
+   */
+  public static void authorizationPluginRenamePrivileges(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      NameIdentifier newIdent,
+      List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
-      MetadataObject newMetadataObject =
-          NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
+      MetadataObject newMetadataObject = NameIdentifierUtil.toMetadataObject(newIdent, type);
 
       MetadataObjectChange renameChange =
           MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, locations);
 
-      String metalake = type == Entity.EntityType.METALAKE ? newName : ident.namespace().level(0);
+      String metalake =
+          type == Entity.EntityType.METALAKE ? newIdent.name() : ident.namespace().level(0);
 
       // For a renamed catalog, we should pass the new name catalog, otherwise we can't find the
       // catalog in the entity store
