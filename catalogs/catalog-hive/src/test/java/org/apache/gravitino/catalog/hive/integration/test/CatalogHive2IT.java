@@ -52,6 +52,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -1399,6 +1400,65 @@ public class CatalogHive2IT extends BaseIT {
             .getMessage()
             .contains(
                 "please ensure that the type of the new column position is compatible with the old one"));
+  }
+
+  @Test
+  public void testOutOfBandRenameKeepsColumnTags() throws InterruptedException {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("hive_oob_rename_table"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, createColumns(), TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+    String tagName = GravitinoITUtils.genRandomName("hive_oob_rename_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    try {
+      loadColumn(ident, HIVE_COL_NAME1).supportsTags().associateTags(new String[] {tagName}, null);
+
+      // Rename the table directly in the Hive Metastore. It keeps its Gravitino id in its table
+      // parameters, so loading it under the new name imports it again over the same id.
+      String newName = GravitinoITUtils.genRandomName("hive_oob_renamed_table");
+      HiveTable hiveTable = loadHiveTable(schemaName, ident.name());
+      HiveTable.Builder renamed =
+          HiveTable.builder()
+              .withName(newName)
+              .withColumns(hiveTable.columns())
+              .withProperties(hiveTable.properties())
+              .withAuditInfo(hiveTable.auditInfo())
+              .withDistribution(hiveTable.distribution())
+              .withSortOrders(hiveTable.sortOrder())
+              .withPartitioning(hiveTable.partitioning())
+              .withCatalogName(hiveTable.catalogName())
+              .withDatabaseName(hiveTable.databaseName());
+      if (hiveTable.comment() != null) {
+        renamed.withComment(hiveTable.comment());
+      }
+      hiveClientPool.run(
+          client -> {
+            client.alterTable(hmsCatalog, schemaName, ident.name(), renamed.build());
+            return null;
+          });
+
+      // The column keeps its id, so the tag follows the table to its new name.
+      NameIdentifier newIdent = NameIdentifier.of(schemaName, newName);
+      Column column = loadColumn(newIdent, HIVE_COL_NAME1);
+      Assertions.assertArrayEquals(new String[] {tagName}, column.supportsTags().listTags());
+      MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", catalogName, schemaName, newName, HIVE_COL_NAME1)
+              .toLowerCase(Locale.ROOT),
+          objects[0].fullName().toLowerCase(Locale.ROOT));
+    } finally {
+      metalake.deleteTag(tagName);
+    }
+  }
+
+  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
+    return Arrays.stream(catalog.asTableCatalog().loadTable(tableIdent).columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 
   @Test

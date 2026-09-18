@@ -579,7 +579,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw new RuntimeException("Failed to import the table entity to the store", e);
     }
 
-    return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
+    // The store may keep ids the entity above doesn't carry, e.g. the ids of the columns an
+    // earlier import of this table already registered, so return what it actually stored.
+    TableEntity storedEntity = tableEntity;
+    try {
+      storedEntity = store.get(identifier, TABLE, TableEntity.class);
+    } catch (Exception e) {
+      LOG.warn("Failed to read back the imported table {}, use the imported entity", identifier, e);
+    }
+
+    return EntityCombinedTable.of(table.tableFromCatalog(), storedEntity)
         .withHiddenProperties(table.hiddenProperties());
   }
 
