@@ -31,8 +31,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.function.Function;
@@ -860,9 +860,10 @@ public class TagIT extends BaseIT {
           .asTableCatalog()
           .alterTable(tableIdent, TableChange.deleteColumn(new String[] {"c1"}, true));
 
-      // The dropped column no longer resolves, and the tag no longer lists it.
-      Assertions.assertThrows(
-          NoSuchMetadataObjectException.class, () -> c1.supportsTags().listTags());
+      // The dropped column no longer resolves, and the tag no longer lists it. The server reports
+      // NoSuchMetadataObjectException; the client's tag error handler surfaces it as
+      // NotFoundException.
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
       Assertions.assertEquals(0, metalake.getTag(tag.name()).associatedObjects().count());
 
       // A new column with the same name does not inherit the dropped column's tag.
@@ -905,8 +906,7 @@ public class TagIT extends BaseIT {
       Assertions.assertEquals(
           String.join(".", relationalCatalog.name(), schema.name(), tableIdent.name(), "c1_new"),
           objects[0].fullName());
-      Assertions.assertThrows(
-          NoSuchMetadataObjectException.class, () -> c1.supportsTags().listTags());
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
     } finally {
       relationalCatalog.asTableCatalog().dropTable(tableIdent);
     }
