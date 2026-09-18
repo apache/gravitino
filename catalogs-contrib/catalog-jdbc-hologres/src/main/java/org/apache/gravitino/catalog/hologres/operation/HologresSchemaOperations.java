@@ -101,6 +101,7 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
           "Hologres does not support properties on schema create.");
     }
 
+    validateSqlIdentifier(schema);
     StringBuilder sqlBuilder = new StringBuilder(String.format("CREATE SCHEMA \"%s\";", schema));
     if (StringUtils.isNotEmpty(comment)) {
       String escapedComment = comment.replace("'", "''");
@@ -128,6 +129,7 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
+    validateSqlIdentifier(schema);
     StringBuilder sqlBuilder = new StringBuilder(String.format("DROP SCHEMA \"%s\"", schema));
     if (cascade) {
       sqlBuilder.append(" CASCADE");
