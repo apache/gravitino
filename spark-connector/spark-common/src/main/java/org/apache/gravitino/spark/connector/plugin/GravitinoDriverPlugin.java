@@ -112,6 +112,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
     SparkConf conf = sc.conf();
+    if (!conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLED, true)) {
+      LOG.info("Gravitino Spark connector is disabled.");
+      return Collections.emptyMap();
+    }
+
     String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI);
     String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
     Map<String, String> gravitinoClientConfig = extractGravitinoClientConfig(conf);

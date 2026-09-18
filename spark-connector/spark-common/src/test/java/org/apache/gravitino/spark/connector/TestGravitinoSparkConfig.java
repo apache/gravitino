@@ -20,9 +20,13 @@
 package org.apache.gravitino.spark.connector;
 
 import static org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.extractGravitinoClientConfig;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Map;
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,5 +46,21 @@ public class TestGravitinoSparkConfig {
     Map<String, String> clientConfig = extractGravitinoClientConfig(sparkConf);
     Assertions.assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "1000");
     Assertions.assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "2000");
+  }
+
+  @Test
+  void testIsGravitinoEnabled() {
+    Assertions.assertTrue(GravitinoSparkConfig.isGravitinoEnabled(sparkSession(new SparkConf())));
+    Assertions.assertFalse(
+        GravitinoSparkConfig.isGravitinoEnabled(
+            sparkSession(new SparkConf().set(GravitinoSparkConfig.GRAVITINO_ENABLED, "false"))));
+  }
+
+  private static SparkSession sparkSession(SparkConf sparkConf) {
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    SparkSession sparkSession = mock(SparkSession.class);
+    when(sparkSession.sparkContext()).thenReturn(sparkContext);
+    return sparkSession;
   }
 }
