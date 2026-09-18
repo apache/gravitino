@@ -332,6 +332,78 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVersionCheckRefreshKeepsExistingColumnIdsAndComments() throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("version-check-keep-ids").toString();
+    AuditInfo columnAudit =
+        AuditInfo.builder().withCreator("column_creator").withCreateTime(Instant.EPOCH).build();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("id")
+                    .withComment("the id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(columnAudit)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(11L)
+                    .withName("dropped")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withAuditInfo(columnAudit)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(12L);
+    AtomicReference<TableEntity> updated = new AtomicReference<>();
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              updated.set(updater.apply(tableEntity));
+              return updated.get();
+            });
+
+    // The dataset moved to a new version: "id" is still there, "dropped" is gone and "name" is new.
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("name", new ArrowType.Utf8()),
+                    Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loadedTable =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals("9", loadedTable.properties().get(LANCE_TABLE_VERSION));
+    List<ColumnEntity> columns = updated.get().columns();
+    Assertions.assertEquals(2, columns.size());
+
+    ColumnEntity name = columns.get(0);
+    Assertions.assertEquals("name", name.name());
+    Assertions.assertEquals(12L, name.id());
+    Assertions.assertEquals(0, name.position());
+
+    ColumnEntity id = columns.get(1);
+    Assertions.assertEquals("id", id.name());
+    Assertions.assertEquals(10L, id.id());
+    Assertions.assertEquals(1, id.position());
+    Assertions.assertEquals("the id", id.comment());
+    Assertions.assertEquals(columnAudit, id.auditInfo());
+    Assertions.assertEquals("the id", loadedTable.columns()[1].comment());
+  }
+
+  @Test
   public void testVersionCheckSkipsRefreshWhenVersionIsCurrent() throws Exception {
     lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");

@@ -715,12 +715,36 @@ public class LanceTableOperations extends ManagedTableOperations {
             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
             .withCreateTime(Instant.now())
             .build();
+    // Tags, owners and privileges are attached to a column by id, so a column that is still in the
+    // dataset keeps its id. It also keeps its comment and audit info, which the dataset doesn't
+    // carry.
+    Map<String, ColumnEntity> existingColumns =
+        tableEntity.columns().stream()
+            .collect(
+                Collectors.toMap(
+                    ColumnEntity::name, Function.identity(), (first, second) -> first));
     List<ColumnEntity> columnEntities =
         IntStream.range(0, columns.length)
             .mapToObj(
-                i ->
-                    ColumnEntity.toColumnEntity(
-                        columns[i], i, idGenerator.nextId(), columnAuditInfo))
+                i -> {
+                  ColumnEntity existing = existingColumns.get(columns[i].name());
+                  if (existing == null) {
+                    return ColumnEntity.toColumnEntity(
+                        columns[i], i, idGenerator.nextId(), columnAuditInfo);
+                  }
+                  return ColumnEntity.builder()
+                      .withId(existing.id())
+                      .withName(columns[i].name())
+                      .withPosition(i)
+                      .withDataType(columns[i].dataType())
+                      .withComment(
+                          columns[i].comment() != null ? columns[i].comment() : existing.comment())
+                      .withNullable(columns[i].nullable())
+                      .withAutoIncrement(columns[i].autoIncrement())
+                      .withDefaultValue(columns[i].defaultValue())
+                      .withAuditInfo((AuditInfo) existing.auditInfo())
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return TableEntity.builder()
