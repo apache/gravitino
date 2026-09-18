@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
@@ -35,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -48,14 +46,12 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -1168,20 +1164,6 @@ public class TestTagMetaService extends TestJDBCBackend {
         new NameIdentifier[] {tag.nameIdentifier()},
         new NameIdentifier[0]);
 
-    PolicyEntity policy =
-        createAndInsertPolicyEntity(
-            "policy_tag_cascade",
-            "comment",
-            PolicyContents.custom(
-                ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TAG), null),
-            METALAKE_NAME);
-    PolicyMetaService.getInstance()
-        .associatePoliciesWithMetadataObject(
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            new NameIdentifier[] {policy.nameIdentifier()},
-            new NameIdentifier[0]);
-
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -1209,14 +1191,12 @@ public class TestTagMetaService extends TestJDBCBackend {
     String tagAsSecurableObject =
         String.format("metadata_object_id = %d AND type = 'TAG'", tag.id());
     assertEquals(1, countActiveTagRel(tag.id()));
-    assertEquals(1, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
 
     assertTrue(tagMetaService.deleteTag(tag.nameIdentifier()));
 
     assertEquals(0, countActiveTagRel(tag.id()));
-    assertEquals(0, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
     assertTrue(

@@ -43,7 +43,6 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
-import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
@@ -228,11 +227,6 @@ public class PolicyMetaService {
               SessionUtils.doWithoutCommit(
                   PolicyMetadataObjectRelMapper.class,
                   mapper -> mapper.softDeletePolicyMetadataObjectRelsByPolicyId(policyId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TagMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeleteTagMetadataObjectRelsByMetadataObject(policyId, policyType)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,

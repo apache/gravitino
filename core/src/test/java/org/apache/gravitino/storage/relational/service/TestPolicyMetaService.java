@@ -54,7 +54,6 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
@@ -1065,14 +1064,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         new NameIdentifier[] {policy.nameIdentifier()},
         new NameIdentifier[0]);
 
-    TagEntity tag = createAndInsertTagEntity("tag_policy_cascade", "comment", METALAKE_NAME);
-    TagMetaService.getInstance()
-        .associateTagsWithMetadataObject(
-            policy.nameIdentifier(),
-            Entity.EntityType.POLICY,
-            new NameIdentifier[] {tag.nameIdentifier()},
-            new NameIdentifier[0]);
-
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -1101,7 +1092,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     String policyAsSecurableObject =
         String.format("metadata_object_id = %d AND type = 'POLICY'", policy.id());
     assertEquals(1, countActivePolicyRel(policy.id()));
-    assertEquals(1, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
     assertEquals(1, countActiveRows("role_meta_securable_object", policyAsSecurableObject));
     assertFalse(listPolicyVersions(policy.id()).isEmpty());
@@ -1113,7 +1103,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertTrue(listPolicyVersions(policy.id()).values().stream().allMatch(d -> d > 0L));
 
     assertEquals(0, countActivePolicyRel(policy.id()));
-    assertEquals(0, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(0, countActiveRows("owner_meta", policyAsMetadataObject));
     assertEquals(0, countActiveRows("role_meta_securable_object", policyAsSecurableObject));
     assertTrue(
