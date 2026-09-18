@@ -782,6 +782,43 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testDisabledPoliciesAreExcludedFromMetadataObjectResults() {
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+    String directPolicyName = "disabled_direct_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyEntity directPolicy =
+        policyManager.createPolicy(
+            METALAKE, directPolicyName, Policy.BuiltInType.CUSTOM, null, false, content);
+    String tagPolicyName = "disabled_tag_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyEntity tagPolicy =
+        policyManager.createPolicy(
+            METALAKE, tagPolicyName, Policy.BuiltInType.CUSTOM, null, false, content);
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    policyManager.associatePoliciesForMetadataObject(
+        METALAKE, tableObject, new String[] {directPolicy.name()}, null);
+    associatePolicyThroughTag(tagPolicy, tableObject);
+
+    Assertions.assertEquals(
+        0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+    Assertions.assertThrows(
+        NoSuchPolicyException.class,
+        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, directPolicy.name()));
+    Assertions.assertThrows(
+        NoSuchPolicyException.class,
+        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, tagPolicy.name()));
+
+    policyManager.enablePolicy(METALAKE, directPolicy.name());
+    policyManager.enablePolicy(METALAKE, tagPolicy.name());
+
+    Assertions.assertEquals(
+        ImmutableSet.of(directPolicy.name(), tagPolicy.name()),
+        ImmutableSet.copyOf(policyManager.listPoliciesForMetadataObject(METALAKE, tableObject)));
+  }
+
+  @Test
   public void testChildTagValueOverridesParentPolicySelector() {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     PolicyEntity policy =

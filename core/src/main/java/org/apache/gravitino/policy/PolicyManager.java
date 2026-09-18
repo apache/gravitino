@@ -320,7 +320,9 @@ public class PolicyManager implements PolicyDispatcher {
       Arrays.stream(listDirectPoliciesForMetadataObject(metalake, parent, true))
           .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
     }
-    return policiesById.values().toArray(new PolicyEntity[0]);
+    return policiesById.values().stream()
+        .filter(PolicyEntity::enabled)
+        .toArray(PolicyEntity[]::new);
   }
 
   @Override

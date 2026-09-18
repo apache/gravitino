@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +60,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
@@ -71,6 +73,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
@@ -214,6 +218,13 @@ public class TestTagOperations extends BaseOperationsTest {
     String policyName = "policy1";
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.name()).thenReturn(policyName);
+    when(policy.policyType()).thenReturn(Policy.BuiltInType.CUSTOM);
+    when(policy.enabled()).thenReturn(true);
+    when(policy.content())
+        .thenReturn(
+            PolicyContents.custom(
+                Collections.emptyMap(), Collections.singleton(MetadataObject.Type.TABLE), null));
+    when(policy.auditInfo()).thenReturn(testAuditInfo1);
     RelationalEntity<PolicyEntity> association =
         new RelationalEntity<>(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -231,6 +242,20 @@ public class TestTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), listResponse.getStatus());
     Assertions.assertArrayEquals(
         new String[] {policyName}, listResponse.readEntity(NameListResponse.class).getNames());
+
+    Response detailsResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+    PolicyForTagAssociationListResponse details =
+        detailsResponse.readEntity(PolicyForTagAssociationListResponse.class);
+    details.validate();
+    Assertions.assertEquals(1, details.getAssociations().length);
+    Assertions.assertSame(
+        AllValuesSelector.get(), details.getAssociations()[0].getSelector().toSelector());
 
     PolicyAssociationSelectorDTO selector =
         PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get());

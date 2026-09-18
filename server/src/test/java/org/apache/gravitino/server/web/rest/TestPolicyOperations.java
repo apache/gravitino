@@ -60,12 +60,14 @@ import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
@@ -209,6 +211,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
     String tagName = "tag1";
     TagEntity tag = mock(TagEntity.class);
     when(tag.name()).thenReturn(tagName);
+    when(tag.properties()).thenReturn(ImmutableMap.of());
+    when(tag.assignment()).thenReturn(Optional.empty());
+    when(tag.auditInfo()).thenReturn(testAuditInfo1);
     RelationalEntity<TagEntity> association =
         new RelationalEntity<>(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -227,6 +232,20 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     Assertions.assertArrayEquals(
         new String[] {tagName}, response.readEntity(NameListResponse.class).getNames());
+
+    Response detailsResponse =
+        target(policyPath(metalake) + "/" + policyName + "/tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+    TagForPolicyAssociationListResponse details =
+        detailsResponse.readEntity(TagForPolicyAssociationListResponse.class);
+    details.validate();
+    Assertions.assertEquals(1, details.getAssociations().length);
+    Assertions.assertSame(
+        AllValuesSelector.get(), details.getAssociations()[0].getSelector().toSelector());
   }
 
   @Test

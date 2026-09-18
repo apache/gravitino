@@ -312,12 +312,15 @@ Constraints and indexes:
 
 `selector` rules:
 
-1. `selector` is required and must not be null.
+1. New associations require a non-null `selector`. Persisted null selector values are read as
+   `ALL_VALUES` for storage compatibility.
 2. `ALL_VALUES` matches whenever the effective tag assignment exists.
 3. `TAG_VALUE` matches when the effective tag assignment contains the same value as
    `selector.value`.
 4. `TAG_VALUE` contains one non-blank `value` string.
-5. If the tag defines allowed values, the selector value must be one of the allowed values.
+5. `TAG_VALUE` selector validation is syntactic only and is independent of the tag's current
+   allowed values. A selector that cannot match a current effective assignment remains valid but
+   does not select the policy.
 6. Selector JSON is canonicalized before storage and comparison.
 7. The first version supports `ALL_VALUES` and `TAG_VALUE`. It does not support value absence,
    negative matching, principals, scopes, or general expressions. Future versions can add new
@@ -572,15 +575,16 @@ corresponding view privileges.
 }
 ```
 
-**Behavior:** Resolves object policies for one metadata object from its effective tags. Returns
+**Behavior:** Resolves object policies for one metadata object from its effective tags and includes
+legacy direct policy relations during the compatibility window. Returns
 `404 Not Found` if the metadata object does not exist. This endpoint is read-only and does not
 modify policy objects or object-policy relationships. The caller must be authorized to access the
 metadata object. Resolved policies for which the caller lacks `VIEW_POLICY` are filtered from both
 response shapes. `APPLY_POLICY` implies `VIEW_POLICY` for backward compatibility.
-With `details=true`, `inherited` is `true` when the policy is selected only through effective tags
-or legacy direct policy relations inherited from ancestor metadata objects. It is `false` when at
-least one matching policy-tag relation uses a tag assigned directly to the requested object, or
-when the legacy direct policy relation is on the requested object.
+With `details=true`, `inherited` is `true` when every source of the policy comes from an ancestor
+metadata object, whether through inherited effective tags or legacy direct policy relations. It is
+`false` when at least one source is a tag assignment or legacy direct policy relation on the
+requested object.
 
 A single policy can be associated with multiple effective tags on the same object. The resolver
 deduplicates by policy entity and current version, not by equivalent policy content. Different

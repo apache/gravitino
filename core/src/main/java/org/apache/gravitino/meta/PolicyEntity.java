@@ -133,10 +133,11 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   /**
    * Returns a copy of this policy entity with the given inheritance context.
    *
-   * <p>The inheritance context records whether the policy was selected only by inherited tag
-   * assignments. It is not part of the policy definition fields.
+   * <p>The inheritance context records whether the policy was selected only from ancestor metadata
+   * objects, either by an inherited tag assignment or a legacy direct policy association. It is not
+   * part of the policy definition fields.
    *
-   * @param inherited Whether the policy was selected only by inherited tag assignments.
+   * @param inherited Whether the policy was selected only from ancestor metadata objects.
    * @return The copied policy entity with the inheritance context.
    */
   public PolicyEntity copyWithInherited(boolean inherited) {

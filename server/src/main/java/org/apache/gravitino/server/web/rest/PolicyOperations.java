@@ -61,6 +61,7 @@ import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -406,9 +407,7 @@ public class PolicyOperations {
                             new TagForPolicyAssociationDTO(
                                 DTOConverters.toDTO(
                                     (TagEntity) association.targetEntity(), Optional.empty()),
-                                PolicyAssociationSelectorDTO.fromSelector(
-                                    PolicyAssociationSelectorSerde.deserialize(
-                                        association.relationValue().orElseThrow()))))
+                                toSelectorDTO(association)))
                     .toArray(TagForPolicyAssociationDTO[]::new);
             return Utils.ok(new TagForPolicyAssociationListResponse(associationDTOs));
           });
@@ -430,6 +429,14 @@ public class PolicyOperations {
             .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 
     return builder.build();
+  }
+
+  static PolicyAssociationSelectorDTO toSelectorDTO(RelationalEntity<?> association) {
+    return PolicyAssociationSelectorDTO.fromSelector(
+        association
+            .relationValue()
+            .map(PolicyAssociationSelectorSerde::deserialize)
+            .orElseGet(AllValuesSelector::get));
   }
 
   private static void validateCreatePolicyType(String policyType) {

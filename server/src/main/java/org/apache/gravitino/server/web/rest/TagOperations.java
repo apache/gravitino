@@ -60,7 +60,6 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -375,9 +374,7 @@ public class TagOperations {
                             new PolicyForTagAssociationDTO(
                                 PolicyOperations.toDTO(
                                     (PolicyEntity) association.targetEntity(), Optional.empty()),
-                                PolicyAssociationSelectorDTO.fromSelector(
-                                    PolicyAssociationSelectorSerde.deserialize(
-                                        association.relationValue().orElseThrow()))))
+                                PolicyOperations.toSelectorDTO(association)))
                     .toArray(PolicyForTagAssociationDTO[]::new);
             return Utils.ok(new PolicyForTagAssociationListResponse(associationDTOs));
           });
