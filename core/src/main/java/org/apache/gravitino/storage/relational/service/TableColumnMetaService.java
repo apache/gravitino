@@ -262,8 +262,9 @@ public class TableColumnMetaService {
   private void deleteColumnRelations(List<Long> columnIds) {
     // A dropped column keeps its rows, so nothing else removes the relations that reference it.
     // This runs in the table update transaction, so the relations go away with the column. A wide
-    // table can drop many columns at once, so the ids are deleted in batches. Policies cannot be
-    // attached to columns, so there are no policy relations to remove.
+    // table can drop many columns at once, so the ids are deleted in batches. Tags are the main
+    // relation on columns; the owner API does not reject columns either, so owner rows are removed
+    // too. Policies cannot be attached to columns, so there are no policy relations to remove.
     String columnType = MetadataObject.Type.COLUMN.name();
     Lists.partition(columnIds, COLUMN_INSERT_BATCH_SIZE)
         .forEach(

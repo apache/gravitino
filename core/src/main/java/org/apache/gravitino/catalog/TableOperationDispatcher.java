@@ -30,8 +30,10 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -912,7 +914,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();
     Set<String> matchedCatalogColumns = new HashSet<>();
     boolean columnsNeedsUpdate = false;
-    for (Map.Entry<String, ColumnEntity> entry : columnsFromTableEntity.entrySet()) {
+    // Renamed and dropped columns claim their catalog names first. Otherwise a stale stored column
+    // (e.g. dropped outside Gravitino) that has the same name as a rename target could be visited
+    // first and take that name, and the renamed column would lose its id.
+    List<Map.Entry<String, ColumnEntity>> storedColumns =
+        new ArrayList<>(columnsFromTableEntity.entrySet());
+    storedColumns.sort(Comparator.comparing(e -> !nameChanges.containsKey(e.getKey())));
+    for (Map.Entry<String, ColumnEntity> entry : storedColumns) {
       // Follow renames so the stored column keeps its id under its new name.
       String catalogColumnName =
           nameChanges.containsKey(entry.getKey())
@@ -1012,7 +1020,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Update the columns in the Gravitino store. The diff above only decides whether a write is
     // needed: it was computed before taking the lock, and a concurrent alter may have changed the
     // stored columns since, e.g. renamed a column while keeping its id. So the columns are matched
-    // again against the entity being updated, which is the latest stored one.
+    // again against the entity being updated, which is the latest stored one. This narrows the
+    // load/alter race but does not close it: if this load read the catalog before a concurrent
+    // alter and the store after it, the catalog snapshot is the stale side. Closing that needs
+    // alterTable and loadTable to exclude each other, which is tracked separately.
     Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,

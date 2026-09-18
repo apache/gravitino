@@ -27,10 +27,16 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestSecretPropertyUtils {
+
+  @AfterEach
+  void resetAdditionalMatcher() {
+    SensitivePropertyKeyMatcher.resetToDefaults();
+  }
 
   @Test
   void testAssembleAndWrite() {
@@ -134,11 +140,23 @@ public class TestSecretPropertyUtils {
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-key"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-name"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("gcs-service-account-file"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-user"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("warehouse"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(null));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(""));
+  }
+
+  @Test
+  void testBuildSecretsIncludesAdditionalSensitiveKey() {
+    SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = Map.of("jdbc-passwrod", "typo-secret", "jdbc-user", "root");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Assertions.assertEquals("typo-secret", secrets.get("jdbc-passwrod"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-user"));
+    }
   }
 
   @Test

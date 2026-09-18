@@ -266,52 +266,38 @@ public class ModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            // All versions are filtered in one call so the authorization state loaded for the
+            // request (user, roles, model id, owner) is resolved once instead of once per version.
             if (verbose) {
               ModelVersion[] modelVersions = modelDispatcher.listModelVersionInfos(modelId);
               modelVersions = modelVersions == null ? new ModelVersion[0] : modelVersions;
               modelVersions =
-                  Arrays.stream(modelVersions)
-                      .filter(
-                          modelVersion -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
-                                  NameIdentifierUtil.ofModelVersion(
-                                      metalake, catalog, schema, model, modelVersion.version())
-                                };
-                            return MetadataAuthzHelper.filterByExpression(
-                                        metalake,
-                                        AuthorizationExpressionConstants
-                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
-                                        Entity.EntityType.MODEL_VERSION,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
-                      .toArray(ModelVersion[]::new);
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.MODEL_VERSION,
+                      modelVersions,
+                      modelVersion ->
+                          NameIdentifierUtil.ofModelVersion(
+                              metalake, catalog, schema, model, modelVersion.version()));
               LOG.info("List {} versions of model {}", modelVersions.length, modelId);
               return Utils.ok(
                   new ModelVersionInfoListResponse(DTOConverters.toDTOs(modelVersions)));
             } else {
               int[] versions = modelDispatcher.listModelVersions(modelId);
               versions = versions == null ? new int[0] : versions;
+              Integer[] boxedVersions = Arrays.stream(versions).boxed().toArray(Integer[]::new);
               versions =
-                  Arrays.stream(versions)
-                      .filter(
-                          modelVersion -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
+                  Arrays.stream(
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.MODEL_VERSION,
+                              boxedVersions,
+                              version ->
                                   NameIdentifierUtil.ofModelVersion(
-                                      metalake, catalog, schema, model, modelVersion)
-                                };
-                            return MetadataAuthzHelper.filterByExpression(
-                                        metalake,
-                                        AuthorizationExpressionConstants
-                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
-                                        Entity.EntityType.MODEL_VERSION,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
+                                      metalake, catalog, schema, model, version)))
+                      .mapToInt(Integer::intValue)
                       .toArray();
               LOG.info("List {} versions of model {}", versions.length, modelId);
               return Utils.ok(new ModelVersionListResponse(versions));

@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.secret.SensitivePropertyKeyKeywords;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -636,4 +637,23 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<List<String>> SENSITIVE_KEY_KEYWORDS =
+      new ConfigBuilder("gravitino.secret.sensitiveKeyKeywords")
+          .doc(
+              "Comma-separated property key keywords treated as credential-like. Matching is "
+                  + "case-insensitive; each entry is a literal substring of the property key, "
+                  + "not a regular expression. This list replaces the default "
+                  + "(secret, password, token, credential, access, account). Set a shorter list "
+                  + "to stop masking keys that only match a default keyword, add words such as "
+                  + "private or passwrod, or set an empty value to disable name-based matching.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null
+                      && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
+              SensitivePropertyKeyKeywords.invalidKeywordMessage())
+          .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
 }

@@ -35,16 +35,15 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -67,7 +66,9 @@ public class MetadataAuthzHelper {
 
   /**
    * Entity types that support batch get operations for cache preloading. These types have
-   * implemented the batchGetByIdentifier method in their respective MetaService classes.
+   * implemented the batchGetByIdentifier method in their respective MetaService classes and are
+   * cacheable (see {@link BaseEntityCache#isCacheable(Entity.EntityType)}); a batch get of a
+   * non-cacheable type such as MODEL or JOB_TEMPLATE would be discarded, so it is not issued.
    */
   private static final List<Entity.EntityType> SUPPORTED_PRELOAD_ENTITY_TYPES =
       Arrays.asList(
@@ -77,11 +78,9 @@ public class MetadataAuthzHelper {
           Entity.EntityType.TABLE,
           Entity.EntityType.FILESET,
           Entity.EntityType.TOPIC,
-          Entity.EntityType.MODEL,
           Entity.EntityType.TAG,
           Entity.EntityType.POLICY,
-          Entity.EntityType.JOB,
-          Entity.EntityType.JOB_TEMPLATE);
+          Entity.EntityType.JOB);
 
   /**
    * Topic and Table may be from the external system and the schema may not exist in Gravitino, so
@@ -96,6 +95,7 @@ public class MetadataAuthzHelper {
           .collect(Collectors.toUnmodifiableSet());
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
+  private static final String MODEL_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
   private static final String METALAKE_ONLY_SCOPE = "METALAKE";
   private static final String CATALOG_PARENT_SCOPES = "METALAKE";
@@ -136,6 +136,18 @@ public class MetadataAuthzHelper {
                       tableLikeParentPrivilegePath(Privilege.Name.MODIFY_TABLE),
                       tableLikeParentPrivilegePath(Privilege.Name.CREATE_TABLE),
                       tableLikeParentPrivilegePath(Privilege.Name.CREATE_VIEW))),
+              Entity.EntityType.MODEL,
+              Map.of(
+                  AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(MODEL_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.USE_MODEL, MODEL_PARENT_SCOPES))),
+              Entity.EntityType.JOB_TEMPLATE,
+              Map.of(
+                  AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(METALAKE_ONLY_SCOPE),
+                      parentPrivilegePath(Privilege.Name.USE_JOB_TEMPLATE, METALAKE_ONLY_SCOPE))),
               Entity.EntityType.SCHEMA,
               Map.of(
                   AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
@@ -403,9 +415,8 @@ public class MetadataAuthzHelper {
     // per-object loop over every catalog in the metalake.
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
-    boolean isMetadataObject = METADATA_OBJECT_ENTITY_TYPES.contains(entityType);
     if (enableAuthorization() && nameIdentifiers.length > 0) {
-      if (isMetadataObject) {
+      if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
         Arrays.stream(nameIdentifiers)
             .forEach(
                 identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
@@ -435,13 +446,6 @@ public class MetadataAuthzHelper {
           nameIdentifiers.length);
     }
     preloadToCache(entityType, nameIdentifiers);
-    // Ownership is defined on metadata objects, independently of the filter expression.
-    // Users/groups are not metadata objects. OwnerMetaService.batchGetOwner resolves IDs per
-    // identifier, so calling it for users/groups would still perform two SELECTs per entry
-    // before the batched owner-relation queries.
-    if (isMetadataObject) {
-      preloadOwner(entityType, nameIdentifiers);
-    }
 
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
@@ -597,8 +601,10 @@ public class MetadataAuthzHelper {
       return;
     }
 
-    // Only preload entity types that support batch get operations
-    if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)) {
+    // Only preload entity types that support batch get operations and that the entity cache
+    // keeps; the batch get result is otherwise dropped on the floor.
+    if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)
+        || !BaseEntityCache.isCacheable(entityType)) {
       return;
     }
 
@@ -623,22 +629,5 @@ public class MetadataAuthzHelper {
             Arrays.asList(nameIdentifiers),
             entityType,
             EntityClassMapper.getEntityClass(entityType));
-  }
-
-  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (!GravitinoEnv.getInstance().cacheEnabled()) {
-      return;
-    }
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    try {
-      entityStore
-          .relationOperations()
-          .batchListEntitiesByRelation(
-              SupportsRelationOperations.Type.OWNER_REL,
-              Arrays.stream(nameIdentifiers).toList(),
-              entityType);
-    } catch (Exception e) {
-      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
-    }
   }
 }
