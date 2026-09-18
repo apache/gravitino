@@ -122,7 +122,7 @@ class TestRayIcebergIntegration(IntegrationTestEnv):
             )
 
         # Imports are deferred so the module can be collected without the optional IT deps.
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-error,import-outside-toplevel
         from pyiceberg.catalog import load_catalog
         from pyiceberg.schema import Schema
         from pyiceberg.types import LongType, NestedField, StringType
