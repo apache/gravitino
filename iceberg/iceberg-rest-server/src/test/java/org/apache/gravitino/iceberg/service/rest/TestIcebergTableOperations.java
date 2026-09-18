@@ -67,6 +67,7 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.SnapshotParser;
@@ -1154,10 +1155,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   void testFilterSnapshotsByRefsKeepsCredentials() {
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
-            tableSchema,
-            org.apache.iceberg.PartitionSpec.unpartitioned(),
-            "s3://bucket/db/tbl",
-            ImmutableMap.of());
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
     org.apache.iceberg.rest.credentials.Credential credential =
         IcebergRESTUtils.toRESTCredential(
             "s3://bucket/db/tbl/",
@@ -1185,10 +1183,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   void testFilterSnapshotsByRefsPreservesMetadataLocationAndHistory() {
     TableMetadata base =
         TableMetadata.newTableMetadata(
-            tableSchema,
-            org.apache.iceberg.PartitionSpec.unpartitioned(),
-            "s3://bucket/db/tbl",
-            ImmutableMap.of());
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
     Snapshot first = snapshot(1L, null, 1000L);
     Snapshot second = snapshot(2L, 1L, 2000L);
     TableMetadata withHistory =
