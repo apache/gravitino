@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -42,7 +43,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the policy entity.");
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the policy entity.");
+      Field.required("name", "The name of the policy entity.", EntityFieldLimits.MAX_NAME_LENGTH);
   public static final Field POLICY_TYPE =
       Field.required("policyType", Policy.BuiltInType.class, "The type of the policy entity.");
   public static final Field COMMENT =

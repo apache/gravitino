@@ -24,6 +24,8 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -70,12 +72,19 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
+    // Check the comment before the underlying catalog creates the topic.
+    checkCommentLength(comment);
     return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayout, properties);
   }
 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
+    for (TopicChange change : changes) {
+      if (change instanceof TopicChange.UpdateTopicComment) {
+        checkCommentLength(((TopicChange.UpdateTopicComment) change).getNewComment());
+      }
+    }
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     return dispatcher.alterTopic(normalizeCaseSensitive(ident), changes);
@@ -105,6 +114,11 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
 
     Capability capabilities = getCapability(topicIdents[0], catalogManager);
     return applyCaseSensitive(topicIdents, Capability.Scope.TOPIC, capabilities);
+  }
+
+  private static void checkCommentLength(String comment) {
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.TOPIC);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier topicIdent) {
