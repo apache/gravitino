@@ -29,21 +29,21 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 
 /**
- * Supplementary matcher for credential-like property key typos.
+ * Supplementary matcher for credential-like property key substrings configured at runtime.
  *
  * <p>The built-in sensitive key pattern in {@link SecretPropertyUtils} always applies first. This
- * class adds optional configured typo substrings so mistyped credential property names (for example
- * {@code jdbc-passwrod}) are still treated as sensitive.
+ * class adds optional configured substrings beyond the built-in keywords, for example common typos
+ * ({@code passwrod}) or extra credential-like words ({@code private}).
  */
 final class SensitivePropertyKeyMatcher {
 
-  private static volatile Set<String> typoPatterns = Set.of();
+  private static volatile Set<String> additionalPatterns = Set.of();
 
   private SensitivePropertyKeyMatcher() {}
 
-  static boolean matchesTypoPattern(String lowerKey) {
-    for (String typoPattern : typoPatterns) {
-      if (lowerKey.contains(typoPattern)) {
+  static boolean matchesAdditionalPattern(String lowerKey) {
+    for (String additionalPattern : additionalPatterns) {
+      if (lowerKey.contains(additionalPattern)) {
         return true;
       }
     }
@@ -51,29 +51,29 @@ final class SensitivePropertyKeyMatcher {
   }
 
   /**
-   * Applies typo pattern settings from Gravitino configuration.
+   * Applies additional sensitive key substring settings from Gravitino configuration.
    *
    * @param config server configuration
    */
   static void configure(Config config) {
-    configure(config.get(Configs.SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS));
+    configure(config.get(Configs.SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS));
   }
 
-  static void configure(List<String> configuredTypoPatterns) {
-    Set<String> normalizedTypoPatterns = new LinkedHashSet<>();
-    if (configuredTypoPatterns != null) {
-      for (String typoPattern : configuredTypoPatterns) {
+  static void configure(List<String> configuredAdditionalPatterns) {
+    Set<String> normalizedPatterns = new LinkedHashSet<>();
+    if (configuredAdditionalPatterns != null) {
+      for (String additionalPattern : configuredAdditionalPatterns) {
         Preconditions.checkArgument(
-            SensitivePropertyKeyKeywords.isValidTypoPattern(typoPattern),
-            SensitivePropertyKeyKeywords.invalidTypoPatternMessage());
-        normalizedTypoPatterns.add(typoPattern.trim().toLowerCase(Locale.ROOT));
+            SensitivePropertyKeyKeywords.isValidAdditionalPattern(additionalPattern),
+            SensitivePropertyKeyKeywords.invalidAdditionalPatternMessage());
+        normalizedPatterns.add(additionalPattern.trim().toLowerCase(Locale.ROOT));
       }
     }
-    typoPatterns = ImmutableSet.copyOf(normalizedTypoPatterns);
+    additionalPatterns = ImmutableSet.copyOf(normalizedPatterns);
   }
 
   @VisibleForTesting
   static void resetToDefaults() {
-    typoPatterns = Set.of();
+    additionalPatterns = Set.of();
   }
 }

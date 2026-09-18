@@ -34,20 +34,27 @@ public final class SensitivePropertyKeyKeywords {
   static final Pattern BUILTIN_PATTERN =
       Pattern.compile(".*(" + BUILTIN_SUBSTRINGS.stream().collect(Collectors.joining("|")) + ").*");
 
-  private static final String INVALID_TYPO_PATTERN_MSG =
-      "Typo patterns must be non-blank and must not duplicate built-in sensitive keywords: "
+  private static final String INVALID_ADDITIONAL_PATTERN_MSG =
+      "Additional patterns must be non-blank and must not duplicate built-in sensitive keywords: "
           + String.join(", ", BUILTIN_SUBSTRINGS);
 
   private SensitivePropertyKeyKeywords() {}
 
-  public static boolean isValidTypoPattern(String typoPattern) {
-    if (StringUtils.isBlank(typoPattern)) {
+  /**
+   * Returns whether {@code pattern} may be configured as an additional sensitive key substring.
+   *
+   * <p>Built-in keywords are always matched and must not be repeated in configuration. Any other
+   * non-blank substring is allowed, including common credential typos (for example {@code
+   * passwrod}) and extra credential-like words (for example {@code private}).
+   */
+  public static boolean isValidAdditionalPattern(String pattern) {
+    if (StringUtils.isBlank(pattern)) {
       return false;
     }
-    return !BUILTIN_SUBSTRINGS.contains(typoPattern.trim().toLowerCase(Locale.ROOT));
+    return !BUILTIN_SUBSTRINGS.contains(pattern.trim().toLowerCase(Locale.ROOT));
   }
 
-  public static String invalidTypoPatternMessage() {
-    return INVALID_TYPO_PATTERN_MSG;
+  public static String invalidAdditionalPatternMessage() {
+    return INVALID_ADDITIONAL_PATTERN_MSG;
   }
 }

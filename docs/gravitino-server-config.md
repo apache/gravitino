@@ -354,14 +354,16 @@ Gravitino masks credential-like property keys on list/get responses and can reco
 inline values via `getSecrets`. Built-in detection already matches keys whose names contain
 `secret`, `password`, `token`, `credential`, `access`, or `account` (case-insensitive).
 
-Use the setting below to declare **additional typo substrings** for mistyped credential property
-names (for example `jdbc-passwrod`). Each entry is matched as a case-insensitive substring of the
-property key. Keep entries specific to known misspellings; overly broad values such as `key` can
-mask unrelated properties. Entries must not duplicate the built-in keywords listed above.
+Use the setting below to declare **additional substrings** beyond that built-in set. Typical uses
+include common credential typos (for example `passwrod` for `jdbc-passwrod`) and extra
+credential-like words your deployment uses (for example `private` for `jdbc-private-key`). Each
+entry is matched as a case-insensitive substring of the property key. Keep entries specific;
+overly broad values such as `key` can mask unrelated properties. Entries must not duplicate the
+built-in keywords listed above.
 
 | Configuration Item | Description | Default Value |
 |---|---|---|
-| `gravitino.properties.sensitive-key-typo-patterns` | Comma-separated typo substrings for credential-like property keys | _(empty)_ |
+| `gravitino.properties.sensitive-key-additional-patterns` | Comma-separated additional substrings for credential-like property keys | _(empty)_ |
 
 ### Securing the Server
 

@@ -638,13 +638,14 @@ public class Configs {
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
 
-  public static final ConfigEntry<List<String>> SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS =
-      new ConfigBuilder("gravitino.properties.sensitive-key-typo-patterns")
+  public static final ConfigEntry<List<String>> SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS =
+      new ConfigBuilder("gravitino.properties.sensitive-key-additional-patterns")
           .doc(
-              "Additional credential-like property key typo substrings. Matching is "
+              "Additional credential-like property key substrings beyond the built-in keywords "
+                  + "(secret, password, token, credential, access, account). Matching is "
                   + "case-insensitive; each entry is treated as a substring of the property key. "
-                  + "Entries must not duplicate built-in sensitive keywords (secret, password, "
-                  + "token, credential, access, account).")
+                  + "Use for common typos (passwrod) or extra credential-like words (private). "
+                  + "Entries must not duplicate the built-in keywords.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .toSequence()
@@ -652,7 +653,7 @@ public class Configs {
               valueList ->
                   valueList != null
                       && valueList.stream()
-                          .allMatch(SensitivePropertyKeyKeywords::isValidTypoPattern),
-              SensitivePropertyKeyKeywords.invalidTypoPatternMessage())
+                          .allMatch(SensitivePropertyKeyKeywords::isValidAdditionalPattern),
+              SensitivePropertyKeyKeywords.invalidAdditionalPatternMessage())
           .createWithDefault(Collections.emptyList());
 }

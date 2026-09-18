@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 public class TestSecretPropertyUtils {
 
   @AfterEach
-  void resetTypoMatcher() {
+  void resetAdditionalMatcher() {
     SensitivePropertyKeyMatcher.resetToDefaults();
   }
 
@@ -149,7 +149,7 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testBuildSecretsIncludesTypoSensitiveKey() {
+  void testBuildSecretsIncludesAdditionalSensitiveKey() {
     SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = Map.of("jdbc-passwrod", "typo-secret", "jdbc-user", "root");

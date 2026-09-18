@@ -60,11 +60,11 @@ public final class SecretPropertyUtils {
   private SecretPropertyUtils() {}
 
   /**
-   * Configures supplementary sensitive property key typo patterns from server configuration.
+   * Configures additional sensitive property key substrings from server configuration.
    *
    * @param config server configuration
    */
-  public static void configureSensitiveKeyTypoPatterns(Config config) {
+  public static void configureSensitiveKeyAdditionalPatterns(Config config) {
     SensitivePropertyKeyMatcher.configure(config);
   }
 
@@ -74,8 +74,9 @@ public final class SecretPropertyUtils {
    * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
    * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
    * storage account key/name and GCS service-account file paths), or when it contains a configured
-   * typo substring ({@link Configs#SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS}). Underscores and hyphens
-   * are not normalized; they are irrelevant because the matched keywords contain neither.
+   * additional substring ({@link Configs#SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS}). Underscores
+   * and hyphens are not normalized; they are irrelevant because the matched keywords contain
+   * neither.
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern
@@ -88,7 +89,7 @@ public final class SecretPropertyUtils {
     if (SENSITIVE_PROPERTY_KEY_PATTERN.matcher(lowerKey).matches()) {
       return true;
     }
-    return SensitivePropertyKeyMatcher.matchesTypoPattern(lowerKey);
+    return SensitivePropertyKeyMatcher.matchesAdditionalPattern(lowerKey);
   }
 
   /**

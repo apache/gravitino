@@ -32,8 +32,8 @@ import org.junit.jupiter.api.Test;
 public class TestHiddenPropertyMaskUtils {
 
   @AfterEach
-  void resetTypoMatcher() {
-    SecretPropertyUtils.configureSensitiveKeyTypoPatterns(new Config(false) {});
+  void resetAdditionalMatcher() {
+    SecretPropertyUtils.configureSensitiveKeyAdditionalPatterns(new Config(false) {});
   }
 
   @Test
@@ -182,10 +182,10 @@ public class TestHiddenPropertyMaskUtils {
   }
 
   @Test
-  void testMaskHiddenPropertiesMasksTypoSensitiveKey() {
+  void testMaskHiddenPropertiesMasksAdditionalSensitiveKey() {
     Config config = new Config(false) {};
-    config.set(Configs.SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS, List.of("passwrod"));
-    SecretPropertyUtils.configureSensitiveKeyTypoPatterns(config);
+    config.set(Configs.SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS, List.of("passwrod"));
+    SecretPropertyUtils.configureSensitiveKeyAdditionalPatterns(config);
     PropertiesMetadata metadata =
         new PropertiesMetadata() {
           @Override
