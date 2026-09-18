@@ -18,53 +18,53 @@
  */
 package org.apache.gravitino.secret;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Locale;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
-/** Built-in credential-like substrings used for sensitive property key detection. */
+/**
+ * Default credential-like substrings used for sensitive property key detection.
+ *
+ * <p>These keywords are the default value of {@link
+ * org.apache.gravitino.Configs#SENSITIVE_KEY_KEYWORDS}. A configured list replaces them entirely.
+ */
 public final class SensitivePropertyKeyKeywords {
 
-  static final Set<String> BUILTIN_SUBSTRINGS =
-      ImmutableSet.of("secret", "password", "token", "credential", "access", "account");
+  static final List<String> DEFAULT_KEYWORDS =
+      List.of("secret", "password", "token", "credential", "access", "account");
 
-  static final Pattern BUILTIN_PATTERN =
-      Pattern.compile(".*(" + BUILTIN_SUBSTRINGS.stream().collect(Collectors.joining("|")) + ").*");
-
-  private static final String INVALID_ADDITIONAL_KEYWORD_MSG =
-      "Additional keywords must be non-blank and must not contain a built-in sensitive keyword: "
-          + String.join(", ", BUILTIN_SUBSTRINGS);
+  private static final String INVALID_KEYWORD_MSG = "Sensitive key keywords must be non-blank";
 
   private SensitivePropertyKeyKeywords() {}
 
   /**
-   * Returns whether {@code keyword} may be configured as an additional sensitive key substring.
+   * Returns the default sensitive property key keywords.
    *
-   * <p>Built-in keywords are always matched. An additional keyword that contains one of them adds
-   * no new matches and is rejected. Any other non-blank substring is allowed, including common
-   * credential typos (for example {@code passwrod}) and extra credential-like words (for example
-   * {@code private}).
-   *
-   * @param keyword candidate additional keyword
-   * @return true when the keyword may be configured
+   * @return an immutable list of default keywords
    */
-  public static boolean isValidAdditionalKeyword(String keyword) {
-    if (StringUtils.isBlank(keyword)) {
-      return false;
-    }
-    String normalized = keyword.trim().toLowerCase(Locale.ROOT);
-    return BUILTIN_SUBSTRINGS.stream().noneMatch(normalized::contains);
+  public static List<String> defaultKeywords() {
+    return DEFAULT_KEYWORDS;
   }
 
   /**
-   * Returns the validation message for an illegal additional sensitive keyword.
+   * Returns whether {@code keyword} may appear in {@link
+   * org.apache.gravitino.Configs#SENSITIVE_KEY_KEYWORDS}.
+   *
+   * <p>Blank entries are rejected. The configured list replaces the defaults, so a deployment can
+   * omit a default keyword such as {@code access} or add one such as {@code private}.
+   *
+   * @param keyword candidate keyword
+   * @return true when the keyword may be configured
+   */
+  public static boolean isValidKeyword(String keyword) {
+    return StringUtils.isNotBlank(keyword);
+  }
+
+  /**
+   * Returns the validation message for an illegal sensitive key keyword.
    *
    * @return the validation message
    */
-  public static String invalidAdditionalKeywordMessage() {
-    return INVALID_ADDITIONAL_KEYWORD_MSG;
+  public static String invalidKeywordMessage() {
+    return INVALID_KEYWORD_MSG;
   }
 }

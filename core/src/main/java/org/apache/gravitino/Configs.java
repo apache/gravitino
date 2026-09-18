@@ -638,23 +638,22 @@ public class Configs {
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
 
-  public static final ConfigEntry<List<String>> SENSITIVE_KEY_ADDITIONAL_KEYWORDS =
-      new ConfigBuilder("gravitino.secret.sensitiveKeyAdditionalKeywords")
+  public static final ConfigEntry<List<String>> SENSITIVE_KEY_KEYWORDS =
+      new ConfigBuilder("gravitino.secret.sensitiveKeyKeywords")
           .doc(
-              "Comma-separated additional credential-like property key keywords beyond the "
-                  + "built-in keywords (secret, password, token, credential, access, account). "
-                  + "Matching is case-insensitive; each entry is a literal substring of the "
-                  + "property key, not a regular expression. Use for common typos (passwrod) or "
-                  + "extra credential-like words (private). Entries must not contain a built-in "
-                  + "keyword.")
+              "Comma-separated property key keywords treated as credential-like. Matching is "
+                  + "case-insensitive; each entry is a literal substring of the property key, "
+                  + "not a regular expression. This list replaces the default "
+                  + "(secret, password, token, credential, access, account). Set a shorter list "
+                  + "to stop masking keys that only match a default keyword, add words such as "
+                  + "private or passwrod, or set an empty value to disable name-based matching.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .toSequence()
           .checkValue(
               valueList ->
                   valueList != null
-                      && valueList.stream()
-                          .allMatch(SensitivePropertyKeyKeywords::isValidAdditionalKeyword),
-              SensitivePropertyKeyKeywords.invalidAdditionalKeywordMessage())
-          .createWithDefault(Collections.emptyList());
+                      && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
+              SensitivePropertyKeyKeywords.invalidKeywordMessage())
+          .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
 }

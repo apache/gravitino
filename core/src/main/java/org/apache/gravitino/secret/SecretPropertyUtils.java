@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -41,14 +40,6 @@ import org.apache.gravitino.connector.PropertyEntry;
  */
 public final class SecretPropertyUtils {
 
-  /**
-   * Property keys whose names look like credentials. Matching is case-insensitive. Used to mask API
-   * responses and to expose plaintext via {@code getSecrets} for undeclared / mistyped credential
-   * properties.
-   */
-  private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
-      SensitivePropertyKeyKeywords.BUILTIN_PATTERN;
-
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
       new PropertiesMetadata() {
@@ -61,35 +52,32 @@ public final class SecretPropertyUtils {
   private SecretPropertyUtils() {}
 
   /**
-   * Configures additional sensitive property key keywords from server configuration.
+   * Replaces the sensitive property key keywords from server configuration.
    *
    * @param config server configuration
    */
-  public static void configureSensitiveKeyAdditionalKeywords(Config config) {
+  public static void configureSensitiveKeyKeywords(Config config) {
     SensitivePropertyKeyMatcher.configure(config);
   }
 
   /**
    * Returns whether a property key name looks sensitive (credential-like).
    *
-   * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
-   * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
-   * storage account key/name and GCS service-account file paths), or when it contains a configured
-   * additional keyword ({@link Configs#SENSITIVE_KEY_ADDITIONAL_KEYWORDS}). Underscores and hyphens
-   * are not normalized; they are irrelevant because the matched keywords contain neither.
+   * <p>A key matches when, after lower-casing, it contains one of the active keywords as a literal
+   * substring. The default keywords are {@code secret}, {@code password}, {@code token}, {@code
+   * credential}, {@code access}, and {@code account} (covers Azure storage account key/name and GCS
+   * service-account file paths). {@link Configs#SENSITIVE_KEY_KEYWORDS} replaces that set, so a
+   * deployment can drop a default keyword or add another. Underscores and hyphens are not
+   * normalized; they are irrelevant because the default keywords contain neither.
    *
    * @param key the property key
-   * @return true when the key name matches the sensitive pattern
+   * @return true when the key name matches an active keyword
    */
   public static boolean isSensitivePropertyKey(@Nullable String key) {
     if (key == null || key.isEmpty()) {
       return false;
     }
-    String lowerKey = key.toLowerCase(Locale.ROOT);
-    if (SENSITIVE_PROPERTY_KEY_PATTERN.matcher(lowerKey).matches()) {
-      return true;
-    }
-    return SensitivePropertyKeyMatcher.matchesAdditionalKeyword(lowerKey);
+    return SensitivePropertyKeyMatcher.matches(key.toLowerCase(Locale.ROOT));
   }
 
   /**

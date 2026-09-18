@@ -33,7 +33,7 @@ public class TestHiddenPropertyMaskUtils {
 
   @AfterEach
   void resetAdditionalMatcher() {
-    SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(new Config(false) {});
+    SecretPropertyUtils.configureSensitiveKeyKeywords(new Config(false) {});
   }
 
   @Test
@@ -184,8 +184,8 @@ public class TestHiddenPropertyMaskUtils {
   @Test
   void testMaskHiddenPropertiesMasksAdditionalSensitiveKey() {
     Config config = new Config(false) {};
-    config.set(Configs.SENSITIVE_KEY_ADDITIONAL_KEYWORDS, List.of("passwrod"));
-    SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(config);
+    config.set(Configs.SENSITIVE_KEY_KEYWORDS, List.of("passwrod"));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
     PropertiesMetadata metadata =
         new PropertiesMetadata() {
           @Override

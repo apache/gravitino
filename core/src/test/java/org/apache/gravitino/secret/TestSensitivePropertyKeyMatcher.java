@@ -33,72 +33,55 @@ public class TestSensitivePropertyKeyMatcher {
   }
 
   @Test
-  void testConfiguredAdditionalSubstringMatchesTypo() {
-    SensitivePropertyKeyMatcher.configure(List.of("passwrod", "secert", "tokne"));
-    Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
-    Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("catalog.secert".toLowerCase()));
-    Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("oauth2.tokne".toLowerCase()));
-    Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passord".toLowerCase()));
+  void testDefaultKeywordsMatchBuiltinNames() {
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("aws-access-key-id"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
   }
 
   @Test
-  void testConfiguredAdditionalSubstringMatchesExtraKeyword() {
-    SensitivePropertyKeyMatcher.configure(List.of("private"));
-    Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-private-key".toLowerCase()));
-    Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-user".toLowerCase()));
+  void testConfiguredKeywordsReplaceDefaults() {
+    SensitivePropertyKeyMatcher.configure(List.of("passwrod", "secert", "private"));
+    Assertions.assertTrue(SensitivePropertyKeyMatcher.matches("jdbc-passwrod"));
+    Assertions.assertTrue(SensitivePropertyKeyMatcher.matches("catalog.secert"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-private-key"));
+    Assertions.assertFalse(SensitivePropertyKeyMatcher.matches("jdbc-passord"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-access-key-id"));
   }
 
   @Test
-  void testAdditionalPatternsAreCaseInsensitive() {
+  void testKeywordsAreCaseInsensitive() {
     SensitivePropertyKeyMatcher.configure(List.of("PASSWROD"));
-    Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
+    Assertions.assertTrue(SensitivePropertyKeyMatcher.matches("jdbc-passwrod"));
   }
 
   @Test
-  void testUnconfiguredAdditionalPatternDoesNotMatch() {
+  void testEmptyKeywordListDisablesNameMatching() {
+    SensitivePropertyKeyMatcher.configure(List.of());
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-access-key-id"));
     SensitivePropertyKeyMatcher.resetToDefaults();
-    Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
   }
 
   @Test
-  void testRejectsBuiltinKeywordAdditionalPattern() {
+  void testRejectsBlankKeyword() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> SensitivePropertyKeyMatcher.configure(List.of("password")));
+            () -> SensitivePropertyKeyMatcher.configure(List.of(" ")));
     Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(SensitivePropertyKeyKeywords.invalidAdditionalKeywordMessage()));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> SensitivePropertyKeyMatcher.configure(List.of("TOKEN")));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> SensitivePropertyKeyMatcher.configure(List.of("my-password")));
-    Config config = new Config(false) {};
-    config.set(Configs.SENSITIVE_KEY_ADDITIONAL_KEYWORDS, List.of("secrets"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(config));
+        exception.getMessage().contains(SensitivePropertyKeyKeywords.invalidKeywordMessage()));
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
   }
 
   @Test
-  void testAdditionalMatcherSupplementsBuiltinPattern() {
-    SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
-    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
-    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
-    SensitivePropertyKeyMatcher.resetToDefaults();
-    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
-    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
+  void testConfigReplacesDefaultKeywords() {
+    Config config = new Config(false) {};
+    config.set(Configs.SENSITIVE_KEY_KEYWORDS, List.of("private"));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
+    Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-private-key"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-password"));
   }
 }
