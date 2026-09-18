@@ -361,8 +361,8 @@ matching. The value is a comma-separated list. Each entry is a case-insensitive 
 of the property key, not a regular expression. Keep entries specific; overly broad values such as
 `key` can mask unrelated properties.
 
-| Configuration Item | Description | Default Value |
-|---|---|---|
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
 | `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
 
 ### Securing the Server
