@@ -20,6 +20,7 @@
 package org.apache.gravitino.utils;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
@@ -130,6 +131,44 @@ public class TestJdbcUrlUtils {
         GravitinoRuntimeException.class,
         () -> JdbcUrlUtils.validateJdbcConfig("testDriver", url, Collections.emptyMap()),
         () -> "Expected unsafe URL to be rejected but it was accepted: " + url);
+  }
+
+  @Test
+  public void unsafeParamBehindUpperCaseHexEscapeMidDecodeIsRejected() {
+    // Regression for a case-sensitivity gap in the malformed-escape sanitizer. A decode pass can
+    // regenerate a percent escape whose hex digits include an upper-case letter: "%25%36%46"
+    // decodes to "%6F", the escape for 'o'. The caller only lower-cases the ORIGINAL URL, so this
+    // "%6F" appears mid-decode. A sanitizer that recognizes only lower-case hex treats "%6F" as
+    // malformed and rewrites it to "%256F", so it never decodes to 'o' and the hidden
+    // 'autoDeserialize' is missed. The '#%zz' fragment poisons the non-sanitizing decode path
+    // (MySQL Connector/J decodes query tokens independently and ignores the fragment), forcing
+    // detection through the sanitizing path under test.
+    assertUnsafeRejected("jdbc:mysql://h/db?aut%25%36%46deserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mariadb://h/db?aut%25%36%46deserialize=true#%zz");
+  }
+
+  @Test
+  public void validUpperCaseHexEscapeIsNotMangledBySanitizer() {
+    // A valid percent escape whose hex digits include an upper-case letter ("%2F", identical to
+    // "%2f") must decode the same as its lower-case form and must not be mangled into a literal
+    // '%'. Such an escape reaches the sanitizer only mid-decode, past the caller's initial
+    // lower-casing, so exercise the sanitizing decode path directly: "%25%32%46" -> "%2F" -> '/',
+    // and "%25%32%66" -> "%2f" -> '/'. The '#%zz' fragment keeps the non-sanitizing path from
+    // decoding, so the fully decoded form is produced by the path under test.
+    List<String> upperHexForms =
+        JdbcUrlUtils.decodedFormsForScan("jdbc:mysql://h/db?p=a%25%32%46b#%zz");
+    List<String> lowerHexForms =
+        JdbcUrlUtils.decodedFormsForScan("jdbc:mysql://h/db?p=a%25%32%66b#%zz");
+
+    String upperDecoded = upperHexForms.get(upperHexForms.size() - 1);
+    String lowerDecoded = lowerHexForms.get(lowerHexForms.size() - 1);
+    Assertions.assertEquals(
+        lowerDecoded,
+        upperDecoded,
+        "Upper-case hex escape must decode identically to its lower-case form");
+    Assertions.assertTrue(
+        upperDecoded.contains("a/b"),
+        () -> "Expected '%2F' to decode to '/', but the sanitizer mangled it: " + upperDecoded);
   }
 
   @Test

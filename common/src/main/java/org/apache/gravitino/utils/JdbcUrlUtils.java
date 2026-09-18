@@ -125,7 +125,7 @@ public class JdbcUrlUtils {
    * '{@code %}', making the URL decodable by {@link URLDecoder}.
    */
   private static String sanitizeMalformedPercentEscapes(String url) {
-    return url.replaceAll("%(?![0-9a-f]{2})", "%25");
+    return url.replaceAll("%(?![0-9a-fA-F]{2})", "%25");
   }
 
   private static boolean anyFormStartsWith(List<String> forms, String prefix) {
