@@ -242,19 +242,12 @@ public class TestGravitinoInterceptionService {
       when(invocation.getMethod()).thenReturn(method);
       when(invocation.getArguments()).thenReturn(new Object[] {"metalake", "catalog", "schema"});
       when(invocation.proceed())
-          .thenAnswer(
-              unused -> {
-                AuthorizationRequestContext context =
-                    AuthorizationRequestScope.getOrCreate("metalake", authorizer);
-                Assertions.assertSame(entry.get(), context);
-                return context;
-              });
+          .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake"));
       MethodInterceptor interceptor =
           new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
       Object first = interceptor.invoke(invocation);
       Assertions.assertSame(entry.get(), first);
-      Assertions.assertNotSame(
-          first, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+      Assertions.assertNotSame(first, AuthorizationRequestScope.getOrCreate("metalake"));
       Object second = interceptor.invoke(invocation);
       Assertions.assertSame(entry.get(), second);
       Assertions.assertNotSame(first, second);
@@ -262,8 +255,7 @@ public class TestGravitinoInterceptionService {
       try (Response failure = (Response) interceptor.invoke(invocation)) {
         assertEquals(500, failure.getStatus());
       }
-      Assertions.assertNotSame(
-          entry.get(), AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+      Assertions.assertNotSame(entry.get(), AuthorizationRequestScope.getOrCreate("metalake"));
     }
   }
 

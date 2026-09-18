@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.GET;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
@@ -225,11 +224,11 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   protected final Object authorizeMethod(Method method, Object[] args, MethodInvoker methodInvoker)
       throws Throwable {
     try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
-      return authorizeMethod(method, args, methodInvoker, scope);
+      return authorizeMethodInScope(method, args, methodInvoker, scope);
     }
   }
 
-  private Object authorizeMethod(
+  private Object authorizeMethodInScope(
       Method method, Object[] args, MethodInvoker methodInvoker, AuthorizationRequestScope scope)
       throws Throwable {
     try {
@@ -326,14 +325,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
             throw new ForbiddenException(notAuthzMessage);
           }
         }
-        // Only read operations can reuse entry decisions without crossing a metadata or policy
-        // mutation. The scope is closed even if authorization or the endpoint fails.
-        if (!skipStandardCheck && metalakeIdent != null && method.isAnnotationPresent(GET.class)) {
-          scope.bind(
-              metalakeIdent.name(),
-              GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
-              authorizationRequestContext);
-        }
+        // A skipped standard check authorized nothing that list filtering could reuse.
+        scope.bindIfRead(
+            method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {

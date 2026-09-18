@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.GET;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -272,14 +271,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                   expressionAnnotation, metadataContext, method, evaluatedExpression);
             }
           }
-          // Reuse entry authorization only while executing a read operation. The scope also
-          // isolates nested invocations and is removed on every success or failure path.
-          if (metalakeIdent != null && method.isAnnotationPresent(GET.class)) {
-            scope.bind(
-                metalakeIdent.name(),
-                GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
-                authorizationRequestContext);
-          }
+          scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
       } catch (IllegalMetadataObjectException ex) {

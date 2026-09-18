@@ -907,9 +907,8 @@ public class TestJcasbinAuthorizer {
     Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
 
     try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
-      scope.bind(METALAKE, jcasbinAuthorizer, entryContext);
-      AuthorizationRequestContext filterContext =
-          AuthorizationRequestScope.getOrCreate(METALAKE, jcasbinAuthorizer);
+      scope.bind(METALAKE, entryContext);
+      AuthorizationRequestContext filterContext = AuthorizationRequestScope.getOrCreate(METALAKE);
       assertSame(entryContext, filterContext);
       assertFalse(
           jcasbinAuthorizer.authorize(principal, METALAKE, catalog, SELECT_TABLE, filterContext));
@@ -919,8 +918,7 @@ public class TestJcasbinAuthorizer {
     }
 
     // A subsequent request must revalidate SQL versions, even with warm shared role caches.
-    AuthorizationRequestContext nextContext =
-        AuthorizationRequestScope.getOrCreate(METALAKE, jcasbinAuthorizer);
+    AuthorizationRequestContext nextContext = AuthorizationRequestScope.getOrCreate(METALAKE);
     assertTrue(jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, nextContext));
     verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
   }

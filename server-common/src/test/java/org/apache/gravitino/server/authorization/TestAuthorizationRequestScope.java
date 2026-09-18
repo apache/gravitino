@@ -20,15 +20,12 @@ package org.apache.gravitino.server.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Test;
 
@@ -38,74 +35,55 @@ public class TestAuthorizationRequestScope {
   @Test
   public void testSecurityBoundaries() throws Exception {
     UserPrincipal principal = new UserPrincipal("tester");
-    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     PrincipalUtils.doAs(
         principal,
         () -> {
           AuthorizationRequestContext context = new AuthorizationRequestContext();
           try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
-            scope.bind("metalake", authorizer, context);
-            assertSame(context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
-            assertNotSame(context, AuthorizationRequestScope.getOrCreate("other", authorizer));
-            assertNotSame(
-                context,
-                AuthorizationRequestScope.getOrCreate("metalake", mock(GravitinoAuthorizer.class)));
+            scope.bind("metalake", context);
+            assertSame(context, AuthorizationRequestScope.getOrCreate("metalake"));
+            assertNotSame(context, AuthorizationRequestScope.getOrCreate("other"));
             PrincipalUtils.doAs(
                 new UserPrincipal("other"),
                 () -> {
-                  assertNotSame(
-                      context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+                  assertNotSame(context, AuthorizationRequestScope.getOrCreate("metalake"));
                   return null;
                 });
+            // The same user with other active roles is an equal but distinct principal instance,
+            // and must get a context that carries its own roles.
             UserPrincipal assumed = principal.withActiveRoles(ActiveRoles.of(List.of("reader")));
-            assertEquals(principal, assumed);
             PrincipalUtils.doAs(
                 assumed,
                 () -> {
                   AuthorizationRequestContext isolated =
-                      AuthorizationRequestScope.getOrCreate("metalake", authorizer);
+                      AuthorizationRequestScope.getOrCreate("metalake");
                   assertNotSame(context, isolated);
                   assertEquals(assumed.getActiveRoles(), isolated.getActiveRoles());
                   return null;
                 });
-            context.setActiveRoles(ActiveRoles.none());
-            assertNotSame(context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
           }
-          assertNotSame(context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+          assertNotSame(context, AuthorizationRequestScope.getOrCreate("metalake"));
           return null;
         });
   }
 
-  /** Nested and asynchronous work must not accidentally inherit cached authorization. */
+  /** Asynchronous work must not inherit the bound context, and a closed scope leaves nothing. */
   @Test
-  public void testNestedScopeAndWorkerIsolation() throws Exception {
+  public void testWorkerIsolationAndCleanup() throws Exception {
     PrincipalUtils.doAs(
         new UserPrincipal("tester"),
         () -> {
-          GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
           AuthorizationRequestContext context = new AuthorizationRequestContext();
-          try (AuthorizationRequestScope outer = AuthorizationRequestScope.open()) {
-            outer.bind("metalake", authorizer, context);
-            assertThrows(
-                IllegalStateException.class,
-                () -> {
-                  try (AuthorizationRequestScope inner = AuthorizationRequestScope.open()) {
-                    assertNotSame(
-                        context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
-                    AuthorizationRequestContext nested = new AuthorizationRequestContext();
-                    inner.bind("metalake", authorizer, nested);
-                    assertSame(
-                        nested, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
-                    throw new IllegalStateException("nested invocation failed");
-                  }
-                });
-            assertSame(context, AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+          try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+            scope.bind("metalake", context);
+            assertSame(context, AuthorizationRequestScope.getOrCreate("metalake"));
             assertNotSame(
                 context,
                 CompletableFuture.supplyAsync(
-                        () -> AuthorizationRequestScope.getOrCreate("metalake", authorizer))
+                        () -> AuthorizationRequestScope.getOrCreate("metalake"))
                     .join());
           }
+          assertNotSame(context, AuthorizationRequestScope.getOrCreate("metalake"));
           return null;
         });
   }

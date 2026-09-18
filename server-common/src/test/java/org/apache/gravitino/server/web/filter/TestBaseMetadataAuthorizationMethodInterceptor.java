@@ -33,7 +33,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.EnumMap;
@@ -42,10 +41,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import org.apache.gravitino.Config;
@@ -318,21 +317,22 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testReadListReusesEntryContext(boolean hasDeny) throws Throwable {
-    ExecutorService workers = Executors.newFixedThreadPool(2);
-    Field executorField = MetadataAuthzHelper.class.getDeclaredField("executor");
-    executorField.setAccessible(true);
-    Object previousExecutor = executorField.get(null);
-    executorField.set(null, workers);
     AtomicInteger userLoads = new AtomicInteger();
     Set<AuthorizationRequestContext> contexts = ConcurrentHashMap.newKeySet();
-    Set<String> workerThreads = ConcurrentHashMap.newKeySet();
+    AtomicBoolean perObjectLoopRan = new AtomicBoolean();
     AtomicReference<AuthorizationRequestContext> entryContext = new AtomicReference<>();
+    Function<String, Optional<UserUpdatedAt>> loadUser =
+        key -> {
+          userLoads.incrementAndGet();
+          return Optional.of(new UserUpdatedAt(1L, 1L));
+        };
     try (MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class)) {
       GravitinoEnv env = mock(GravitinoEnv.class);
       Config config = mock(Config.class);
       envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
       when(env.config()).thenReturn(config);
       when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
+      when(config.get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE)).thenReturn(2);
       principalUtils.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
       authorizationUtils
           .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
@@ -340,12 +340,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               invocation -> {
                 AuthorizationRequestContext context = invocation.getArgument(2);
                 entryContext.set(context);
-                context.computeUserInfoIfAbsent(
-                    "metalake::tester",
-                    key -> {
-                      userLoads.incrementAndGet();
-                      return Optional.of(new UserUpdatedAt(1L, 1L));
-                    });
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
                 return null;
               });
       when(authorizer.authorize(any(), any(), any(), any(), any()))
@@ -353,12 +348,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               invocation -> {
                 AuthorizationRequestContext context = invocation.getArgument(4);
                 contexts.add(context);
-                context.computeUserInfoIfAbsent(
-                    "metalake::tester",
-                    key -> {
-                      userLoads.incrementAndGet();
-                      return Optional.of(new UserUpdatedAt(1L, 1L));
-                    });
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
                 return true;
               });
       when(authorizer.hasDenyPolicy(any(), any(), any(), any()))
@@ -373,7 +363,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                 MetadataObject object = invocation.getArgument(2);
                 contexts.add(invocation.getArgument(4));
                 if (object.type() == MetadataObject.Type.TABLE) {
-                  workerThreads.add(Thread.currentThread().getName());
+                  perObjectLoopRan.set(true);
                 }
                 return hasDeny && object.name().equals("hidden");
               });
@@ -396,12 +386,8 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
           (NameIdentifier[]) result);
       assertEquals(Set.of(entryContext.get()), contexts);
       assertEquals(1, userLoads.get());
-      assertEquals(hasDeny, !workerThreads.isEmpty());
-      assertNotSame(
-          entryContext.get(), AuthorizationRequestScope.getOrCreate("metalake", authorizer));
-    } finally {
-      executorField.set(null, previousExecutor);
-      workers.shutdownNow();
+      assertEquals(hasDeny, perObjectLoopRan.get());
+      assertNotSame(entryContext.get(), AuthorizationRequestScope.getOrCreate("metalake"));
     }
   }
 
@@ -415,11 +401,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     when(invocation.proceed())
         .thenAnswer(
             unused -> {
-              context.set(AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+              context.set(AuthorizationRequestScope.getOrCreate("metalake"));
               throw failure;
             });
     assertSame(failure, new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
-    assertNotSame(context.get(), AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+    assertNotSame(context.get(), AuthorizationRequestScope.getOrCreate("metalake"));
   }
 
   /** Write operations must not expose pre-mutation authorization decisions to later filtering. */
@@ -434,7 +420,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
             });
     TestInvocation invocation = invocation("writeTables", null);
     when(invocation.proceed())
-        .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake", authorizer));
+        .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake"));
     Object result = new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation);
     assertInstanceOf(AuthorizationRequestContext.class, result);
     assertNotSame(entryContext.get(), result);

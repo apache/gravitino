@@ -19,92 +19,99 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.gravitino.UserPrincipal;
+import javax.ws.rs.GET;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Makes entry authorization state available to list filtering during a synchronous read request.
- * Workers receive the context explicitly; this thread-local scope is not inherited by workers.
- * Nested invocations start isolated and restore the enclosing scope when closed.
+ *
+ * <p>The interceptor opens a scope around the REST method, binds the context it built for entry
+ * authorization when the method is a read, and closes the scope when the method returns. {@link
+ * #getOrCreate(String)} then hands that context to {@code MetadataAuthzHelper.filterByExpression}
+ * on the same thread. Filter workers receive the context explicitly; this thread-local scope is not
+ * inherited by them.
+ *
+ * <p>This is separate from {@link org.apache.gravitino.utils.RequestContext} because it is bound to
+ * the intercepted method, not to the servlet request, and is closed together with it.
  */
 public final class AuthorizationRequestScope implements AutoCloseable {
   private static final ThreadLocal<AuthorizationRequestScope> CURRENT = new ThreadLocal<>();
 
-  @Nullable private final AuthorizationRequestScope previous;
-  private final Principal principal;
+  @Nullable private Principal principal;
   @Nullable private String metalake;
-  @Nullable private GravitinoAuthorizer authorizer;
   @Nullable private AuthorizationRequestContext context;
 
-  private AuthorizationRequestScope() {
-    previous = CURRENT.get();
-    principal = PrincipalUtils.getCurrentPrincipal();
-    CURRENT.set(this);
-  }
+  private AuthorizationRequestScope() {}
 
   /**
-   * Opens an isolated invocation scope, to be closed on the calling thread with try-with-resources.
+   * Opens the scope of one intercepted invocation, to be closed on the same thread with
+   * try-with-resources.
    *
    * @return the new scope
    */
   public static AuthorizationRequestScope open() {
-    return new AuthorizationRequestScope();
+    AuthorizationRequestScope scope = new AuthorizationRequestScope();
+    CURRENT.set(scope);
+    return scope;
+  }
+
+  /**
+   * Binds completed entry authorization to this scope when the method is a read operation. Only
+   * reads may reuse entry decisions, because a mutation could invalidate them before the list is
+   * filtered. Nothing is bound for other methods or when no metalake was authorized.
+   *
+   * @param method the intercepted REST method
+   * @param metalakeIdent the authorized metalake, or null when entry authorization had none
+   * @param context the entry authorization context
+   */
+  public void bindIfRead(
+      Method method, @Nullable NameIdentifier metalakeIdent, AuthorizationRequestContext context) {
+    if (metalakeIdent != null && method.isAnnotationPresent(GET.class)) {
+      bind(metalakeIdent.name(), context);
+    }
   }
 
   /**
    * Binds completed entry authorization for a read-only operation to this scope.
    *
    * @param metalake the authorized metalake
-   * @param authorizer the authorizer that populated the context
    * @param context the entry authorization context
    */
-  public void bind(
-      String metalake, GravitinoAuthorizer authorizer, AuthorizationRequestContext context) {
+  public void bind(String metalake, AuthorizationRequestContext context) {
+    this.principal = PrincipalUtils.getCurrentPrincipal();
     this.metalake = Objects.requireNonNull(metalake, "metalake");
-    this.authorizer = Objects.requireNonNull(authorizer, "authorizer");
     this.context = Objects.requireNonNull(context, "context");
   }
 
   /**
-   * Reuses entry authorization only for the same principal instance, active roles, metalake and
-   * authorizer. Otherwise returns a fresh context. Principal identity is intentional: principal
-   * equality may omit active-role or authentication attributes.
+   * Returns the bound entry context when it was built for the current principal instance and the
+   * given metalake, otherwise a fresh context. Principal identity is compared on purpose: a context
+   * snapshots the principal's active roles when it is created, and principal equality may ignore
+   * those.
    *
    * @param metalake the metalake being filtered
-   * @param authorizer the authorizer used for filtering
    * @return the matching request context, or a new independent context
    */
-  public static AuthorizationRequestContext getOrCreate(
-      String metalake, GravitinoAuthorizer authorizer) {
+  public static AuthorizationRequestContext getOrCreate(String metalake) {
     AuthorizationRequestScope scope = CURRENT.get();
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
     if (scope != null
         && scope.context != null
-        && scope.principal == principal
-        && scope.authorizer == authorizer
-        && Objects.equals(scope.metalake, metalake)
-        && (!(principal instanceof UserPrincipal)
-            || scope
-                .context
-                .getActiveRoles()
-                .equals(((UserPrincipal) principal).getActiveRoles()))) {
+        && scope.principal == PrincipalUtils.getCurrentPrincipal()
+        && Objects.equals(scope.metalake, metalake)) {
       return scope.context;
     }
     return new AuthorizationRequestContext();
   }
 
-  /** Restores the enclosing scope or removes all state when the invocation completes. */
+  /** Removes the scope when the invocation completes. */
   @Override
   public void close() {
-    if (previous == null) {
-      CURRENT.remove();
-    } else {
-      CURRENT.set(previous);
-    }
+    CURRENT.remove();
   }
 }
