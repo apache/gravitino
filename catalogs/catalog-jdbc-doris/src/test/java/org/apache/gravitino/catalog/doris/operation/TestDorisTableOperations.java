@@ -680,7 +680,7 @@ public class TestDorisTableOperations extends TestDoris {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> DorisTableOperations.deleteIndexDefinition(load, deleteIndex2));
-    Assertions.assertEquals("Index does not exist", thrown.getMessage());
+    Assertions.assertEquals("Index does not exist: uk_1", thrown.getMessage());
 
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = DorisTableOperations.deleteIndexDefinition(load, deleteIndex3);

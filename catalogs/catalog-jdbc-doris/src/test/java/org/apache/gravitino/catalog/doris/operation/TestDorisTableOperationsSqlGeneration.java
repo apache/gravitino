@@ -798,7 +798,7 @@ public class TestDorisTableOperationsSqlGeneration {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> DorisTableOperations.deleteIndexDefinition(table, strictDeleteIndex));
-    Assertions.assertEquals("Index does not exist", exception.getMessage());
+    Assertions.assertEquals("Index does not exist: idx_missing", exception.getMessage());
   }
 
   @Test
