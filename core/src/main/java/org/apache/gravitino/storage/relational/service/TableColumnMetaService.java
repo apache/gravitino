@@ -28,12 +28,16 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -174,10 +178,12 @@ public class TableColumnMetaService {
     }
 
     // Mark the columns to DELETE if they are not existed in new columns.
+    List<Long> deletedColumnIds = Lists.newArrayList();
     for (ColumnEntity oldColumn : oldColumns.values()) {
       if (!newColumns.containsKey(oldColumn.id())) {
         columnPOsToInsert.add(
             POConverters.initializeColumnPO(newTablePO, oldColumn, ColumnPO.ColumnOpType.DELETE));
+        deletedColumnIds.add(oldColumn.id());
       }
     }
 
@@ -194,6 +200,30 @@ public class TableColumnMetaService {
     }
 
     insertColumnPOsInBatches(columnPOsToInsert);
+    deleteColumnRelations(deletedColumnIds);
+  }
+
+  private void deleteColumnRelations(List<Long> columnIds) {
+    // A dropped column keeps its rows, so nothing else removes the relations that reference it.
+    // This runs in the table update transaction, so the relations go away with the column. A wide
+    // table can drop many columns at once, so the ids are deleted in batches. Policies cannot be
+    // attached to columns, so there are no policy relations to remove.
+    String columnType = MetadataObject.Type.COLUMN.name();
+    Lists.partition(columnIds, COLUMN_INSERT_BATCH_SIZE)
+        .forEach(
+            batch -> {
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteTagMetadataObjectRelsByMetadataObjects(batch, columnType));
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.batchSoftDeleteOwnerRelByMetadataObjects(
+                          batch.stream()
+                              .map(id -> new OwnerRelForDeletion(id, columnType))
+                              .collect(Collectors.toList())));
+            });
   }
 
   private void insertColumnPOsInBatches(List<ColumnPO> columnPOs) {
