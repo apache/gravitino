@@ -32,6 +32,10 @@ The catalog automatically loads the Azure Data Lake Storage filesystem provider 
 classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
 properties do not need to be set.
 
+The bundle uses JSSE for TLS and does not include the optional WildFly OpenSSL provider.
+If you explicitly set Hadoop's `fs.azure.ssl.channel.mode` to `OpenSSL`, install a compatible
+provider separately on the catalog or client classpath. The default mode does not require it.
+
 ## Azure Data Lake Storage Properties
 
 These properties are needed in addition to the shared
