@@ -243,6 +243,65 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, countActiveColumnRelations(kept));
   }
 
+  @TestTemplate
+  public void testMoveTableWithColumnChangeMovesAllColumns() throws Exception {
+    String catalogName = "catalog1";
+    String oldSchemaName = "schema1";
+    String newSchemaName = "schema2";
+    createParentEntities(METALAKE_NAME, catalogName, oldSchemaName, AUDIT_INFO);
+    createAndInsertSchema(METALAKE_NAME, catalogName, newSchemaName);
+
+    ColumnEntity unchanged = newIntColumn("unchanged", 0, "comment");
+    ColumnEntity changed = newIntColumn("changed", 1, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_move")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, oldSchemaName))
+            .withColumns(Lists.newArrayList(unchanged, changed))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // Move the table to the other schema and change one column in the same update.
+    ColumnEntity changedColumn = newIntColumn("changed", 1, "new comment", changed.id());
+    TableEntity moved =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, newSchemaName))
+            .withColumns(Lists.newArrayList(unchanged, changedColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().updateTable(table.nameIdentifier(), (TableEntity old) -> moved);
+
+    // Dropping the old schema must not take any of the moved table's columns with it.
+    Assertions.assertTrue(
+        SchemaMetaService.getInstance()
+            .deleteSchema(NameIdentifier.of(METALAKE_NAME, catalogName, oldSchemaName), true));
+
+    TableEntity retrieved =
+        TableMetaService.getInstance().getTableByIdentifier(moved.nameIdentifier());
+    compareTwoColumns(moved.columns(), retrieved.columns());
+  }
+
+  private ColumnEntity newIntColumn(String name, int position, String comment) {
+    return newIntColumn(name, position, comment, RandomIdGenerator.INSTANCE.nextId());
+  }
+
+  private ColumnEntity newIntColumn(String name, int position, String comment, long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withPosition(position)
+        .withComment(comment)
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
   private void insertColumnRelations(long columnId) throws SQLException {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);

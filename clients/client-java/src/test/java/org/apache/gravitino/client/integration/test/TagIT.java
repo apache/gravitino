@@ -862,6 +862,54 @@ public class TagIT extends BaseIT {
     }
   }
 
+  @Test
+  public void testMovedTableKeepsColumnTagsAfterOldSchemaIsDropped() {
+    String sourceSchema = GravitinoITUtils.genRandomName("tag_it_move_source_schema");
+    relationalCatalog.asSchemas().createSchema(sourceSchema, "comment", Collections.emptyMap());
+    NameIdentifier sourceIdent =
+        NameIdentifier.of(sourceSchema, GravitinoITUtils.genRandomName("tag_it_move_table"));
+    relationalCatalog
+        .asTableCatalog()
+        .createTable(
+            sourceIdent,
+            new Column[] {
+              Column.of("c1", Types.IntegerType.get()), Column.of("c2", Types.StringType.get())
+            },
+            "comment",
+            Collections.emptyMap());
+    NameIdentifier movedIdent = NameIdentifier.of(schema.name(), sourceIdent.name());
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_move_table_tag"),
+              "comment",
+              Collections.emptyMap());
+      loadColumn(sourceIdent, "c1").supportsTags().associateTags(new String[] {tag.name()}, null);
+
+      // Move the table to another schema and change another column in the same request.
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(
+              sourceIdent,
+              TableChange.rename(sourceIdent.name(), schema.name()),
+              TableChange.updateColumnComment(new String[] {"c2"}, "new comment"));
+
+      // Dropping the old schema must not take the moved table's unchanged column with it.
+      Assertions.assertTrue(relationalCatalog.asSchemas().dropSchema(sourceSchema, true));
+
+      Column c1 = loadColumn(movedIdent, "c1");
+      Assertions.assertArrayEquals(new String[] {tag.name()}, c1.supportsTags().listTags());
+      MetadataObject[] objects = metalake.getTag(tag.name()).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", relationalCatalog.name(), schema.name(), movedIdent.name(), "c1"),
+          objects[0].fullName());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(movedIdent);
+      relationalCatalog.asSchemas().dropSchema(sourceSchema, true);
+    }
+  }
+
   private NameIdentifier createColumnTestTable(String prefix) {
     NameIdentifier tableIdent =
         NameIdentifier.of(schema.name(), GravitinoITUtils.genRandomName(prefix));

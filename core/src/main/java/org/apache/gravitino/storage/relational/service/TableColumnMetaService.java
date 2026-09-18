@@ -187,15 +187,18 @@ public class TableColumnMetaService {
       }
     }
 
+    // If the table moved to another schema, move all of its existing column rows as well, whether
+    // or not any column changed. Only the changed columns get new rows below, so otherwise the
+    // unchanged ones would stay under the old schema and be dropped with it.
+    if (!newTable.namespace().equals(oldTable.namespace())) {
+      SessionUtils.doWithoutCommit(
+          TableColumnMapper.class,
+          mapper ->
+              mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
+    }
+
     // If there is no change, directly return
     if (columnPOsToInsert.isEmpty()) {
-      // If namespace is changed, just update the schema_id of the columns.
-      if (!newTable.namespace().equals(oldTable.namespace())) {
-        SessionUtils.doWithoutCommit(
-            TableColumnMapper.class,
-            mapper ->
-                mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
-      }
       return;
     }
 
