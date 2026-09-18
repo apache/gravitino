@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -45,7 +46,7 @@ public final class SecretPropertyUtils {
    * properties.
    */
   private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
-      Pattern.compile(".*(secret|password|token|credential|access|account).*");
+      SensitivePropertyKeyKeywords.BUILTIN_PATTERN;
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
@@ -57,6 +58,15 @@ public final class SecretPropertyUtils {
       };
 
   private SecretPropertyUtils() {}
+
+  /**
+   * Configures supplementary sensitive property key typo patterns from server configuration.
+   *
+   * @param config server configuration
+   */
+  public static void configureSensitiveKeyTypoPatterns(Config config) {
+    SensitivePropertyKeyMatcher.configure(config);
+  }
 
   /**
    * Returns whether a property key name looks sensitive (credential-like).

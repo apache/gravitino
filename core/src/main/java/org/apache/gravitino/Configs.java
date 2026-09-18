@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.secret.SensitivePropertyKeyKeywords;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -641,13 +642,17 @@ public class Configs {
       new ConfigBuilder("gravitino.properties.sensitive-key-typo-patterns")
           .doc(
               "Additional credential-like property key typo substrings. Matching is "
-                  + "case-insensitive; each entry is treated as a substring of the property key.")
+                  + "case-insensitive; each entry is treated as a substring of the property key. "
+                  + "Entries must not duplicate built-in sensitive keywords (secret, password, "
+                  + "token, credential, access, account).")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .toSequence()
           .checkValue(
               valueList ->
-                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
-              ConfigConstants.NOT_BLANK_ERROR_MSG)
+                  valueList != null
+                      && valueList.stream()
+                          .allMatch(SensitivePropertyKeyKeywords::isValidTypoPattern),
+              SensitivePropertyKeyKeywords.invalidTypoPatternMessage())
           .createWithDefault(Collections.emptyList());
 }

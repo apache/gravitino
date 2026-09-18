@@ -58,6 +58,19 @@ public class TestSensitivePropertyKeyMatcher {
   }
 
   @Test
+  void testRejectsBuiltinKeywordTypoPattern() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SensitivePropertyKeyMatcher.configure(List.of("password")));
+    Assertions.assertTrue(
+        exception.getMessage().contains(SensitivePropertyKeyKeywords.invalidTypoPatternMessage()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SensitivePropertyKeyMatcher.configure(List.of("TOKEN")));
+  }
+
+  @Test
   void testTypoMatcherSupplementsBuiltinPattern() {
     SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));

@@ -348,6 +348,21 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
 | `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
 
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. Built-in detection already matches keys whose names contain
+`secret`, `password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+Use the setting below to declare **additional typo substrings** for mistyped credential property
+names (for example `jdbc-passwrod`). Each entry is matched as a case-insensitive substring of the
+property key. Keep entries specific to known misspellings; overly broad values such as `key` can
+mask unrelated properties. Entries must not duplicate the built-in keywords listed above.
+
+| Configuration Item | Description | Default Value |
+|---|---|---|
+| `gravitino.properties.sensitive-key-typo-patterns` | Comma-separated typo substrings for credential-like property keys | _(empty)_ |
+
 ### Securing the Server
 
 #### Authentication

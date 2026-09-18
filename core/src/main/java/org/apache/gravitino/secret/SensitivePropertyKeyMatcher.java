@@ -19,12 +19,14 @@
 package org.apache.gravitino.secret;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 
 /**
  * Supplementary matcher for credential-like property key typos.
@@ -48,13 +50,23 @@ final class SensitivePropertyKeyMatcher {
     return false;
   }
 
+  /**
+   * Applies typo pattern settings from Gravitino configuration.
+   *
+   * @param config server configuration
+   */
+  static void configure(Config config) {
+    configure(config.get(Configs.SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS));
+  }
+
   static void configure(List<String> configuredTypoPatterns) {
     Set<String> normalizedTypoPatterns = new LinkedHashSet<>();
     if (configuredTypoPatterns != null) {
       for (String typoPattern : configuredTypoPatterns) {
-        if (StringUtils.isNotBlank(typoPattern)) {
-          normalizedTypoPatterns.add(typoPattern.trim().toLowerCase(Locale.ROOT));
-        }
+        Preconditions.checkArgument(
+            SensitivePropertyKeyKeywords.isValidTypoPattern(typoPattern),
+            SensitivePropertyKeyKeywords.invalidTypoPatternMessage());
+        normalizedTypoPatterns.add(typoPattern.trim().toLowerCase(Locale.ROOT));
       }
     }
     typoPatterns = ImmutableSet.copyOf(normalizedTypoPatterns);
