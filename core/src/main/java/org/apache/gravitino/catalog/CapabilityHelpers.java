@@ -29,6 +29,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -94,6 +95,18 @@ public class CapabilityHelpers {
               return change;
             })
         .toArray(FilesetChange[]::new);
+  }
+
+  public static ModelChange[] applyCapabilities(Capability capabilities, ModelChange... changes) {
+    return Arrays.stream(changes)
+        .map(
+            change -> {
+              if (change instanceof ModelChange.RenameModel) {
+                return applyCapabilities((ModelChange.RenameModel) change, capabilities);
+              }
+              return change;
+            })
+        .toArray(ModelChange[]::new);
   }
 
   public static ViewChange[] applyCapabilities(Capability capabilities, ViewChange... changes) {
@@ -355,6 +368,14 @@ public class CapabilityHelpers {
             Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
     applyNameSpecification(Capability.Scope.FILESET, newName, capabilities);
     return FilesetChange.rename(newName);
+  }
+
+  private static ModelChange applyCapabilities(
+      ModelChange.RenameModel renameModel, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    String newName =
+        applyCaseSensitiveOnName(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    return ModelChange.rename(newName);
   }
 
   private static ViewChange applyCapabilities(

@@ -27,6 +27,7 @@ import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -38,10 +39,11 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, "The unique id of the tag entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the tag entity.");
+      Field.required("name", "The name of the tag entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the tag entity.");
+      Field.optional(
+          "comment", "The comment of the tag entity.", EntityFieldLimits.MAX_COMMENT_LENGTH);
 
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the tag entity.");

@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
@@ -356,5 +357,34 @@ public class MetalakeIT extends BaseIT {
     for (GravitinoMetalake metalake : metaLakes) {
       Assertions.assertFalse(client.dropMetalake(metalake.name()));
     }
+  }
+
+  @Test
+  public void testMetalakeCommentLength() {
+    String tooLongComment = StringUtils.repeat("c", 257);
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> client.createMetalake(metalakeNameA, tooLongComment, Collections.emptyMap()));
+    assertTrue(
+        e.getMessage().contains("The comment of the metalake must not exceed 256 characters"),
+        e.getMessage());
+    assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(metalakeNameA));
+
+    String maxLengthComment = StringUtils.repeat("c", 256);
+    GravitinoMetalake metalake =
+        client.createMetalake(metalakeNameA, maxLengthComment, Collections.emptyMap());
+    assertEquals(maxLengthComment, metalake.comment());
+
+    e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                client.alterMetalake(metalakeNameA, MetalakeChange.updateComment(tooLongComment)));
+    assertTrue(
+        e.getMessage().contains("The comment of the metalake must not exceed 256 characters"),
+        e.getMessage());
+    assertEquals(maxLengthComment, client.loadMetalake(metalakeNameA).comment());
   }
 }
