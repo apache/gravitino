@@ -22,14 +22,12 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.meta.EntityFieldLimits;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -120,30 +118,5 @@ public class TestFilesetNormalizeDispatcher extends TestOperationDispatcher {
                     filesetIdent2, "comment", Fileset.Type.MANAGED, "fileset41", props));
     Assertions.assertEquals(
         "The FILESET name 'a?' is illegal. Illegal name: a?", exception.getMessage());
-  }
-
-  @Test
-  public void testCommentLength() {
-    Namespace filesetNs = Namespace.of(metalake, catalog, "testCommentLength");
-    Map<String, String> props = ImmutableMap.of("k1", "v1");
-    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
-
-    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset");
-    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
-    Exception exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                filesetNormalizeDispatcher.createFileset(
-                    filesetIdent, tooLongComment, Fileset.Type.MANAGED, "fileset_limit", props));
-    Assertions.assertEquals(
-        "The comment of the fileset must not exceed 256 characters", exception.getMessage());
-    Assertions.assertFalse(filesetNormalizeDispatcher.filesetExists(filesetIdent));
-
-    String maxLengthComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH);
-    Fileset fileset =
-        filesetNormalizeDispatcher.createFileset(
-            filesetIdent, maxLengthComment, Fileset.Type.MANAGED, "fileset_limit", props);
-    Assertions.assertEquals(maxLengthComment, fileset.comment());
   }
 }

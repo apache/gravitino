@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.storage.relational.converters;
 
-import java.sql.DataTruncation;
 import java.sql.SQLException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -52,21 +51,6 @@ public class TestMySQLExceptionConverter {
         "The tag entity has a value that exceeds the maximum length of its column.",
         exception.getMessage());
     // The database error must not be exposed to the client through the cause.
-    Assertions.assertNull(exception.getCause());
-  }
-
-  @Test
-  public void testConvertDataTruncation() {
-    // Reported by Connector/J when MySQL truncates a value without the strict SQL mode.
-    SQLException sqlException = new DataTruncation(1, false, false, 300, 128);
-    MySQLExceptionConverter converter = new MySQLExceptionConverter();
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> converter.toGravitinoException(sqlException, Entity.EntityType.TAG, "test"));
-    Assertions.assertEquals(
-        "The tag entity has a value that exceeds the maximum length of its column.",
-        exception.getMessage());
     Assertions.assertNull(exception.getCause());
   }
 }

@@ -20,7 +20,6 @@ package org.apache.gravitino;
 
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
-import org.apache.gravitino.meta.EntityFieldLimits;
 
 /** This class represents a field in the Apache Gravitino framework. */
 @EqualsAndHashCode

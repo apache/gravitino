@@ -20,19 +20,14 @@ package org.apache.gravitino.storage.relational.converters;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Locale;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Exception converter to Apache Gravitino exception for H2. The definition of error codes can be
  * found in the document: <a href="https://h2database.com/javadoc/org/h2/api/ErrorCode.html"></a>
  */
 public class H2ExceptionConverter implements SQLExceptionConverter {
-  private static final Logger LOG = LoggerFactory.getLogger(H2ExceptionConverter.class);
-
   /** It means found a duplicated primary key or unique key entry in H2. */
   private static final int DUPLICATED_ENTRY_ERROR_CODE = 23505;
 
@@ -50,15 +45,7 @@ public class H2ExceptionConverter implements SQLExceptionConverter {
         throw new EntityAlreadyExistsException(
             se, "The %s entity: %s already exists.", type.name(), name);
       case VALUE_TOO_LONG_ERROR_CODE:
-        // compatible with H2 in MySQL mode
-      case MySQLExceptionConverter.DATA_TOO_LONG_ERROR_CODE:
-        // Do not attach the SQL exception as the cause, it would expose the database error
-        // message to the client through the stack trace of the error response.
-        LOG.warn("Failed to persist the {} entity: {}", type, name, se);
-        throw new IllegalArgumentException(
-            String.format(
-                "The %s entity has a value that exceeds the maximum length of its column.",
-                type.name().toLowerCase(Locale.ROOT)));
+        throw ValueTooLongExceptions.of(se, type, name);
       default:
         throw new IOException("error code: " + se.getErrorCode(), se);
     }

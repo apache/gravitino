@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.meta;
+package org.apache.gravitino;
 
 import java.util.Locale;
 import javax.annotation.Nullable;
-import org.apache.gravitino.Entity;
 
 /**
  * The maximum lengths of entity fields persisted by the relational entity store.

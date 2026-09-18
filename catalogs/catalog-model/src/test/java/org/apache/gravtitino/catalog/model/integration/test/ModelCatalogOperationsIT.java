@@ -1260,44 +1260,22 @@ public class ModelCatalogOperationsIT extends BaseIT {
         "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", null));
   }
 
-  private static void assertPropertiesEqual(
-      Map<String, String> expectedUserProps, Map<String, String> actual) {
-    Assertions.assertFalse(actual.containsKey(StringIdentifier.ID_KEY));
-    Assertions.assertEquals(expectedUserProps, actual);
-  }
+  @Test
+  public void testRenameModelWithIllegalName() {
+    String modelName = RandomNameUtils.genRandomName("model_rename_spec");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
 
-  private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetalakes.length);
-
-    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(metalakeName, loadMetalake.name());
-
-    gravitinoMetalake = loadMetalake;
-  }
-
-  private void createCatalog() {
-    gravitinoMetalake.createCatalog(catalogName, Catalog.Type.MODEL, "comment", ImmutableMap.of());
-    gravitinoCatalog = gravitinoMetalake.loadCatalog(catalogName);
-  }
-
-  private void createSchema() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    String comment = "comment";
-
-    gravitinoCatalog.asSchemas().createSchema(schemaName, comment, properties);
-    Schema loadSchema = gravitinoCatalog.asSchemas().loadSchema(schemaName);
-    Assertions.assertEquals(schemaName, loadSchema.name());
-    Assertions.assertEquals(comment, loadSchema.comment());
-    Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
-    Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
-  }
-
-  private void dropSchema() {
-    gravitinoCatalog.asSchemas().dropSchema(schemaName, true);
+    String tooLongName = StringUtils.repeat("m", 129);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoCatalog
+                    .asModelCatalog()
+                    .alterModel(modelIdent, ModelChange.rename(tooLongName)));
+    Assertions.assertTrue(e.getMessage().contains("is illegal"), e.getMessage());
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelExists(modelIdent));
   }
 
   @Test
@@ -1345,5 +1323,45 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(
         new String[] {maxLengthAlias},
         gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0).aliases());
+  }
+
+  private static void assertPropertiesEqual(
+      Map<String, String> expectedUserProps, Map<String, String> actual) {
+    Assertions.assertFalse(actual.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(expectedUserProps, actual);
+  }
+
+  private void createMetalake() {
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
+
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
+
+    gravitinoMetalake = loadMetalake;
+  }
+
+  private void createCatalog() {
+    gravitinoMetalake.createCatalog(catalogName, Catalog.Type.MODEL, "comment", ImmutableMap.of());
+    gravitinoCatalog = gravitinoMetalake.loadCatalog(catalogName);
+  }
+
+  private void createSchema() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+    String comment = "comment";
+
+    gravitinoCatalog.asSchemas().createSchema(schemaName, comment, properties);
+    Schema loadSchema = gravitinoCatalog.asSchemas().loadSchema(schemaName);
+    Assertions.assertEquals(schemaName, loadSchema.name());
+    Assertions.assertEquals(comment, loadSchema.comment());
+    Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
+    Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
+  }
+
+  private void dropSchema() {
+    gravitinoCatalog.asSchemas().dropSchema(schemaName, true);
   }
 }

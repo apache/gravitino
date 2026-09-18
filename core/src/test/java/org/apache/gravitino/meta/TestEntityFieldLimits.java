@@ -28,6 +28,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -76,8 +77,10 @@ public class TestEntityFieldLimits {
 
   @Test
   public void testLengthCountsCodePoints() {
-    // An emoji is two UTF-16 chars but one character for MySQL (utf8mb4) and PostgreSQL, so a
-    // name of 128 emojis can be stored and must still pass validation when it is read back.
+    // An emoji is two UTF-16 chars but one character for MySQL (utf8mb4) and PostgreSQL, where a
+    // name of 128 emojis fits the column and must still pass validation when it is read back. H2
+    // counts UTF-16 chars, so it rejects such a name in the database instead, which the SQL
+    // exception converter reports as an IllegalArgumentException as well.
     String emoji = new String(Character.toChars(0x1F600));
     String maxLengthName = StringUtils.repeat(emoji, EntityFieldLimits.MAX_NAME_LENGTH);
     Assertions.assertDoesNotThrow(() -> tagBuilder(maxLengthName, null));

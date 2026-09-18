@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -33,7 +34,6 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
-import org.apache.gravitino.meta.EntityFieldLimits;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listTopics(Namespace)}) are

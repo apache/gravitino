@@ -20,11 +20,8 @@ package org.apache.gravitino.storage.relational.converters;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Locale;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Exception converter to Apache Gravitino exception for PostgreSQL. The definition of error codes
@@ -32,8 +29,6 @@ import org.slf4j.LoggerFactory;
  * href="https://www.postgresql.org/docs/8.4/errcodes-appendix.html">error code of PostgreSQL</a>
  */
 public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
-  private static final Logger LOG = LoggerFactory.getLogger(PostgreSQLExceptionConverter.class);
-
   private static final String DUPLICATED_ENTRY_ERROR_CODE = "23505";
 
   /** It means a value is too long for its column in PostgreSQL. */
@@ -49,13 +44,7 @@ public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
         throw new EntityAlreadyExistsException(
             sqlException, "The %s entity: %s already exists.", type.name(), name);
       case STRING_DATA_RIGHT_TRUNCATION_ERROR_CODE:
-        // Do not attach the SQL exception as the cause, it would expose the database error
-        // message to the client through the stack trace of the error response.
-        LOG.warn("Failed to persist the {} entity: {}", type, name, sqlException);
-        throw new IllegalArgumentException(
-            String.format(
-                "The %s entity has a value that exceeds the maximum length of its column.",
-                type.name().toLowerCase(Locale.ROOT)));
+        throw ValueTooLongExceptions.of(sqlException, type, name);
       default:
         throw new IOException(sqlException);
     }

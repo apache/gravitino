@@ -82,6 +82,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -121,7 +122,6 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.EntityFieldLimits;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretConstants;
@@ -1436,6 +1436,32 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(comment + "_new", fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
     }
+  }
+
+  @Test
+  public void testCreateFilesetWithTooLongComment() throws IOException {
+    final long testId = generateTestId();
+    final String schemaName = "schema" + testId;
+    final String name = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", null, schemaPath);
+
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createFileset(name, schemaName, tooLongComment, Fileset.Type.MANAGED, null, null));
+    Assertions.assertEquals(
+        "The comment of the fileset must not exceed 256 characters", exception.getMessage());
+
+    // The fileset directory must not be created for a rejected fileset.
+    Path filesetPath = new Path(schemaPath, name);
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(filesetPath));
+
+    createFileset(name, schemaName, "comment", Fileset.Type.MANAGED, null, null);
+    Assertions.assertTrue(fs.exists(filesetPath));
   }
 
   @Test
