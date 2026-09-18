@@ -231,7 +231,7 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
-    SecretPropertyUtils.configureSensitiveKeyAdditionalPatterns(config);
+    SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(config);
     this.manageFullComponents = false;
     initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
@@ -246,7 +246,7 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino full environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
-    SecretPropertyUtils.configureSensitiveKeyAdditionalPatterns(config);
+    SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(config);
     this.manageFullComponents = true;
     initBaseComponents();
     initGravitinoServerComponents();

@@ -19,6 +19,8 @@
 package org.apache.gravitino.secret;
 
 import java.util.List;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,22 +36,22 @@ public class TestSensitivePropertyKeyMatcher {
   void testConfiguredAdditionalSubstringMatchesTypo() {
     SensitivePropertyKeyMatcher.configure(List.of("passwrod", "secert", "tokne"));
     Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-passwrod".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
     Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("catalog.secert".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("catalog.secert".toLowerCase()));
     Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("oauth2.tokne".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("oauth2.tokne".toLowerCase()));
     Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-passord".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passord".toLowerCase()));
   }
 
   @Test
   void testConfiguredAdditionalSubstringMatchesExtraKeyword() {
     SensitivePropertyKeyMatcher.configure(List.of("private"));
     Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-private-key".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-private-key".toLowerCase()));
     Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-user".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-user".toLowerCase()));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("jdbc-private-key"));
   }
 
@@ -57,14 +59,14 @@ public class TestSensitivePropertyKeyMatcher {
   void testAdditionalPatternsAreCaseInsensitive() {
     SensitivePropertyKeyMatcher.configure(List.of("PASSWROD"));
     Assertions.assertTrue(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-passwrod".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
   }
 
   @Test
   void testUnconfiguredAdditionalPatternDoesNotMatch() {
     SensitivePropertyKeyMatcher.resetToDefaults();
     Assertions.assertFalse(
-        SensitivePropertyKeyMatcher.matchesAdditionalPattern("jdbc-passwrod".toLowerCase()));
+        SensitivePropertyKeyMatcher.matchesAdditionalKeyword("jdbc-passwrod".toLowerCase()));
   }
 
   @Test
@@ -76,10 +78,18 @@ public class TestSensitivePropertyKeyMatcher {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains(SensitivePropertyKeyKeywords.invalidAdditionalPatternMessage()));
+            .contains(SensitivePropertyKeyKeywords.invalidAdditionalKeywordMessage()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> SensitivePropertyKeyMatcher.configure(List.of("TOKEN")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SensitivePropertyKeyMatcher.configure(List.of("my-password")));
+    Config config = new Config(false) {};
+    config.set(Configs.SENSITIVE_KEY_ADDITIONAL_KEYWORDS, List.of("secrets"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SecretPropertyUtils.configureSensitiveKeyAdditionalKeywords(config));
   }
 
   @Test

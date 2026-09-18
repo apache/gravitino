@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -60,11 +61,11 @@ public final class SecretPropertyUtils {
   private SecretPropertyUtils() {}
 
   /**
-   * Configures additional sensitive property key substrings from server configuration.
+   * Configures additional sensitive property key keywords from server configuration.
    *
    * @param config server configuration
    */
-  public static void configureSensitiveKeyAdditionalPatterns(Config config) {
+  public static void configureSensitiveKeyAdditionalKeywords(Config config) {
     SensitivePropertyKeyMatcher.configure(config);
   }
 
@@ -74,9 +75,8 @@ public final class SecretPropertyUtils {
    * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
    * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
    * storage account key/name and GCS service-account file paths), or when it contains a configured
-   * additional substring ({@link Configs#SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS}). Underscores
-   * and hyphens are not normalized; they are irrelevant because the matched keywords contain
-   * neither.
+   * additional keyword ({@link Configs#SENSITIVE_KEY_ADDITIONAL_KEYWORDS}). Underscores and hyphens
+   * are not normalized; they are irrelevant because the matched keywords contain neither.
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern
@@ -89,7 +89,7 @@ public final class SecretPropertyUtils {
     if (SENSITIVE_PROPERTY_KEY_PATTERN.matcher(lowerKey).matches()) {
       return true;
     }
-    return SensitivePropertyKeyMatcher.matchesAdditionalPattern(lowerKey);
+    return SensitivePropertyKeyMatcher.matchesAdditionalKeyword(lowerKey);
   }
 
   /**

@@ -142,7 +142,8 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.lance-rest.gravitino-metalake = metalake
 
 # THE CONFIGURATION FOR sensitive property key matching
-# Additional credential-like property key substrings beyond the built-in keywords
-# (secret, password, token, credential, access, account). Use for typos (passwrod) or extra
-# words (private). Entries must not duplicate the built-in keywords.
-# gravitino.properties.sensitive-key-additional-patterns = passwrod,secert,private
+# Comma-separated additional keywords beyond the built-in set
+# (secret, password, token, credential, access, account). Each entry is a literal substring,
+# not a regular expression. Use for typos (passwrod) or extra words (private). Entries must
+# not contain a built-in keyword.
+# gravitino.secret.sensitiveKeyAdditionalKeywords = passwrod,secert,private

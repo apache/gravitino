@@ -34,27 +34,37 @@ public final class SensitivePropertyKeyKeywords {
   static final Pattern BUILTIN_PATTERN =
       Pattern.compile(".*(" + BUILTIN_SUBSTRINGS.stream().collect(Collectors.joining("|")) + ").*");
 
-  private static final String INVALID_ADDITIONAL_PATTERN_MSG =
-      "Additional patterns must be non-blank and must not duplicate built-in sensitive keywords: "
+  private static final String INVALID_ADDITIONAL_KEYWORD_MSG =
+      "Additional keywords must be non-blank and must not contain a built-in sensitive keyword: "
           + String.join(", ", BUILTIN_SUBSTRINGS);
 
   private SensitivePropertyKeyKeywords() {}
 
   /**
-   * Returns whether {@code pattern} may be configured as an additional sensitive key substring.
+   * Returns whether {@code keyword} may be configured as an additional sensitive key substring.
    *
-   * <p>Built-in keywords are always matched and must not be repeated in configuration. Any other
-   * non-blank substring is allowed, including common credential typos (for example {@code
-   * passwrod}) and extra credential-like words (for example {@code private}).
+   * <p>Built-in keywords are always matched. An additional keyword that contains one of them adds
+   * no new matches and is rejected. Any other non-blank substring is allowed, including common
+   * credential typos (for example {@code passwrod}) and extra credential-like words (for example
+   * {@code private}).
+   *
+   * @param keyword candidate additional keyword
+   * @return true when the keyword may be configured
    */
-  public static boolean isValidAdditionalPattern(String pattern) {
-    if (StringUtils.isBlank(pattern)) {
+  public static boolean isValidAdditionalKeyword(String keyword) {
+    if (StringUtils.isBlank(keyword)) {
       return false;
     }
-    return !BUILTIN_SUBSTRINGS.contains(pattern.trim().toLowerCase(Locale.ROOT));
+    String normalized = keyword.trim().toLowerCase(Locale.ROOT);
+    return BUILTIN_SUBSTRINGS.stream().noneMatch(normalized::contains);
   }
 
-  public static String invalidAdditionalPatternMessage() {
-    return INVALID_ADDITIONAL_PATTERN_MSG;
+  /**
+   * Returns the validation message for an illegal additional sensitive keyword.
+   *
+   * @return the validation message
+   */
+  public static String invalidAdditionalKeywordMessage() {
+    return INVALID_ADDITIONAL_KEYWORD_MSG;
   }
 }

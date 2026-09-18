@@ -638,14 +638,15 @@ public class Configs {
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
 
-  public static final ConfigEntry<List<String>> SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS =
-      new ConfigBuilder("gravitino.properties.sensitive-key-additional-patterns")
+  public static final ConfigEntry<List<String>> SENSITIVE_KEY_ADDITIONAL_KEYWORDS =
+      new ConfigBuilder("gravitino.secret.sensitiveKeyAdditionalKeywords")
           .doc(
-              "Additional credential-like property key substrings beyond the built-in keywords "
-                  + "(secret, password, token, credential, access, account). Matching is "
-                  + "case-insensitive; each entry is treated as a substring of the property key. "
-                  + "Use for common typos (passwrod) or extra credential-like words (private). "
-                  + "Entries must not duplicate the built-in keywords.")
+              "Comma-separated additional credential-like property key keywords beyond the "
+                  + "built-in keywords (secret, password, token, credential, access, account). "
+                  + "Matching is case-insensitive; each entry is a literal substring of the "
+                  + "property key, not a regular expression. Use for common typos (passwrod) or "
+                  + "extra credential-like words (private). Entries must not contain a built-in "
+                  + "keyword.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .toSequence()
@@ -653,7 +654,7 @@ public class Configs {
               valueList ->
                   valueList != null
                       && valueList.stream()
-                          .allMatch(SensitivePropertyKeyKeywords::isValidAdditionalPattern),
-              SensitivePropertyKeyKeywords.invalidAdditionalPatternMessage())
+                          .allMatch(SensitivePropertyKeyKeywords::isValidAdditionalKeyword),
+              SensitivePropertyKeyKeywords.invalidAdditionalKeywordMessage())
           .createWithDefault(Collections.emptyList());
 }

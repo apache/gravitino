@@ -32,18 +32,19 @@ import org.apache.gravitino.Configs;
  * Supplementary matcher for credential-like property key substrings configured at runtime.
  *
  * <p>The built-in sensitive key pattern in {@link SecretPropertyUtils} always applies first. This
- * class adds optional configured substrings beyond the built-in keywords, for example common typos
- * ({@code passwrod}) or extra credential-like words ({@code private}).
+ * class adds optional configured keywords beyond the built-in set, for example common typos ({@code
+ * passwrod}) or extra credential-like words ({@code private}). Each keyword is matched as a
+ * case-insensitive substring of the property key.
  */
 final class SensitivePropertyKeyMatcher {
 
-  private static volatile Set<String> additionalPatterns = Set.of();
+  private static volatile Set<String> additionalKeywords = Set.of();
 
   private SensitivePropertyKeyMatcher() {}
 
-  static boolean matchesAdditionalPattern(String lowerKey) {
-    for (String additionalPattern : additionalPatterns) {
-      if (lowerKey.contains(additionalPattern)) {
+  static boolean matchesAdditionalKeyword(String lowerKey) {
+    for (String additionalKeyword : additionalKeywords) {
+      if (lowerKey.contains(additionalKeyword)) {
         return true;
       }
     }
@@ -51,29 +52,29 @@ final class SensitivePropertyKeyMatcher {
   }
 
   /**
-   * Applies additional sensitive key substring settings from Gravitino configuration.
+   * Applies additional sensitive key keyword settings from Gravitino configuration.
    *
    * @param config server configuration
    */
   static void configure(Config config) {
-    configure(config.get(Configs.SENSITIVE_PROPERTY_KEY_ADDITIONAL_PATTERNS));
+    configure(config.get(Configs.SENSITIVE_KEY_ADDITIONAL_KEYWORDS));
   }
 
-  static void configure(List<String> configuredAdditionalPatterns) {
-    Set<String> normalizedPatterns = new LinkedHashSet<>();
-    if (configuredAdditionalPatterns != null) {
-      for (String additionalPattern : configuredAdditionalPatterns) {
+  static void configure(List<String> configuredAdditionalKeywords) {
+    Set<String> normalizedKeywords = new LinkedHashSet<>();
+    if (configuredAdditionalKeywords != null) {
+      for (String additionalKeyword : configuredAdditionalKeywords) {
         Preconditions.checkArgument(
-            SensitivePropertyKeyKeywords.isValidAdditionalPattern(additionalPattern),
-            SensitivePropertyKeyKeywords.invalidAdditionalPatternMessage());
-        normalizedPatterns.add(additionalPattern.trim().toLowerCase(Locale.ROOT));
+            SensitivePropertyKeyKeywords.isValidAdditionalKeyword(additionalKeyword),
+            SensitivePropertyKeyKeywords.invalidAdditionalKeywordMessage());
+        normalizedKeywords.add(additionalKeyword.trim().toLowerCase(Locale.ROOT));
       }
     }
-    additionalPatterns = ImmutableSet.copyOf(normalizedPatterns);
+    additionalKeywords = ImmutableSet.copyOf(normalizedKeywords);
   }
 
   @VisibleForTesting
   static void resetToDefaults() {
-    additionalPatterns = Set.of();
+    additionalKeywords = Set.of();
   }
 }
