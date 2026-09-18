@@ -263,6 +263,43 @@ public class TestIcebergConfig {
             "3"));
   }
 
+  /**
+   * A federated catalog forwards requests unchanged: its table format version properties are
+   * neither validated nor declared to the remote catalog, and Iceberg's own property is forwarded
+   * as the operator set it.
+   */
+  @Test
+  public void testFederatedCatalogDoesNotGovernTableFormatVersions() {
+    IcebergConfig federated =
+        new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND,
+                    "rest",
+                    IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                    "4",
+                    IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                    "3",
+                    IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                    "1"))
+            .forFederatedCatalog();
+
+    Assertions.assertDoesNotThrow(federated::validateTableFormatVersions);
+    Assertions.assertFalse(federated.getDeclaredDefaultTableFormatVersion().isPresent());
+    Assertions.assertEquals(
+        "1",
+        federated
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+    IcebergConfig defaultOnly =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3"))
+            .forFederatedCatalog();
+    Assertions.assertFalse(
+        defaultOnly
+            .getIcebergCatalogProperties()
+            .containsKey(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+  }
+
   private static void assertInvalidTableFormatVersions(
       String expectedMessage, Map<String, String> properties) {
     IcebergConfig config = new IcebergConfig(properties);

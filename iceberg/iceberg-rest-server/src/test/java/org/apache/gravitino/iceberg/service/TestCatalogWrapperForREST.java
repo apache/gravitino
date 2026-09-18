@@ -35,16 +35,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.BaseTransaction;
@@ -57,6 +60,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -65,6 +69,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
+import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.Endpoint;
@@ -87,10 +92,15 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCatalogWrapperForREST {
 
   private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
+
+  private static final Namespace FV_NAMESPACE = Namespace.of("fv_db");
 
   @Test
   void testCheckPropertiesForCompatibility() {
@@ -2083,6 +2093,327 @@ public class TestCatalogWrapperForREST {
       }
       return super.getCatalog();
     }
+  }
+
+  @Test
+  void testCreateWithoutFormatVersionPropertiesKeepsTodaysDefaults() throws Exception {
+    try (CatalogWrapperForREST wrapper = formatVersionWrapper(ImmutableMap.of())) {
+      Assertions.assertFalse(
+          wrapper
+              .getIcebergConfig()
+              .getIcebergCatalogProperties()
+              .containsKey(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+      Assertions.assertEquals(2, createdFormatVersion(wrapper, "direct", null, false));
+      Assertions.assertEquals(2, createdFormatVersion(wrapper, "staged", null, true));
+      // The highest version the bundled Iceberg writes is still accepted.
+      Assertions.assertEquals(4, createdFormatVersion(wrapper, "v4", "4", false));
+    }
+  }
+
+  @Test
+  void testCreateWithoutRequestedVersionUsesCatalogDefault() throws Exception {
+    try (CatalogWrapperForREST wrapper =
+        formatVersionWrapper(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3"))) {
+      Assertions.assertEquals(
+          "3",
+          wrapper
+              .getIcebergConfig()
+              .getIcebergCatalogProperties()
+              .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+      Assertions.assertEquals(3, createdFormatVersion(wrapper, "direct", null, false));
+      Assertions.assertEquals(3, createdFormatVersion(wrapper, "staged", null, true));
+      // An explicit version below the default is honoured.
+      Assertions.assertEquals(1, createdFormatVersion(wrapper, "explicit", "1", false));
+    }
+  }
+
+  @Test
+  void testCreateAboveMaxFormatVersionIsRefused() throws Exception {
+    try (CatalogWrapperForREST wrapper =
+        formatVersionWrapper(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2"))) {
+      for (boolean stageCreate : new boolean[] {false, true}) {
+        IllegalArgumentException e =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    wrapper.createTable(
+                        FV_NAMESPACE, fvRequest("too_new", "3", stageCreate), false));
+        Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(e));
+        Assertions.assertTrue(
+            e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_MAX), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("limit 2"), e.getMessage());
+        Assertions.assertFalse(wrapper.tableExists(TableIdentifier.of(FV_NAMESPACE, "too_new")));
+      }
+
+      Assertions.assertEquals(2, createdFormatVersion(wrapper, "at_max", "2", false));
+    }
+  }
+
+  @Test
+  void testUpgradeCommitAboveMaxFormatVersionIsRefused() throws Exception {
+    try (CatalogWrapperForREST wrapper =
+        formatVersionWrapper(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2"))) {
+      TableIdentifier ident = TableIdentifier.of(FV_NAMESPACE, "upgraded");
+      wrapper.createTable(FV_NAMESPACE, fvRequest(ident.name(), "1", false), false);
+
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> wrapper.updateTable(ident, upgradeRequest(3)));
+      Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(e));
+      Assertions.assertTrue(
+          e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_MAX), e.getMessage());
+      Assertions.assertEquals(1, wrapper.loadTable(ident).tableMetadata().formatVersion());
+
+      // An upgrade up to the maximum still succeeds.
+      Assertions.assertEquals(
+          2, wrapper.updateTable(ident, upgradeRequest(2)).tableMetadata().formatVersion());
+    }
+  }
+
+  @Test
+  void testStagedCreateCommitAboveMaxFormatVersionIsRefused() throws Exception {
+    try (CatalogWrapperForREST wrapper =
+        formatVersionWrapper(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2"))) {
+      Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+              stagedCreateMetadataUpdates(schema, Optional.of(3)));
+
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> wrapper.updateTable(TableIdentifier.of(FV_NAMESPACE, "staged"), request));
+      Assertions.assertTrue(
+          e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_MAX), e.getMessage());
+    }
+  }
+
+  /**
+   * With {@code table-format-version.max} unset, a version above the build's ceiling is refused on
+   * every governed path with HTTP 400 and a message that names the supported range, not the unset
+   * property. Nothing is created or changed.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"create", "stage-create", "upgrade", "staged-create-commit"})
+  void testAboveBuildCeilingIsRefusedWithMaxUnset(String path) throws Exception {
+    try (CatalogWrapperForREST wrapper = formatVersionWrapper(ImmutableMap.of())) {
+      TableIdentifier ident = TableIdentifier.of(FV_NAMESPACE, "v5_" + path.replace('-', '_'));
+      if (path.equals("upgrade")) {
+        wrapper.createTable(FV_NAMESPACE, fvRequest(ident.name(), "4", false), false);
+      }
+      Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+      Executable refused;
+      switch (path) {
+        case "create":
+          refused =
+              () -> wrapper.createTable(FV_NAMESPACE, fvRequest(ident.name(), "5", false), false);
+          break;
+        case "stage-create":
+          refused =
+              () -> wrapper.createTable(FV_NAMESPACE, fvRequest(ident.name(), "5", true), false);
+          break;
+        case "upgrade":
+          refused = () -> wrapper.updateTable(ident, upgradeRequest(5));
+          break;
+        default:
+          refused =
+              () ->
+                  wrapper.updateTable(
+                      ident,
+                      new UpdateTableRequest(
+                          List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+                          stagedCreateMetadataUpdates(schema, Optional.of(5))));
+      }
+
+      IllegalArgumentException e = Assertions.assertThrows(IllegalArgumentException.class, refused);
+      Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(e));
+      Assertions.assertEquals(
+          "Iceberg format-version 5 is not supported by this Gravitino (supports 1-4)",
+          e.getMessage());
+      if (path.equals("upgrade")) {
+        Assertions.assertEquals(4, wrapper.loadTable(ident).tableMetadata().formatVersion());
+      } else {
+        Assertions.assertFalse(wrapper.tableExists(ident));
+      }
+    }
+  }
+
+  @Test
+  void testExistingTableAboveMaxFormatVersionStillLoadsAndCommits() throws Exception {
+    // Both wrappers share one in-memory catalog, as a catalog does before and after its maximum
+    // is lowered.
+    String catalogUuid = UUID.randomUUID().toString();
+    TableIdentifier ident = TableIdentifier.of(FV_NAMESPACE, "v3_table");
+    try {
+      try (CatalogWrapperForREST before =
+          formatVersionWrapper(ImmutableMap.of(IcebergConstants.CATALOG_UUID, catalogUuid))) {
+        before.createTable(FV_NAMESPACE, fvRequest(ident.name(), "3", false), false);
+      }
+
+      try (CatalogWrapperForREST after =
+          formatVersionWrapper(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_UUID,
+                  catalogUuid,
+                  IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                  "2"))) {
+        Assertions.assertEquals(3, after.loadTable(ident).tableMetadata().formatVersion());
+
+        UpdateTableRequest setProperty =
+            new UpdateTableRequest(
+                Collections.emptyList(),
+                List.of(new MetadataUpdate.SetProperties(ImmutableMap.of("k", "v"))));
+        Assertions.assertEquals(
+            "v", after.updateTable(ident, setProperty).tableMetadata().property("k", null));
+        // Restating the table's current version is not an upgrade.
+        Assertions.assertEquals(
+            3, after.updateTable(ident, upgradeRequest(3)).tableMetadata().formatVersion());
+      }
+    } finally {
+      IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    }
+  }
+
+  @Test
+  void testFederatedCreateIsNotCappedByMaxFormatVersion() {
+    FederatedCatalogWrapper wrapper =
+        new FederatedCatalogWrapper(
+            "federated-format-version-test",
+            new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND,
+                    "rest",
+                    IcebergConstants.URI,
+                    "http://localhost:1",
+                    IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                    "2")));
+
+    // The request is forwarded to the unreachable remote rather than refused locally.
+    Assertions.assertThrows(
+        RESTException.class,
+        () -> wrapper.createTable(FV_NAMESPACE, fvRequest("remote", "4", false), false));
+  }
+
+  @Test
+  void testFederatedStagedCreateCommitIsNotCappedByMaxFormatVersion() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
+    BaseTransaction baseTransaction = mock(BaseTransaction.class);
+    TableOperations ops = mock(TableOperations.class);
+    when(catalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(tableBuilder);
+    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
+    when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
+    when(baseTransaction.underlyingOps()).thenReturn(ops);
+    when(baseTransaction.currentMetadata()).thenReturn(minimalTableMetadataForStagedCreateTest());
+    AtomicReference<TableMetadata> opsCurrent = new AtomicReference<>();
+    when(ops.current()).thenAnswer(invocation -> opsCurrent.get());
+    doAnswer(
+            invocation -> {
+              opsCurrent.set(invocation.getArgument(1));
+              return null;
+            })
+        .when(ops)
+        .commit(any(), any());
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "2"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+            stagedCreateMetadataUpdates(schema, Optional.of(4)));
+
+    Assertions.assertDoesNotThrow(
+        () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
+    verify(tableBuilder).withProperty("format-version", "4");
+  }
+
+  @Test
+  void testInvalidFormatVersionPropertiesRejectTheCatalog() {
+    Map<String, String> defaultAboveMax =
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+            "3",
+            IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+            "2");
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> formatVersionWrapper(defaultAboveMax));
+    Assertions.assertTrue(
+        e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT), e.getMessage());
+
+    Map<String, String> conflictingIcebergDefault =
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+            "3",
+            IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+            "2");
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> formatVersionWrapper(conflictingIcebergDefault));
+    Assertions.assertTrue(
+        e.getMessage().contains(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION),
+        e.getMessage());
+  }
+
+  private static CatalogWrapperForREST formatVersionWrapper(Map<String, String> properties) {
+    Map<String, String> config = new HashMap<>(properties);
+    config.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    CatalogWrapperForREST wrapper =
+        new CatalogWrapperForREST("format-version-test", new IcebergConfig(config));
+    SupportsNamespaces namespaces = (SupportsNamespaces) wrapper.getCatalog();
+    if (!namespaces.namespaceExists(FV_NAMESPACE)) {
+      namespaces.createNamespace(FV_NAMESPACE);
+    }
+    return wrapper;
+  }
+
+  private static int createdFormatVersion(
+      CatalogWrapperForREST wrapper,
+      String name,
+      @Nullable String formatVersion,
+      boolean stageCreate) {
+    return wrapper
+        .createTable(FV_NAMESPACE, fvRequest(name, formatVersion, stageCreate), false)
+        .tableMetadata()
+        .formatVersion();
+  }
+
+  private static CreateTableRequest fvRequest(
+      String name, @Nullable String formatVersion, boolean stageCreate) {
+    CreateTableRequest.Builder builder =
+        CreateTableRequest.builder()
+            .withName(name)
+            .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+            .withPartitionSpec(PartitionSpec.unpartitioned());
+    if (formatVersion != null) {
+      builder.setProperties(ImmutableMap.of(TableProperties.FORMAT_VERSION, formatVersion));
+    }
+    if (stageCreate) {
+      builder.stageCreate();
+    }
+    return builder.build();
+  }
+
+  private static UpdateTableRequest upgradeRequest(int formatVersion) {
+    return new UpdateTableRequest(
+        Collections.emptyList(), List.of(new MetadataUpdate.UpgradeFormatVersion(formatVersion)));
   }
 
   // Extends FederatedCatalogWrapper so table operations use the federation REST path against

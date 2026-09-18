@@ -112,4 +112,50 @@ public class TestStaticIcebergConfigProvider {
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
     Assertions.assertEquals(Optional.empty(), config);
   }
+
+  @Test
+  public void testTableFormatVersionConfigPerCatalog() {
+    Map<String, String> config = Maps.newHashMap();
+    // gravitino.iceberg-rest.table-format-version.max, with the prefix already stripped
+    config.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3");
+    config.put("catalog.v1_catalog." + IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "1");
+
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    provider.initialize(config);
+
+    IcebergConfig defaultConfig =
+        provider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG).get();
+    Assertions.assertEquals(3, defaultConfig.getMaxTableFormatVersion());
+    Assertions.assertEquals(2, defaultConfig.getDefaultTableFormatVersion());
+
+    IcebergConfig v1Config = provider.getIcebergCatalogConfig("v1_catalog").get();
+    Assertions.assertEquals(1, v1Config.getDefaultTableFormatVersion());
+    Assertions.assertEquals(
+        IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION, v1Config.getMaxTableFormatVersion());
+  }
+
+  @Test
+  public void testInvalidTableFormatVersionConfigFailsAtLoad() {
+    Map<String, String> config = Maps.newHashMap();
+    config.put("catalog.bad." + IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "4");
+    config.put("catalog.bad." + IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3");
+
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    IllegalArgumentException e =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> provider.initialize(config));
+    Assertions.assertTrue(e.getMessage().contains("must not exceed"), e.getMessage());
+  }
+
+  /** A catalog with the rest backend forwards requests unchanged, so its bounds are not checked. */
+  @Test
+  public void testFederatedCatalogIsNotValidatedAtLoad() {
+    Map<String, String> config = Maps.newHashMap();
+    config.put("catalog.federated." + IcebergConstants.CATALOG_BACKEND, "rest");
+    config.put("catalog.federated." + IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "4");
+    config.put("catalog.federated." + IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3");
+
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    Assertions.assertDoesNotThrow(() -> provider.initialize(config));
+    Assertions.assertTrue(provider.getIcebergCatalogConfig("federated").isPresent());
+  }
 }

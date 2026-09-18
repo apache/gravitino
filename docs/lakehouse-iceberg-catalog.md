@@ -52,19 +52,23 @@ Mixing Iceberg JARs from different versions on the client classpath is not compa
 | `table-format-version.default` | The format version of a new table that does not request one. Accepts the values `format-version` accepts, and must not exceed `table-format-version.max`. | `2` | No |
 | `table-format-version.max` | The highest format version a table may be created at or upgraded to. Accepts the values `format-version` accepts. | `4`, the highest version the bundled Iceberg writes | No |
 
-The two `table-format-version` properties apply to all tables of the catalog created through the Gravitino API:
+The two `table-format-version` properties apply to all tables of the catalog, through both the Gravitino API and the Iceberg REST service:
 
 - A new table that does not set `format-version` is created at `table-format-version.default`.
-  If you set `table-default.format-version` yourself, directly or with the `gravitino.bypass.` prefix, it must
+  The Iceberg REST service also writes it to Iceberg's `table-default.format-version`. If you set
+  `table-default.format-version` yourself, directly or with the `gravitino.bypass.` prefix, it must
   match `table-format-version.default`.
-- Creating a table above `table-format-version.max` fails with an `IllegalArgumentException`
-  (HTTP 400). Existing tables above the maximum still load and commit.
+- Creating a table above `table-format-version.max`, or upgrading one above it through the Iceberg
+  REST service, fails with an `IllegalArgumentException` (HTTP 400). Existing tables above the
+  maximum still load and commit.
 - `4`, the highest version the bundled Iceberg writes, is also the highest this Gravitino build
   accepts: `table-format-version.max` can only lower it, and a table above it fails with HTTP 400.
 - A `table-format-version.default` above `table-format-version.max`, or a
   `table-default.format-version` that conflicts with them, fails the catalog when it loads: every
   schema and table operation on it fails with an `IllegalArgumentException` (HTTP 400) until the
   properties are fixed.
+- On the Iceberg REST service, catalogs with the `rest` backend forward requests unchanged, so these
+  properties do not apply to them.
 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.

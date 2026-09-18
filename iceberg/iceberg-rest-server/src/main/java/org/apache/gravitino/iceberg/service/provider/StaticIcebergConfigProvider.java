@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.utils.MapUtils;
@@ -60,6 +61,12 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
                                 properties, String.format("catalog.%s.", catalogName)))));
     this.catalogConfigs.put(
         IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
+    // Fail at startup rather than on the first request to a misconfigured catalog. A catalog with
+    // the rest backend federates a remote catalog and forwards requests unchanged, so the table
+    // format version properties do not apply to it.
+    catalogConfigs.values().stream()
+        .filter(config -> !isFederated(config))
+        .forEach(IcebergConfig::validateTableFormatVersions);
   }
 
   @Override
@@ -69,6 +76,12 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void close() {}
+
+  private static boolean isFederated(IcebergConfig config) {
+    return IcebergCatalogBackend.REST
+        .name()
+        .equalsIgnoreCase(config.get(IcebergConfig.CATALOG_BACKEND));
+  }
 
   private Optional<String> getCatalogName(String catalogConfigKey) {
     if (!catalogConfigKey.startsWith("catalog.")) {

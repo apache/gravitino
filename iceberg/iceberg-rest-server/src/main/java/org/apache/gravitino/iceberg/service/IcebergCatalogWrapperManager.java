@@ -160,15 +160,21 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     IcebergCatalogBackend backend =
         IcebergCatalogBackend.valueOf(
             enrichedConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    // A federated catalog forwards requests unchanged, so the table format version properties do
+    // not apply to it.
+    IcebergConfig wrapperConfig =
+        backend == IcebergCatalogBackend.REST
+            ? enrichedConfig.forFederatedCatalog()
+            : enrichedConfig;
     CatalogWrapperForREST rest =
         backend == IcebergCatalogBackend.REST
-            ? new FederatedCatalogWrapper(catalogName, enrichedConfig)
-            : new CatalogWrapperForREST(catalogName, enrichedConfig);
+            ? new FederatedCatalogWrapper(catalogName, wrapperConfig)
+            : new CatalogWrapperForREST(catalogName, wrapperConfig);
     AuthenticationConfig authenticationConfig =
-        new AuthenticationConfig(enrichedConfig.getAllConfig());
+        new AuthenticationConfig(wrapperConfig.getAllConfig());
     if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
       return (CatalogWrapperForREST)
-          new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, enrichedConfig);
+          new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, wrapperConfig);
     }
 
     return rest;
