@@ -31,6 +31,9 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
   private static final String DUPLICATED_ENTRY_ERROR_CODE = "23505";
 
+  /** It means a value is too long for its column in PostgreSQL. */
+  private static final String STRING_DATA_RIGHT_TRUNCATION_ERROR_CODE = "22001";
+
   @Override
   @SuppressWarnings("FormatStringAnnotation")
   public void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
@@ -40,6 +43,8 @@ public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
       case DUPLICATED_ENTRY_ERROR_CODE:
         throw new EntityAlreadyExistsException(
             sqlException, "The %s entity: %s already exists.", type.name(), name);
+      case STRING_DATA_RIGHT_TRUNCATION_ERROR_CODE:
+        throw ValueTooLongExceptions.of(sqlException, type, name);
       default:
         throw new IOException(sqlException);
     }
