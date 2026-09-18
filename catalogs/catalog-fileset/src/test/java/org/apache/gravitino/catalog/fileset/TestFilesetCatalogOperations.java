@@ -76,6 +76,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -120,6 +121,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.EntityFieldLimits;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretConstants;
@@ -493,6 +495,26 @@ public class TestFilesetCatalogOperations {
             + FilesetCatalogPropertiesMetadata.LOCATION
             + " must not be blank",
         exception.getMessage());
+  }
+
+  @Test
+  public void testCreateSchemaWithTooLongComment() throws IOException {
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    String schemaPath = TEST_ROOT_PATH + "/" + name;
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createSchema(name, tooLongComment, null, schemaPath));
+    Assertions.assertEquals(
+        "The comment of the schema must not exceed 256 characters", exception.getMessage());
+
+    // The schema directory must not be created for a rejected schema.
+    Path path = new Path(schemaPath);
+    FileSystem fs = path.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(path));
   }
 
   @Test
@@ -1413,6 +1435,32 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertEquals(comment + "_new", fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
+    }
+  }
+
+  @Test
+  public void testUpdateFilesetCommentTooLong() throws IOException {
+    final long testId = generateTestId();
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String name = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+    createSchema(schemaName, comment, null, schemaPath);
+    createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.alterFileset(filesetIdent, FilesetChange.updateComment(tooLongComment)));
+      Assertions.assertEquals(
+          "The comment of the fileset must not exceed 256 characters", exception.getMessage());
+      Assertions.assertEquals(comment, ops.loadFileset(filesetIdent).comment());
     }
   }
 

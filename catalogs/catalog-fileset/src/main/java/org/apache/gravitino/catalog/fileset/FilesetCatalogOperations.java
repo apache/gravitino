@@ -114,6 +114,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.EntityFieldLimits;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -815,6 +816,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Check the comment before the schema directories are created, the entity validation only
+    // happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
+
     if (disableFSOps) {
       return super.createSchema(ident, comment, properties);
     }

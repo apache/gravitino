@@ -139,6 +139,12 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     Entity.super.validate();
     Preconditions.checkArgument(
         !uris.isEmpty(), "The uri of the model version entity must not be empty.");
+    if (aliases != null) {
+      aliases.forEach(
+          alias ->
+              EntityFieldLimits.checkMaxLength(
+                  alias, EntityFieldLimits.MAX_NAME_LENGTH, "alias", type()));
+    }
   }
 
   @Override

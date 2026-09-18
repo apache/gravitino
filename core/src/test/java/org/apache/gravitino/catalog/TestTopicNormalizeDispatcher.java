@@ -21,11 +21,13 @@ package org.apache.gravitino.catalog;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.meta.EntityFieldLimits;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -100,5 +102,37 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
             () -> topicNormalizeDispatcher.createTopic(topicIdent2, "comment", null, props));
     Assertions.assertEquals(
         "The TOPIC name 'a?' is illegal. Illegal name: a?", exception.getMessage());
+  }
+
+  @Test
+  public void testCommentLength() {
+    Namespace topicNs = Namespace.of(metalake, catalog, "testCommentLength");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic");
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> topicNormalizeDispatcher.createTopic(topicIdent, tooLongComment, null, props));
+    Assertions.assertEquals(
+        "The comment of the topic must not exceed 256 characters", exception.getMessage());
+    Assertions.assertFalse(topicNormalizeDispatcher.topicExists(topicIdent));
+
+    String maxLengthComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH);
+    Topic topic = topicNormalizeDispatcher.createTopic(topicIdent, maxLengthComment, null, props);
+    Assertions.assertEquals(maxLengthComment, topic.comment());
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                topicNormalizeDispatcher.alterTopic(
+                    topicIdent, TopicChange.updateComment(tooLongComment)));
+    Assertions.assertEquals(
+        "The comment of the topic must not exceed 256 characters", exception.getMessage());
+    Assertions.assertEquals(
+        maxLengthComment, topicNormalizeDispatcher.loadTopic(topicIdent).comment());
   }
 }

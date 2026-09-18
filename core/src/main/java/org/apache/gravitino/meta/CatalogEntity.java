@@ -47,7 +47,10 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   public static final Field PROVIDER =
       Field.required("provider", String.class, "The provider of the catalog");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment or description of the catalog");
+      Field.optional(
+          "comment",
+          "The comment or description of the catalog",
+          EntityFieldLimits.MAX_COMMENT_LENGTH);
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties associated with the catalog");
   public static final Field AUDIT_INFO =

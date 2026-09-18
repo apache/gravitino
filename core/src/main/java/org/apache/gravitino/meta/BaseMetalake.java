@@ -42,7 +42,8 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
       Field.required("id", Long.class, "The metalake's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The metalake's name");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The metalake's comment or description");
+      Field.optional(
+          "comment", "The metalake's comment or description", EntityFieldLimits.MAX_COMMENT_LENGTH);
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties associated with the metalake");
   public static final Field AUDIT_INFO =

@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.io.IOException;
 import java.util.Map;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -34,6 +35,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.EntityFieldLimits;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -88,6 +90,10 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    // Check the comment before the underlying catalog creates the storage locations, the entity
+    // validation only happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.FILESET);
     return dispatcher.createMultipleLocationFileset(
         normalizeNameIdentifier(ident),
         comment,

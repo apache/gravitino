@@ -39,7 +39,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the role entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the role entity.");
+      Field.required("name", "The name of the role entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the role entity.");

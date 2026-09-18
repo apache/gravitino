@@ -40,7 +40,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the user entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the user entity.");
+      Field.required("name", "The name of the user entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
