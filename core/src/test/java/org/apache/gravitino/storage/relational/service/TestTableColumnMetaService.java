@@ -385,6 +385,67 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteReusesNewestIdOfDuplicateLegacyColumns() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity older = newIntColumn("a", 0, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_duplicate_names")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(older))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    ColumnEntity newer = newIntColumn("b", 1, "comment");
+    TableEntity withNewer =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(older, newer))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(table.nameIdentifier(), (TableEntity old) -> withNewer);
+    insertColumnRelations(older.id());
+    insertColumnRelations(newer.id());
+
+    // Legacy data: two live columns share one name. The newer one was written at a later version.
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "UPDATE "
+              + TableColumnMapper.COLUMN_TABLE_NAME
+              + " SET column_name = 'a' WHERE column_id = "
+              + newer.id());
+    }
+
+    ColumnEntity reimported = newIntColumn("a", 0, "comment");
+    TableEntity overwritten =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(reimported))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(overwritten, true);
+
+    List<ColumnEntity> columns =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()).columns();
+    Assertions.assertEquals(1, columns.size());
+    Assertions.assertEquals(newer.id(), columns.get(0).id());
+    Assertions.assertEquals(2, countActiveColumnRelations(newer.id()));
+    Assertions.assertEquals(0, countActiveColumnRelations(older.id()));
+  }
+
+  @TestTemplate
   public void testOverwriteWithoutColumnsRemovesAllColumnRelations() throws Exception {
     String catalogName = "catalog1";
     String schemaName = "schema1";

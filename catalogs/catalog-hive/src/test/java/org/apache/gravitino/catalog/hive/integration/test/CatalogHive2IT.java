@@ -1455,13 +1455,6 @@ public class CatalogHive2IT extends BaseIT {
     }
   }
 
-  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
-    return Arrays.stream(catalog.asTableCatalog().loadTable(tableIdent).columns())
-        .filter(c -> c.name().equals(columnName))
-        .findFirst()
-        .get();
-  }
-
   @Test
   public void testCrossSchemaTableRename() throws TException, InterruptedException {
     // Create a second schema to serve as the rename destination.
@@ -2006,5 +1999,12 @@ public class CatalogHive2IT extends BaseIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     return properties;
+  }
+
+  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
+    return Arrays.stream(catalog.asTableCatalog().loadTable(tableIdent).columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 }

@@ -22,6 +22,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.collect.Lists;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -145,9 +146,15 @@ public class TableColumnMetaService {
     // handed to a second column.
     Set<Long> carriedIds = columns.stream().map(ColumnEntity::id).collect(Collectors.toSet());
     Map<String, Long> reusableIdsByName = new HashMap<>();
-    for (ColumnPO storedColumn : storedColumns) {
+    // Legacy data may hold two live columns with one name. Visit the most recently written one
+    // first, so the same id is reused whatever order the database returns the rows in.
+    List<ColumnPO> newestFirst = Lists.newArrayList(storedColumns);
+    newestFirst.sort(
+        Comparator.comparing(ColumnPO::getTableVersion)
+            .thenComparing(ColumnPO::getColumnId)
+            .reversed());
+    for (ColumnPO storedColumn : newestFirst) {
       if (!carriedIds.contains(storedColumn.getColumnId())) {
-        // Legacy data may hold two live columns with one name; the first one is reused.
         reusableIdsByName.putIfAbsent(storedColumn.getColumnName(), storedColumn.getColumnId());
       }
     }

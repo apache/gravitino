@@ -502,13 +502,6 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     }
   }
 
-  private static Column findColumn(Table table, String columnName) {
-    return Arrays.stream(table.columns())
-        .filter(c -> c.name().equals(columnName))
-        .findFirst()
-        .get();
-  }
-
   @Test
   void testLanceTableFormat() {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
@@ -1282,5 +1275,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     } catch (IOException e) {
       LOG.warn("Failed to delete external table directory: {}", externalTableLocation, e);
     }
+  }
+
+  private static Column findColumn(Table table, String columnName) {
+    return Arrays.stream(table.columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 }
