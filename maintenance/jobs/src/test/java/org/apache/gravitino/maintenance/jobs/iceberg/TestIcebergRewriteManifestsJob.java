@@ -34,6 +34,45 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergRewriteManifestsJob {
 
   @Test
+  public void testInvalidEntryArgumentsFailBeforeSparkStarts() {
+    String[][] invalid = {
+      {},
+      {"--catalog", "cat", "--table"},
+      {"--catalog", "{{catalog_name}}", "--table", "db.t"},
+      {"--catalog", " ", "--table", "db.t"},
+      {"--catalog", "cat", "--table", "db.t", "--use-caching", "yes"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "-1"},
+      {"--catalog", "cat", "--table", "db.t", "--spark-conf", "not-json"},
+      {"--catalog", "cat", "--table", "db.t", "--unknown", "value"},
+      {"--catalog", "cat", "--table", "db.t", "--catalog", "other"}
+    };
+    for (String[] args : invalid) {
+      assertThrows(IllegalArgumentException.class, () -> IcebergRewriteManifestsJob.main(args));
+    }
+  }
+
+  @Test
+  public void testEntryArgumentsOmitEmptyAndUnresolvedOptionals() {
+    Map<String, String> args =
+        IcebergRewriteManifestsJob.parseArguments(
+            new String[] {
+              "--catalog",
+              "cat",
+              "--table",
+              "db.t",
+              "--use-caching",
+              "{{use_caching}}",
+              "--spec-id",
+              "",
+              "--spark-conf",
+              " "
+            });
+    assertNull(args.get("use-caching"));
+    assertNull(args.get("spec-id"));
+    assertNull(args.get("spark-conf"));
+  }
+
+  @Test
   public void testJobTemplateHasCorrectName() {
     IcebergRewriteManifestsJob job = new IcebergRewriteManifestsJob();
     SparkJobTemplate template = job.jobTemplate();

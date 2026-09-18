@@ -20,9 +20,10 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.SparkSession;
-import java.util.regex.Pattern;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -52,7 +53,8 @@ public final class IcebergJobUtils {
    * @param value the argument value to inspect
    * @return the value, or null if it is null or an unresolved placeholder
    */
-  public static String nullIfUnresolvedPlaceholder(String value) {
+  @Nullable
+  public static String nullIfUnresolvedPlaceholder(@Nullable String value) {
     if (value == null || UNRESOLVED_PLACEHOLDER_PATTERN.matcher(value.trim()).matches()) {
       return null;
     }

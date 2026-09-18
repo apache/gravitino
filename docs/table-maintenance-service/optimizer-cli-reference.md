@@ -378,7 +378,7 @@ The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 
 ### Parameters
 
-`catalog_name` and `table_identifier` are required. The rest are optional.
+`catalog_name` and `table_identifier` are required. For this job, omitted or blank optional argument values use the defaults below; unresolved optional template placeholders are also treated as absent.
 
 | Key                  | Description                                                              | Default                             |
 | -------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
@@ -430,7 +430,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/jobs/runs
 ```
 
-The job builds this statement, including `use_caching` and `spec_id` only when you supply them:
+The request above uses Iceberg defaults. Adding `"use_caching": "false"` and `"spec_id": "2"` to `jobConf` produces:
 
 ```sql
 CALL `rest_catalog`.system.rewrite_manifests(
@@ -450,13 +450,10 @@ cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-manifests/{job_id}/
 A successful run reports its state as `SUCCEEDED` and logs how many manifests it replaced:
 
 ```text
-Rewrite Manifests Results:
-  Rewritten manifests: 24
-  Added manifests: 2
+Rewrite Manifests Results: Rewritten manifests: 24, Added manifests: 2
 ```
 
 Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
-
 
 ## Related
 
