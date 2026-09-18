@@ -223,6 +223,68 @@ public class TestIcebergCatalogPropertiesMetadata {
     }
   }
 
+  /**
+   * The bounds are checked against each other, and against Iceberg's own {@code
+   * table-default.format-version} in any spelling, when the catalog is created or altered rather
+   * than only when it loads.
+   */
+  @Test
+  void testTableFormatVersionPropertiesAreValidatedTogetherOnCreateAndAlter() {
+    IllegalArgumentException onCreate =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForCreate(
+                    metadata,
+                    withBackend(
+                        ImmutableMap.of(
+                            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                            "4",
+                            IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                            "3"))));
+    Assertions.assertTrue(onCreate.getMessage().contains("must not exceed"), onCreate.getMessage());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForCreate(
+                metadata,
+                withBackend(
+                    ImmutableMap.of(
+                        IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                        "3",
+                        "gravitino.bypass." + IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                        "2"))));
+    Assertions.assertDoesNotThrow(
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForCreate(
+                metadata,
+                withBackend(
+                    ImmutableMap.of(
+                        IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                        "3",
+                        IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                        "3"))));
+
+    // An alter is checked against the properties the catalog would have after it.
+    Map<String, String> current =
+        withBackend(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "4"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForAlter(
+                metadata,
+                current,
+                ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3"),
+                Collections.emptyMap()));
+    Assertions.assertDoesNotThrow(
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForAlter(
+                metadata,
+                current,
+                ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3"),
+                ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "4")));
+  }
+
   private static Map<String, String> withBackend(Map<String, String> properties) {
     Map<String, String> result = new HashMap<>(properties);
     result.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "memory");

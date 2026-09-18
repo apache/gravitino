@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
@@ -39,6 +40,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.utils.MapUtils;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -163,6 +165,20 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
     return PROPERTIES_METADATA;
   }
 
+  /**
+   * Validates the table format version properties together, against the Iceberg catalog properties
+   * the catalog is loaded with: {@code gravitino.bypass.} properties with the prefix removed, and
+   * the properties Gravitino carries over. A catalog is refused at create or alter rather than only
+   * when it loads.
+   *
+   * @param properties the complete catalog properties.
+   * @throws IllegalArgumentException if the table format version properties are invalid.
+   */
+  @Override
+  public void validateProperties(Map<String, String> properties) {
+    IcebergPropertiesUtils.validateTableFormatVersions(loadedCatalogProperties(properties));
+  }
+
   public Map<String, String> transformProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> icebergProperties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProperties);
@@ -173,6 +189,14 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           }
         });
     return icebergProperties;
+  }
+
+  /** The properties {@link IcebergCatalogOperations} builds its Iceberg configuration from. */
+  private Map<String, String> loadedCatalogProperties(Map<String, String> properties) {
+    Map<String, String> loaded =
+        new HashMap<>(MapUtils.getPrefixMap(properties, CATALOG_BYPASS_PREFIX));
+    loaded.putAll(transformProperties(properties));
+    return loaded;
   }
 
   /**

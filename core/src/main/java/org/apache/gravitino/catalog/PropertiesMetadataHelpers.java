@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -84,6 +85,32 @@ public class PropertiesMetadataHelpers {
         checkValueFormat(key, value, propertiesMetadata.getPropertyEntry(key)::decode);
       }
     }
+    propertiesMetadata.validateProperties(properties);
+  }
+
+  /**
+   * Validates an alter against the entity's current properties: each changed property on its own,
+   * as {@link #validatePropertyForAlter(PropertiesMetadata, Map, Map)} does, and then the
+   * properties the entity would have after the change together, through {@link
+   * PropertiesMetadata#validateProperties(Map)}.
+   *
+   * @param propertiesMetadata the properties metadata of the entity.
+   * @param currentProperties the entity's current properties, or {@code null} when it has none.
+   * @param upserts the properties the alter sets.
+   * @param deletes the properties the alter removes.
+   * @throws IllegalArgumentException if the alter is invalid.
+   */
+  public static void validatePropertyForAlter(
+      PropertiesMetadata propertiesMetadata,
+      Map<String, String> currentProperties,
+      Map<String, String> upserts,
+      Map<String, String> deletes) {
+    validatePropertyForAlter(propertiesMetadata, upserts, deletes);
+    Map<String, String> altered =
+        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
+    deletes.keySet().forEach(altered::remove);
+    altered.putAll(upserts);
+    propertiesMetadata.validateProperties(altered);
   }
 
   public static void validatePropertyForAlter(

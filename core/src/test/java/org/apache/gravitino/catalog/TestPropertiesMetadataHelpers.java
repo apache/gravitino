@@ -36,6 +36,20 @@ public class TestPropertiesMetadataHelpers {
 
   private static final TestBasePropertiesMetadata METADATA = new TestBasePropertiesMetadata();
 
+  /** Refuses {@code low} above {@code high}, a rule no single property's decoder can check. */
+  private static final TestBasePropertiesMetadata ORDERED_METADATA =
+      new TestBasePropertiesMetadata() {
+        @Override
+        public void validateProperties(Map<String, String> properties) {
+          if (properties.containsKey("low")
+              && properties.containsKey("high")
+              && Integer.parseInt(properties.get("low"))
+                  > Integer.parseInt(properties.get("high"))) {
+            throw new IllegalArgumentException("low must not exceed high");
+          }
+        }
+      };
+
   @Test
   void testCreateRejectsMaskedPlaceholder() {
     Map<String, String> props =
@@ -69,5 +83,45 @@ public class TestPropertiesMetadataHelpers {
   void testAlterAllowsNormalUpserts() {
     Map<String, String> upserts = ImmutableMap.of("custom", "new-value");
     assertDoesNotThrow(() -> validatePropertyForAlter(METADATA, upserts, Collections.emptyMap()));
+  }
+
+  @Test
+  void testCreateValidatesThePropertiesTogether() {
+    assertDoesNotThrow(
+        () ->
+            validatePropertyForCreate(
+                ORDERED_METADATA,
+                ImmutableMap.of(TEST_REQUIRED_KEY, "v", "low", "1", "high", "2")));
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                validatePropertyForCreate(
+                    ORDERED_METADATA,
+                    ImmutableMap.of(TEST_REQUIRED_KEY, "v", "low", "3", "high", "2")));
+    assertTrue(exception.getMessage().contains("low must not exceed high"));
+  }
+
+  @Test
+  void testAlterValidatesTheCurrentPropertiesWithTheChangeApplied() {
+    Map<String, String> current = ImmutableMap.of("low", "1", "high", "2");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validatePropertyForAlter(
+                ORDERED_METADATA, current, ImmutableMap.of("low", "3"), Collections.emptyMap()));
+    // Removing the bound the change would violate makes the same change valid.
+    assertDoesNotThrow(
+        () ->
+            validatePropertyForAlter(
+                ORDERED_METADATA,
+                current,
+                ImmutableMap.of("low", "3"),
+                ImmutableMap.of("high", "2")));
+    assertDoesNotThrow(
+        () ->
+            validatePropertyForAlter(
+                ORDERED_METADATA, null, ImmutableMap.of("low", "3"), Collections.emptyMap()));
   }
 }

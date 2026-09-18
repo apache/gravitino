@@ -63,10 +63,11 @@ The two `table-format-version` properties apply to all tables of the catalog, th
   maximum still load and commit.
 - `4`, the highest version the bundled Iceberg writes, is also the highest this Gravitino build
   accepts: `table-format-version.max` can only lower it, and a table above it fails with HTTP 400.
-- A `table-format-version.default` above `table-format-version.max`, or a
-  `table-default.format-version` that conflicts with them, fails the catalog when it loads: every
-  schema and table operation on it fails with an `IllegalArgumentException` (HTTP 400) until the
-  properties are fixed.
+- Gravitino checks the two properties, against each other and against `table-default.format-version`,
+  when you create or alter the catalog: a `table-format-version.default` above
+  `table-format-version.max` fails the create or the alter, and the catalog keeps its properties.
+  A catalog saved before these checks with such properties still loads, but every schema and table
+  operation on it fails with an `IllegalArgumentException` (HTTP 400) until the properties are fixed.
 - On the Iceberg REST service, catalogs with the `rest` backend forward requests unchanged, so these
   properties do not apply to them.
 

@@ -1078,6 +1078,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       getCatalogAlterProperty(changes);
                   validatePropertyForAlter(
                       metadata.catalogPropertiesMetadata(),
+                      storedCatalog.entity().getProperties(),
                       alterProperty.getLeft(),
                       alterProperty.getRight());
                   return null;
@@ -1239,6 +1240,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             getCatalogAlterProperty(changes);
                         validatePropertyForAlter(
                             f.catalogPropertiesMetadata(),
+                            catalog.entity().getProperties(),
                             alterProperty.getLeft(),
                             alterProperty.getRight());
                         return null;
