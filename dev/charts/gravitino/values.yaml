@@ -448,29 +448,37 @@ log4j2Properties: {}
   # basePath: "${sys:gravitino.log.path}"
   # serverName: "${sys:gravitino.server.name}"
 
+  ## Log retention. Rolled archives are kept for logMaxAge. Their total size is also capped: when the
+  ## cap is exceeded, the oldest archives are deleted first.
+  # logMaxAge: 30d
+  # serverLogMaxTotalSize: 2GB
+
   ## RollingFileAppender name, pattern, path and rollover policy
   # rollingAppenderType: RollingFile
   # rollingAppenderName: fileLogger
   # rollingAppenderFileName: "${basePath}/${serverName}.log"
-  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.log.gz"
+  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.%i.log.gz"
+  ## When you change the archive name, set rollingAppenderStrategyDeleteIfFileNameGlob to match it.
   # rollingAppenderLayoutType: PatternLayout
   # rollingAppenderLayoutPattern: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n"
   # rollingAppenderPoliciesType: Policies
 
   ## RollingFileAppender rotation policy
   # rollingAppenderPoliciesSizeType: SizeBasedTriggeringPolicy
-  # rollingAppenderPoliciesSizeSize: 10MB
+  # rollingAppenderPoliciesSizeSize: 100MB
   # rollingAppenderPoliciesTimeType: TimeBasedTriggeringPolicy
   # rollingAppenderPoliciesTimeInterval: 1
   # rollingAppenderPoliciesTimeModulate: true
   # rollingAppenderStrategyType: DefaultRolloverStrategy
+  # rollingAppenderStrategyFileIndex: nomax
   # rollingAppenderStrategyDeleteType: Delete
   # rollingAppenderStrategyDeleteBasePath: "${basePath}"
-  # rollingAppenderStrategyDeleteMaxDepth: 10
+  # rollingAppenderStrategyDeleteMaxDepth: 1
+  # rollingAppenderStrategyDeleteIfFileNameGlob: "${serverName}_*.log.gz"
   # rollingAppenderStrategyDeleteIfLastModifiedType: IfLastModified
 
-  ## Delete all files older than 30 days
-  # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
+  ## Delete archives older than this age. Defaults to logMaxAge.
+  # rollingAppenderStrategyDeleteIfLastModifiedAge: "${logMaxAge}"
 
   ## JCasbin logger
   # jcasbinLoggerLevel: warn
