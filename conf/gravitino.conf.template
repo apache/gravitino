@@ -140,3 +140,10 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.lance-rest.gravitino-uri = http://localhost:8090
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
 # gravitino.lance-rest.gravitino-metalake = metalake
+
+# THE CONFIGURATION FOR sensitive property key matching
+# Additional typo substrings for credential-like property keys (comma-separated).
+# gravitino.properties.sensitive-key-typo-patterns = passwrod,secert,tokne
+# Maximum Damerau-Levenshtein distance for fuzzy matching property key tokens against
+# credential keywords and configured typo patterns. Set to 0 to disable fuzzy matching.
+# gravitino.properties.sensitive-key-fuzzy-match-max-distance = 1

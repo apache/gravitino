@@ -23,9 +23,7 @@ import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -38,14 +36,6 @@ import org.apache.gravitino.connector.PropertyEntry;
  * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
-
-  /**
-   * Property keys whose names look like credentials. Matching is case-insensitive. Used to mask API
-   * responses and to expose plaintext via {@code getSecrets} for undeclared / mistyped credential
-   * properties.
-   */
-  private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
-      Pattern.compile(".*(secret|password|token|credential|access|account).*");
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
@@ -61,19 +51,17 @@ public final class SecretPropertyUtils {
   /**
    * Returns whether a property key name looks sensitive (credential-like).
    *
-   * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
-   * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
-   * storage account key/name and GCS service-account file paths). Underscores and hyphens are not
-   * normalized; they are irrelevant because the matched keywords contain neither.
+   * <p>A key matches when it contains the built-in credential-like keywords ({@code secret}, {@code
+   * password}, {@code token}, {@code credential}, {@code access}, or {@code account}), a configured
+   * typo pattern ({@link Configs#SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS}), or a token that
+   * fuzzy-matches those references within {@link
+   * Configs#SENSITIVE_PROPERTY_KEY_FUZZY_MATCH_MAX_DISTANCE}.
    *
    * @param key the property key
    * @return true when the key name matches the sensitive pattern
    */
   public static boolean isSensitivePropertyKey(@Nullable String key) {
-    if (key == null || key.isEmpty()) {
-      return false;
-    }
-    return SENSITIVE_PROPERTY_KEY_PATTERN.matcher(key.toLowerCase(Locale.ROOT)).matches();
+    return SensitivePropertyKeyMatcher.isSensitive(key);
   }
 
   /**

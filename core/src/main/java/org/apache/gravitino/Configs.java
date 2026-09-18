@@ -636,4 +636,30 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<List<String>> SENSITIVE_PROPERTY_KEY_TYPO_PATTERNS =
+      new ConfigBuilder("gravitino.properties.sensitive-key-typo-patterns")
+          .doc(
+              "Additional credential-like property key typo patterns. Matching is case-insensitive. "
+                  + "Each entry is treated as a substring of the property key and, when fuzzy matching "
+                  + "is enabled, as a fuzzy reference token.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
+              ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(Collections.emptyList());
+
+  public static final ConfigEntry<Integer> SENSITIVE_PROPERTY_KEY_FUZZY_MATCH_MAX_DISTANCE =
+      new ConfigBuilder("gravitino.properties.sensitive-key-fuzzy-match-max-distance")
+          .doc(
+              "Maximum Damerau-Levenshtein distance for fuzzy matching property key tokens against "
+                  + "credential keywords and configured typo patterns. Set to 0 to disable fuzzy "
+                  + "matching and rely on built-in keywords plus configured typo substrings only.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1);
 }
