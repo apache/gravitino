@@ -118,6 +118,7 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET);
     boolean dropped = dispatcher.dropFileset(ident);
+    // A false result means the fileset was already gone and the registration was kept.
     if (dropped) {
       AuthorizationUtils.authorizationPluginRemovePrivileges(
           ident, Entity.EntityType.FILESET, locations);

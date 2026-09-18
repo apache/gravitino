@@ -49,6 +49,12 @@ tests:
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "rootLogger\\.level = info"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.name = org\\.casbin\\.jcasbin"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.level = warn"
 
   - it: renders customized Gravitino and log4j configuration
     release:
@@ -63,6 +69,7 @@ tests:
         gravitino.custom.setting: "{{ .Values.entity.store }}"
       log4j2Properties:
         rootLoggerLevel: debug
+        jcasbinLoggerLevel: debug
       additionalLog4j2Properties:
         logger.custom.name: org.apache.gravitino.Custom
     asserts:
@@ -81,6 +88,9 @@ tests:
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "rootLogger\\.level = debug"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.level = debug"
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "logger\\.custom\\.name = org\\.apache\\.gravitino\\.Custom"

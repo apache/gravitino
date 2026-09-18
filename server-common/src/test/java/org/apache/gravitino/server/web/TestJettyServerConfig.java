@@ -32,6 +32,17 @@ import org.junit.jupiter.api.Test;
 public class TestJettyServerConfig {
 
   @Test
+  public void testIncludeErrorStackTrace() {
+    Config config = new Config() {};
+    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(config, "");
+    Assertions.assertTrue(jettyServerConfig.isIncludeErrorStackTrace());
+
+    config.set(JettyServerConfig.INCLUDE_ERROR_STACK_TRACE, false);
+    jettyServerConfig = JettyServerConfig.fromConfig(config, "");
+    Assertions.assertFalse(jettyServerConfig.isIncludeErrorStackTrace());
+  }
+
+  @Test
   public void testCipherAlgorithms() {
     Config noIntersectConfig = new Config() {};
     noIntersectConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, "test1,test2");

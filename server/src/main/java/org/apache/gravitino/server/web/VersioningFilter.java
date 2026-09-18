@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -94,6 +95,22 @@ public class VersioningFilter implements Filter {
   private static final String ACCEPT_VERSION_HEADER = "Accept";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
 
+  private final ObjectMapper objectMapper;
+
+  /** Creates a versioning filter with the backward-compatible error response behavior. */
+  public VersioningFilter() {
+    this.objectMapper = ObjectMapperProvider.objectMapper();
+  }
+
+  /**
+   * Creates a versioning filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether error responses should include diagnostic stack traces
+   */
+  public VersioningFilter(boolean includeErrorStackTrace) {
+    this.objectMapper = ObjectMapperProvider.objectMapper(includeErrorStackTrace);
+  }
+
   private static String getAcceptVersion(int version) {
     return String.format("application/vnd.gravitino.v%d+json", version);
   }
@@ -151,8 +168,7 @@ public class VersioningFilter implements Filter {
     return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
   }
 
-  private static boolean isUnsupportedVersion(int version, ServletResponse response)
-      throws IOException {
+  private boolean isUnsupportedVersion(int version, ServletResponse response) throws IOException {
     if (ApiVersion.isSupportedVersion(version)) {
       return false;
     }
@@ -168,7 +184,7 @@ public class VersioningFilter implements Filter {
     resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
     resp.setContentType("application/json");
     resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
+    objectMapper.writeValue(resp.getWriter(), errorResponse);
     return true;
   }
 

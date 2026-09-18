@@ -80,12 +80,16 @@ public interface Transform extends Expression {
       return new Expression[] {ref};
     }
 
+    // Type-strict equality is intentional: two different transform types over the same field
+    // (e.g. year(ts) and identity(ts)) must not compare equal. All concrete subclasses are final
+    // and delegate to this implementation, so the getClass() check is exact, not limiting.
+    @SuppressWarnings("EqualsGetClass")
     @Override
     public boolean equals(Object o) {
       if (this == o) {
         return true;
       }
-      if (!(o instanceof SingleFieldTransform)) {
+      if (o == null || getClass() != o.getClass()) {
         return false;
       }
       SingleFieldTransform that = (SingleFieldTransform) o;

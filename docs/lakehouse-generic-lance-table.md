@@ -114,6 +114,22 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
 - `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
 
+### Format boundary
+
+The Generic Catalog is format-agnostic for its general table APIs, but a Lance table operation must
+target an entity whose `format` property is `lance` (case-insensitive). Lance REST direct
+operations such as describe, drop, deregister, and alter reject a known non-Lance entity with
+HTTP `400 INVALID_INPUT`; `tableExists` presents it as absent. These checks preserve the existing
+metadata and location.
+
+For create requests dispatched to the Lance table delegator, an existing non-Lance entity remains
+a normal name conflict for `CREATE` (`409`). `EXIST_OK`, create `OVERWRITE`, and register
+`OVERWRITE` are rejected with `IllegalArgumentException` by the direct Gravitino API, which is
+returned as HTTP `400` by the Lance REST service. In particular, overwrite validation happens
+before metadata removal or a Lance dataset delete. Generic Catalog `ListTables` behavior is
+unchanged; it continues to list all formats. Format-specific listing is a separate follow-up
+concern.
+
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
 Also set additional properties specific to your lakehouse format or custom requirements.

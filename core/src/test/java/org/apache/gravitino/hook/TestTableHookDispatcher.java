@@ -49,6 +49,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
@@ -83,19 +84,28 @@ public class TestTableHookDispatcher {
   }
 
   @Test
-  public void testDropDoesNotRemoveAuthorizationPrivilegeWhenTableDoesNotExist() {
+  public void testDropKeepsPrivilegesWhenExternalDropReturnsFalse() {
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
+    // false means the table was renamed or dropped out of band: the registration is kept, so the
+    // plugin privileges of the entity that is still alive under another name must be kept too.
     Mockito.when(dispatcher.dropTable(ident)).thenReturn(false);
+    Mockito.when(dispatcher.purgeTable(ident)).thenReturn(false);
 
     try (MockedStatic<AuthorizationUtils> authorizationUtils =
         Mockito.mockStatic(AuthorizationUtils.class)) {
-      assertFalse(hook.dropTable(ident));
+      authorizationUtils
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hook.dropTable(ident));
+      Assertions.assertFalse(hook.purgeTable(ident));
+
       authorizationUtils.verify(
           () ->
               AuthorizationUtils.authorizationPluginRemovePrivileges(
-                  ident, Entity.EntityType.TABLE, null),
+                  Mockito.any(), Mockito.any(), Mockito.any()),
           Mockito.never());
     }
   }
