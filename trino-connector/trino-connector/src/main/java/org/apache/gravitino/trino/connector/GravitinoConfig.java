@@ -104,9 +104,10 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry(
           "gravitino.metalake",
-          "The name of the metalake (top-level namespace) to connect to",
+          "The name of the metalake (top-level namespace) to connect to. "
+              + "When unset, the catalogs of every metalake are loaded.",
           "",
-          true);
+          false);
 
   private static final ConfigEntry GRAVITINO_USER =
       new ConfigEntry(
@@ -116,23 +117,37 @@ public class GravitinoConfig {
           false);
 
   /**
-   * @deprecated Please use {@code gravitino.use-single-metalake} instead.
+   * @deprecated Please use {@code gravitino.catalog-name-with-metalake} instead.
    */
   @Deprecated
   @SuppressWarnings("UnusedVariable")
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
-          "Deprecated: omits the metalake prefix from catalog names. Use gravitino.use-single-metalake instead.",
+          "Deprecated: omits the metalake prefix from catalog names. Use gravitino.catalog-name-with-metalake instead.",
           "true",
           false);
 
+  /**
+   * Legacy switch, read only when {@code gravitino.catalog-name-with-metalake} is unset.
+   *
+   * @deprecated Please use {@code gravitino.catalog-name-with-metalake} instead.
+   */
+  @Deprecated
   private static final ConfigEntry GRAVITINO_SINGLE_METALAKE_MODE =
       new ConfigEntry(
           "gravitino.use-single-metalake",
-          "If true, only one metalake is supported in this connector; identify the catalog by <catalog_name>. "
-              + "If false, multiple metalakes are supported; identify the catalog by <metalake_name>.<catalog_name>.",
+          "Deprecated: if false, identify the catalog by <metalake_name>.<catalog_name> and load "
+              + "every metalake. Use gravitino.catalog-name-with-metalake instead.",
           "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_CATALOG_NAME_WITH_METALAKE =
+      new ConfigEntry(
+          "gravitino.catalog-name-with-metalake",
+          "If true, identify the catalog by <metalake_name>.<catalog_name> and load every metalake. "
+              + "If false, identify the catalog by <catalog_name>.",
+          "false",
           false);
 
   private static final ConfigEntry GRAVITINO_CLOUD_REGION_CODE =
@@ -347,15 +362,35 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the metalake name for used.
+   * Retrieves the configured metalake name.
    *
-   * @return the metalake name for used
+   * @return the trimmed metalake name, or an empty string when {@code gravitino.metalake} is unset;
+   *     see {@link #hasMetalake()}
    */
   public String getMetalake() {
     // Trimmed so a stray leading/trailing space in the catalog properties file does not make this
     // value silently stop matching the canonical metalake name the load loop records states
     // under, e.g. in the catalog_status/load_status system tables' per-metalake filtering.
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue).trim();
+  }
+
+  /**
+   * Whether a metalake is configured.
+   *
+   * @return true if {@code gravitino.metalake} is set to a non-blank value
+   */
+  public boolean hasMetalake() {
+    return !getMetalake().isEmpty();
+  }
+
+  /**
+   * Whether the catalogs of every metalake are loaded. This is the case when no metalake is
+   * configured, or when catalog names carry the metalake.
+   *
+   * @return true if all metalakes are loaded
+   */
+  public boolean loadAllMetalakes() {
+    return !hasMetalake() || catalogNameWithMetalake();
   }
 
   /**
@@ -379,14 +414,33 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the single metalake mode.
+   * Whether Trino catalog names carry the metalake, as {@code "<metalake>.<catalog>"}. The
+   * deprecated {@code gravitino.use-single-metalake=false} is honored when the new key is unset.
    *
-   * @return the single metalake mode
+   * @return true if catalog names are qualified with the metalake
    */
-  public boolean singleMetalakeMode() {
-    return Boolean.parseBoolean(
-        config.getOrDefault(
-            GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue));
+  public boolean catalogNameWithMetalake() {
+    String value = config.get(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key);
+    if (value != null) {
+      return parseBooleanConfig(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key, value.trim());
+    }
+    return !parseBooleanConfig(
+        GRAVITINO_SINGLE_METALAKE_MODE.key,
+        config
+            .getOrDefault(
+                GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue)
+            .trim());
+  }
+
+  /**
+   * Whether the deprecated {@code gravitino.use-single-metalake} key is present and still decides
+   * the catalog naming, so that its use can be reported.
+   *
+   * @return true if the deprecated key is set and the replacing key is not
+   */
+  public boolean usesDeprecatedSingleMetalakeKey() {
+    return config.containsKey(GRAVITINO_SINGLE_METALAKE_MODE.key)
+        && !config.containsKey(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key);
   }
 
   boolean isDynamicConnector() {
@@ -647,15 +701,17 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX and
-    // GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX
+    // Copy configuration with prefixes that are not represented by exact entries in
+    // CONFIG_DEFINITIONS. In particular, scoped Iceberg REST URIs must reach dynamic catalogs so
+    // that workers use the same per-metalake endpoint as the coordinator.
     config.entrySet().stream()
         .filter(
             entry ->
                 (entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
                         || entry
                             .getKey()
-                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
+                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key)
+                        || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_URI.key + "."))
                     && !GravitinoConnectorFactory.isSecuritySensitivePropertyName(entry.getKey()))
         .forEach(
             entry ->
@@ -802,10 +858,8 @@ public class GravitinoConfig {
    * Unlike the discovered endpoint, this is plain local file configuration and is therefore
    * identical and valid on every node — coordinator and workers alike.
    *
-   * <p>{@code gravitino.iceberg.rest-uri.<metalake>} is checked first. The unscoped {@code
-   * gravitino.iceberg.rest-uri} is honored only in single-metalake mode, where it is unambiguous;
-   * in multi-metalake mode it is ignored, since a single Iceberg REST server serves exactly one
-   * metalake and applying it to every metalake would misroute the others.
+   * <p>{@code gravitino.iceberg.rest-uri.<metalake>} is checked first and overrides the unscoped
+   * {@code gravitino.iceberg.rest-uri}, which is the default for every metalake.
    *
    * @param metalake the metalake to resolve the override for
    * @return the manually configured Iceberg REST server endpoint, or an empty string when unset
@@ -815,11 +869,8 @@ public class GravitinoConfig {
     if (StringUtils.isNotBlank(scopedValue)) {
       return scopedValue;
     }
-    if (singleMetalakeMode()) {
-      return config.getOrDefault(
-          GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
-    }
-    return GRAVITINO_ICEBERG_REST_URI.defaultValue;
+    return config.getOrDefault(
+        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
   }
 
   /**

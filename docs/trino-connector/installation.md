@@ -145,7 +145,7 @@ gravitino.metalake=test
 ```
 
 - The `gravitino.name` defines which Gravitino Trino connector is used. It must be `gravitino`.
-- The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
+- The `gravitino.metalake` defines which metalake is used. It should exist in the Gravitino server. It is optional: when omitted, the catalogs of every metalake are loaded, see [configuration](./configuration.md).
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 
 Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
