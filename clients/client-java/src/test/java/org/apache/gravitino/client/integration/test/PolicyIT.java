@@ -564,12 +564,10 @@ public class PolicyIT extends BaseIT {
     Assertions.assertFalse(policies7[0].inherited().get());
     Assertions.assertTrue(policies7[0].enabled());
 
-    // Test disable the policy then list again
+    // Test disabled policies are excluded when listing associated policies
     Assertions.assertDoesNotThrow(() -> metalake.disablePolicy(policy1.name()));
     Policy[] policies8 = relationalCatalog.supportsPolicies().listPolicyInfos();
-    Assertions.assertEquals(1, policies8.length);
-    Assertions.assertEquals(policy1.name(), policies8[0].name());
-    Assertions.assertFalse(policies8[0].enabled());
+    Assertions.assertEquals(0, policies8.length);
     Assertions.assertDoesNotThrow(() -> metalake.enablePolicy(policy1.name()));
 
     // Test get associated policy for catalog
