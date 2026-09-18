@@ -977,6 +977,50 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRenameIntoNameOfStaleStoredColumn() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_stale_column");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_stale_column");
+    // The names are chosen so that the stale column "b" comes before "z" in the stored columns'
+    // HashMap iteration order.
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("z")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("b")
+              .withPosition(1)
+              .withType(Types.IntegerType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("c")
+              .withPosition(2)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    // Drop b outside Gravitino, so the store still has it, then rename z to b through Gravitino.
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops())
+        .alterTable(tableIdent, TableChange.deleteColumn(new String[] {"b"}, false));
+    tableOperationDispatcher.alterTable(
+        tableIdent, TableChange.renameColumn(new String[] {"z"}, "b"));
+
+    Map<String, Long> afterRename = columnIds(tableIdent);
+    Assertions.assertEquals(ids.get("z"), afterRename.get("b"));
+    Assertions.assertEquals(ids.get("c"), afterRename.get("c"));
+    Assertions.assertEquals(2, afterRename.size());
+  }
+
+  @Test
   public void testResolveColumnNameChanges() {
     Assertions.assertEquals(
         ImmutableMap.of("a", "c"),
