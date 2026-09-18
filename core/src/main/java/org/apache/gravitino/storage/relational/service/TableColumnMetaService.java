@@ -22,14 +22,18 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.collect.Lists;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -115,6 +119,62 @@ public class TableColumnMetaService {
     insertColumnPOsInBatches(columnPOs);
   }
 
+  /**
+   * Gives each column the id of the stored live column with the same name, if there is one, and
+   * removes the relations of the stored columns that are gone.
+   *
+   * <p>Tags, owners and privileges are attached to a column by id, so a table that is written again
+   * as a whole, e.g. re-imported, must keep the ids of the columns it still has. Columns with no
+   * stored counterpart keep the id they were given, and a stored id is never given to a second
+   * column. Names are matched exactly, as the catalog reports them. A stored column whose id is not
+   * kept is dropped, so its relations are removed in the same transaction, as for a column dropped
+   * by an alter.
+   *
+   * @param tableId the id of the stored table
+   * @param tableVersion the table version whose columns are reused
+   * @param columns the columns to write
+   * @return the columns, with the stored ids where the names match
+   */
+  List<ColumnEntity> reuseStoredColumnIds(
+      Long tableId, Long tableVersion, List<ColumnEntity> columns) {
+    List<ColumnPO> storedColumns = getColumnsByTableIdAndVersion(tableId, tableVersion);
+    if (storedColumns.isEmpty()) {
+      return columns;
+    }
+
+    // A stored id that one of the columns already carries stays with that column, so it is never
+    // handed to a second column.
+    Set<Long> carriedIds = columns.stream().map(ColumnEntity::id).collect(Collectors.toSet());
+    Map<String, Long> reusableIdsByName = new HashMap<>();
+    // Legacy data may hold two live columns with one name. Visit the most recently written one
+    // first, so the same id is reused whatever order the database returns the rows in.
+    List<ColumnPO> newestFirst = Lists.newArrayList(storedColumns);
+    newestFirst.sort(
+        Comparator.comparing(ColumnPO::getTableVersion)
+            .thenComparing(ColumnPO::getColumnId)
+            .reversed());
+    for (ColumnPO storedColumn : newestFirst) {
+      if (!carriedIds.contains(storedColumn.getColumnId())) {
+        reusableIdsByName.putIfAbsent(storedColumn.getColumnName(), storedColumn.getColumnId());
+      }
+    }
+
+    List<ColumnEntity> result = Lists.newArrayListWithCapacity(columns.size());
+    for (ColumnEntity column : columns) {
+      Long storedId = reusableIdsByName.remove(column.name());
+      result.add(storedId == null ? column : withId(column, storedId));
+    }
+
+    Set<Long> keptIds = result.stream().map(ColumnEntity::id).collect(Collectors.toSet());
+    deleteColumnRelations(
+        storedColumns.stream()
+            .map(ColumnPO::getColumnId)
+            .filter(id -> !keptIds.contains(id))
+            .distinct()
+            .collect(Collectors.toList()));
+    return result;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteColumnsByTableId")
@@ -187,15 +247,18 @@ public class TableColumnMetaService {
       }
     }
 
+    // If the table moved to another schema, move all of its existing column rows as well, whether
+    // or not any column changed. Only the changed columns get new rows below, so otherwise the
+    // unchanged ones would stay under the old schema and be dropped with it.
+    if (!newTable.namespace().equals(oldTable.namespace())) {
+      SessionUtils.doWithoutCommit(
+          TableColumnMapper.class,
+          mapper ->
+              mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
+    }
+
     // If there is no change, directly return
     if (columnPOsToInsert.isEmpty()) {
-      // If namespace is changed, just update the schema_id of the columns.
-      if (!newTable.namespace().equals(oldTable.namespace())) {
-        SessionUtils.doWithoutCommit(
-            TableColumnMapper.class,
-            mapper ->
-                mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
-      }
       return;
     }
 
@@ -225,6 +288,20 @@ public class TableColumnMetaService {
                               .map(id -> new OwnerRelForDeletion(id, columnType))
                               .collect(Collectors.toList())));
             });
+  }
+
+  private static ColumnEntity withId(ColumnEntity column, Long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(column.name())
+        .withPosition(column.position())
+        .withDataType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .withAuditInfo((AuditInfo) column.auditInfo())
+        .build();
   }
 
   private void insertColumnPOsInBatches(List<ColumnPO> columnPOs) {
