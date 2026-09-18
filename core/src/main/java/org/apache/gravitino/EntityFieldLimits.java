@@ -55,9 +55,7 @@ public final class EntityFieldLimits {
       @Nullable Entity.EntityType entityType) {
     // Count code points rather than UTF-16 chars, since MySQL (utf8mb4) and PostgreSQL count a
     // supplementary character such as an emoji as one character.
-    if (value != null
-        && value.length() > maxLength
-        && value.codePointCount(0, value.length()) > maxLength) {
+    if (value != null && value.codePointCount(0, value.length()) > maxLength) {
       throw new IllegalArgumentException(exceedMaxLengthMessage(fieldName, entityType, maxLength));
     }
   }
