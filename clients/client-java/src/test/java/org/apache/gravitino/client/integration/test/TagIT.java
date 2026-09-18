@@ -31,6 +31,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.function.Function;
@@ -50,6 +51,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.Tag;
@@ -789,6 +791,97 @@ public class TagIT extends BaseIT {
 
     Assertions.assertEquals(1, tag4.associatedObjects().count());
     Assertions.assertEquals(column.name(), tag4.associatedObjects().objects()[0].name());
+  }
+
+  @Test
+  public void testDroppedColumnIsRemovedFromTagObjects() {
+    NameIdentifier tableIdent = createColumnTestTable("tag_it_drop_column_table");
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_drop_column_tag"),
+              "comment",
+              Collections.emptyMap());
+      Column c1 = loadColumn(tableIdent, "c1");
+      c1.supportsTags().associateTags(new String[] {tag.name()}, null);
+      Assertions.assertArrayEquals(new String[] {tag.name()}, c1.supportsTags().listTags());
+
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(tableIdent, TableChange.deleteColumn(new String[] {"c1"}, true));
+
+      // The dropped column no longer resolves, and the tag no longer lists it. The server reports
+      // NoSuchMetadataObjectException; the client's tag error handler surfaces it as
+      // NotFoundException.
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
+      Assertions.assertEquals(0, metalake.getTag(tag.name()).associatedObjects().count());
+
+      // A new column with the same name does not inherit the dropped column's tag.
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(
+              tableIdent, TableChange.addColumn(new String[] {"c1"}, Types.IntegerType.get()));
+      Assertions.assertEquals(0, loadColumn(tableIdent, "c1").supportsTags().listTags().length);
+      Assertions.assertEquals(0, metalake.getTag(tag.name()).associatedObjects().count());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(tableIdent);
+    }
+  }
+
+  @Test
+  public void testRenamedColumnKeepsItsTags() {
+    NameIdentifier tableIdent = createColumnTestTable("tag_it_rename_column_table");
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_rename_column_tag"),
+              "comment",
+              Collections.emptyMap());
+      Column c1 = loadColumn(tableIdent, "c1");
+      c1.supportsTags().associateTags(new String[] {tag.name()}, null);
+
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(tableIdent, TableChange.renameColumn(new String[] {"c1"}, "c1_new"));
+
+      // The tag follows the column to its new name.
+      Column renamed = loadColumn(tableIdent, "c1_new");
+      Assertions.assertArrayEquals(new String[] {tag.name()}, renamed.supportsTags().listTags());
+      Assertions.assertFalse(renamed.supportsTags().getTag(tag.name()).inherited().get());
+
+      // The tag lists the column under its new name only, and the old name no longer resolves.
+      MetadataObject[] objects = metalake.getTag(tag.name()).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(MetadataObject.Type.COLUMN, objects[0].type());
+      Assertions.assertEquals(
+          String.join(".", relationalCatalog.name(), schema.name(), tableIdent.name(), "c1_new"),
+          objects[0].fullName());
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(tableIdent);
+    }
+  }
+
+  private NameIdentifier createColumnTestTable(String prefix) {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schema.name(), GravitinoITUtils.genRandomName(prefix));
+    relationalCatalog
+        .asTableCatalog()
+        .createTable(
+            tableIdent,
+            new Column[] {
+              Column.of("c1", Types.IntegerType.get()), Column.of("c2", Types.StringType.get())
+            },
+            "comment",
+            Collections.emptyMap());
+    return tableIdent;
+  }
+
+  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
+    return Arrays.stream(relationalCatalog.asTableCatalog().loadTable(tableIdent).columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 
   @Test

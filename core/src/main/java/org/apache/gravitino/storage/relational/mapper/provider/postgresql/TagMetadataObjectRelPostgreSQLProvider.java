@@ -74,6 +74,23 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   }
 
   @Override
+  public String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE deleted_at = 0 AND metadata_object_type = #{metadataObjectType}"
+        + " AND metadata_object_id IN ("
+        + "<foreach collection='metadataObjectIds' item='metadataObjectId' separator=','>"
+        + "#{metadataObjectId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
+  @Override
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
