@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 public class IcebergConstants {
 
   // Iceberg catalog properties constants
@@ -47,6 +52,37 @@ public class IcebergConstants {
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
   public static final String CATALOG_BACKEND_NAME = "catalog-backend-name";
+
+  /** Catalog property: the format version of a new table that does not request one. */
+  public static final String TABLE_FORMAT_VERSION_DEFAULT = "table-format-version.default";
+
+  /** Catalog property: the highest format version a table may be created at or upgraded to. */
+  public static final String TABLE_FORMAT_VERSION_MAX = "table-format-version.max";
+
+  /** Iceberg catalog property that sets the format version of tables created without one. */
+  public static final String ICEBERG_TABLE_DEFAULT_FORMAT_VERSION = "table-default.format-version";
+
+  /**
+   * The format version of a new table when neither the request nor {@link
+   * #TABLE_FORMAT_VERSION_DEFAULT} names one.
+   */
+  public static final int DEFAULT_TABLE_FORMAT_VERSION = 2;
+
+  /**
+   * The Iceberg table format versions Gravitino accepts: {@code 1} to {@code 4}, the range the
+   * bundled Iceberg version (1.11) can write.
+   */
+  public static final Set<Integer> SUPPORTED_TABLE_FORMAT_VERSIONS =
+      Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(1, 2, 3, 4)));
+
+  /**
+   * The highest format version this Gravitino build accepts, and the one a table may be created at
+   * or upgraded to when {@link #TABLE_FORMAT_VERSION_MAX} is unset. {@link
+   * #TABLE_FORMAT_VERSION_MAX} can only lower it. It tracks the bundled Iceberg's highest writable
+   * version, and a test fails when the two differ.
+   */
+  public static final int DEFAULT_MAX_TABLE_FORMAT_VERSION =
+      Collections.max(SUPPORTED_TABLE_FORMAT_VERSIONS);
 
   // IO properties
   public static final String IO_IMPL = "io-impl";

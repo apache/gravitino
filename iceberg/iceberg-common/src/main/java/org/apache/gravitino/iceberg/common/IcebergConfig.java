@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.OverwriteDefaultConfig;
@@ -414,12 +415,72 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
     super(false);
   }
 
+  /**
+   * Returns the properties used to initialize the Iceberg catalog backend.
+   *
+   * <p>When {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} is set, it is also written to
+   * Iceberg's {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}, so tables created
+   * without a format version get it.
+   *
+   * @return the Iceberg catalog properties.
+   * @throws IllegalArgumentException if the table format version properties are invalid.
+   */
   public Map<String, String> getIcebergCatalogProperties() {
+    validateTableFormatVersions();
     Map<String, String> config = getAllConfig();
     Map<String, String> transformedConfig =
         IcebergPropertiesUtils.toIcebergCatalogProperties(config);
     transformedConfig.putAll(config);
+    getConfiguredDefaultTableFormatVersion()
+        .ifPresent(
+            version ->
+                transformedConfig.put(
+                    IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                    String.valueOf(version)));
     return transformedConfig;
+  }
+
+  /**
+   * Validates the table format version properties of this configuration.
+   *
+   * @throws IllegalArgumentException if a value is not a supported format version, the default
+   *     exceeds the maximum, or {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}
+   *     conflicts with them.
+   */
+  public void validateTableFormatVersions() {
+    IcebergPropertiesUtils.validateTableFormatVersions(getAllConfig());
+  }
+
+  /**
+   * Returns {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} when it is set.
+   *
+   * @return the configured default table format version, or empty when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public Optional<Integer> getConfiguredDefaultTableFormatVersion() {
+    return IcebergPropertiesUtils.configuredDefaultTableFormatVersion(getAllConfig());
+  }
+
+  /**
+   * Returns the format version of a new table that does not request one.
+   *
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT}, or {@link
+   *     IcebergConstants#DEFAULT_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public int getDefaultTableFormatVersion() {
+    return IcebergPropertiesUtils.defaultTableFormatVersion(getAllConfig());
+  }
+
+  /**
+   * Returns the highest format version a table may be created at or upgraded to.
+   *
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_MAX}, or {@link
+   *     IcebergConstants#DEFAULT_MAX_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public int getMaxTableFormatVersion() {
+    return IcebergPropertiesUtils.maxTableFormatVersion(getAllConfig());
   }
 
   @Override

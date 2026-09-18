@@ -19,7 +19,10 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.storage.COSProperties;
@@ -157,5 +160,73 @@ public class TestIcebergCatalogPropertiesMetadata {
         transformedProperties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
     Assertions.assertEquals(
         "5678", transformedProperties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testTableFormatVersionPropertiesAreMutableWithCodeDefaults() {
+    for (String property :
+        new String[] {
+          IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, IcebergConstants.TABLE_FORMAT_VERSION_MAX
+        }) {
+      Assertions.assertTrue(metadata.containsProperty(property));
+      Assertions.assertFalse(metadata.isImmutableProperty(property));
+      Assertions.assertFalse(metadata.isHiddenProperty(property));
+      Assertions.assertFalse(metadata.isRequiredProperty(property));
+    }
+    Assertions.assertEquals(
+        IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION,
+        metadata.getDefaultValue(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT));
+    Assertions.assertEquals(
+        IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION,
+        metadata.getDefaultValue(IcebergConstants.TABLE_FORMAT_VERSION_MAX));
+
+    // Both reach the Iceberg catalog configuration on the Gravitino API.
+    Map<String, String> transformed =
+        metadata.transformProperties(
+            ImmutableMap.of(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "3",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "3"));
+    Assertions.assertEquals("3", transformed.get(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT));
+    Assertions.assertEquals("3", transformed.get(IcebergConstants.TABLE_FORMAT_VERSION_MAX));
+  }
+
+  @Test
+  void testInvalidTableFormatVersionValuesAreRejected() {
+    for (String property :
+        new String[] {
+          IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, IcebergConstants.TABLE_FORMAT_VERSION_MAX
+        }) {
+      for (String invalid : new String[] {"0", "5", "abc", ""}) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForCreate(
+                    metadata, withBackend(ImmutableMap.of(property, invalid))),
+            property + "=" + invalid);
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForAlter(
+                    metadata, ImmutableMap.of(property, invalid), Collections.emptyMap()),
+            property + "=" + invalid);
+      }
+      Assertions.assertDoesNotThrow(
+          () ->
+              PropertiesMetadataHelpers.validatePropertyForCreate(
+                  metadata, withBackend(ImmutableMap.of(property, "3"))));
+      Assertions.assertDoesNotThrow(
+          () ->
+              PropertiesMetadataHelpers.validatePropertyForAlter(
+                  metadata, ImmutableMap.of(property, "3"), Collections.emptyMap()));
+    }
+  }
+
+  private static Map<String, String> withBackend(Map<String, String> properties) {
+    Map<String, String> result = new HashMap<>(properties);
+    result.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "memory");
+    result.put(IcebergCatalogPropertiesMetadata.URI, "memory://");
+    return result;
   }
 }

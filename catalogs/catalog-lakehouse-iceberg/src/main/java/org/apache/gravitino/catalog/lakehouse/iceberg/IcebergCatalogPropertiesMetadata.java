@@ -126,6 +126,14 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false,
                 null,
                 false),
+            tableFormatVersionPropertyEntry(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "The format version of a new Iceberg table that does not request one",
+                IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION),
+            tableFormatVersionPropertyEntry(
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "The highest format version an Iceberg table may be created at or upgraded to",
+                IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION),
             integerOptionalPropertyEntry(
                 IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
                 "HTTP connection timeout in milliseconds for the REST catalog backend",
@@ -165,5 +173,29 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           }
         });
     return icebergProperties;
+  }
+
+  /**
+   * Builds an optional, mutable catalog property that holds an Iceberg table format version.
+   *
+   * @param name property name
+   * @param description property description
+   * @param defaultValue the version that applies when the property is unset
+   * @return the property entry
+   */
+  private static PropertyEntry<Integer> tableFormatVersionPropertyEntry(
+      String name, String description, int defaultValue) {
+    return new PropertyEntry.Builder<Integer>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(Integer.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(value -> IcebergPropertiesUtils.parseTableFormatVersion(name, value))
+        .withEncoder(String::valueOf)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
   }
 }

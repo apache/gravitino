@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.primitives.Ints;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -107,6 +108,12 @@ public class IcebergCatalogOperations
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
+  /** Format version of a new table that does not request one. */
+  private int defaultFormatVersion = IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION;
+
+  /** Highest format version a new table may request. */
+  private int maxFormatVersion = IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION;
+
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
@@ -133,6 +140,8 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+    this.defaultFormatVersion = icebergConfig.getDefaultTableFormatVersion();
+    this.maxFormatVersion = icebergConfig.getMaxTableFormatVersion();
 
     try {
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
@@ -589,6 +598,7 @@ public class IcebergCatalogOperations
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
+    checkRequestedFormatVersion(properties);
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
       if (!schemaExists(schemaIdent)) {
@@ -633,7 +643,7 @@ public class IcebergCatalogOperations
       LoadTableResponse loadTableResponse =
           icebergCatalogWrapper.createTable(
               IcebergCatalogWrapperHelper.getIcebergNamespace(schemaIdent.name()),
-              createdTable.toCreateTableRequest());
+              createdTable.toCreateTableRequest(defaultFormatVersion));
       loadTableResponse.validate();
 
       LOG.info("Created Iceberg table {}", tableIdent.name());
@@ -788,6 +798,29 @@ public class IcebergCatalogOperations
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  /**
+   * Refuses a new table that requests a format version above the catalog's {@code
+   * table-format-version.max} or above the highest version this Gravitino build supports.
+   *
+   * @param properties the table properties, or null when the request has none.
+   * @throws IllegalArgumentException if the requested version is invalid or above the maximum.
+   */
+  private void checkRequestedFormatVersion(@Nullable Map<String, String> properties) {
+    String requested =
+        properties == null ? null : properties.get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
+    if (StringUtils.isBlank(requested)) {
+      return;
+    }
+    // A version above the build's ceiling is reported as unsupported before the generic parse
+    // error, so every create path names the ceiling.
+    Integer requestedVersion = Ints.tryParse(requested.trim());
+    if (requestedVersion != null) {
+      IcebergPropertiesUtils.checkTableFormatVersionAllowed(requestedVersion, maxFormatVersion);
+    }
+    IcebergPropertiesUtils.parseTableFormatVersion(
+        IcebergTablePropertiesMetadata.FORMAT_VERSION, requested);
   }
 
   private IcebergViewCatalogOperations viewCatalogOperations() {
