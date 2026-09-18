@@ -1112,6 +1112,53 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertFalse(policyMetaService.deletePolicy(policy.nameIdentifier()));
   }
 
+  @TestTemplate
+  public void testDeletePolicyKeepsSameNamePolicyInAnotherMetalake() throws IOException {
+    String anotherMetalakeName = METALAKE_NAME + "_another";
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertMakeLake(anotherMetalakeName);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_same_name");
+    CatalogEntity anotherCatalog = createAndInsertCatalog(anotherMetalakeName, "catalog_same_name");
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_same_name",
+            AUDIT_INFO);
+    PolicyEntity anotherPolicy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(anotherMetalakeName),
+            "policy_same_name",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    policyMetaService.insertPolicy(anotherPolicy, false);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {policy.nameIdentifier()},
+        new NameIdentifier[0]);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        anotherCatalog.nameIdentifier(),
+        anotherCatalog.type(),
+        new NameIdentifier[] {anotherPolicy.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+
+    assertTrue(listPolicyVersions(policy.id()).values().stream().allMatch(d -> d > 0L));
+    assertEquals(0, countActivePolicyRel(policy.id()));
+
+    // The policy with the same name in the other metalake is left untouched.
+    assertFalse(listPolicyVersions(anotherPolicy.id()).isEmpty());
+    assertTrue(listPolicyVersions(anotherPolicy.id()).values().stream().allMatch(d -> d == 0L));
+    assertEquals(1, countActivePolicyRel(anotherPolicy.id()));
+    assertEquals(
+        anotherPolicy, policyMetaService.getPolicyByIdentifier(anotherPolicy.nameIdentifier()));
+  }
+
   private Integer countActivePolicyRel(Long policyId) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);

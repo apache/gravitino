@@ -198,16 +198,10 @@ public class PolicyMetaService {
     long policyId = policyPO.getPolicyId();
     String policyType = MetadataObject.Type.POLICY.name();
 
-    // Delete the version info, the meta and everything that references the policy by its id in the
-    // same transaction. The version delete matches live policies by name, so it runs first.
+    // Everything that references the policy, including its versions, is removed by the policy's id
+    // in the same transaction, so the cleanup does not depend on the policy row still being live.
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyVersionMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
-                          metalakeName, ident.name())),
           () -> {
             Integer deleted =
                 SessionUtils.getWithoutCommit(
@@ -223,6 +217,10 @@ public class PolicyMetaService {
                   ident.name());
             }
           },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyVersionMapper.class,
+                  mapper -> mapper.softDeletePolicyVersionsByPolicyId(policyId)),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyMetadataObjectRelMapper.class,

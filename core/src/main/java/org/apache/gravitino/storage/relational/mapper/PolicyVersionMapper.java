@@ -46,6 +46,11 @@ public interface PolicyVersionMapper {
 
   @UpdateProvider(
       type = PolicyVersionSQLProviderFactory.class,
+      method = "softDeletePolicyVersionsByPolicyId")
+  Integer softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId);
+
+  @UpdateProvider(
+      type = PolicyVersionSQLProviderFactory.class,
       method = "deletePolicyVersionsByLegacyTimeline")
   Integer deletePolicyVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
