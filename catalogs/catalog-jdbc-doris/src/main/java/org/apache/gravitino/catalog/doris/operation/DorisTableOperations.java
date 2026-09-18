@@ -1073,7 +1073,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       if (deleteIndex.isIfExists()) {
         return "";
       }
-      Preconditions.checkArgument(false, "Index does not exist");
+      throw new IllegalArgumentException("Index does not exist");
     }
     return "DROP INDEX `" + deleteIndex.getName() + "`";
   }
