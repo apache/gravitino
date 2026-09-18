@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -730,7 +731,7 @@ public class TestCatalogConnectorManager {
     // Built from the same definition the server reports, so that the next cycle sees it as up to
     // date. Built outside the answer below: touching the catalog mock while a stubbing is in
     // progress would break that stubbing.
-    GravitinoCatalog registered = new GravitinoCatalog("test", catalog, ImmutableMap.of());
+    GravitinoCatalog registered = new GravitinoCatalog("test", catalog);
     // What Trino does while CREATE CATALOG runs: the first registration creates the connector, so
     // the manager knows which metalake owns the Trino catalog name from then on.
     Mockito.doAnswer(
@@ -847,8 +848,7 @@ public class TestCatalogConnectorManager {
               String metalake = owner[0];
               // Built before the stubbing: touching the catalog mock while a stubbing is in
               // progress would break that stubbing.
-              GravitinoCatalog registered =
-                  new GravitinoCatalog(metalake, catalog, ImmutableMap.of());
+              GravitinoCatalog registered = new GravitinoCatalog(metalake, catalog);
               CatalogConnectorContext context =
                   manager.createCatalogConnectorContext(
                       "memory",
