@@ -38,9 +38,12 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
@@ -187,25 +190,63 @@ public class PolicyMetaService {
       baseMetricName = "deletePolicy")
   public boolean deletePolicy(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
-    int[] policyMetaDeletedCount = new int[] {0};
-    int[] policyVersionDeletedCount = new int[] {0};
+    PolicyPO policyPO;
+    try {
+      policyPO = getPolicyPOByMetalakeAndName(metalakeName, ident.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+    long policyId = policyPO.getPolicyId();
+    String policyType = MetadataObject.Type.POLICY.name();
 
-    // We should delete meta and version info
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            policyMetaDeletedCount[0] =
+    // Delete the version info, the meta and everything that references the policy by its id in the
+    // same transaction. The version delete matches live policies by name, so it runs first.
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyVersionMapper.class,
+                  mapper ->
+                      mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
+                          metalakeName, ident.name())),
+          () -> {
+            Integer deleted =
                 SessionUtils.getWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper ->
-                        mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name())),
-        () ->
-            policyVersionDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    PolicyVersionMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
-                            metalakeName, ident.name())));
-    return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
+                        mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name()));
+            // The policy was renamed or deleted after its id was read. Roll back, so the cleanup
+            // below never touches the rows of a policy that is still live under another name.
+            if (deleted == null || deleted == 0) {
+              throw new NoSuchEntityException(
+                  NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                  Entity.EntityType.POLICY.name().toLowerCase(),
+                  ident.name());
+            }
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeletePolicyMetadataObjectRelsByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteTagMetadataObjectRelsByMetadataObject(policyId, policyType)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(policyId, policyType)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper -> mapper.softDeleteObjectRelsByMetadataObject(policyId, policyType)));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+
+    return true;
   }
 
   @Monitored(

@@ -41,6 +41,9 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -146,26 +149,57 @@ public class TagMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTag")
   public boolean deleteTag(NameIdentifier identifier) {
     String metalakeName = identifier.namespace().level(0);
-    int[] tagDeletedCount = new int[] {0};
-    int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    TagPO tagPO;
+    try {
+      tagPO = getTagPOByMetalakeAndName(metalakeName, identifier.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+    long tagId = tagPO.getTagId();
+    String tagType = MetadataObject.Type.TAG.name();
 
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            tagDeletedCount[0] =
+    // Everything that references the tag is removed by the tag's id in the same transaction, so
+    // the cleanup does not depend on the tag row still being live.
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            Integer deleted =
                 SessionUtils.getWithoutCommit(
                     TagMetaMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetaByMetalakeAndTagName(
-                            metalakeName, identifier.name())),
-        () ->
-            tagMetadataObjectRelDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper ->
-                        mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-                            metalakeName, identifier.name())));
+                            metalakeName, identifier.name()));
+            // The tag was renamed or deleted after its id was read. Roll back, so the cleanup
+            // below never touches the rows of a tag that is still live under another name.
+            if (deleted == null || deleted == 0) {
+              throw new NoSuchEntityException(
+                  NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                  Entity.EntityType.TAG.name().toLowerCase(),
+                  identifier.name());
+            }
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(tagId, tagType)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper -> mapper.softDeleteOwnerRelByMetadataObjectIdAndType(tagId, tagType)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper -> mapper.softDeleteObjectRelsByMetadataObject(tagId, tagType)));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
+    return true;
   }
 
   @Monitored(

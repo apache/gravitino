@@ -105,6 +105,11 @@ public interface PolicyMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = PolicyMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeletePolicyMetadataObjectRelsByPolicyId")
+  Integer softDeletePolicyMetadataObjectRelsByPolicyId(@Param("policyId") Long policyId);
+
+  @UpdateProvider(
+      type = PolicyMetadataObjectRelSQLProviderFactory.class,
       method = "softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName")
   Integer softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);

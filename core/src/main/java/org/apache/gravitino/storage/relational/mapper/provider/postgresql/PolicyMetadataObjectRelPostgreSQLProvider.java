@@ -41,6 +41,15 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
       " CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
 
   @Override
+  public String softDeletePolicyMetadataObjectRelsByPolicyId(Long policyId) {
+    return "UPDATE "
+        + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at ="
+        + DELETED_AT_NOW_EXPRESSION
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
       String metalakeName, String policyName) {
     return "UPDATE "
