@@ -27,6 +27,7 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogRegistrationState;
 
@@ -57,16 +58,16 @@ public class GravitinoSystemTableCatalogStatus extends GravitinoSystemTable {
               ColumnMetadata.builder().setName("failure_count").setType(BIGINT).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableCatalogStatus.
    *
    * @param catalogConnectorManager the manager for catalog connectors
-   * @param metalake the metalake to report on
+   * @param metalake the metalake to report on, or null for every metalake
    */
   public GravitinoSystemTableCatalogStatus(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
     this.metalake = metalake;
   }
@@ -76,7 +77,7 @@ public class GravitinoSystemTableCatalogStatus extends GravitinoSystemTable {
     // Take a snapshot first, the load loop writes these states concurrently and the column
     // builders must all end up with the same number of positions.
     // The load loop is shared by every entry catalog in this Trino, so report only the metalake
-    // this connector is configured with.
+    // this connector is configured with, or every metalake when none is configured.
     List<CatalogRegistrationState> states =
         catalogConnectorManager.getCatalogRegistrationStates(metalake);
     int size = states.size();
