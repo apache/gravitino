@@ -36,6 +36,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -43,10 +46,12 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -1282,6 +1287,60 @@ public class TestTagMetaService extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  public void testDeleteTagCleansEveryDependentRelation() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_tag_cascade");
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag = createAndInsertTagEntity("tag_cascade", "comment", METALAKE_NAME);
+    tagMetaService.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {tag.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user_tag_cascade",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(tag.nameIdentifier(), Entity.EntityType.TAG, user.nameIdentifier(), user.type());
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_tag_cascade",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofTag(
+                    tag.name(), Lists.newArrayList(Privileges.ApplyTag.allow()))),
+            null);
+    backend.insert(role, false);
+
+    String tagAsMetadataObject =
+        String.format("metadata_object_id = %d AND metadata_object_type = 'TAG'", tag.id());
+    String tagAsSecurableObject =
+        String.format("metadata_object_id = %d AND type = 'TAG'", tag.id());
+    assertEquals(1, countActiveTagRel(tag.id()));
+    assertEquals(1, countActiveRows("owner_meta", tagAsMetadataObject));
+    assertEquals(1, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
+
+    assertTrue(tagMetaService.deleteTag(tag.nameIdentifier()));
+
+    assertEquals(0, countActiveTagRel(tag.id()));
+    assertEquals(0, countActiveRows("owner_meta", tagAsMetadataObject));
+    assertEquals(0, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
+    assertTrue(
+        tagMetaService
+            .listTagsForMetadataObject(catalog.nameIdentifier(), catalog.type())
+            .isEmpty());
+    assertFalse(tagMetaService.deleteTag(tag.nameIdentifier()));
+  }
+
   private Integer countActiveTagRel(Long tagId) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -1297,6 +1356,22 @@ public class TestTagMetaService extends TestJDBCBackend {
       } else {
         throw new RuntimeException("Doesn't contain data");
       }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private int countActiveRows(String table, String condition) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, condition))) {
+      Assertions.assertTrue(rs.next());
+      return rs.getInt(1);
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }

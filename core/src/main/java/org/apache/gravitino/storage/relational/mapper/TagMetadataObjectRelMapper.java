@@ -66,6 +66,11 @@ public interface TagMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByTagId")
+  Integer softDeleteTagMetadataObjectRelsByTagId(@Param("tagId") Long tagId);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "softDeleteTagMetadataObjectRelsByMetalakeAndTagName")
   Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);

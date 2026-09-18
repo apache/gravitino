@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -40,6 +41,9 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -47,9 +51,11 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -1040,6 +1046,119 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     return new EntitiesToTest(catalog, schema, table, topic, fileset, model);
   }
 
+  @TestTemplate
+  public void testDeletePolicyCleansEveryDependentRelation() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_policy_cascade");
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_cascade",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {policy.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user_policy_cascade",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(
+            policy.nameIdentifier(), Entity.EntityType.POLICY, user.nameIdentifier(), user.type());
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_policy_cascade",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofPolicy(
+                    policy.name(), Lists.newArrayList(Privileges.ApplyPolicy.allow()))),
+            null);
+    backend.insert(role, false);
+
+    String policyAsMetadataObject =
+        String.format("metadata_object_id = %d AND metadata_object_type = 'POLICY'", policy.id());
+    String policyAsSecurableObject =
+        String.format("metadata_object_id = %d AND type = 'POLICY'", policy.id());
+    assertEquals(1, countActivePolicyRel(policy.id()));
+    assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
+    assertEquals(1, countActiveRows("role_meta_securable_object", policyAsSecurableObject));
+    assertFalse(listPolicyVersions(policy.id()).isEmpty());
+    assertTrue(listPolicyVersions(policy.id()).values().stream().allMatch(d -> d == 0L));
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+
+    // Every version of the policy is retired with it.
+    assertTrue(listPolicyVersions(policy.id()).values().stream().allMatch(d -> d > 0L));
+
+    assertEquals(0, countActivePolicyRel(policy.id()));
+    assertEquals(0, countActiveRows("owner_meta", policyAsMetadataObject));
+    assertEquals(0, countActiveRows("role_meta_securable_object", policyAsSecurableObject));
+    assertTrue(
+        policyMetaService
+            .listPoliciesForMetadataObject(catalog.nameIdentifier(), catalog.type())
+            .isEmpty());
+    assertFalse(policyMetaService.deletePolicy(policy.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testDeletePolicyKeepsSameNamePolicyInAnotherMetalake() throws IOException {
+    String anotherMetalakeName = METALAKE_NAME + "_another";
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertMakeLake(anotherMetalakeName);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_same_name");
+    CatalogEntity anotherCatalog = createAndInsertCatalog(anotherMetalakeName, "catalog_same_name");
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_same_name",
+            AUDIT_INFO);
+    PolicyEntity anotherPolicy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(anotherMetalakeName),
+            "policy_same_name",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    policyMetaService.insertPolicy(anotherPolicy, false);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {policy.nameIdentifier()},
+        new NameIdentifier[0]);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        anotherCatalog.nameIdentifier(),
+        anotherCatalog.type(),
+        new NameIdentifier[] {anotherPolicy.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+
+    assertTrue(listPolicyVersions(policy.id()).values().stream().allMatch(d -> d > 0L));
+    assertEquals(0, countActivePolicyRel(policy.id()));
+
+    // The policy with the same name in the other metalake is left untouched.
+    assertFalse(listPolicyVersions(anotherPolicy.id()).isEmpty());
+    assertTrue(listPolicyVersions(anotherPolicy.id()).values().stream().allMatch(d -> d == 0L));
+    assertEquals(1, countActivePolicyRel(anotherPolicy.id()));
+    assertEquals(
+        anotherPolicy, policyMetaService.getPolicyByIdentifier(anotherPolicy.nameIdentifier()));
+  }
+
   private Integer countActivePolicyRel(Long policyId) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -1074,6 +1193,22 @@ public class TestPolicyMetaService extends TestJDBCBackend {
       } else {
         throw new RuntimeException("Doesn't contain data");
       }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private int countActiveRows(String table, String condition) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, condition))) {
+      Assertions.assertTrue(rs.next());
+      return rs.getInt(1);
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }
