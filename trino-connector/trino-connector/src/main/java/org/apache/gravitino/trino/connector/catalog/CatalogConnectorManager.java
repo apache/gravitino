@@ -26,6 +26,7 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,9 +76,11 @@ public class CatalogConnectorManager {
   private final ConcurrentHashMap<String, CatalogConnectorContext> catalogConnectors =
       new ConcurrentHashMap<>();
 
-  // The registration state of every catalog seen by the load loop, keyed by the Trino catalog
-  // name. Written only by the load loop thread, read by query threads through the system tables
-  // and by stored procedure threads through describeRegistrationFailure().
+  // The registration state of every catalog seen by the load loop, keyed by the metalake and the
+  // Trino catalog name (see stateKey), since two metalakes can report the same Trino catalog name
+  // when every metalake is loaded with unqualified names. Written only by the load loop thread,
+  // read by query threads through the system tables and by stored procedure threads through
+  // describeRegistrationFailure().
   private final ConcurrentHashMap<String, CatalogRegistrationState> catalogStates =
       new ConcurrentHashMap<>();
 
@@ -183,6 +186,14 @@ public class CatalogConnectorManager {
     // Parsed eagerly so a misconfigured value fails startup instead of surfacing every poll as an
     // unrelated "Load Metalake failed" error.
     config.isIcebergRestRoutingEnabled();
+    if (config.usesDeprecatedSingleMetalakeKey()) {
+      LOG.warn(
+          "gravitino.use-single-metalake is deprecated, use gravitino.catalog-name-with-metalake "
+              + "instead.");
+    }
+    if (!config.hasMetalake()) {
+      LOG.info("gravitino.metalake is not set, the catalogs of every metalake are loaded.");
+    }
   }
 
   /**
@@ -228,8 +239,12 @@ public class CatalogConnectorManager {
       }
       trinoReachable = true;
 
-      Set<String> usedMetalakes = new HashSet<>();
-      if (config.singleMetalakeMode()) {
+      // Iterated in the server's listing order, so that with unqualified catalog names a clash
+      // between two metalakes first seen in the same cycle follows that order. Once a metalake
+      // has registered a Trino name it keeps it across cycles (see the ownership check in
+      // loadCatalogs), whatever the order becomes later.
+      Set<String> usedMetalakes = new LinkedHashSet<>();
+      if (!config.loadAllMetalakes()) {
         usedMetalakes.add(targetMetalake);
         metalakes.computeIfAbsent(targetMetalake, this::retrieveMetalake);
       } else {
@@ -307,9 +322,7 @@ public class CatalogConnectorManager {
     catalogStates
         .values()
         .removeIf(
-            state ->
-                !usedMetalakes.contains(state.getMetalake())
-                    && !catalogConnectors.containsKey(state.getTrinoCatalogName()));
+            state -> !usedMetalakes.contains(state.getMetalake()) && !hasLiveConnector(state));
     metalakeErrors.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
     metalakes.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
   }
@@ -517,13 +530,31 @@ public class CatalogConnectorManager {
             state ->
                 state.getMetalake().equals(metalakeName)
                     && !presentTrinoNames.contains(state.getTrinoCatalogName())
-                    && !catalogConnectors.containsKey(state.getTrinoCatalogName()));
+                    && !hasLiveConnector(state));
 
     // Load new catalogs belows to the metalake.
     for (String catalogName : catalogNames) {
       String trinoCatalogName = getTrinoCatalogName(metalakeName, catalogName);
+      // With unqualified names a catalog of another metalake may already hold this Trino name.
+      // The first one registered keeps it; this one is reported and left alone, so that it is
+      // neither loaded over the existing connector nor treated as a refresh of it.
+      CatalogConnectorContext existing = catalogConnectors.get(trinoCatalogName);
+      if (existing != null && !existing.getCatalog().getMetalake().equals(metalakeName)) {
+        recordCatalogState(
+            CatalogRegistrationState.failed(
+                metalakeName,
+                catalogName,
+                trinoCatalogName,
+                null,
+                String.format(
+                    "Trino catalog name %s is already registered by metalake %s. Rename the "
+                        + "catalog or set gravitino.catalog-name-with-metalake=true",
+                    trinoCatalogName, existing.getCatalog().getMetalake())),
+            null);
+        continue;
+      }
       // Known before the catalog is even loaded, since it only depends on the name.
-      boolean alreadyRegistered = catalogConnectors.containsKey(trinoCatalogName);
+      boolean alreadyRegistered = existing != null;
       // Tracked outside the try so that a failure can still report the provider it knows about.
       String provider = null;
       try {
@@ -598,7 +629,7 @@ public class CatalogConnectorManager {
     CatalogRegistrationState[] seen = new CatalogRegistrationState[1];
     CatalogRegistrationState state =
         catalogStates.compute(
-            newState.getTrinoCatalogName(),
+            stateKey(newState.getMetalake(), newState.getTrinoCatalogName()),
             (name, previous) -> {
               seen[0] = previous;
               return newState.withHistoryOf(previous);
@@ -739,6 +770,21 @@ public class CatalogConnectorManager {
   }
 
   /**
+   * Retrieves the catalog connector context of a Gravitino catalog. With unqualified catalog names
+   * the Trino name may be held by a catalog of another metalake, which is not the one asked for.
+   *
+   * @param metalake the metalake the catalog belongs to
+   * @param catalogName the name of the catalog in Gravitino
+   * @return the catalog connector context, or null if this catalog is not registered
+   */
+  @Nullable
+  public CatalogConnectorContext getCatalogConnector(String metalake, String catalogName) {
+    CatalogConnectorContext context =
+        catalogConnectors.get(getTrinoCatalogName(metalake, catalogName));
+    return context != null && context.getCatalog().getMetalake().equals(metalake) ? context : null;
+  }
+
+  /**
    * Checks if a catalog connector exists for the specified catalog name.
    *
    * @param catalogName the name of the catalog
@@ -779,7 +825,7 @@ public class CatalogConnectorManager {
    * @return the Trino catalog name
    */
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.singleMetalakeMode()
+    return !config.catalogNameWithMetalake()
         ? catalog
         : trinoCatalogNameHandler.getCatalogName(metalake, catalog);
   }
@@ -796,13 +842,11 @@ public class CatalogConnectorManager {
 
   /**
    * Retrieves a snapshot of the registration state of every Gravitino catalog seen by the load
-   * loop. Package-private: production callers always know which metalake they report on and use
-   * {@link #getCatalogRegistrationStates(String)}; this exists for tests that assert on the whole
-   * set of tracked catalogs.
+   * loop.
    *
    * @return the registration states
    */
-  List<CatalogRegistrationState> getCatalogRegistrationStates() {
+  public List<CatalogRegistrationState> getCatalogRegistrationStates() {
     return List.copyOf(catalogStates.values());
   }
 
@@ -810,13 +854,27 @@ public class CatalogConnectorManager {
    * Retrieves a snapshot of the registration state of every Gravitino catalog seen by the load loop
    * that belongs to the given metalake.
    *
-   * @param metalake the metalake to filter by
+   * @param metalake the metalake to filter by, or null for every metalake
    * @return the registration states belonging to that metalake
    */
-  public List<CatalogRegistrationState> getCatalogRegistrationStates(String metalake) {
+  public List<CatalogRegistrationState> getCatalogRegistrationStates(@Nullable String metalake) {
+    if (metalake == null) {
+      return getCatalogRegistrationStates();
+    }
     return catalogStates.values().stream()
         .filter(state -> state.getMetalake().equals(metalake))
         .toList();
+  }
+
+  private static String stateKey(String metalake, String trinoCatalogName) {
+    return metalake + "." + trinoCatalogName;
+  }
+
+  // Whether the catalog this state describes still has its connector in Trino. The connector under
+  // the same Trino name may belong to another metalake, which says nothing about this catalog.
+  private boolean hasLiveConnector(CatalogRegistrationState state) {
+    CatalogConnectorContext live = catalogConnectors.get(state.getTrinoCatalogName());
+    return live != null && live.getCatalog().getMetalake().equals(state.getMetalake());
   }
 
   /**
@@ -866,7 +924,7 @@ public class CatalogConnectorManager {
    * @return a human readable explanation
    */
   public String describeRegistrationFailure(String metalake, String trinoCatalogName) {
-    CatalogRegistrationState state = catalogStates.get(trinoCatalogName);
+    CatalogRegistrationState state = catalogStates.get(stateKey(metalake, trinoCatalogName));
     if (state != null && state.getLastError() != null) {
       return String.format("%s: %s", state.getStatus(), state.getLastError());
     }
@@ -913,12 +971,15 @@ public class CatalogConnectorManager {
       String catalogConfig = config.getCatalogConfig();
 
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
-      if (this.config.singleMetalakeMode()
+      if (!this.config.catalogNameWithMetalake()
           && StringUtils.isNotBlank(targetMetalake)
           && !targetMetalake.equals(catalog.getMetalake())) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-            "Multiple metalakes are not supported");
+            String.format(
+                "Catalog %s belongs to metalake %s but this connector is configured for metalake "
+                    + "%s; set gravitino.catalog-name-with-metalake=true to serve several metalakes",
+                catalog.getName(), catalog.getMetalake(), targetMetalake));
       }
       GravitinoMetalake metalake =
           metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake);

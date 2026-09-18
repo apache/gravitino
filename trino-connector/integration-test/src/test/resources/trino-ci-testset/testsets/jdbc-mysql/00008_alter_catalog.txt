@@ -1,5 +1,6 @@
 CALL
 
+<<<<<<< HEAD
 "gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false""}"
 
 CALL
@@ -13,5 +14,20 @@ CALL
 CALL
 
 "gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""trino.bypass.join-pushdown.strategy"":""EAGER""}"
+=======
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino""}","test"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value""}","test"
+
+CALL
+
+"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
+>>>>>>> c8e6d3b1f ([#13301] improvement (trino-connector): Make gravitino.metalake optional (#13302))
 
 CALL
