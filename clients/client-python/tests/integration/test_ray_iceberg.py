@@ -91,12 +91,6 @@ class TestRayIcebergIntegration(IntegrationTestEnv):
         cls.appended_iceberg_rest_conf = True
         cls.restart_server()
 
-        if not cls._wait_for_iceberg_rest_ready():
-            raise RuntimeError(
-                "Iceberg REST auxiliary service did not become ready at "
-                + ICEBERG_REST_BASE_URL
-            )
-
         cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
         cls.gravitino_admin_client.create_metalake(
             cls.METALAKE_NAME,
@@ -112,8 +106,20 @@ class TestRayIcebergIntegration(IntegrationTestEnv):
             catalog_type=Catalog.Type.RELATIONAL,
             provider="lakehouse-iceberg",
             comment="Ray Iceberg IT catalog",
-            properties={"catalog-backend": "memory", "warehouse": cls.temp_dir},
+            # Gravitino requires a non-empty URI property even though its memory backend
+            # does not use the URI to initialize the in-memory Iceberg catalog.
+            properties={
+                "catalog-backend": "memory",
+                "uri": "memory://ray-iceberg-it",
+                "warehouse": cls.temp_dir,
+            },
         )
+
+        if not cls._wait_for_iceberg_rest_ready():
+            raise RuntimeError(
+                "Iceberg REST auxiliary service did not become ready at "
+                + ICEBERG_REST_BASE_URL
+            )
 
         # Imports are deferred so the module can be collected without the optional IT deps.
         # pylint: disable=import-outside-toplevel
@@ -238,6 +244,10 @@ class TestRayIcebergIntegration(IntegrationTestEnv):
             "name": "default",
             "type": "rest",
             "uri": ICEBERG_REST_BASE_URL,
+            "auth": {
+                "type": "basic",
+                "basic": {"username": "anonymous", "password": ""},
+            },
         }
 
     @staticmethod

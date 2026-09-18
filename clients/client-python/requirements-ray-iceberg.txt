@@ -17,3 +17,4 @@
 
 ray==2.55.1
 pyiceberg==0.12.0
+pandas==2.3.3
