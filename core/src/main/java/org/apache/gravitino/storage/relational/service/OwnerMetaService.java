@@ -283,6 +283,11 @@ public class OwnerMetaService {
    * has no live row cannot see each other's insert: the second one fails the unique key once the
    * first commits, and is then replayed once so that it retires the row it could not see. That
    * makes the outcome "last assignment wins" without a lock on the object itself.
+   *
+   * <p>The replay needs a fresh transaction: PostgreSQL aborts the whole transaction on the
+   * unique-key failure, so nothing can be retried on the same connection. The assignment therefore
+   * replays only when it owns the transaction, which is the case for every caller today. A caller
+   * that already holds a transaction gets the failure as is.
    */
   private void assignOwner(
       String metalake,
@@ -292,6 +297,7 @@ public class OwnerMetaService {
       long ownerId,
       Runnable retirePreviousOwners,
       Runnable insertOwners) {
+    boolean ownsTransaction = !SessionUtils.isInTransaction();
     for (int attempt = 0; ; attempt++) {
       try {
         SessionUtils.doMultipleWithCommit(
@@ -301,7 +307,7 @@ public class OwnerMetaService {
             insertOwners);
         return;
       } catch (RuntimeException e) {
-        if (attempt > 0 || !isDuplicateOwnerRow(e)) {
+        if (!ownsTransaction || attempt > 0 || !isDuplicateOwnerRow(e)) {
           throw e;
         }
         LOG.debug("Owner assignment lost a race on {} and is replayed once", owner, e);

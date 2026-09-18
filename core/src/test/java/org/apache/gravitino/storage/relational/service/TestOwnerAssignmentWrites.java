@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -132,7 +133,8 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
     assertNull(
         whileTransactionHeld(
             () -> setOwner(owned, first, Entity.EntityType.USER),
-            () -> setOwner(owned, second, Entity.EntityType.GROUP)));
+            () -> setOwner(owned, second, Entity.EntityType.GROUP),
+            true));
     assertEquals(1, liveOwnerRowsForObject(owned));
     assertEquals("second", ownerName(owned));
   }
@@ -148,7 +150,8 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
     assertNull(
         whileTransactionHeld(
             () -> setOwner(owned, first, Entity.EntityType.USER),
-            () -> setOwner(owned, second, Entity.EntityType.GROUP)));
+            () -> setOwner(owned, second, Entity.EntityType.GROUP),
+            true));
     assertEquals(1, liveOwnerRowsForObject(owned));
     assertEquals("second", ownerName(owned));
   }
@@ -286,26 +289,61 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
   }
 
   private Throwable whileTransactionHeld(Executable holder, Executable contender) throws Exception {
-    return whileTransactionHeld(holder, contender, () -> {}, true);
+    return whileTransactionHeld(holder, contender, () -> {}, true, false);
   }
 
-  /**
-   * Runs {@code holder} inside a transaction held open on this thread, starts {@code contender} in
-   * its own transaction on another thread, waits until the database reports the contender blocked
-   * on the holder, then commits or rolls back the holder and returns the contender's failure, or
-   * null when it committed.
-   */
+  private Throwable whileTransactionHeld(
+      Executable holder, Executable contender, boolean standaloneContender) throws Exception {
+    return whileTransactionHeld(holder, contender, () -> {}, true, standaloneContender);
+  }
+
   private Throwable whileTransactionHeld(
       Executable holder, Executable contender, Executable beforeCompletion, boolean commitHolder)
       throws Exception {
+    return whileTransactionHeld(holder, contender, beforeCompletion, commitHolder, false);
+  }
+
+  /**
+   * Runs {@code holder} inside a transaction held open on this thread, starts {@code contender} on
+   * another thread, waits until the database reports the contender blocked on the holder, then
+   * commits or rolls back the holder and returns the contender's failure, or null when it
+   * committed.
+   *
+   * <p>By default the contender is wrapped in a transaction of its own so that its session can be
+   * identified. A {@code standaloneContender} runs exactly as production does, owning its
+   * transactions, which is what the owner assignment needs to replay a lost race: its session is
+   * then not known in advance and the wait is recognised by the holder side alone.
+   */
+  private Throwable whileTransactionHeld(
+      Executable holder,
+      Executable contender,
+      Executable beforeCompletion,
+      boolean commitHolder,
+      boolean standaloneContender)
+      throws Exception {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     CompletableFuture<Long> started = new CompletableFuture<>();
+    if (standaloneContender) {
+      raiseDefaultLockTimeout();
+    }
     SessionUtils.beginTransaction();
     try {
       long holderId = prepareTransaction();
       Assertions.assertDoesNotThrow(holder);
-      Future<Throwable> result = submitTransaction(executor, started, contender);
-      awaitBlockedBy(result, started.get(10, TimeUnit.SECONDS), holderId);
+      Future<Throwable> result =
+          standaloneContender
+              ? executor.submit(
+                  () -> {
+                    try {
+                      contender.execute();
+                      return null;
+                    } catch (Throwable failure) {
+                      return failure;
+                    }
+                  })
+              : submitTransaction(executor, started, contender);
+      awaitBlockedBy(
+          result, standaloneContender ? null : started.get(10, TimeUnit.SECONDS), holderId);
       Assertions.assertDoesNotThrow(beforeCompletion);
       if (commitHolder) {
         SessionUtils.commitTransaction();
@@ -369,33 +407,53 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
     }
   }
 
-  private void awaitBlockedBy(Future<Throwable> result, long contenderId, long holderId)
+  /**
+   * H2 gives new sessions a one-second lock timeout. A standalone contender opens its own sessions,
+   * so the database-wide default is raised instead of a per-session setting.
+   */
+  private void raiseDefaultLockTimeout() throws SQLException {
+    if (!"h2".equals(backendType)) {
+      return;
+    }
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement()) {
+      statement.execute("SET DEFAULT_LOCK_TIMEOUT 30000");
+    }
+  }
+
+  /**
+   * Waits until the database reports a session blocked by the holder: the given contender session
+   * when known, otherwise any session. On MySQL a waiter on the implicit lock of an uncommitted
+   * insert is reported as blocked by itself rather than by the inserting transaction, so that shape
+   * is accepted too.
+   */
+  private void awaitBlockedBy(Future<Throwable> result, @Nullable Long contenderId, long holderId)
       throws Exception {
     String query;
     switch (backendType) {
       case "h2":
         query =
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE SESSION_ID = "
-                + contenderId
-                + " AND BLOCKER_ID = "
-                + holderId;
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE BLOCKER_ID = "
+                + holderId
+                + (contenderId == null ? "" : " AND SESSION_ID = " + contenderId);
         break;
       case "mysql":
         query =
             "SELECT COUNT(*) FROM performance_schema.data_lock_waits w"
                 + " JOIN performance_schema.threads r ON r.THREAD_ID = w.REQUESTING_THREAD_ID"
                 + " JOIN performance_schema.threads b ON b.THREAD_ID = w.BLOCKING_THREAD_ID"
-                + " WHERE r.PROCESSLIST_ID = "
-                + contenderId
-                + " AND b.PROCESSLIST_ID = "
-                + holderId;
+                + " WHERE (b.PROCESSLIST_ID = "
+                + holderId
+                + " OR b.THREAD_ID = r.THREAD_ID)"
+                + (contenderId == null ? "" : " AND r.PROCESSLIST_ID = " + contenderId);
         break;
       case "postgresql":
         query =
-            "SELECT COUNT(*) FROM unnest(pg_blocking_pids("
-                + contenderId
-                + ")) AS blocker(pid) WHERE pid = "
-                + holderId;
+            "SELECT COUNT(*) FROM pg_stat_activity a WHERE "
+                + holderId
+                + " = ANY(pg_blocking_pids(a.pid))"
+                + (contenderId == null ? "" : " AND a.pid = " + contenderId);
         break;
       default:
         throw new IllegalStateException("Unsupported backend: " + backendType);
