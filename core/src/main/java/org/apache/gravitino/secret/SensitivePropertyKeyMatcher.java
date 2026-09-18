@@ -24,35 +24,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Matches credential-like property keys for masking and {@code getSecrets} recovery.
+ * Supplementary matcher for credential-like property key typos.
  *
- * <p>Besides the built-in substring keywords ({@code secret}, {@code password}, {@code token},
- * {@code credential}, {@code access}, {@code account}), Gravitino can be configured with extra typo
- * substrings so mistyped credential property names (for example {@code jdbc-passwrod}) are still
- * treated as sensitive.
+ * <p>The built-in sensitive key pattern in {@link SecretPropertyUtils} always applies first. This
+ * class adds optional configured typo substrings so mistyped credential property names (for example
+ * {@code jdbc-passwrod}) are still treated as sensitive.
  */
 final class SensitivePropertyKeyMatcher {
-
-  private static final Pattern BUILTIN_SENSITIVE_KEY_PATTERN =
-      Pattern.compile(".*(secret|password|token|credential|access|account).*");
 
   private static volatile Set<String> typoPatterns = Set.of();
 
   private SensitivePropertyKeyMatcher() {}
 
-  static boolean isSensitive(@Nullable String key) {
-    if (key == null || key.isEmpty()) {
-      return false;
-    }
-    String lowerKey = key.toLowerCase(Locale.ROOT);
-    if (BUILTIN_SENSITIVE_KEY_PATTERN.matcher(lowerKey).matches()) {
-      return true;
-    }
+  static boolean matchesTypoPattern(String lowerKey) {
     for (String typoPattern : typoPatterns) {
       if (lowerKey.contains(typoPattern)) {
         return true;

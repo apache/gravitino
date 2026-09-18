@@ -21,7 +21,7 @@ package org.apache.gravitino.secret;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 
-/** Initializes {@link SensitivePropertyKeyMatcher} from server configuration. */
+/** Initializes supplementary typo patterns for {@link SecretPropertyUtils} from configuration. */
 public final class SensitivePropertyKeyConfigurer {
 
   private SensitivePropertyKeyConfigurer() {}
