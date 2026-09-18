@@ -105,6 +105,7 @@ import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -230,6 +231,7 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
     this.manageFullComponents = false;
     initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
@@ -244,6 +246,7 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino full environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
     this.manageFullComponents = true;
     initBaseComponents();
     initGravitinoServerComponents();

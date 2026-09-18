@@ -1146,10 +1146,10 @@ public class TestTagManager {
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
       Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
 
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("finance"));
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
       Assertions.assertEquals(
-          TagValueSelector.of("finance"),
+          TagValueSelector.of("engineering"),
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);

@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
@@ -65,6 +66,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   private String comment;
   private boolean enabled;
   private PolicyContent content;
+  @Nullable private Boolean inherited;
   private AuditInfo auditInfo;
 
   private PolicyEntity() {}
@@ -125,7 +127,33 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   }
 
   public Optional<Boolean> inherited() {
-    return Optional.empty();
+    return Optional.ofNullable(inherited);
+  }
+
+  /**
+   * Returns a copy of this policy entity with the given inheritance context.
+   *
+   * <p>The inheritance context records whether the policy was selected only from ancestor metadata
+   * objects, either by an inherited tag assignment or a legacy direct policy association. It is not
+   * part of the policy definition fields.
+   *
+   * @param inherited Whether the policy was selected only from ancestor metadata objects.
+   * @return The copied policy entity with the inheritance context.
+   */
+  public PolicyEntity copyWithInherited(boolean inherited) {
+    PolicyEntity copy =
+        PolicyEntity.builder()
+            .withId(id)
+            .withName(name)
+            .withNamespace(namespace)
+            .withPolicyType(policyType)
+            .withComment(comment)
+            .withEnabled(enabled)
+            .withContent(content)
+            .withAuditInfo(auditInfo)
+            .build();
+    copy.inherited = inherited;
+    return copy;
   }
 
   @Override

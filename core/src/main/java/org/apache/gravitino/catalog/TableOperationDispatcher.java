@@ -25,19 +25,26 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_T
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -296,13 +303,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         isRenameTable && !managed
                             ? getTableEntityBeforeRename(ident)
                             : Optional.empty();
+                    TableChange[] normalizedChanges =
+                        applyCapabilities(catalog.capabilities(), changes);
                     Table table =
                         catalog.doWithTableOps(
-                            tableOps ->
-                                tableOps.alterTable(
-                                    ident, applyCapabilities(catalog.capabilities(), changes)));
+                            tableOps -> tableOps.alterTable(ident, normalizedChanges));
                     return new AlterTableCatalogResult(
-                        snapshotTable(catalog, table, managed), tableEntityBeforeRename);
+                        snapshotTable(catalog, table, managed),
+                        tableEntityBeforeRename,
+                        resolveColumnNameChanges(normalizedChanges));
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
@@ -346,7 +355,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
-                                updateColumnsIfNecessary(alteredTable, tableEntity);
+                                updateColumnsIfNecessary(
+                                    alteredTable, tableEntity, catalogResult.columnNameChanges);
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -795,8 +805,83 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return String.join(", ", differences);
   }
 
+  /**
+   * Works out what each top-level column that existed before an alter is called after it.
+   *
+   * <p>Stored columns are matched to the catalog's columns by name, so without this a renamed
+   * column would look like a dropped column plus a new one, and lose its id and everything attached
+   * to it. The changes are replayed in order, so chained renames resolve to the final name. A
+   * column that is not in the returned map keeps its name, and a column mapped to {@code null} was
+   * dropped, so a new column that reuses its name is not mistaken for it.
+   *
+   * @param changes the changes applied to the table, after capability normalization
+   * @return the new name of each renamed column, or {@code null} for each dropped column, keyed by
+   *     the column's name before the alter
+   */
+  @VisibleForTesting
+  static Map<String, String> resolveColumnNameChanges(TableChange... changes) {
+    // Original name -> current name, or null once the original column is dropped.
+    Map<String, String> originalToCurrent = new HashMap<>();
+    // Current names of columns added by these changes.
+    Set<String> addedColumns = new HashSet<>();
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn) {
+        String[] fieldName = ((TableChange.AddColumn) change).fieldName();
+        if (fieldName.length == 1) {
+          addedColumns.add(fieldName[0]);
+        }
+
+      } else if (change instanceof TableChange.RenameColumn) {
+        TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+        if (rename.fieldName().length != 1) {
+          continue;
+        }
+        String from = rename.fieldName()[0];
+        String to = rename.getNewName();
+        String original = originalColumnNamed(originalToCurrent, addedColumns, from);
+        if (original != null) {
+          originalToCurrent.put(original, to);
+        } else if (addedColumns.remove(from)) {
+          addedColumns.add(to);
+        }
+
+      } else if (change instanceof TableChange.DeleteColumn) {
+        String[] fieldName = ((TableChange.DeleteColumn) change).fieldName();
+        if (fieldName.length != 1) {
+          continue;
+        }
+        String original = originalColumnNamed(originalToCurrent, addedColumns, fieldName[0]);
+        if (original != null) {
+          originalToCurrent.put(original, null);
+        } else {
+          addedColumns.remove(fieldName[0]);
+        }
+      }
+    }
+
+    originalToCurrent.entrySet().removeIf(e -> e.getKey().equals(e.getValue()));
+    return originalToCurrent;
+  }
+
+  /** Returns the original name of the pre-existing column currently called {@code name}. */
+  @Nullable
+  private static String originalColumnNamed(
+      Map<String, String> originalToCurrent, Set<String> addedColumns, String name) {
+    for (Map.Entry<String, String> entry : originalToCurrent.entrySet()) {
+      if (name.equals(entry.getValue())) {
+        return entry.getKey();
+      }
+    }
+    // A name no change has touched yet still belongs to the pre-existing column of that name.
+    if (!originalToCurrent.containsKey(name) && !addedColumns.contains(name)) {
+      return name;
+    }
+    return null;
+  }
+
   private Pair<Boolean, List<ColumnEntity>> updateColumnsIfNecessary(
-      Table tableFromCatalog, TableEntity tableFromGravitino) {
+      Table tableFromCatalog, TableEntity tableFromGravitino, Map<String, String> nameChanges) {
     if (tableFromCatalog == null || tableFromGravitino == null) {
       LOG.warn(
           "Cannot update columns for table when altering because table or table entity is "
@@ -818,9 +903,28 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Check if columns need to be updated in Gravitino store
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();
+    Set<String> matchedCatalogColumns = new HashSet<>();
     boolean columnsNeedsUpdate = false;
-    for (Map.Entry<String, ColumnEntity> entry : columnsFromTableEntity.entrySet()) {
-      Pair<Integer, Column> columnPair = columnsFromCatalogTable.get(entry.getKey());
+    // Renamed and dropped columns claim their catalog names first. Otherwise a stale stored column
+    // (e.g. dropped outside Gravitino) that has the same name as a rename target could be visited
+    // first and take that name, and the renamed column would lose its id.
+    List<Map.Entry<String, ColumnEntity>> storedColumns =
+        new ArrayList<>(columnsFromTableEntity.entrySet());
+    storedColumns.sort(Comparator.comparing(e -> !nameChanges.containsKey(e.getKey())));
+    for (Map.Entry<String, ColumnEntity> entry : storedColumns) {
+      // Follow renames so the stored column keeps its id under its new name.
+      String catalogColumnName =
+          nameChanges.containsKey(entry.getKey())
+              ? nameChanges.get(entry.getKey())
+              : entry.getKey();
+      Pair<Integer, Column> columnPair =
+          catalogColumnName == null || matchedCatalogColumns.contains(catalogColumnName)
+              ? null
+              : columnsFromCatalogTable.get(catalogColumnName);
+      if (columnPair != null) {
+        matchedCatalogColumns.add(catalogColumnName);
+      }
+
       if (columnPair == null) {
         LOG.debug(
             "Column {} is not found in the table from underlying source, it will be removed"
@@ -867,7 +971,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Check if there are new columns in the table from the underlying source
     for (Map.Entry<String, Pair<Integer, Column>> entry : columnsFromCatalogTable.entrySet()) {
-      if (!columnsFromTableEntity.containsKey(entry.getKey())) {
+      if (!matchedCatalogColumns.contains(entry.getKey())) {
         LOG.debug(
             "Column {} of table: {} is found in the table from underlying source but not in the table "
                 + "entity, it will be added to the table entity",
@@ -895,14 +999,23 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
     Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
         updateColumnsIfNecessary(
-            combinedTable.tableFromCatalog(), combinedTable.tableFromGravitino());
+            combinedTable.tableFromCatalog(),
+            combinedTable.tableFromGravitino(),
+            Collections.emptyMap());
 
     // No need to update the columns
     if (!columnsUpdateResult.getLeft()) {
       return combinedTable.tableFromGravitino();
     }
 
-    // Update the columns in the Gravitino store
+    // Update the columns in the Gravitino store. The diff above only decides whether a write is
+    // needed: it was computed before taking the lock, and a concurrent alter may have changed the
+    // stored columns since, e.g. renamed a column while keeping its id. So the columns are matched
+    // again against the entity being updated, which is the latest stored one. This narrows the
+    // load/alter race but does not close it: if this load read the catalog before a concurrent
+    // alter and the store after it, the catalog snapshot is the stale side. Closing that needs
+    // alterTable and loadTable to exclude each other, which is tracked separately.
+    Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,
         LockType.WRITE,
@@ -921,7 +1034,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withNamespace(entity.namespace())
                                 .withComment(entity.comment())
                                 .withProperties(entity.properties())
-                                .withColumns(columnsUpdateResult.getRight())
+                                .withColumns(
+                                    updateColumnsIfNecessary(
+                                            tableFromCatalog, entity, Collections.emptyMap())
+                                        .getRight())
                                 .withPartitioning(entity.partitioning())
                                 .withDistribution(entity.distribution())
                                 .withSortOrders(entity.sortOrders())
@@ -955,11 +1071,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private static final class AlterTableCatalogResult extends TableCatalogResult {
 
     private final Optional<TableEntity> tableEntityBeforeRename;
+    private final Map<String, String> columnNameChanges;
 
     private AlterTableCatalogResult(
-        TableCatalogResult tableResult, Optional<TableEntity> tableEntityBeforeRename) {
+        TableCatalogResult tableResult,
+        Optional<TableEntity> tableEntityBeforeRename,
+        Map<String, String> columnNameChanges) {
       super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
       this.tableEntityBeforeRename = tableEntityBeforeRename;
+      this.columnNameChanges = columnNameChanges;
     }
   }
 

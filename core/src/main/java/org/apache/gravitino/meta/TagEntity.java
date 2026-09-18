@@ -63,6 +63,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private Map<String, String> properties;
   private String[] allowedValues;
   @Nullable private TagAssignment assignment;
+  @Nullable private Boolean inherited;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -128,7 +129,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
   @Override
   public Optional<Boolean> inherited() {
-    return Optional.empty();
+    return Optional.ofNullable(inherited);
   }
 
   @Override
@@ -172,16 +173,34 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
    * @return The copied tag entity with the assignment context.
    */
   public TagEntity copyWithAssignment(@Nullable TagAssignment assignment) {
-    return TagEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withComment(comment)
-        .withProperties(properties)
-        .withAllowedValues(allowedValues)
-        .withAssignment(assignment)
-        .withAuditInfo(auditInfo)
-        .build();
+    TagEntity copy =
+        TagEntity.builder()
+            .withId(id)
+            .withName(name)
+            .withNamespace(namespace)
+            .withComment(comment)
+            .withProperties(properties)
+            .withAllowedValues(allowedValues)
+            .withAssignment(assignment)
+            .withAuditInfo(auditInfo)
+            .build();
+    copy.inherited = inherited;
+    return copy;
+  }
+
+  /**
+   * Returns a copy of this tag entity with the given inheritance context.
+   *
+   * <p>The inheritance context is used only when the tag is resolved for a metadata object; it is
+   * not part of the tag definition fields.
+   *
+   * @param inherited Whether the tag assignment is inherited from an ancestor object.
+   * @return The copied tag entity with the inheritance context.
+   */
+  public TagEntity copyWithInherited(boolean inherited) {
+    TagEntity copy = copyWithAssignment(assignment);
+    copy.inherited = inherited;
+    return copy;
   }
 
   public static Builder builder() {

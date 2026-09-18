@@ -124,6 +124,13 @@ public class TagMetadataObjectRelSQLProviderFactory {
         .softDeleteTagMetadataObjectRelsByMetadataObject(metadataObjectId, metadataObjectType);
   }
 
+  public static String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .softDeleteTagMetadataObjectRelsByMetadataObjects(metadataObjectIds, metadataObjectType);
+  }
+
   public static String softDeleteTagMetadataObjectRelsByCatalogId(
       @Param("catalogId") Long catalogId) {
     return getProvider().softDeleteTagMetadataObjectRelsByCatalogId(catalogId);
