@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,9 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -184,6 +187,101 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     TableEntity retrievedTable =
         TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
     compareTwoColumns(createdTable.columns(), retrievedTable.columns());
+  }
+
+  @TestTemplate
+  public void testDropColumnsRemovesTheirRelationsInBatches() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    // More dropped columns than one cleanup batch holds.
+    int columnCount = 1502;
+    List<ColumnEntity> columns = new ArrayList<>(columnCount);
+    for (int i = 0; i < columnCount; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("column_" + i)
+              .withPosition(i)
+              .withDataType(Types.IntegerType.get())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withAuditInfo(AUDIT_INFO)
+              .build());
+    }
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_drop_columns")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    long firstDropped = columns.get(0).id();
+    long lastDropped = columns.get(columnCount - 2).id();
+    long kept = columns.get(columnCount - 1).id();
+    for (long columnId : new long[] {firstDropped, lastDropped, kept}) {
+      insertColumnRelations(columnId);
+    }
+
+    TableEntity updated =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(columns.get(columnCount - 1)))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(table.nameIdentifier(), (TableEntity old) -> updated);
+
+    Assertions.assertEquals(0, countActiveColumnRelations(firstDropped));
+    Assertions.assertEquals(0, countActiveColumnRelations(lastDropped));
+    Assertions.assertEquals(2, countActiveColumnRelations(kept));
+  }
+
+  private void insertColumnRelations(long columnId) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "INSERT INTO owner_meta (metalake_id, metadata_object_id, metadata_object_type,"
+              + " owner_id, owner_type, audit_info, current_version, last_version, deleted_at,"
+              + " updated_at) VALUES (1, "
+              + columnId
+              + ", 'COLUMN', 1, 'USER', '{}', 0, 0, 0, 0)");
+      statement.executeUpdate(
+          "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type,"
+              + " audit_info, current_version, last_version, deleted_at) VALUES (1, "
+              + columnId
+              + ", 'COLUMN', '{}', 0, 0, 0)");
+    }
+  }
+
+  private int countActiveColumnRelations(long columnId) throws SQLException {
+    int count = 0;
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table : new String[] {"owner_meta", "tag_relation_meta"}) {
+        try (ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM "
+                    + table
+                    + " WHERE metadata_object_type = 'COLUMN' AND deleted_at = 0"
+                    + " AND metadata_object_id = "
+                    + columnId)) {
+          Assertions.assertTrue(resultSet.next());
+          count += resultSet.getInt(1);
+        }
+      }
+    }
+    return count;
   }
 
   @TestTemplate
@@ -536,6 +634,12 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         TableColumnMetaService.getInstance()
             .getColumnIdByTableIdAndName(retrievedTable.id(), updatedColumn.name());
     Assertions.assertEquals(updatedColumn.id(), updatedColumnId);
+    // The column keeps its id on rename, so its old name must no longer resolve to it.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(retrievedTable.id(), column.name()));
 
     ColumnPO updatedColumnPO =
         TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id());
@@ -564,6 +668,16 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id()));
+    // Neither name of the dropped column resolves, and it has no full name any more.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(retrievedTable.id(), column.name()));
+    Map<Long, String> fullNames =
+        MetadataObjectService.getColumnObjectsFullName(Lists.newArrayList(updatedColumn.id()));
+    Assertions.assertTrue(fullNames.containsKey(updatedColumn.id()));
+    Assertions.assertNull(fullNames.get(updatedColumn.id()));
   }
 
   @TestTemplate
