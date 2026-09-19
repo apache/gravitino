@@ -354,12 +354,32 @@ The user verification flow is:
 
 ### 7.2 Password Verification
 
+See [Design of Verified Basic Credential Cache in Gravitino](gravitino-basic-credential-cache.md)
+for the full cache design (key/value layout, invalidation, industry comparison, and security
+trade-offs).
+
 The password verification flow is:
 
 1. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
-2. Read the stored `password_hash`.
-3. Verify the submitted password against `password_hash` using the configured hashing algorithm.
-4. If verification succeeds, authenticate the request; otherwise reject it.
+2. If the user is disabled or has no `password_hash`, reject the request with **401**.
+3. If `gravitino.authenticator.basic.credentialCacheEnabled` is true, check the in-process
+   verified-credential cache for this username and password. On a hit whose cached password-hash
+   fingerprint still matches the stored hash, skip re-derivation and accept the request. Failed
+   authentications are never cached. When the cache is disabled (default), every request continues
+   to step 4.
+4. Otherwise verify the submitted password against `password_hash` using the configured hashing
+   algorithm (SHA3-512 with `i=100000` by default). On success, if the cache is enabled, remember the
+   credential for a short TTL so repeat Basic requests from the same client do not pay the full
+   derivation cost again. On failure, reject with **401**.
+5. Password changes, disables, and user removal invalidate that username's cache entry immediately
+   on the local node. Authentication always reloads the user from storage, so a changed hash or
+   disabled flag also fails closed on other nodes before TTL expiry.
+
+Configuration:
+
+- `gravitino.authenticator.basic.credentialCacheEnabled` (default `false`)
+- `gravitino.authenticator.basic.credentialCacheExpirationSecs` (default `60`, used when enabled)
+- `gravitino.authenticator.basic.credentialCacheMaxSize` (default `10000`, used when enabled)
 
 ### 7.3 Group Resolution
 
