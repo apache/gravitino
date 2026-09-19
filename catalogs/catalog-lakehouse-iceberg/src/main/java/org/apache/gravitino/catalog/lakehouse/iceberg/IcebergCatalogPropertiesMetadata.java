@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
@@ -39,6 +40,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.utils.MapUtils;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -126,6 +128,14 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false,
                 null,
                 false),
+            tableFormatVersionPropertyEntry(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "The format version of a new Iceberg table that does not request one",
+                IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION),
+            tableFormatVersionPropertyEntry(
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "The highest format version an Iceberg table may be created at or upgraded to",
+                IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION),
             integerOptionalPropertyEntry(
                 IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
                 "HTTP connection timeout in milliseconds for the REST catalog backend",
@@ -155,6 +165,20 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
     return PROPERTIES_METADATA;
   }
 
+  /**
+   * Validates the table format version properties together, against the Iceberg catalog properties
+   * the catalog is loaded with: {@code gravitino.bypass.} properties with the prefix removed, and
+   * the properties Gravitino carries over. A catalog is refused at create or alter rather than only
+   * when it loads.
+   *
+   * @param properties the complete catalog properties.
+   * @throws IllegalArgumentException if the table format version properties are invalid.
+   */
+  @Override
+  public void validateProperties(Map<String, String> properties) {
+    IcebergPropertiesUtils.validateTableFormatVersions(loadedCatalogProperties(properties));
+  }
+
   public Map<String, String> transformProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> icebergProperties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProperties);
@@ -165,5 +189,37 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           }
         });
     return icebergProperties;
+  }
+
+  /** The properties {@link IcebergCatalogOperations} builds its Iceberg configuration from. */
+  private Map<String, String> loadedCatalogProperties(Map<String, String> properties) {
+    Map<String, String> loaded =
+        new HashMap<>(MapUtils.getPrefixMap(properties, CATALOG_BYPASS_PREFIX));
+    loaded.putAll(transformProperties(properties));
+    return loaded;
+  }
+
+  /**
+   * Builds an optional, mutable catalog property that holds an Iceberg table format version.
+   *
+   * @param name property name
+   * @param description property description
+   * @param defaultValue the version that applies when the property is unset
+   * @return the property entry
+   */
+  private static PropertyEntry<Integer> tableFormatVersionPropertyEntry(
+      String name, String description, int defaultValue) {
+    return new PropertyEntry.Builder<Integer>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(Integer.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(value -> IcebergPropertiesUtils.parseTableFormatVersion(name, value))
+        .withEncoder(String::valueOf)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
   }
 }

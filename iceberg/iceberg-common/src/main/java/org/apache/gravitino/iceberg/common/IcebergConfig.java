@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.OverwriteDefaultConfig;
@@ -397,6 +398,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(720);
 
+  private final boolean governsTableFormatVersions;
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
@@ -406,20 +409,124 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   }
 
   public IcebergConfig(Map<String, String> properties) {
+    this(properties, true);
+  }
+
+  private IcebergConfig(Map<String, String> properties, boolean governsTableFormatVersions) {
     super(false);
     loadFromMap(properties, k -> true);
+    this.governsTableFormatVersions = governsTableFormatVersions;
   }
 
   public IcebergConfig() {
     super(false);
+    this.governsTableFormatVersions = true;
   }
 
+  /**
+   * Returns this configuration for an Iceberg REST service catalog that federates a remote Iceberg
+   * REST catalog. Such a catalog forwards requests unchanged, so the table format version
+   * properties do not apply to it: they are neither validated nor declared to the remote catalog as
+   * {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}.
+   *
+   * @return a configuration with the same properties that does not govern table format versions
+   */
+  public IcebergConfig forFederatedCatalog() {
+    return new IcebergConfig(getAllConfig(), false);
+  }
+
+  /**
+   * Returns whether this catalog applies the table format version properties.
+   *
+   * @return {@code false} for a {@link #forFederatedCatalog() federated} catalog, whose properties
+   *     are not read at all; {@code true} otherwise
+   */
+  public boolean governsTableFormatVersions() {
+    return governsTableFormatVersions;
+  }
+
+  /**
+   * Returns the properties used to initialize the Iceberg catalog backend.
+   *
+   * <p>When {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} is set, it is also written to
+   * Iceberg's {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}, so tables created
+   * without a format version get it. A {@link #forFederatedCatalog() federated} catalog's
+   * properties are neither validated nor given a declared default.
+   *
+   * @return the Iceberg catalog properties.
+   * @throws IllegalArgumentException if the table format version properties are invalid.
+   */
   public Map<String, String> getIcebergCatalogProperties() {
+    validateTableFormatVersions();
     Map<String, String> config = getAllConfig();
     Map<String, String> transformedConfig =
         IcebergPropertiesUtils.toIcebergCatalogProperties(config);
     transformedConfig.putAll(config);
+    getDeclaredDefaultTableFormatVersion()
+        .ifPresent(
+            version ->
+                transformedConfig.put(
+                    IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                    String.valueOf(version)));
     return transformedConfig;
+  }
+
+  /**
+   * Validates the table format version properties of this configuration.
+   *
+   * @throws IllegalArgumentException if a value is not a supported format version, the default
+   *     exceeds the maximum, or {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}
+   *     conflicts with them.
+   */
+  public void validateTableFormatVersions() {
+    if (governsTableFormatVersions) {
+      IcebergPropertiesUtils.validateTableFormatVersions(getAllConfig());
+    }
+  }
+
+  /**
+   * Returns the default format version this catalog declares to Iceberg as {@link
+   * IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION}.
+   *
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} when it is set, otherwise empty,
+   *     leaving the default to Iceberg; always empty for a {@link #forFederatedCatalog() federated}
+   *     catalog.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public Optional<Integer> getDeclaredDefaultTableFormatVersion() {
+    return governsTableFormatVersions ? getConfiguredDefaultTableFormatVersion() : Optional.empty();
+  }
+
+  /**
+   * Returns {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} when it is set.
+   *
+   * @return the configured default table format version, or empty when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public Optional<Integer> getConfiguredDefaultTableFormatVersion() {
+    return IcebergPropertiesUtils.configuredDefaultTableFormatVersion(getAllConfig());
+  }
+
+  /**
+   * Returns the format version of a new table that does not request one.
+   *
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT}, or {@link
+   *     IcebergConstants#DEFAULT_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public int getDefaultTableFormatVersion() {
+    return IcebergPropertiesUtils.defaultTableFormatVersion(getAllConfig());
+  }
+
+  /**
+   * Returns the highest format version a table may be created at or upgraded to.
+   *
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_MAX}, or {@link
+   *     IcebergConstants#DEFAULT_MAX_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public int getMaxTableFormatVersion() {
+    return IcebergPropertiesUtils.maxTableFormatVersion(getAllConfig());
   }
 
   @Override

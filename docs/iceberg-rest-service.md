@@ -647,6 +647,28 @@ View operations are supported when using the JDBC catalog backend with schema ve
 |----------------------------------------------|---------------------------------------------------------------------------------------------------------------------|---------------|----------|
 | `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out. | `V1`          | No       |
 
+#### Table Format Version
+
+| Configuration item                                    | Description                                                                                                        | Default value                                       | Required |
+|-------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------|----------|
+| `gravitino.iceberg-rest.table-format-version.default` | The format version of a new table that does not request one. Must not exceed `table-format-version.max`.          | `2`                                                 | No       |
+| `gravitino.iceberg-rest.table-format-version.max`     | The highest format version a table may be created at or upgraded to.                                               | `4`, the highest version the bundled Iceberg writes | No       |
+
+- Both accept the values the `format-version` table property accepts. For a dynamic catalog, set
+  the catalog properties `table-format-version.default` and `table-format-version.max` instead.
+- A create or stage-create without `format-version` gets `table-format-version.default`, which the
+  service also writes to Iceberg's `table-default.format-version`. A
+  `table-default.format-version` that you set yourself must match it.
+- A create, stage-create, or `upgrade-format-version` commit above `table-format-version.max` fails
+  with HTTP 400. Existing tables above the maximum still load and commit.
+- `4`, the highest version the bundled Iceberg writes, is also the highest this Gravitino build
+  accepts: `table-format-version.max` can only lower it, and a version above it fails with HTTP 400
+  on the same paths.
+- A catalog whose default exceeds its maximum, or whose `table-default.format-version` conflicts,
+  fails to load. The static configuration is checked at startup.
+- Catalogs with the `rest` backend forward requests unchanged, so these settings do not apply to
+  them.
+
 #### Additional Iceberg Catalog Properties
 
 Add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).

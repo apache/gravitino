@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -31,10 +32,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -52,11 +56,13 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Scan;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
@@ -66,6 +72,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -81,6 +88,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private final Object catalogConfigToClientsLock = new Object();
 
   private final ScanPlanCache scanPlanCache;
+
+  /** The catalog's {@code table-format-version.default}, or null when unset. */
+  @Nullable private final Integer configuredDefaultFormatVersion;
+
+  /**
+   * The catalog's effective {@code table-format-version.max}; the build's ceiling for a federated
+   * catalog, which does not apply the bounds.
+   */
+  private final int maxFormatVersion;
 
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
@@ -113,10 +129,18 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
+    this.configuredDefaultFormatVersion =
+        config.getDeclaredDefaultTableFormatVersion().orElse(null);
+    // A federated catalog forwards requests unchanged, so its bounds are not read or parsed.
+    this.maxFormatVersion =
+        config.governsTableFormatVersions()
+            ? config.getMaxTableFormatVersion()
+            : IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION;
   }
 
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
+    request = applyFormatVersionBounds(request);
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(
@@ -125,6 +149,65 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
+  }
+
+  /**
+   * Commits table changes, refusing a format version upgrade above {@code
+   * table-format-version.max}.
+   *
+   * <p>A commit that keeps an existing table at a version above the maximum is not an upgrade and
+   * still succeeds; only a staged-create commit or a commit that raises the version is refused.
+   *
+   * @param tableIdentifier the table to change.
+   * @param updateTableRequest the requirements and updates to commit.
+   * @return the committed table.
+   * @throws IllegalArgumentException if the commit upgrades the table above the maximum.
+   */
+  @Override
+  public LoadTableResponse updateTable(
+      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    checkFormatVersionUpgrade(tableIdentifier, updateTableRequest);
+    return super.updateTable(tableIdentifier, updateTableRequest);
+  }
+
+  /**
+   * Applies the catalog's format version bounds to a create or stage-create request.
+   *
+   * <p>A requested version above {@code table-format-version.max} is refused. A stage-create that
+   * requests no version gets {@code table-format-version.default} when the catalog sets it, because
+   * Iceberg builds staged metadata without the catalog's {@code table-default.} properties. A
+   * direct create gets it from {@code table-default.format-version}.
+   *
+   * @param request the create request.
+   * @return the request to create the table with.
+   * @throws IllegalArgumentException if the requested version exceeds the maximum.
+   */
+  @VisibleForTesting
+  CreateTableRequest applyFormatVersionBounds(CreateTableRequest request) {
+    String requested = request.properties().get(TableProperties.FORMAT_VERSION);
+    if (StringUtils.isNotBlank(requested)) {
+      // An unparsable value is left for Iceberg to reject, as before.
+      Integer requestedVersion = Ints.tryParse(requested.trim());
+      if (requestedVersion != null) {
+        IcebergPropertiesUtils.checkTableFormatVersionAllowed(requestedVersion, maxFormatVersion);
+      }
+      return request;
+    }
+    if (!request.stageCreate() || configuredDefaultFormatVersion == null) {
+      return request;
+    }
+
+    Map<String, String> properties = new HashMap<>(request.properties());
+    properties.put(TableProperties.FORMAT_VERSION, String.valueOf(configuredDefaultFormatVersion));
+    return CreateTableRequest.builder()
+        .withName(request.name())
+        .withSchema(request.schema())
+        .withPartitionSpec(request.spec())
+        .withWriteOrder(request.writeOrder())
+        .withLocation(request.location())
+        .setProperties(properties)
+        .stageCreate()
+        .build();
   }
 
   public LoadTableResponse loadTable(
@@ -640,6 +723,36 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
     }
     return scan;
+  }
+
+  /**
+   * Refuses a commit that upgrades a table, or creates a staged table, above {@code
+   * table-format-version.max}.
+   *
+   * @param tableIdentifier the table to change.
+   * @param request the commit request.
+   * @throws IllegalArgumentException if the commit's target version exceeds the maximum.
+   */
+  private void checkFormatVersionUpgrade(
+      TableIdentifier tableIdentifier, UpdateTableRequest request) {
+    OptionalInt targetVersion =
+        request.updates().stream()
+            .filter(MetadataUpdate.UpgradeFormatVersion.class::isInstance)
+            .mapToInt(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
+            .max();
+    if (!targetVersion.isPresent() || targetVersion.getAsInt() <= maxFormatVersion) {
+      return;
+    }
+    boolean isCreate =
+        request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+    if (!isCreate
+        && targetVersion.getAsInt() <= loadTableMetadata(tableIdentifier).formatVersion()) {
+      // Not an upgrade: the table is already at or above the target version.
+      return;
+    }
+    IcebergPropertiesUtils.checkTableFormatVersionAllowed(
+        targetVersion.getAsInt(), maxFormatVersion);
   }
 
   private ScanPlanCache loadScanPlanCache(IcebergConfig config) {

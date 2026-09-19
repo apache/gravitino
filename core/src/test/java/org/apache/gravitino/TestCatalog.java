@@ -43,6 +43,9 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   public static final String PROPERTY_KEY2 = "key2";
   public static final String PROPERTY_KEY3 = "key3";
   public static final String PROPERTY_KEY4 = "key4";
+  /** A value {@link #PROPERTY_KEY2} and {@link #PROPERTY_KEY4} may not both hold. */
+  public static final String CONFLICTING_VALUE = "conflicting-value";
+
   public static final String PROPERTY_RESERVED_KEY = "reserved_key";
   public static final String PROPERTY_HIDDEN_KEY = "hidden_key";
   public static final String PROPERTY_KEY5_PREFIX = "key5-";
@@ -175,6 +178,15 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
                     false /* hidden */,
                     false /* reserved */))
             .build();
+      }
+
+      @Override
+      public void validateProperties(Map<String, String> properties) {
+        if (CONFLICTING_VALUE.equals(properties.get(PROPERTY_KEY2))
+            && CONFLICTING_VALUE.equals(properties.get(PROPERTY_KEY4))) {
+          throw new IllegalArgumentException(
+              PROPERTY_KEY2 + " and " + PROPERTY_KEY4 + " must not both be " + CONFLICTING_VALUE);
+        }
       }
     };
   }

@@ -295,6 +295,33 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
+  public void testTableFormatVersionCatalogPropertiesReachTheIcebergConfig() {
+    Map<String, String> catalogProperties = new HashMap<>();
+    catalogProperties.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    catalogProperties.put(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3");
+    catalogProperties.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "3");
+    catalogProperties.put("gravitino.bypass.table-default.format-version", "3");
+
+    IcebergConfig icebergConfig =
+        DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
+
+    Assertions.assertEquals(3, icebergConfig.getDefaultTableFormatVersion());
+    Assertions.assertEquals(3, icebergConfig.getMaxTableFormatVersion());
+    Assertions.assertEquals(
+        "3",
+        icebergConfig
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+    // A bypassed Iceberg default that disagrees with the catalog default is rejected.
+    catalogProperties.put("gravitino.bypass.table-default.format-version", "2");
+    IcebergConfig conflicting =
+        DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, conflicting::getIcebergCatalogProperties);
+  }
+
+  @Test
   public void testInternalCatalogFetcher() throws IllegalAccessException {
     String metalakeName = "test_metalake";
     String catalogName = "internal_catalog";

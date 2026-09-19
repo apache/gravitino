@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestCatalog.CONFLICTING_VALUE;
 import static org.apache.gravitino.TestCatalog.PROPERTY_HIDDEN_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
@@ -285,6 +286,55 @@ public class TestCatalogManager {
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change5));
     Assertions.assertTrue(
         e3.getMessage().contains("Property key6-1 is immutable"), e3.getMessage());
+    reset();
+  }
+
+  @Test
+  void testPropertiesAreValidatedTogetherOnCreateAndAlter() throws IOException {
+    NameIdentifier refused = NameIdentifier.of("metalake", "conflicting_create");
+    Map<String, String> conflicting =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, CONFLICTING_VALUE)
+            .put(PROPERTY_KEY4, CONFLICTING_VALUE)
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .build();
+    Exception onCreate =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    refused, Catalog.Type.RELATIONAL, provider, "comment", conflicting));
+    Assertions.assertTrue(
+        onCreate.getMessage().contains("must not both be"), onCreate.getMessage());
+    Assertions.assertFalse(catalogManager.catalogExists(refused));
+
+    NameIdentifier ident = NameIdentifier.of("metalake", "conflicting_alter");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, CONFLICTING_VALUE)
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .build();
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    // Each change is valid on its own; only the properties the catalog would have together are not.
+    Exception onAlter =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident, CatalogChange.setProperty(PROPERTY_KEY4, CONFLICTING_VALUE)));
+    Assertions.assertTrue(onAlter.getMessage().contains("must not both be"), onAlter.getMessage());
+    Assertions.assertNotEquals(
+        CONFLICTING_VALUE, catalogManager.loadCatalog(ident).properties().get(PROPERTY_KEY4));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.alterCatalog(
+                ident,
+                CatalogChange.setProperty(PROPERTY_KEY2, "value2"),
+                CatalogChange.setProperty(PROPERTY_KEY4, CONFLICTING_VALUE)));
     reset();
   }
 

@@ -198,4 +198,17 @@ public interface PropertiesMetadata {
     }
     return Optional.empty();
   }
+
+  /**
+   * Validates the rules that relate several properties to each other, which a single property
+   * entry's decoder cannot check.
+   *
+   * <p>It is handed the complete property map the entity would have: the requested properties at
+   * create, and the stored properties with the change applied at alter. The default has no such
+   * rules.
+   *
+   * @param properties the complete properties of the entity.
+   * @throws IllegalArgumentException if the properties violate a rule.
+   */
+  default void validateProperties(Map<String, String> properties) throws IllegalArgumentException {}
 }
