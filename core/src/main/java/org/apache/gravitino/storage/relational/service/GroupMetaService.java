@@ -193,7 +193,7 @@ public class GroupMetaService {
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeForGroupCreate(metalakePO),
+          () -> lockMetalakeForGroupWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
@@ -204,6 +204,9 @@ public class GroupMetaService {
                       mapper.insertGroupMeta(groupPO);
                     }
                   }),
+          () ->
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(metalakePO.getMetalakeId(), roleIds),
           () -> {
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
@@ -304,6 +307,16 @@ public class GroupMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            if (!insertRoleIds.isEmpty() || !deleteRoleIds.isEmpty()) {
+              // The cascade writes memberships before principals; this update does the reverse.
+              // Fence grants and revokes before the principal CAS to avoid both orphan grants and
+              // a revoke/cascade deadlock. Metadata-only updates write no membership rows, so they
+              // need no parent lock (which would serialize unrelated updates on H2).
+              lockMetalakeForGroupWrite(
+                  identifier.namespace().level(0), oldGroupPO.getMetalakeId());
+            }
+          },
+          () -> {
             int updated =
                 SessionUtils.getWithoutCommit(
                     GroupMetaMapper.class,
@@ -315,6 +328,9 @@ public class GroupMetaService {
               throw groupWriteFailure(identifier, oldGroupPO, GroupLookup.NAME);
             }
           },
+          () ->
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(oldGroupPO.getMetalakeId(), insertRoleIds),
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -444,34 +460,22 @@ public class GroupMetaService {
   }
 
   /**
-   * Holds the parent metalake row for the rest of the transaction, so the group cannot be created
-   * under a metalake that is going away.
+   * Keeps the metalake alive while creating a group or changing role memberships.
    *
-   * <p>The lock is shared, not exclusive: many groups can be created under the same metalake at the
-   * same time. Dropping a metalake takes an exclusive lock on this row, so a drop and a create
-   * cannot overlap. Whoever gets the row first wins, and the loser either sees the metalake gone or
-   * inserts under a metalake that is still there.
-   *
-   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
-   * looked the metalake up by name, so a renamed row means the name in the request no longer
-   * exists.
-   *
-   * <p>The metalake's version is deliberately not compared, matching {@code CatalogMetaService}.
-   * Holding the row is what makes the create safe. An unrelated metalake edit that commits in
-   * between bumps the version without making this create wrong, so comparing it would reject the
-   * create for no reason.
+   * <p>Take this shared lock before the principal write, matching the metalake cascade's root lock.
+   * Concurrent writes can share it on MySQL/PostgreSQL; H2 uses an exclusive lock. Validate the
+   * observed identity and name, not the version, so unrelated metalake edits remain allowed.
    */
-  private void lockMetalakeForGroupCreate(MetalakePO observedMetalakePO) {
+  private void lockMetalakeForGroupWrite(String metalakeName, Long metalakeId) {
     OccWriteSupport.lockParentForChildWrite(
-        observedMetalakePO.getMetalakeName(),
+        metalakeName,
         Entity.EntityType.METALAKE,
         () ->
             SessionUtils.getWithoutCommit(
                 MetalakeMetaMapper.class,
-                mapper ->
-                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
         null,
-        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+        current -> Objects.equals(current.getMetalakeName(), metalakeName));
   }
 
   private RuntimeException groupWriteFailure(
