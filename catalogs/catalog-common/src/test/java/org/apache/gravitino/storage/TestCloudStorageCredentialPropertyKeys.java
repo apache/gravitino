@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Test;
 
 public class TestCloudStorageCredentialPropertyKeys {
@@ -64,5 +66,51 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_REGION));
+
+    // Secret-bearing keys from Glue/Paimon-DLF are static credentials.
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
+
+    // Access key IDs are non-hidden identifiers, not secrets; they behave like s3/oss/cos IDs.
+    assertFalse(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertFalse(
+        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
+  }
+
+  @Test
+  void testModuleSecretKeysStrippedButAccessKeyIdsSurvive() {
+    Map<String, String> input =
+        Map.of(
+            AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "aad-secret",
+            GlueConstants.AWS_ACCESS_KEY_ID, "ak",
+            GlueConstants.AWS_SECRET_ACCESS_KEY, "sk",
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak",
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk",
+            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, "dlf-token");
+
+    Map<String, String> filtered =
+        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+
+    // The four secret-bearing keys must be stripped.
+    assertFalse(filtered.containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+    assertFalse(filtered.containsKey(GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
+    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
+
+    // Access key IDs are non-hidden identifiers and must survive in properties().
+    assertEquals("ak", filtered.get(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertEquals("dlf-ak", filtered.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
   }
 }

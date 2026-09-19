@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 
 /**
  * Gravitino property keys for cloud static <em>secret</em> credentials.
@@ -50,7 +52,11 @@ public final class CloudStorageCredentialPropertyKeys {
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
+          AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+          GlueConstants.AWS_SECRET_ACCESS_KEY,
+          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+          PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN);
 
   private CloudStorageCredentialPropertyKeys() {}
 
