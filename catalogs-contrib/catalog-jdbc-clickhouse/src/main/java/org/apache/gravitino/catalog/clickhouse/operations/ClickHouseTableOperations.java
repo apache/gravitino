@@ -1515,7 +1515,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     settings.put(TableConstants.SETTINGS_PREFIX + key, value);
   }
 
-  private static int findTopLevelKeyword(String value, String keyword) {
+  private static int findLastTopLevelKeyword(String value, String keyword) {
+    int keywordIndex = -1;
     for (int i = 0; i < value.length(); i++) {
       char current = value.charAt(i);
       if (isQuoteDelimiter(current)) {
@@ -1529,10 +1530,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       } else if (current == ')') {
         throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
       } else if (isKeywordAt(value, i, keyword)) {
-        return i;
+        keywordIndex = i;
       }
     }
-    return -1;
+    return keywordIndex;
   }
 
   private static boolean isKeywordAt(String value, int index, String keyword) {
@@ -1554,9 +1555,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // engine_full is formatted from ClickHouse's ASTStorage, where SETTINGS is the final storage
-    // clause. Locate it at top level and parse the remainder so keywords in engine parameters and
-    // quoted values are not treated as clause boundaries.
-    int settingsStart = findTopLevelKeyword(engineFull, "SETTINGS");
+    // clause. Use the last top-level match because ORDER BY may contain an unquoted identifier
+    // named "settings". Quoted values and engine parameters are skipped by the scanner.
+    int settingsStart = findLastTopLevelKeyword(engineFull, "SETTINGS");
     if (settingsStart >= 0) {
       return parseSettingsClause(engineFull.substring(settingsStart + "SETTINGS".length()).trim());
     }

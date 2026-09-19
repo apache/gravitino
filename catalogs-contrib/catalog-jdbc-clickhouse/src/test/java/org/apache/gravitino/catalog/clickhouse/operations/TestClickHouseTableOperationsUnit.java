@@ -431,7 +431,7 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
-  void testParseSettingsFindsTopLevelClause() {
+  void testParseSettingsFindsLastTopLevelClause() {
     ExposedClickHouseTableOperations ops = newOps();
 
     Map<String, String> settings =
@@ -448,6 +448,13 @@ public class TestClickHouseTableOperationsUnit {
     Assertions.assertEquals(1, settings.size());
     Assertions.assertEquals(
         "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY settings SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
   }
 
   @Test

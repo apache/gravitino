@@ -2887,9 +2887,18 @@ public class CatalogClickHouseIT extends BaseIT {
     String name = GravitinoITUtils.genRandomName("settings_native");
     clickhouseService.executeQuery(
         String.format(
-            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+            "CREATE TABLE `%s`.`%s` (settings Int32) ENGINE = MergeTree ORDER BY settings"
                 + " SETTINGS index_granularity = 2048",
             schemaName, name));
+
+    String engineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, name));
+    Assertions.assertNotNull(engineFull);
+    Assertions.assertTrue(
+        engineFull.contains("ORDER BY settings SETTINGS index_granularity = 2048"), engineFull);
 
     Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
     Map<String, String> props = loaded.properties();
