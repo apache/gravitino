@@ -35,4 +35,13 @@ public class NetworksConflictTest {
     final String subnet2 = "10.20.31.0/28"; // allocate IP ranger is 10.20.31.1 ~ 10.20.31.14
     Assertions.assertFalse(ContainerSuite.ipRangesOverlap(subnet1, subnet2));
   }
+
+  @Test
+  public void dockerGatewayModeRequiresDocker28() {
+    Assertions.assertTrue(ContainerSuite.supportsDirectRoutingGatewayMode("28.0.0"));
+    Assertions.assertTrue(ContainerSuite.supportsDirectRoutingGatewayMode("29.7.2"));
+    Assertions.assertFalse(ContainerSuite.supportsDirectRoutingGatewayMode("27.5.1"));
+    Assertions.assertFalse(ContainerSuite.supportsDirectRoutingGatewayMode("unknown"));
+    Assertions.assertFalse(ContainerSuite.supportsDirectRoutingGatewayMode(null));
+  }
 }

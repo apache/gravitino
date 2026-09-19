@@ -32,7 +32,9 @@ repositories {
 val glueHiveJarsDir: String? = project(":spark-connector").extra["glueHiveJarsDir"] as String?
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark35.get()
+// Keep patch-version compatibility checks module-local; do not change the shared version catalog.
+val sparkVersion: String =
+  project.properties["sparkVersionOverride"] as? String ?: libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4spark35.get()
 val paimonVersion: String = libs.versions.paimon.get()
@@ -115,6 +117,9 @@ dependencies {
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   compileOnly(libs.lance.namespace.apache.client)
   compileOnly(libs.aws.glue)
+  if (scalaVersion == "2.12") {
+    compileOnly(libs.doris.spark.connector)
+  }
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
@@ -216,6 +221,9 @@ dependencies {
   testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  if (scalaVersion == "2.12") {
+    testImplementation(libs.doris.spark.connector)
+  }
   testImplementation(libs.testcontainers)
   testImplementation(libs.aws.policy)
   testImplementation(project(":iceberg:iceberg-common"))
@@ -248,7 +256,40 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+if (scalaVersion != "2.12") {
+  sourceSets {
+    named("main") {
+      java.exclude("**/jdbc/doris/**")
+    }
+    named("test") {
+      java.exclude("**/jdbc/doris/**")
+      java.exclude("**/integration/test/jdbc/SparkJdbcDorisAuthorizationIT35.java")
+      java.exclude("**/integration/test/jdbc/SparkJdbcDorisCatalogIT35.java")
+      java.exclude("**/integration/test/jdbc/SparkJdbcDorisLoadPrivilegeIT35.java")
+    }
+  }
+}
+
 tasks.test {
+  if (scalaVersion == "2.12") {
+    doFirst {
+      if (System.getProperty("gravitino.doris.spark.connector.jar").isNullOrBlank()) {
+        val dorisConnectorJar =
+          configurations.testRuntimeClasspath.get().files.firstOrNull {
+            it.name.startsWith("spark-doris-connector-spark-3.5-") && it.name.endsWith(".jar")
+          }
+        if (dorisConnectorJar == null) {
+          throw GradleException(
+            "The Doris Spark Connector JAR is required for Spark 3.5 integration tests"
+          )
+        }
+        systemProperty(
+          "gravitino.doris.spark.connector.jar",
+          dorisConnectorJar.absolutePath
+        )
+      }
+    }
+  }
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
   if (!enableSparkSQLITs) {
@@ -270,6 +311,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar")
   }
 }
 

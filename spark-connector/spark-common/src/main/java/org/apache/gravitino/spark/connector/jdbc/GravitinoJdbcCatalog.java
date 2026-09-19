@@ -65,7 +65,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @param sparkProperties the mutable Spark properties map to update
    */
   @VisibleForTesting
-  static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
+  protected static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
     Credential[] credentials;
     try {
       credentials = catalog.supportsCredentials().getCredentials();

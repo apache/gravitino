@@ -28,6 +28,8 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -96,6 +98,17 @@ public class DorisContainer extends BaseContainer {
     String composeFile =
         ITUtils.joinPath(
             dir, "integration-test-common", "doris-docker-script", "docker-compose.yaml");
+    List<File> composeFiles = new ArrayList<>();
+    composeFiles.add(new File(composeFile));
+    if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
+      composeFiles.add(
+          new File(
+              ITUtils.joinPath(
+                  dir,
+                  "integration-test-common",
+                  "doris-docker-script",
+                  "docker-compose-mac-network.yaml")));
+    }
 
     Preconditions.check(
         "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE "
@@ -116,7 +129,7 @@ public class DorisContainer extends BaseContainer {
     }
 
     composeContainer =
-        new ComposeContainer(new File(composeFile))
+        new ComposeContainer(composeFiles)
             .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", image)
             .withEnv("GRAVITINO_CI_DORIS_FE_IMAGE", feImage)
             .withEnv("GRAVITINO_CI_DORIS_BE_IMAGE", beImage)
@@ -197,6 +210,11 @@ public class DorisContainer extends BaseContainer {
   /** Returns the host-mapped MySQL port (random, not the container-internal 9030). */
   public int getFeMysqlPort() {
     return feMysqlPort;
+  }
+
+  /** Returns the host-mapped HTTP port of the Doris FE. */
+  public int getFeHttpPort() {
+    return composeContainer.getServicePort(FE_SERVICE, FE_HTTP_PORT);
   }
 
   @Override
