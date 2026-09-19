@@ -127,6 +127,26 @@ public class TestPostgreSqlTypeConverter {
         () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
   }
 
+  @Test
+  public void testFromGravitinoExternalTypeValidation() {
+    checkGravitinoTypeToJdbcType(NUMERIC, Types.ExternalType.of(NUMERIC));
+
+    // An external type cannot append another action to the generated ALTER TABLE statement.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(
+                Types.ExternalType.of("int, ALTER COLUMN other SET DATA TYPE text")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(
+                Types.ExternalType.of("json; DROP TABLE foo")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("int -- comment")));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
