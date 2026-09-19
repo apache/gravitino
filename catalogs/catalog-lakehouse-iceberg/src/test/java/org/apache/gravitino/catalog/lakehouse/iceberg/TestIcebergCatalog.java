@@ -139,6 +139,44 @@ public class TestIcebergCatalog {
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());
   }
 
+  /**
+   * A stored catalog whose {@code table-format-version.default} exceeds its {@code .max}, as one
+   * saved before these properties were validated at create and alter could be, still loads as
+   * metadata: {@code CatalogManager} does not initialize the operations on load. Its first schema
+   * or table operation initializes them and fails with an {@link IllegalArgumentException} that
+   * names both properties, which the Gravitino server maps to HTTP 400. The failure repeats on
+   * every operation until the properties are fixed.
+   */
+  @Test
+  void testStoredCatalogWithDefaultAboveMaxFailsOnFirstOperation() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3");
+    properties.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2");
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(7L)
+            .withName("default-above-max")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .withProperties(properties)
+            .build();
+    IcebergCatalog catalog =
+        new IcebergCatalog().withCatalogConf(properties).withCatalogEntity(entity);
+
+    Assertions.assertEquals(
+        "3", catalog.properties().get(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT));
+    for (int attempt = 0; attempt < 2; attempt++) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(IllegalArgumentException.class, catalog::ops);
+      Assertions.assertEquals(
+          "'table-format-version.default' (3) must not exceed 'table-format-version.max' (2)",
+          e.getMessage());
+    }
+  }
+
   @Test
   public void testShouldValidateWarehouseProperty() {
     Assertions.assertTrue(

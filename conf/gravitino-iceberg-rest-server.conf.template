@@ -50,6 +50,9 @@ gravitino.iceberg-rest.includeErrorStackTrace = true
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog
 gravitino.iceberg-rest.warehouse = /tmp
+# Format version of a new table that doesn't request one (default 2), and the highest allowed (default 4).
+# gravitino.iceberg-rest.table-format-version.default = 3
+# gravitino.iceberg-rest.table-format-version.max = 3
 
 # THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND WITH S3 SUPPORT
 

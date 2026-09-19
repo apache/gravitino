@@ -23,6 +23,7 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.day;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.truncate;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -715,12 +716,157 @@ public class TestIcebergTable {
     Assertions.assertEquals("3", rebuiltFormatVersion("3"));
   }
 
+  @Test
+  void testRebuildCreatePropertiesUsesCatalogDefaultFormatVersion() {
+    Assertions.assertEquals(
+        "3",
+        IcebergTable.rebuildCreateProperties(new HashMap<>(), 3)
+            .get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+    Map<String, String> explicit = new HashMap<>();
+    explicit.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "1");
+    Assertions.assertEquals(
+        "1",
+        IcebergTable.rebuildCreateProperties(explicit, 3)
+            .get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+  }
+
+  @Test
+  void testCreateTableWithoutFormatVersionPropertiesKeepsTodaysDefault() throws Exception {
+    try (IcebergCatalogOperations ops = formatVersionOperations(Maps.newHashMap())) {
+      Assertions.assertEquals(2, createdFormatVersion(ops, "unset", null));
+      Assertions.assertEquals(4, createdFormatVersion(ops, "v4", "4"));
+    }
+  }
+
+  @Test
+  void testCreateTableWithoutRequestedVersionUsesCatalogDefault() throws Exception {
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3");
+    try (IcebergCatalogOperations ops = formatVersionOperations(conf)) {
+      Assertions.assertEquals(3, createdFormatVersion(ops, "defaulted", null));
+      Assertions.assertEquals(1, createdFormatVersion(ops, "explicit", "1"));
+    }
+  }
+
+  @Test
+  void testCreateTableAboveMaxFormatVersionIsRefused() throws Exception {
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2");
+    try (IcebergCatalogOperations ops = formatVersionOperations(conf)) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> createdFormatVersion(ops, "too_new", "3"));
+      Assertions.assertTrue(
+          e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_MAX), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("limit 2"), e.getMessage());
+      Assertions.assertFalse(ops.tableExists(formatVersionTableIdent("too_new")));
+
+      Assertions.assertEquals(2, createdFormatVersion(ops, "at_max", "2"));
+    }
+  }
+
+  /**
+   * A version above the build's ceiling is refused as unsupported, naming the supported range
+   * rather than the unset {@code table-format-version.max}. The Gravitino API validates the table
+   * properties first, which reports the invalid value with the ceiling as the cause, and then
+   * creates through the operations, so both are checked. The {@link IllegalArgumentException} maps
+   * to HTTP 400.
+   */
+  @Test
+  void testCreateTableAboveBuildCeilingNamesTheCeiling() throws Exception {
+    String expected = "Iceberg format-version 5 is not supported by this Gravitino (supports 1-4)";
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForCreate(
+                    TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA.tablePropertiesMetadata(),
+                    ImmutableMap.of(IcebergTablePropertiesMetadata.FORMAT_VERSION, "5")));
+    Assertions.assertTrue(
+        e.getMessage().contains(IcebergTablePropertiesMetadata.FORMAT_VERSION), e.getMessage());
+    Assertions.assertEquals(expected, e.getCause().getMessage());
+
+    try (IcebergCatalogOperations ops = formatVersionOperations(Maps.newHashMap())) {
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> createdFormatVersion(ops, "v5", "5"));
+      Assertions.assertEquals(expected, e.getMessage());
+      Assertions.assertFalse(ops.tableExists(formatVersionTableIdent("v5")));
+    }
+  }
+
+  @Test
+  void testInvalidFormatVersionPropertiesFailCatalogInitialization() {
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3");
+    conf.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "2");
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> formatVersionOperations(conf));
+    Assertions.assertTrue(e.getMessage().contains("must not exceed"), e.getMessage());
+
+    Map<String, String> conflicting = Maps.newHashMap();
+    conflicting.put(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3");
+    conflicting.put(
+        "gravitino.bypass." + IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION, "2");
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> formatVersionOperations(conflicting));
+    Assertions.assertTrue(e.getMessage().contains("conflicts with"), e.getMessage());
+  }
+
+  private static IcebergCatalogOperations formatVersionOperations(Map<String, String> conf) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(UUID.randomUUID().getMostSignificantBits())
+            .withName(ICEBERG_CATALOG_NAME)
+            .withNamespace(Namespace.of(META_LAKE_NAME))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    IcebergCatalogOperations ops = new IcebergCatalogOperations();
+    ops.initialize(conf, entity.toCatalogInfo(), TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA);
+    ops.createSchema(schemaIdent, ICEBERG_COMMENT, Maps.newHashMap());
+    return ops;
+  }
+
+  private static NameIdentifier formatVersionTableIdent(String name) {
+    return NameIdentifier.of(META_LAKE_NAME, ICEBERG_CATALOG_NAME, ICEBERG_SCHEMA_NAME, name);
+  }
+
+  private static int createdFormatVersion(
+      IcebergCatalogOperations ops, String name, String formatVersion) {
+    Map<String, String> properties = Maps.newHashMap();
+    if (formatVersion != null) {
+      properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, formatVersion);
+    }
+    NameIdentifier ident = formatVersionTableIdent(name);
+    ops.createTable(
+        ident,
+        new Column[] {
+          IcebergColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
+        },
+        ICEBERG_COMMENT,
+        properties,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+    return Integer.parseInt(
+        ops.loadTable(ident).properties().get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+  }
+
   private static String rebuiltFormatVersion(String input) {
     Map<String, String> properties = new HashMap<>();
     if (input != null) {
       properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, input);
     }
-    return IcebergTable.rebuildCreateProperties(properties)
+    return IcebergTable.rebuildCreateProperties(
+            properties, IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION)
         .get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
   }
 

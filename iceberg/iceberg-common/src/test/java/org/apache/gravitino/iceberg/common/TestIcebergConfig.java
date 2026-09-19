@@ -171,4 +171,141 @@ public class TestIcebergConfig {
             negativeSocketTimeoutConfig.get(
                 IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
   }
+
+  @Test
+  public void testTableFormatVersionFallbacksWhenUnset() {
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertFalse(config.getConfiguredDefaultTableFormatVersion().isPresent());
+    Assertions.assertEquals(2, config.getDefaultTableFormatVersion());
+    Assertions.assertEquals(4, config.getMaxTableFormatVersion());
+    Assertions.assertEquals(
+        IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION, config.getMaxTableFormatVersion());
+    Assertions.assertFalse(
+        config
+            .getIcebergCatalogProperties()
+            .containsKey(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+    // Iceberg's own property keeps working as before when neither bound is set.
+    IcebergConfig icebergDefaultOnly =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION, "3"));
+    Assertions.assertEquals(
+        "3",
+        icebergDefaultOnly
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+  }
+
+  @Test
+  public void testTableFormatVersionDefaultIsWrittenToIcebergTableDefault() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "3",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "3"));
+    Assertions.assertEquals(3, config.getDefaultTableFormatVersion());
+    Assertions.assertEquals(3, config.getMaxTableFormatVersion());
+    Assertions.assertEquals(
+        "3",
+        config
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+    // The same value in both spellings is accepted.
+    IcebergConfig sameValue =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "3",
+                IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                "3"));
+    Assertions.assertEquals(
+        "3",
+        sameValue
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+  }
+
+  @Test
+  public void testInvalidTableFormatVersionPropertiesAreRejected() {
+    assertInvalidTableFormatVersions(
+        "Invalid value '5'", ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "5"));
+    assertInvalidTableFormatVersions(
+        "Invalid value 'abc'",
+        ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "abc"));
+    assertInvalidTableFormatVersions(
+        "Invalid value '0'", ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "0"));
+    assertInvalidTableFormatVersions(
+        "must not exceed",
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+            "4",
+            IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+            "3"));
+    // An unset default falls back to 2, which a maximum of 1 does not allow.
+    assertInvalidTableFormatVersions(
+        "must not exceed", ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_MAX, "1"));
+    assertInvalidTableFormatVersions(
+        "conflicts with",
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+            "2",
+            IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+            "3"));
+    assertInvalidTableFormatVersions(
+        "must not exceed",
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+            "2",
+            IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+            "3"));
+  }
+
+  /**
+   * A federated catalog forwards requests unchanged: its table format version properties are
+   * neither validated nor declared to the remote catalog, and Iceberg's own property is forwarded
+   * as the operator set it.
+   */
+  @Test
+  public void testFederatedCatalogDoesNotGovernTableFormatVersions() {
+    IcebergConfig federated =
+        new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND,
+                    "rest",
+                    IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                    "4",
+                    IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                    "3",
+                    IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                    "1"))
+            .forFederatedCatalog();
+
+    Assertions.assertDoesNotThrow(federated::validateTableFormatVersions);
+    Assertions.assertFalse(federated.getDeclaredDefaultTableFormatVersion().isPresent());
+    Assertions.assertEquals(
+        "1",
+        federated
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+
+    IcebergConfig defaultOnly =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT, "3"))
+            .forFederatedCatalog();
+    Assertions.assertFalse(
+        defaultOnly
+            .getIcebergCatalogProperties()
+            .containsKey(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+  }
+
+  private static void assertInvalidTableFormatVersions(
+      String expectedMessage, Map<String, String> properties) {
+    IcebergConfig config = new IcebergConfig(properties);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, config::getIcebergCatalogProperties);
+    Assertions.assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
+  }
 }

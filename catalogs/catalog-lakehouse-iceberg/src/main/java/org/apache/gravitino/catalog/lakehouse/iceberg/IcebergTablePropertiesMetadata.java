@@ -23,7 +23,6 @@ import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropert
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
@@ -48,20 +47,24 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
 
   /**
    * The default Iceberg table format version Gravitino applies when {@link #FORMAT_VERSION} is not
-   * explicitly set. Gravitino owns this default rather than deferring to the Iceberg library's own
-   * version-dependent default, and stamps it onto the table at creation.
+   * explicitly set and the catalog does not set {@link
+   * IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT}. Gravitino owns this default rather than
+   * deferring to the Iceberg library's own version-dependent default, and stamps it onto the table
+   * at creation.
    */
-  public static final int ICEBERG_DEFAULT_FORMAT_VERSION = 2;
+  public static final int ICEBERG_DEFAULT_FORMAT_VERSION =
+      IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION;
 
   /**
    * The Iceberg table format versions Gravitino allows creating: {@code 1}–{@code 4}, the range the
-   * bundled Iceberg version (1.11.0) can write. Gravitino is not more restrictive than Iceberg for
-   * the create passthrough; each version's feature set is defined by the Iceberg spec (v1/v2/v3 are
-   * adopted, v3 is required for V3 types such as {@code variant}, and v4 is under active
-   * development and not yet finalized). An unset (empty) value defaults to {@link
-   * #ICEBERG_DEFAULT_FORMAT_VERSION}. Extend this set as newer Iceberg writer versions ship.
+   * bundled Iceberg version (1.11.0) can write. Each version's feature set is defined by the
+   * Iceberg spec (v1/v2/v3 are adopted, v3 is required for V3 types such as {@code variant}, and v4
+   * is under active development and not yet finalized). A catalog can lower the highest allowed
+   * version with {@link IcebergConstants#TABLE_FORMAT_VERSION_MAX}. An unset (empty) value defaults
+   * to the catalog's default format version.
    */
-  public static final Set<Integer> SUPPORTED_FORMAT_VERSIONS = ImmutableSet.of(1, 2, 3, 4);
+  public static final Set<Integer> SUPPORTED_FORMAT_VERSIONS =
+      IcebergConstants.SUPPORTED_TABLE_FORMAT_VERSIONS;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -114,9 +117,10 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
         .withName(FORMAT_VERSION)
         .withDescription(
             "The Iceberg table format version. Gravitino supports creating tables at versions 1 to "
-                + "4 (the range the bundled Iceberg version can write) and defaults to 2 when unset. "
-                + "Version 3 is required for V3 types such as variant; version 4 is not yet a "
-                + "finalized Iceberg spec.")
+                + "4 (the range the bundled Iceberg version can write), up to the catalog's "
+                + "table-format-version.max, and uses the catalog's table-format-version.default "
+                + "(2 when unset) when this is unset. Version 3 is required for V3 types such as "
+                + "variant; version 4 is not yet a finalized Iceberg spec.")
         .withRequired(false)
         .withImmutable(true)
         .withJavaType(Integer.class)
@@ -144,6 +148,9 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
       return ICEBERG_DEFAULT_FORMAT_VERSION;
     }
     int version = Integer.parseInt(value.trim());
+    // Names the build's ceiling, as every other path does, for a version above it.
+    IcebergPropertiesUtils.checkTableFormatVersionAllowed(
+        version, IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION);
     Preconditions.checkArgument(
         SUPPORTED_FORMAT_VERSIONS.contains(version),
         "Unsupported Iceberg format-version: %s, supported versions are %s",

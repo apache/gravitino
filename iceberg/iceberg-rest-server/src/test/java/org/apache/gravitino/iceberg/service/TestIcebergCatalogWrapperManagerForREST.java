@@ -36,6 +36,12 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.RESTException;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -133,6 +139,62 @@ public class TestIcebergCatalogWrapperManagerForREST {
     CatalogWrapperForREST wrapper = newManager().createCatalogWrapper("test", icebergConfig);
 
     Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
+  }
+
+  /**
+   * A federated catalog forwards requests unchanged, so bounds that would refuse a local catalog do
+   * not stop it from loading.
+   */
+  @Test
+  public void testFederatedWrapperIgnoresTableFormatVersionBounds() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://localhost:8181",
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "4",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "3"));
+
+    CatalogWrapperForREST wrapper = newManager().createCatalogWrapper("test", icebergConfig);
+
+    Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
+  }
+
+  /**
+   * A federated catalog does not read its table format version properties at all, so values that
+   * would not even parse on a local catalog neither stop it from loading nor stop a create above
+   * the build's ceiling from reaching the remote catalog.
+   */
+  @Test
+  public void testFederatedWrapperDoesNotParseTableFormatVersionProperties() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://localhost:1",
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "abc",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "abc"));
+
+    CatalogWrapperForREST wrapper = newManager().createCatalogWrapper("test", icebergConfig);
+
+    Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("remote")
+            .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+            .setProperties(ImmutableMap.of(TableProperties.FORMAT_VERSION, "5"))
+            .build();
+    // Forwarded to the unreachable remote rather than refused locally.
+    Assertions.assertThrows(
+        RESTException.class, () -> wrapper.createTable(Namespace.of("db"), request, false));
   }
 
   @Test
