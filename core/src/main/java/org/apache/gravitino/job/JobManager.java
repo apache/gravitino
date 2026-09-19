@@ -31,9 +31,13 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -798,9 +802,8 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executable =
-        fetchFileFromUri(
-            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
+    Map<String, String> stagedArtifacts = stageJobArtifacts(content, jobConf, stagingDir);
+    String executable = stagedArtifacts.get(replacePlaceholder(content.executable(), jobConf));
 
     List<String> args =
         content.arguments().stream()
@@ -823,10 +826,7 @@ public class JobManager implements JobOperationDispatcher {
     if (content.jobType() == JobTemplate.JobType.SHELL) {
       List<String> scripts =
           content.scripts().stream()
-              .map(
-                  script ->
-                      fetchFileFromUri(
-                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .map(script -> stagedArtifacts.get(replacePlaceholder(script, jobConf)))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -845,25 +845,17 @@ public class JobManager implements JobOperationDispatcher {
       String className = replacePlaceholder(content.className(), jobConf);
       List<String> jars =
           content.jars().stream()
-              .map(
-                  jar ->
-                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .map(jar -> stagedArtifacts.get(replacePlaceholder(jar, jobConf)))
               .collect(Collectors.toList());
 
       List<String> files =
           content.files().stream()
-              .map(
-                  file ->
-                      fetchFileFromUri(
-                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .map(file -> stagedArtifacts.get(replacePlaceholder(file, jobConf)))
               .collect(Collectors.toList());
 
       List<String> archives =
           content.archives().stream()
-              .map(
-                  archive ->
-                      fetchFileFromUri(
-                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .map(archive -> stagedArtifacts.get(replacePlaceholder(archive, jobConf)))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
@@ -1071,6 +1063,59 @@ public class JobManager implements JobOperationDispatcher {
 
   private <T> T updatedValue(T currentValue, Optional<T> newValue) {
     return newValue.orElse(currentValue);
+  }
+
+  private static Map<String, String> stageJobArtifacts(
+      JobTemplateEntity.TemplateContent content, Map<String, String> jobConf, File stagingDir) {
+    List<String> artifacts = new ArrayList<>();
+    artifacts.add(content.executable());
+    if (content.jobType() == JobTemplate.JobType.SHELL) {
+      artifacts.addAll(content.scripts());
+    } else if (content.jobType() == JobTemplate.JobType.SPARK) {
+      artifacts.addAll(content.jars());
+      artifacts.addAll(content.files());
+      artifacts.addAll(content.archives());
+    }
+
+    Map<String, URI> artifactSources = new LinkedHashMap<>();
+    Map<URI, String> uniqueSources = new LinkedHashMap<>();
+    for (String artifact : artifacts) {
+      String resolved = replacePlaceholder(artifact, jobConf);
+      URI source = URI.create(resolved).normalize();
+      if (source.getScheme() == null || "file".equalsIgnoreCase(source.getScheme())) {
+        source = new File(source.getPath()).getAbsoluteFile().toURI().normalize();
+      }
+      artifactSources.put(resolved, source);
+      uniqueSources.putIfAbsent(source, resolved);
+    }
+
+    // Keep the executable and the first source for each basename in the staging root.
+    // Stage all root files first so generated subdirectories cannot take an artifact's name.
+    Set<String> fileNames = new HashSet<>();
+    Map<URI, String> stagedPaths = new HashMap<>();
+    Map<URI, String> collisions = new LinkedHashMap<>();
+    uniqueSources.forEach(
+        (source, uri) -> {
+          String fileName = new File(URI.create(uri).getPath()).getName();
+          if (fileNames.add(fileName)) {
+            stagedPaths.put(source, fetchFileFromUri(uri, stagingDir, TIMEOUT_IN_MS));
+          } else {
+            collisions.put(source, uri);
+          }
+        });
+    collisions.forEach(
+        (source, uri) -> {
+          try {
+            File directory = Files.createTempDirectory(stagingDir.toPath(), "artifact-").toFile();
+            stagedPaths.put(source, fetchFileFromUri(uri, directory, TIMEOUT_IN_MS));
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to create staging directory for artifact " + uri, e);
+          }
+        });
+
+    Map<String, String> result = new HashMap<>();
+    artifactSources.forEach((uri, source) -> result.put(uri, stagedPaths.get(source)));
+    return result;
   }
 
   private void pullAndUpdateOwnedJobStatus(String metalake, JobEntity job) {

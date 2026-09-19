@@ -26,8 +26,10 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.job.local.LocalProcessBuilder;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -161,6 +163,128 @@ public class TestJobTemplate {
         resultUris.stream().map(uri -> new File(uri).getName()).collect(Collectors.toList());
     Assertions.assertTrue(resultFileNames.contains(testFile2.getName()));
     Assertions.assertTrue(resultFileNames.contains(testFile3.getName()));
+  }
+
+  @Test
+  public void testPreserveExecutableScriptFilenameCollision() throws Exception {
+    File firstDir = Files.createTempDirectory(tempDir.toPath(), "first").toFile();
+    File secondDir = Files.createTempDirectory(tempDir.toPath(), "second").toFile();
+    File executable = new File(firstDir, "task.sh");
+    File script = new File(secondDir, "task.sh");
+    File config = new File(firstDir, "config.txt");
+    Files.writeString(config.toPath(), "CONFIG\n");
+    Files.writeString(executable.toPath(), "#!/bin/sh\necho FIRST\ncat config.txt\npwd\n");
+    Files.writeString(script.toPath(), "#!/bin/sh\necho SECOND\n");
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("collision")
+            .withExecutable(executable.toURI().toString())
+            .withScripts(
+                Lists.newArrayList(
+                    script.toURI().toString(),
+                    script.toURI().toString(),
+                    config.toURI().toString()))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    ShellJobTemplate runtime =
+        (ShellJobTemplate)
+            JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    Assertions.assertEquals(
+        new File(tempStagingDir, "task.sh").getAbsolutePath(), runtime.executable());
+    Assertions.assertNotEquals(runtime.executable(), runtime.scripts().get(0));
+    Assertions.assertEquals("task.sh", new File(runtime.scripts().get(0)).getName());
+    Assertions.assertEquals(
+        "#!/bin/sh\necho SECOND\n", Files.readString(new File(runtime.scripts().get(0)).toPath()));
+    Assertions.assertEquals(runtime.scripts().get(0), runtime.scripts().get(1));
+    Assertions.assertEquals(
+        new File(tempStagingDir, "config.txt").getAbsolutePath(), runtime.scripts().get(2));
+    Process process = LocalProcessBuilder.create(runtime, ImmutableMap.of()).start();
+    try {
+      Assertions.assertTrue(process.waitFor(10, TimeUnit.SECONDS));
+      Assertions.assertEquals(0, process.exitValue());
+      Assertions.assertEquals(
+          "FIRST\nCONFIG\n" + tempStagingDir.getCanonicalPath() + "\n",
+          Files.readString(new File(tempStagingDir, "output.log").toPath()));
+    } finally {
+      process.destroyForcibly();
+    }
+  }
+
+  @Test
+  public void testPreserveSparkArtifactFilenameCollisions() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "job", ".jar").toFile();
+    List<String> uris = Lists.newArrayList();
+    for (String content : Lists.newArrayList("JAR", "FILE", "ARCHIVE")) {
+      File directory = Files.createTempDirectory(tempDir.toPath(), "spark-artifact").toFile();
+      File artifact = new File(directory, "shared.zip");
+      Files.writeString(artifact.toPath(), content);
+      uris.add(artifact.toURI().toString());
+    }
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("spark-collision")
+            .withExecutable(executable.toURI().toString())
+            .withClassName("Example")
+            .withJars(Lists.newArrayList(uris.get(0)))
+            .withFiles(Lists.newArrayList(uris.get(1)))
+            .withArchives(Lists.newArrayList(uris.get(2)))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    SparkJobTemplate runtime =
+        (SparkJobTemplate)
+            JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    List<String> paths =
+        Lists.newArrayList(
+            runtime.jars().get(0), runtime.files().get(0), runtime.archives().get(0));
+    Assertions.assertEquals(3, paths.stream().distinct().count());
+    for (int i = 0; i < paths.size(); i++) {
+      Assertions.assertEquals("shared.zip", new File(paths.get(i)).getName());
+      Assertions.assertEquals(
+          Lists.newArrayList("JAR", "FILE", "ARCHIVE").get(i),
+          Files.readString(new File(paths.get(i)).toPath()));
+    }
+  }
+
+  @Test
+  public void testRepeatedArtifactUriIsAllowed() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "repeated", ".sh").toFile();
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("repeated")
+            .withExecutable(executable.getAbsolutePath())
+            .withScripts(
+                Lists.newArrayList(executable.toURI().toString(), executable.toURI().toString()))
+            .build();
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(template.name())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    ShellJobTemplate runtime =
+        (ShellJobTemplate)
+            JobManager.createRuntimeJobTemplate(entity, ImmutableMap.of(), tempStagingDir);
+    Assertions.assertEquals(
+        Lists.newArrayList(runtime.executable(), runtime.executable()), runtime.scripts());
   }
 
   @Test
