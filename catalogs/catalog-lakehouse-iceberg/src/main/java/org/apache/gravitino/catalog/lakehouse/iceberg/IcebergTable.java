@@ -77,15 +77,24 @@ public class IcebergTable extends BaseTable {
 
   private IcebergTable() {}
 
-  public static Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
+  /**
+   * Derives the Iceberg create properties from the Gravitino table properties.
+   *
+   * @param createProperties the table properties, updated in place.
+   * @param defaultFormatVersion the catalog's default format version, stamped when the table does
+   *     not set one.
+   * @return {@code createProperties}.
+   * @throws IllegalArgumentException if the provider is not a supported file format.
+   */
+  public static Map<String, String> rebuildCreateProperties(
+      Map<String, String> createProperties, int defaultFormatVersion) {
     // Gravitino owns the default Iceberg table format version: when it is not explicitly set, stamp
-    // ICEBERG_DEFAULT_FORMAT_VERSION rather than relying on the Iceberg library's version-dependent
-    // default or letting a blank value fail to parse downstream.
+    // the catalog's default rather than relying on the Iceberg library's version-dependent default
+    // or letting a blank value fail to parse downstream.
     String formatVersion = createProperties.get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
     if (StringUtils.isBlank(formatVersion)) {
       createProperties.put(
-          IcebergTablePropertiesMetadata.FORMAT_VERSION,
-          String.valueOf(IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION));
+          IcebergTablePropertiesMetadata.FORMAT_VERSION, String.valueOf(defaultFormatVersion));
     }
 
     String provider = createProperties.get(PROP_PROVIDER);
@@ -101,7 +110,14 @@ public class IcebergTable extends BaseTable {
     return createProperties;
   }
 
-  public CreateTableRequest toCreateTableRequest() {
+  /**
+   * Builds the Iceberg create request for this table.
+   *
+   * @param defaultFormatVersion the catalog's default format version, used when the table does not
+   *     set one.
+   * @return the create request.
+   */
+  public CreateTableRequest toCreateTableRequest(int defaultFormatVersion) {
     Schema schema = ConvertUtil.toIcebergSchema(this);
     properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
     properties.put(
@@ -111,7 +127,7 @@ public class IcebergTable extends BaseTable {
             .withName(name)
             .withLocation(location)
             .withSchema(schema)
-            .setProperties(rebuildCreateProperties(properties))
+            .setProperties(rebuildCreateProperties(properties, defaultFormatVersion))
             .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();

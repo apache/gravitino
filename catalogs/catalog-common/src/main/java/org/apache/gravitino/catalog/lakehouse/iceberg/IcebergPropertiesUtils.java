@@ -111,6 +111,11 @@ public class IcebergPropertiesUtils {
     map.put(
         IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
         IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS);
+    // Table format version bounds
+    map.put(
+        IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+        IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT);
+    map.put(IcebergConstants.TABLE_FORMAT_VERSION_MAX, IcebergConstants.TABLE_FORMAT_VERSION_MAX);
 
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 
@@ -158,6 +163,178 @@ public class IcebergPropertiesUtils {
     return Optional.ofNullable(catalogBackend)
         .map(s -> s.toLowerCase(Locale.ROOT))
         .orElse("memory");
+  }
+
+  /**
+   * Parses a table format version, as {@code format-version} accepts it.
+   *
+   * @param property the property that holds the value, named in the error message.
+   * @param value the raw value.
+   * @return the format version.
+   * @throws IllegalArgumentException if the value is not one of {@link
+   *     IcebergConstants#SUPPORTED_TABLE_FORMAT_VERSIONS}.
+   */
+  public static int parseTableFormatVersion(String property, String value) {
+    Integer version = null;
+    if (value != null) {
+      try {
+        version = Integer.parseInt(value.trim());
+      } catch (NumberFormatException e) {
+        // Reported below with the supported versions.
+      }
+    }
+    if (version == null || !IcebergConstants.SUPPORTED_TABLE_FORMAT_VERSIONS.contains(version)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid value '%s' for '%s': supported Iceberg format versions are %s",
+              value, property, IcebergConstants.SUPPORTED_TABLE_FORMAT_VERSIONS));
+    }
+    return version;
+  }
+
+  /**
+   * Returns {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} when the catalog sets it.
+   *
+   * @param catalogProperties the catalog properties.
+   * @return the configured default format version, or empty when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public static Optional<Integer> configuredDefaultTableFormatVersion(
+      Map<String, String> catalogProperties) {
+    return configuredTableFormatVersion(
+        catalogProperties, IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT);
+  }
+
+  /**
+   * Returns the format version of a new table that does not request one.
+   *
+   * @param catalogProperties the catalog properties.
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT}, or {@link
+   *     IcebergConstants#DEFAULT_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public static int defaultTableFormatVersion(Map<String, String> catalogProperties) {
+    return configuredDefaultTableFormatVersion(catalogProperties)
+        .orElse(IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION);
+  }
+
+  /**
+   * Returns the highest format version a table may be created at or upgraded to.
+   *
+   * @param catalogProperties the catalog properties.
+   * @return {@link IcebergConstants#TABLE_FORMAT_VERSION_MAX}, or {@link
+   *     IcebergConstants#DEFAULT_MAX_TABLE_FORMAT_VERSION} when unset.
+   * @throws IllegalArgumentException if the value is not a supported format version.
+   */
+  public static int maxTableFormatVersion(Map<String, String> catalogProperties) {
+    return configuredTableFormatVersion(
+            catalogProperties, IcebergConstants.TABLE_FORMAT_VERSION_MAX)
+        .orElse(IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION);
+  }
+
+  /**
+   * Validates the table format version properties of a catalog together.
+   *
+   * <p>Both bounds must be supported format versions and the default must not exceed the maximum.
+   * Iceberg's own {@link IcebergConstants#ICEBERG_TABLE_DEFAULT_FORMAT_VERSION} must match {@link
+   * IcebergConstants#TABLE_FORMAT_VERSION_DEFAULT} when both are set, and must not exceed {@link
+   * IcebergConstants#TABLE_FORMAT_VERSION_MAX}. When neither bound is set, the Iceberg property is
+   * left to Iceberg as before.
+   *
+   * @param catalogProperties the catalog properties.
+   * @throws IllegalArgumentException if the properties violate any of these rules.
+   */
+  public static void validateTableFormatVersions(Map<String, String> catalogProperties) {
+    Optional<Integer> configuredDefault = configuredDefaultTableFormatVersion(catalogProperties);
+    Optional<Integer> configuredMax =
+        configuredTableFormatVersion(catalogProperties, IcebergConstants.TABLE_FORMAT_VERSION_MAX);
+    int defaultVersion = defaultTableFormatVersion(catalogProperties);
+    int maxVersion = maxTableFormatVersion(catalogProperties);
+    if (defaultVersion > maxVersion) {
+      throw new IllegalArgumentException(
+          String.format(
+              "'%s' (%d) must not exceed '%s' (%d)",
+              IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+              defaultVersion,
+              IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+              maxVersion));
+    }
+
+    String icebergDefault =
+        catalogProperties.get(IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION);
+    if (StringUtils.isBlank(icebergDefault)) {
+      return;
+    }
+    if (configuredDefault.isPresent()) {
+      if (!isSameVersion(configuredDefault.get(), icebergDefault)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "'%s' (%s) conflicts with '%s' (%d); remove '%s' or set it to the same value",
+                IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+                icebergDefault,
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                configuredDefault.get(),
+                IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION));
+      }
+    } else if (configuredMax.isPresent()
+        && parseTableFormatVersion(
+                IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION, icebergDefault)
+            > maxVersion) {
+      throw new IllegalArgumentException(
+          String.format(
+              "'%s' (%s) must not exceed '%s' (%d)",
+              IcebergConstants.ICEBERG_TABLE_DEFAULT_FORMAT_VERSION,
+              icebergDefault,
+              IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+              maxVersion));
+    }
+  }
+
+  /**
+   * Refuses a table format version above the catalog maximum, for a new table or an upgrade.
+   *
+   * <p>A version above {@link IcebergConstants#DEFAULT_MAX_TABLE_FORMAT_VERSION}, the highest this
+   * Gravitino build supports, is refused as unsupported whatever the catalog maximum, because
+   * {@link IcebergConstants#TABLE_FORMAT_VERSION_MAX} can only lower that ceiling.
+   *
+   * @param formatVersion the requested format version.
+   * @param maxFormatVersion the catalog's effective {@link
+   *     IcebergConstants#TABLE_FORMAT_VERSION_MAX}.
+   * @throws IllegalArgumentException if {@code formatVersion} exceeds the build's ceiling or {@code
+   *     maxFormatVersion}.
+   */
+  public static void checkTableFormatVersionAllowed(int formatVersion, int maxFormatVersion) {
+    if (formatVersion > IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Iceberg format-version %d is not supported by this Gravitino (supports %d-%d)",
+              formatVersion,
+              Collections.min(IcebergConstants.SUPPORTED_TABLE_FORMAT_VERSIONS),
+              IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION));
+    }
+    if (formatVersion > maxFormatVersion) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Iceberg format-version %d exceeds the catalog limit %d set by '%s'",
+              formatVersion, maxFormatVersion, IcebergConstants.TABLE_FORMAT_VERSION_MAX));
+    }
+  }
+
+  private static boolean isSameVersion(int version, String value) {
+    try {
+      return Integer.parseInt(value.trim()) == version;
+    } catch (NumberFormatException e) {
+      return false;
+    }
+  }
+
+  private static Optional<Integer> configuredTableFormatVersion(
+      Map<String, String> catalogProperties, String property) {
+    String value = catalogProperties.get(property);
+    if (StringUtils.isBlank(value)) {
+      return Optional.empty();
+    }
+    return Optional.of(parseTableFormatVersion(property, value));
   }
 
   private static void convertProperties(

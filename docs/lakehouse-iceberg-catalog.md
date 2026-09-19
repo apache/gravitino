@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and Limitations
 
 :::info
-Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default; set the `table-format-version.default` catalog property to change it.
 :::
 
 Flink and Spark clients may use a different Iceberg version than the server.
@@ -49,6 +49,22 @@ Mixing Iceberg JARs from different versions on the client classpath is not compa
 | `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001/iceberg`. | (none)                                                                         | Yes                                       |
 | `warehouse`            | Warehouse location of catalog. Use a physical S3 or HDFS location for `hive` or `jdbc` catalog backend, use catalog name for REST catalog backend.                                                      | (none)                                                                         | Yes for `hive` and `jdbc` catalog backend |
 | `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                    | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                        |
+| `table-format-version.default` | The format version of a new table that does not request one. Accepts the values `format-version` accepts, and must not exceed `table-format-version.max`. | `2` | No |
+| `table-format-version.max` | The highest format version a table may be created at or upgraded to. Accepts the values `format-version` accepts. | `4`, the highest version the bundled Iceberg writes | No |
+
+The two `table-format-version` properties apply to all tables of the catalog created through the Gravitino API:
+
+- A new table that does not set `format-version` is created at `table-format-version.default`.
+  If you set `table-default.format-version` yourself, directly or with the `gravitino.bypass.` prefix, it must
+  match `table-format-version.default`.
+- Creating a table above `table-format-version.max` fails with an `IllegalArgumentException`
+  (HTTP 400). Existing tables above the maximum still load and commit.
+- `4`, the highest version the bundled Iceberg writes, is also the highest this Gravitino build
+  accepts: `table-format-version.max` can only lower it, and a table above it fails with HTTP 400.
+- A `table-format-version.default` above `table-format-version.max`, or a
+  `table-default.format-version` that conflicts with them, fails the catalog when it loads: every
+  schema and table operation on it fails with an `IllegalArgumentException` (HTTP 400) until the
+  properties are fixed.
 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
@@ -469,7 +485,7 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 | `location`                | Iceberg location for table storage.                                                                                                                                                                                                                                                 | (none)        | No       | No       | Yes       |
 | `provider`                | The storage provider for table storage.                                                                                                                                                                                                                                             | (none)        | No       | No       | Yes       |
 | `format`                  | The format of table storage.                                                                                                                                                                                                                                                        | (none)        | No       | No       | Yes       |
-| `format-version`          | The Iceberg table format version. Gravitino supports creating tables at versions `1`–`4` (the range the bundled Iceberg version can write) and defaults to `2` when unset. Version `3` is required for V3 types such as `variant`; version `4` is not yet a finalized Iceberg spec. | `2`           | No       | No       | Yes       |
+| `format-version`          | The Iceberg table format version. Gravitino supports creating tables at versions `1`–`4` (the range the bundled Iceberg version can write), up to the catalog's `table-format-version.max`. When unset, the table uses the catalog's `table-format-version.default`, which is `2` unless set. Version `3` is required for V3 types such as `variant`; version `4` is not yet a finalized Iceberg spec. | `2`           | No       | No       | Yes       |
 | `comment`                 | The table comment; use the `comment` field in table meta instead.                                                                                                                                                                                                                   | (none)        | No       | Yes      | No        |
 | `creator`                 | The table creator.                                                                                                                                                                                                                                                                  | (none)        | No       | Yes      | No        |
 | `current-snapshot-id`     | The snapshot represents the current state of the table.                                                                                                                                                                                                                             | (none)        | No       | Yes      | No        |

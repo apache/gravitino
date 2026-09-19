@@ -174,4 +174,90 @@ public class TestIcebergPropertiesUtils {
     backendName = IcebergPropertiesUtils.getCatalogBackendName(catalogProperties);
     Assertions.assertEquals("memory", backendName);
   }
+
+  @Test
+  void testTableFormatVersionFallbacks() {
+    Map<String, String> unset = ImmutableMap.of();
+    Assertions.assertFalse(
+        IcebergPropertiesUtils.configuredDefaultTableFormatVersion(unset).isPresent());
+    Assertions.assertEquals(
+        IcebergConstants.DEFAULT_TABLE_FORMAT_VERSION,
+        IcebergPropertiesUtils.defaultTableFormatVersion(unset));
+    Assertions.assertEquals(
+        IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION,
+        IcebergPropertiesUtils.maxTableFormatVersion(unset));
+    Assertions.assertEquals(4, IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION);
+    Assertions.assertDoesNotThrow(() -> IcebergPropertiesUtils.validateTableFormatVersions(unset));
+
+    Map<String, String> set =
+        ImmutableMap.of(
+            IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+            " 3 ",
+            IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+            "3");
+    Assertions.assertEquals(3, IcebergPropertiesUtils.defaultTableFormatVersion(set));
+    Assertions.assertEquals(3, IcebergPropertiesUtils.maxTableFormatVersion(set));
+  }
+
+  @Test
+  void testParseTableFormatVersionAcceptsOnlySupportedVersions() {
+    for (int version : IcebergConstants.SUPPORTED_TABLE_FORMAT_VERSIONS) {
+      Assertions.assertEquals(
+          version, IcebergPropertiesUtils.parseTableFormatVersion("p", String.valueOf(version)));
+    }
+    for (String invalid : new String[] {"0", "5", "-1", "2.0", "abc", "", null}) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> IcebergPropertiesUtils.parseTableFormatVersion("p", invalid),
+              String.valueOf(invalid));
+      Assertions.assertTrue(e.getMessage().contains("'p'"), e.getMessage());
+    }
+  }
+
+  @Test
+  void testCheckTableFormatVersionAllowed() {
+    Assertions.assertDoesNotThrow(
+        () -> IcebergPropertiesUtils.checkTableFormatVersionAllowed(3, 3));
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergPropertiesUtils.checkTableFormatVersionAllowed(4, 3));
+    Assertions.assertTrue(
+        e.getMessage().contains(IcebergConstants.TABLE_FORMAT_VERSION_MAX), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains("limit 3"), e.getMessage());
+  }
+
+  /**
+   * Above the build's ceiling the error names the supported range, not the catalog maximum, both
+   * when the maximum is unset (it equals the ceiling) and when an operator set a lower one.
+   */
+  @Test
+  void testCheckTableFormatVersionAllowedNamesTheBuildCeiling() {
+    int ceiling = IcebergConstants.DEFAULT_MAX_TABLE_FORMAT_VERSION;
+    Assertions.assertDoesNotThrow(
+        () -> IcebergPropertiesUtils.checkTableFormatVersionAllowed(ceiling, ceiling));
+    for (int max : new int[] {ceiling, 2}) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> IcebergPropertiesUtils.checkTableFormatVersionAllowed(ceiling + 1, max));
+      Assertions.assertEquals(
+          "Iceberg format-version 5 is not supported by this Gravitino (supports 1-4)",
+          e.getMessage());
+    }
+  }
+
+  @Test
+  void testTableFormatVersionPropertiesAreMappedToIcebergConfig() {
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(
+            ImmutableMap.of(
+                IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT,
+                "3",
+                IcebergConstants.TABLE_FORMAT_VERSION_MAX,
+                "4"));
+    Assertions.assertEquals("3", icebergProps.get(IcebergConstants.TABLE_FORMAT_VERSION_DEFAULT));
+    Assertions.assertEquals("4", icebergProps.get(IcebergConstants.TABLE_FORMAT_VERSION_MAX));
+  }
 }
