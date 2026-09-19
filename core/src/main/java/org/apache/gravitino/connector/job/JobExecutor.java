@@ -20,6 +20,8 @@
 package org.apache.gravitino.connector.job;
 
 import java.io.Closeable;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -111,5 +113,37 @@ public interface JobExecutor extends Closeable {
    */
   default boolean isJobStateNodeLocal() {
     return false;
+  }
+
+  /**
+   * Get the captured standard output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @return the stdout lines of the job, or an empty list if not available.
+   * @throws NoSuchJobException If the job with the given identifier does not exist.
+   */
+  default List<String> getJobStdout(String jobId, int maxLines) throws NoSuchJobException {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Get the captured standard error output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @return the stderr lines of the job, or an empty list if not available.
+   * @throws NoSuchJobException If the job with the given identifier does not exist.
+   */
+  default List<String> getJobStderr(String jobId, int maxLines) throws NoSuchJobException {
+    return Collections.emptyList();
   }
 }

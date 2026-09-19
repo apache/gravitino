@@ -279,6 +279,8 @@ paths:
       summary: Get job
       operationId: getJob
       description: Returns the specified job information in the specified metalake
+      parameters:
+        - $ref: "#/components/parameters/includeOutput"
       responses:
         "200":
           description: Returns the job object
@@ -359,6 +361,17 @@ components:
       schema:
         type: string
         default: ""
+    includeOutput:
+      name: includeOutput
+      in: query
+      description: >
+        Whether to also fetch and include the job's captured stdout/stderr output. Output is
+        fetched live from the job executor on every request, so this should only be set to true
+        when the caller actually needs it - it is never included when this parameter is omitted.
+      required: false
+      schema:
+        type: boolean
+        default: false
     jobId:
       name: jobId
       in: path
@@ -613,6 +626,22 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/JobTemplate"
+        stdout:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: >
+            The captured standard output of the job, as a list of lines. Only populated when the
+            job was fetched with includeOutput=true; null otherwise.
+        stderr:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: >
+            The captured standard error output of the job, as a list of lines. Only populated when
+            the job was fetched with includeOutput=true; null otherwise.
 
 
     TemplateUpdate:

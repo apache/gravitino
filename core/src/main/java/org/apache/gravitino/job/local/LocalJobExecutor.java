@@ -28,8 +28,14 @@ import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.WAITING_QUE
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -40,6 +46,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -83,6 +90,10 @@ public class LocalJobExecutor implements JobExecutor {
   private volatile boolean finished = false;
 
   private Map<String, Process> runningProcesses;
+
+  // The working directory of each job, used to locate its captured stdout/stderr files. Cleaned
+  // up together with jobStatus so the two maps stay in sync.
+  private Map<String, File> jobWorkingDirs;
 
   @Override
   public void initialize(Map<String, String> configs) {
@@ -165,6 +176,7 @@ public class LocalJobExecutor implements JobExecutor {
         TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
+    this.jobWorkingDirs = Maps.newConcurrentMap();
 
     // Spark is optional for the local job executor, so a missing Spark installation must not fail
     // the server startup. Warn early instead; Spark jobs will be rejected at submission.
@@ -195,6 +207,9 @@ public class LocalJobExecutor implements JobExecutor {
       }
 
       jobStatus.put(newJobId, Pair.of(JobHandle.Status.QUEUED, UNEXPIRED_TIME_IN_MS));
+      // Retain the working directory so output.log/error.log can be located later without
+      // needing to keep the running Process object around after the job finishes.
+      jobWorkingDirs.put(newJobId, LocalProcessBuilder.resolveWorkingDirectory(jobTemplate));
     }
 
     return newJobId;
@@ -265,6 +280,18 @@ public class LocalJobExecutor implements JobExecutor {
   }
 
   @Override
+  public List<String> getJobStdout(String jobId, int maxLines) throws NoSuchJobException {
+    return readLastLines(
+        new File(getWorkingDir(jobId), LocalProcessBuilder.STDOUT_FILE_NAME), maxLines);
+  }
+
+  @Override
+  public List<String> getJobStderr(String jobId, int maxLines) throws NoSuchJobException {
+    return readLastLines(
+        new File(getWorkingDir(jobId), LocalProcessBuilder.STDERR_FILE_NAME), maxLines);
+  }
+
+  @Override
   public void close() throws IOException {
     // Mark the executor as finished to stop processing jobs
     this.finished = true;
@@ -291,6 +318,7 @@ public class LocalJobExecutor implements JobExecutor {
     // Stop the job status cleanup executor
     jobStatusCleanupExecutor.shutdownNow();
     jobStatus.clear();
+    jobWorkingDirs.clear();
   }
 
   public void runJob(Pair<String, JobTemplate> jobPair) {
@@ -377,9 +405,47 @@ public class LocalJobExecutor implements JobExecutor {
       jobStatus
           .entrySet()
           .removeIf(
-              entry ->
-                  entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
-                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs);
+              entry -> {
+                boolean expired =
+                    entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
+                        && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs;
+                if (expired) {
+                  jobWorkingDirs.remove(entry.getKey());
+                }
+                return expired;
+              });
     }
+  }
+
+  private File getWorkingDir(String jobId) throws NoSuchJobException {
+    File workingDir = jobWorkingDirs.get(jobId);
+    if (workingDir == null) {
+      throw new NoSuchJobException("No job found with ID: %s", jobId);
+    }
+    return workingDir;
+  }
+
+  private List<String> readLastLines(File file, int maxLines) {
+    if (!file.exists()) {
+      // The job hasn't started (or hasn't produced this stream) yet.
+      return ImmutableList.of();
+    }
+
+    List<String> lines = Lists.newArrayList();
+    try (ReversedLinesFileReader reader =
+        ReversedLinesFileReader.builder().setFile(file).setCharset(StandardCharsets.UTF_8).get()) {
+      String line;
+      while (lines.size() < maxLines && (line = reader.readLine()) != null) {
+        lines.add(line);
+      }
+    } catch (IOException e) {
+      // An I/O failure while reading an existing file is unexpected (unlike the file simply not
+      // existing yet, handled above) and must not be silently reported as "no output" - that
+      // would be actively misleading for the debugging use case this method exists for.
+      throw new RuntimeException("Failed to read job output file: " + file, e);
+    }
+
+    Collections.reverse(lines);
+    return ImmutableList.copyOf(lines);
   }
 }

@@ -1817,14 +1817,17 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
-  public JobHandle getJob(String jobId) throws NoSuchJobException {
+  public JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
     Preconditions.checkArgument(StringUtils.isNotBlank(jobId), "job id must not be null or empty");
 
+    Map<String, String> params =
+        includeOutput ? ImmutableMap.of("includeOutput", "true") : Collections.emptyMap();
     JobResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name()))
                 + "/"
                 + RESTUtils.encodeString(jobId),
+            params,
             JobResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());

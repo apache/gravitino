@@ -100,14 +100,21 @@ public interface JobOperationDispatcher extends Closeable {
       throws NoSuchJobTemplateException;
 
   /**
-   * Retrieves a job by its ID in the specified metalake.
+   * Retrieves a job by its ID in the specified metalake, optionally including its captured
+   * stdout/stderr output (see {@link JobEntity#stdout()}/{@link JobEntity#stderr()}).
+   *
+   * <p>Output is fetched live from the {@code JobExecutor} on every call, not persisted, so {@code
+   * includeOutput} should only be set to {@code true} when the caller actually needs the output -
+   * it is never included in {@link #listJobs(String, Optional)}, and callers that don't need output
+   * should pass {@code false} here.
    *
    * @param metalake the name of the metalake
    * @param jobId the ID of the job to retrieve
+   * @param includeOutput whether to also fetch and attach the job's stdout/stderr output
    * @return the job entity associated with the specified ID
    * @throws NoSuchJobException if no job with the specified ID exists
    */
-  JobEntity getJob(String metalake, String jobId) throws NoSuchJobException;
+  JobEntity getJob(String metalake, String jobId, boolean includeOutput) throws NoSuchJobException;
 
   /**
    * Runs a job based on the specified job template and configuration in the specified metalake.
