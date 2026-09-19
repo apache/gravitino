@@ -51,6 +51,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
@@ -162,7 +163,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
 
-      try {
+      try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
@@ -270,6 +271,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                   expressionAnnotation, metadataContext, method, evaluatedExpression);
             }
           }
+          scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
       } catch (IllegalMetadataObjectException ex) {
