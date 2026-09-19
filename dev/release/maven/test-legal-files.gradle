@@ -1,0 +1,196 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import java.nio.charset.StandardCharsets
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+import org.gradle.api.tasks.SourceSetContainer
+
+// Synthetic JARs keep generator checks independent of dependency downloads.
+def generatorType = project(':api').tasks.named('generateMavenLegalFiles').get().class.superclass
+def fixtureGenerator = tasks.register('mavenLegalTestFixture', generatorType)
+def legalTests = tasks.register('testMavenLegalFiles') {
+  group = 'verification'
+  description = 'Checks Maven legal templates, source mappings and packaging edge cases.'
+  doLast {
+    def templates = file('dev/release/maven')
+    ['LICENSE', 'NOTICE'].each { name ->
+      assert file(name).text.trim().startsWith(new File(templates, name).text.trim()): "Maven ${name} differs from the root prefix"
+    }
+    def normalizedRootNotice = file('NOTICE').text.replaceAll(/\s+/, ' ')
+    def modules = subprojects.findAll { it.tasks.findByName('generateMavenLegalFiles') != null }
+    modules.each { module ->
+      module.tasks.named('generateMavenLegalFiles').get().sourceNotices.get().each { name ->
+        new File(templates, "NOTICE.${name}").readLines().findAll { it.trim() }.each { line ->
+          assert normalizedRootNotice.contains(line.trim().replaceAll(/\s+/, ' ')): "Root NOTICE is missing ${name}: ${line}"
+        }
+      }
+      def shadow = module.tasks.findByName('shadowJar')
+      def slf4jPatterns = shadow == null ? [] : shadow.excludes.findAll { it.startsWith('org/slf4j/') }
+      if (!slf4jPatterns.isEmpty()) {
+        assert slf4jPatterns.toSet() == ['org/slf4j/**'].toSet(): "${module.path}: review legal exclusions when changing the SLF4J pattern"
+        assert module.tasks.named('generateBundledLegalFiles').get().excludedGroups.get().contains('org.slf4j'): "${module.path}: excluded SLF4J classes must not retain dependency notices"
+      }
+    }
+    def sourceOwners = modules.collectEntries { module ->
+      [(module): module.extensions.getByType(SourceSetContainer).getByName('main').allJava.files.collect { it.canonicalFile }.toSet()]
+    }
+    file('LICENSE').text.split(/\n\s*\n/).each { section ->
+      def lines = section.readLines().collect { it.trim() }
+      def sources = lines.findAll { it.startsWith('./') && it.contains('/src/main/java/') }.collect { file(it).canonicalFile }
+      if (sources.isEmpty()) return
+      // Only copied sources with applicable upstream notices require a template.
+      def notice = templates.listFiles().find { it.name.startsWith('NOTICE.') && it.readLines().first().startsWith(lines.first()) }
+      if (notice == null) return
+      def name = notice.name.substring('NOTICE.'.length())
+      sourceOwners.each { module, files ->
+        if (sources.any { files.contains(it) }) {
+          assert module.tasks.named('generateMavenLegalFiles').get().sourceNotices.get().contains(name): "${module.path} compiles ${name} sources but omits its notice"
+        }
+      }
+    }
+    sourceOwners.each { module, files ->
+      if (files.any { it.name == 'SparkTransformConverter.java' }) {
+        assert !module.tasks.named('generateJavadocLegalFiles').get().sourceNotices.get().contains('iceberg'): "${module.path}: private Iceberg implementation is absent from Javadoc"
+      }
+    }
+
+    def selector = generatorType.getField('Companion').get(null)
+    ['META-INF/LICENSE', 'META-INF/NOTICE.markdown', 'META-INF/FastDoubleParser-LICENSE',
+     'THIRD-PARTY-NOTICES', 'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
+      assert selector.isLegalResource(it): "Missed legal resource: ${it}"
+    }
+    ['models/license-manager-2018-08-01.json', 'org/example/License.class',
+     'META-INF/services/org.example.License', 'LICENSE.json'].each {
+      assert !selector.isLegalResource(it): "Misclassified payload: ${it}"
+    }
+    def writeZip = { File path, Map entries ->
+      new ZipOutputStream(new FileOutputStream(path)).withCloseable { zip ->
+        entries.each { name, text ->
+          zip.putNextEntry(new ZipEntry(name))
+          zip.write(text.getBytes(StandardCharsets.UTF_8))
+          zip.closeEntry()
+        }
+      }
+    }
+    def readZip = { File path ->
+      new ZipFile(path).withCloseable { zip ->
+        zip.entries().findAll { !it.directory }.collectEntries { entry ->
+          [(entry.name): zip.getInputStream(entry).withCloseable { it.getText('UTF-8') }]
+        }
+      }
+    }
+    def fixtureDir = layout.buildDirectory.dir('tmp/maven-legal-tests').get().asFile
+    delete(fixtureDir)
+    def fixtureTemplates = new File(fixtureDir, 'templates')
+    fixtureTemplates.mkdirs()
+    ['LICENSE': 'Fixture license', 'NOTICE': 'Fixture notice', 'LICENSE.exact': 'Exact version terms',
+     'terms.txt': 'Fallback terms', 'LICENSE.group': 'Group terms'].each { name, text ->
+      new File(fixtureTemplates, name).text = text
+    }
+    def mapping = new File(fixtureTemplates, 'dependencies.txt')
+    def rules = 'example:*=LICENSE.group\nexample:component=terms.txt\nexample:component:1=LICENSE.exact\n'
+    mapping.text = rules
+    def component = new File(fixtureDir, 'component.jar')
+    writeZip(component, ['pkg/Type.class': 'fixture', 'META-INF/LICENSE': 'Dependency terms',
+      'META-INF/license/companion.txt': 'Case-sensitive companion', 'META-INF/NOTICE': 'Dependency notice',
+      'THIRD-PARTY-NOTICES': 'Embedded component notice'])
+    def slf4j = new File(fixtureDir, 'slf4j.jar')
+    writeZip(slf4j, ['org/slf4j/Logger.class': 'fixture', 'META-INF/NOTICE': 'SLF4J fixture notice'])
+    def output = new File(fixtureDir, 'legal.zip')
+    def generator = fixtureGenerator.get()
+    generator.templates.set(fixtureTemplates)
+    generator.outputArchive.set(output)
+    generator.dependencyJars.from(component, slf4j)
+    generator.dependencyIds.set(['component.jar': 'example/component/1/tests', 'slf4j.jar': 'org.slf4j/slf4j-api/2'])
+    assert generator.templateFiles.files.contains(new File(fixtureTemplates, 'terms.txt')): 'Every supplement must be a tracked input'
+    generator.generate()
+    def initial = readZip(output)
+    def prefix = 'META-INF/licenses/example/component/1/tests/'
+    assert initial[prefix + 'META-INF/LICENSE'] == 'Dependency terms'
+    assert initial[prefix + 'META-INF/license/companion.txt'] == 'Case-sensitive companion'
+    assert initial[prefix + 'LICENSE.exact'] == 'Exact version terms'
+    assert initial[prefix + 'THIRD-PARTY-NOTICES'] == 'Embedded component notice'
+    assert !initial.containsKey(prefix + 'terms.txt')
+    assert initial['META-INF/LICENSE'].contains('example:component:1')
+    assert initial['META-INF/NOTICE'].contains('Dependency notice')
+    assert initial['META-INF/NOTICE'].contains('Embedded component notice')
+    def firstBytes = output.bytes
+    generator.generate()
+    assert Arrays.equals(firstBytes, output.bytes): 'Legal ZIP must be deterministic'
+
+    generator.dependencyJars.setFrom(component)
+    ['example/component/2': 'terms.txt', 'example/other/1': 'LICENSE.group'].each { id, supplement ->
+      generator.dependencyIds.set(['component.jar': id])
+      generator.generate()
+      assert readZip(output).containsKey("META-INF/licenses/${id}/${supplement}".toString())
+      assert !readZip(output).keySet().any { it.endsWith('/LICENSE.exact') }: 'Stale supplement was retained'
+    }
+    def empty = new File(fixtureDir, 'empty.jar')
+    writeZip(empty, ['META-INF/MANIFEST.MF': 'Manifest-Version: 1.0'])
+    generator.dependencyJars.setFrom(empty)
+    generator.dependencyIds.set(['empty.jar': 'example/component/1'])
+    generator.generate()
+    assert readZip(output).keySet() == ['META-INF/LICENSE', 'META-INF/NOTICE'].toSet(): 'Empty compatibility JAR received supplements'
+
+    new File(fixtureTemplates, 'NOTICE.source').text = 'Copied source notice'
+    def jqueryLicense = new File(fixtureDir, 'jquery.md')
+    jqueryLicense.text = 'Javadoc asset license'
+    generator.sourceNotices.set(['source'])
+    generator.javadocFiles.from(jqueryLicense)
+    generator.generate()
+    assert readZip(output)['META-INF/NOTICE'].contains('Copied source notice')
+    assert readZip(output)['META-INF/LICENSE'].contains('legal/ directory at the root of this JAR')
+    generator.sourceNotices.set([])
+    generator.javadocFiles.setFrom([])
+
+    def nested = new File(fixtureDir, 'nested.jar')
+    writeZip(nested, initial + ['pkg/Nested.class': 'fixture'])
+    generator.dependencyJars.setFrom(nested)
+    generator.dependencyIds.set(['nested.jar': 'org.apache.gravitino/nested/1'])
+    generator.excludedGroups.set(['org.slf4j'].toSet())
+    generator.generate()
+    def filtered = readZip(output)
+    assert !filtered.keySet().any { it.startsWith('META-INF/licenses/org.slf4j/') }
+    assert !filtered['META-INF/LICENSE'].contains('org.slf4j')
+    assert !filtered['META-INF/NOTICE'].contains('SLF4J fixture notice')
+    assert filtered['META-INF/NOTICE'].count('Bundled component notices:') == 1
+    assert filtered[prefix + 'META-INF/license/companion.txt'] == 'Case-sensitive companion'
+
+    def expectFailure = { String message, Closure action ->
+      boolean failed = false
+      try {
+        action.call()
+      } catch (IllegalArgumentException error) {
+        assert error.message.contains(message): error.message
+        failed = true
+      }
+      assert failed: "Expected failure: ${message}"
+    }
+    mapping.text = rules + 'example:component=LICENSE.group\n'
+    expectFailure('Duplicate Maven legal supplement: example:component') { generator.generate() }
+    mapping.text = rules
+    generator.dependencyJars.setFrom(component)
+    generator.dependencyIds.set(['component.jar': 'example/component/1'])
+    new File(fixtureTemplates, 'LICENSE.exact').delete()
+    expectFailure('Missing Maven legal supplement for example:component: LICENSE.exact') { generator.generate() }
+    logger.lifecycle('Maven legal checks passed')
+  }
+}
+tasks.named('check') { dependsOn(legalTests) }
