@@ -132,6 +132,12 @@ public class TableMetaService {
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
+                    if (overwrite) {
+                      // A copied StringIdentifier must not move another schema's table here.
+                      OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
+                          () -> mapper.selectTableMetaByIdForUpdate(po.getTableId()),
+                          owner -> Objects.equals(owner.getSchemaId(), po.getSchemaId()));
+                    }
                     ops.insertPO(mapper, po, overwrite);
                     if (overwrite) {
                       // MySQL may resolve the upsert through the active (schema_id, table_name,

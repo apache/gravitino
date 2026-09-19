@@ -214,6 +214,12 @@ public class SchemaMetaService {
                     SchemaPO leafPO =
                         POConverters.initializeSchemaPOWithVersion(
                             leafRow, newSchemaPOBuilder(catalogPO));
+                    if (overwrite) {
+                      // A copied StringIdentifier must not move another catalog's schema here.
+                      OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
+                          () -> mapper.selectSchemaMetaByIdForUpdate(leafPO.getSchemaId()),
+                          owner -> Objects.equals(owner.getCatalogId(), leafPO.getCatalogId()));
+                    }
                     ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), overwrite);
                   }));
     } catch (RuntimeException re) {
