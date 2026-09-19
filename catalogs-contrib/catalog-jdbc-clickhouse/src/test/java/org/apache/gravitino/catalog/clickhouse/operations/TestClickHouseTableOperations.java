@@ -174,7 +174,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(),
-            "Alter table properties in ClickHouse is not supported"));
+            "Only ClickHouse table properties with the 'settings.' prefix can be altered"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(

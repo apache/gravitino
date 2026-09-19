@@ -51,11 +51,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -441,6 +443,49 @@ public class TestTagManager {
     Assertions.assertEquals("new comment", removedPropTag.comment());
     Map<String, String> expectedProp2 = ImmutableMap.of("k2", "v2");
     Assertions.assertEquals(expectedProp2, removedPropTag.properties());
+  }
+
+  @Test
+  public void testTagNameAndCommentLength() {
+    String maxLengthName = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH);
+    String tooLongName = maxLengthName + "a";
+    String maxLengthComment = StringUtils.repeat("c", EntityFieldLimits.MAX_COMMENT_LENGTH);
+    String tooLongComment = maxLengthComment + "c";
+
+    Exception e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, tooLongName, null, null));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, "tag1", tooLongComment, null));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag tag = tagManager.createTag(METALAKE, maxLengthName, maxLengthComment, null);
+    Assertions.assertEquals(maxLengthName, tag.name());
+    Assertions.assertEquals(maxLengthComment, tag.comment());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.alterTag(METALAKE, maxLengthName, TagChange.rename(tooLongName)));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagManager.alterTag(
+                    METALAKE, maxLengthName, TagChange.updateComment(tooLongComment)));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag unchanged = tagManager.getTag(METALAKE, maxLengthName);
+    Assertions.assertEquals(maxLengthComment, unchanged.comment());
   }
 
   @Test
@@ -1146,10 +1191,10 @@ public class TestTagManager {
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
       Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
 
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("finance"));
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
       Assertions.assertEquals(
-          TagValueSelector.of("finance"),
+          TagValueSelector.of("engineering"),
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);

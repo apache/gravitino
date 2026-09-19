@@ -33,6 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -168,16 +169,27 @@ public class TableMetaService {
                     }
                   }),
           () -> {
+            List<ColumnEntity> columns = tableEntity.columns();
             // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
-              TableColumnMetaService.getInstance()
-                  .deleteColumnsByTableId(persistedPO.get().getTableId());
+              TablePO storedPO = persistedPO.get();
+              // Overwriting the same table, e.g. re-importing it after an out-of-band rename, keeps
+              // the stored ids of the columns that still exist, so their tags, owners and
+              // privileges stay attached. When the upsert resolved to another table's row, the
+              // ids differ and that table's columns are not inherited.
+              if (columns != null
+                  && po.getTableId().equals(storedPO.getTableId())
+                  && storedPO.getCurrentVersion() > POConverters.INIT_VERSION) {
+                columns =
+                    TableColumnMetaService.getInstance()
+                        .reuseStoredColumnIds(
+                            storedPO.getTableId(), storedPO.getCurrentVersion(), columns);
+              }
+              TableColumnMetaService.getInstance().deleteColumnsByTableId(storedPO.getTableId());
             }
-          },
-          () -> {
-            if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
-              TableColumnMetaService.getInstance()
-                  .insertColumnPOs(persistedPO.get(), tableEntity.columns());
+
+            if (columns != null && !columns.isEmpty()) {
+              TableColumnMetaService.getInstance().insertColumnPOs(persistedPO.get(), columns);
             }
           });
 

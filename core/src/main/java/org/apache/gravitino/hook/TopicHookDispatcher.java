@@ -88,8 +88,11 @@ public class TopicHookDispatcher implements TopicDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TOPIC);
     boolean dropped = dispatcher.dropTopic(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TOPIC, locations);
+    // A false result means the topic was dropped out of band and the registration was kept.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TOPIC, locations);
+    }
     return dropped;
   }
 
