@@ -563,7 +563,7 @@ CREATE TABLE IF NOT EXISTS owner_meta (
     deleted_at BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE (owner_id, metadata_object_id, metadata_object_type, deleted_at)
+    UNIQUE (metadata_object_id, metadata_object_type, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);

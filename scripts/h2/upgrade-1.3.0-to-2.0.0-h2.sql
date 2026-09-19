@@ -98,3 +98,18 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB COMMENT 'semantic model version information';
+
+-- One live owner per object. Merge duplicates left by concurrent assignments before tightening the
+-- unique key: the newest live row (largest id) wins, older ones are soft-deleted.
+UPDATE `owner_meta`
+    SET `deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+        `updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+    WHERE `deleted_at` = 0
+      AND `id` < (
+        SELECT MAX(d.`id`) FROM `owner_meta` d
+        WHERE d.`deleted_at` = 0
+          AND d.`metadata_object_id` = `owner_meta`.`metadata_object_id`
+          AND d.`metadata_object_type` = `owner_meta`.`metadata_object_type`
+      );
+ALTER TABLE `owner_meta` DROP INDEX `uk_ow_me_del`;
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_mi_mo_del` ON `owner_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`);
