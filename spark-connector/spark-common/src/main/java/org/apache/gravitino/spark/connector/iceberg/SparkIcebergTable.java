@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.spark.connector.iceberg;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -38,7 +37,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * For spark-connector in Iceberg, it explicitly uses SparkTable to identify whether it is an Apache
  * Iceberg table, so the SparkIcebergTable must extend SparkTable.
  */
-public class SparkIcebergTable extends SparkTable {
+public class SparkIcebergTable extends SparkIcebergTableBase {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
   private org.apache.spark.sql.connector.catalog.Table sparkTable;
@@ -51,7 +50,7 @@ public class SparkIcebergTable extends SparkTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(sparkTable.table(), !isCacheEnabled(sparkCatalog));
+    super(sparkTable, sparkCatalog);
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             true,
@@ -91,15 +90,5 @@ public class SparkIcebergTable extends SparkTable {
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
     return ((SparkTable) sparkTable).newScanBuilder(options);
-  }
-
-  private static boolean isCacheEnabled(SparkCatalog sparkCatalog) {
-    try {
-      Field cacheEnabled = sparkCatalog.getClass().getDeclaredField("cacheEnabled");
-      cacheEnabled.setAccessible(true);
-      return cacheEnabled.getBoolean(sparkCatalog);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      throw new RuntimeException("Failed to get cacheEnabled field from SparkCatalog", e);
-    }
   }
 }
