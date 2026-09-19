@@ -566,7 +566,10 @@ public class IcebergTableOperations {
       return loadTableResponse;
     }
     TableMetadata filteredMetadata =
-        TableMetadata.buildFrom(metadata).suppressHistoricalSnapshots().build();
+        TableMetadata.buildFrom(metadata)
+            .withMetadataLocation(metadata.metadataFileLocation())
+            .suppressHistoricalSnapshots()
+            .build();
     LoadTableResponse.Builder builder =
         LoadTableResponse.builder()
             .withTableMetadata(filteredMetadata)
