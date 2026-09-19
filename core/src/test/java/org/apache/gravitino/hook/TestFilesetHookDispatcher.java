@@ -43,9 +43,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -258,6 +260,32 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
           }
           schemaHookDispatcher.dropSchema(NameIdentifier.of(filesetNs.levels()), true);
         });
+  }
+
+  @Test
+  public void testDropFilesetShouldNotRemovePrivilegesWhenDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    FilesetDispatcher delegate = Mockito.mock(FilesetDispatcher.class);
+    FilesetHookDispatcher hookDispatcher = new FilesetHookDispatcher(delegate);
+    List<String> locations = Lists.newArrayList("/tmp/fileset");
+
+    Mockito.when(delegate.dropFileset(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> mockedAuthz =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      mockedAuthz
+          .when(
+              () -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET))
+          .thenReturn(locations);
+
+      Assertions.assertFalse(hookDispatcher.dropFileset(ident));
+
+      mockedAuthz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.FILESET, locations),
+          Mockito.never());
+    }
   }
 
   @Test
