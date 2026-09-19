@@ -266,6 +266,7 @@
    Apache Commons Logging
    Apache Commons Net
    Apache Commons Pool
+   Objenesis
    Air Compressor
    Airlift
    AWS SDK for Java 2.0 Annotations
@@ -441,6 +442,9 @@
    Apache HttpComponents Core5
    Helger Profiler
    OpenAPI Tools Jackson Databind Nullable
+   Kryo
+   ReflectASM
+   MinLog
 
    This product bundles various third-party components also under the
    MIT license
@@ -457,6 +461,7 @@
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
+   Jedis
 
    This product bundles various third-party components also under the
    Boost Software License 1.0
@@ -528,6 +533,7 @@
    the public domain.
 
    AOP Alliance
+   JSON-java (org.json)
    XZ For Java
    HdrHistogram
    LatencyUtils
