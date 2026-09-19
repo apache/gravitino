@@ -124,6 +124,15 @@ public class TopicMetaService {
     try {
       TopicPO newTopicPO = POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity);
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until the transaction ends, so the topic cannot be
+          // updated below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      newEntity.nameIdentifier(),
+                      oldTopicPO.getSchemaId(),
+                      oldTopicPO.getCatalogId(),
+                      oldTopicPO.getMetalakeId()),
           () -> {
             // current_version is the decision point for the whole write. Even if another writer
             // changes the payload and later restores it, that writer still advances the version,

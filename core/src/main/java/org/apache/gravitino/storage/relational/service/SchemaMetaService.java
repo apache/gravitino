@@ -59,6 +59,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -296,6 +297,10 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> mapper.softDeleteTableMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> mapper.softDeleteTableVersionsBySchemaIds(schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
                   TableColumnMapper.class,
