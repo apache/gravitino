@@ -662,11 +662,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-    if (StringUtils.isNotEmpty(tableBuilder.comment())) {
+    if (StringUtils.isNotEmpty(tableBuilder.comment())
+        && !"OLAP".equalsIgnoreCase(tableBuilder.comment())) {
       return;
     }
 
-    // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
+    // Doris JDBC metadata can report the OLAP engine as REMARKS. Query the actual table comment
+    // from information_schema when REMARKS is empty or contains that engine name. Preserve the
+    // Gravitino ID suffix so JdbcCatalogOperations can extract it when loading the table.
     StringBuilder comment = new StringBuilder();
     String sql =
         "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
