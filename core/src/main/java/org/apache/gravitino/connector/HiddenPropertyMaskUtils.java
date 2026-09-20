@@ -37,12 +37,11 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *       {@code gravitino.identifier}). Users cannot set them and UIs cannot edit them, so a masked
  *       placeholder is useless.
  *   <li><b>Mask</b> other hidden keys (credentials such as {@code jdbc-password}), secret-manager
- *       URN values, official keys marked hidden in {@link OfficialGravitinoProperties} even when
- *       the current catalog metadata omits them, and <em>unknown</em> keys (not defined by
- *       Gravitino) whose names look sensitive (contain {@code secret}, {@code password}, {@code
- *       token}, {@code credential}, {@code access}, or {@code account}, case-insensitive) with
- *       {@link #MASKED_VALUE}, so clients can see that the property exists without reading the
- *       plaintext.
+ *       URN values, official keys marked hidden in {@link RegisteredPropertyKeys} even when the
+ *       current catalog metadata omits them, and <em>unknown</em> keys (not defined by Gravitino)
+ *       whose names look sensitive (contain {@code secret}, {@code password}, {@code token}, {@code
+ *       credential}, {@code access}, or {@code account}, case-insensitive) with {@link
+ *       #MASKED_VALUE}, so clients can see that the property exists without reading the plaintext.
  *   <li>Return all other properties as-is, including reserved-but-visible ones (for example {@code
  *       in-use}, {@code numFiles}).
  * </ul>
@@ -108,21 +107,21 @@ public final class HiddenPropertyMaskUtils {
         continue;
       }
       boolean definedInCatalog = metadata.containsProperty(key);
-      boolean definedOfficially = OfficialGravitinoProperties.isDefined(key);
+      boolean registered = RegisteredPropertyKeys.isRegistered(key);
       boolean hidden =
           definedInCatalog
               ? metadata.isHiddenProperty(key)
-              : definedOfficially && OfficialGravitinoProperties.isHidden(key);
+              : registered && RegisteredPropertyKeys.isHidden(key);
       boolean reserved =
           definedInCatalog
               ? metadata.isReservedProperty(key)
-              : definedOfficially && OfficialGravitinoProperties.isReserved(key);
+              : registered && RegisteredPropertyKeys.isReserved(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
       } else if (hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
           || (!definedInCatalog
-              && !definedOfficially
+              && !registered
               && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);
       }

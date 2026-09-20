@@ -35,7 +35,7 @@ import org.apache.gravitino.connector.PropertyEntry;
  * <p>Registers the shared base + credential-vending + cloud-storage property entries so officially
  * non-hidden keys (for example {@code credential-providers}, {@code s3-access-key-id}) are present
  * when a catalog does not expose entity metadata. Cross-catalog masking consistency for official
- * keys is handled by {@link org.apache.gravitino.connector.OfficialGravitinoProperties}. Undeclared
+ * keys is handled by {@link org.apache.gravitino.connector.RegisteredPropertyKeys}. Undeclared
  * sensitive-named keys still use fuzzy recovery; declared or official hidden secrets (for example
  * {@code s3-secret-access-key}) remain recoverable.
  */

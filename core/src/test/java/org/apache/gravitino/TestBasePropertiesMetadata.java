@@ -61,7 +61,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
   }
 
   @Override
-  protected boolean enforceOfficialPropertyRegistration() {
+  protected boolean enforceRegisteredPropertyKeys() {
     // Ad-hoc test keys such as "k1" are not production connector definitions.
     return false;
   }

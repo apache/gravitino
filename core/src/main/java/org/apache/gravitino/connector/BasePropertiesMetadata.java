@@ -91,7 +91,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
     // Credential vending keys (e.g. credential-providers) are valid on schema / fileset / table as
     // well as catalog. Register once so catalog metadata includes the official entries; cross-
-    // catalog fuzzy-mask consistency also uses OfficialGravitinoProperties.
+    // catalog fuzzy-mask consistency also uses RegisteredPropertyKeys.
     CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
         (name, entry) -> {
           Preconditions.checkArgument(
@@ -104,42 +104,39 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
   /**
    * Returns whether connector-specific {@link #specificPropertyEntries()} must be registered in
-   * base, shared cloud/credential metadata, or {@link OfficialGravitinoProperties}.
+   * base, shared cloud/credential metadata, or {@link RegisteredPropertyKeys}.
    *
    * <p>Production connectors should leave the default {@code true}. Test stubs that use ad-hoc
    * property names may return {@code false}. This does <strong>not</strong> restrict user-supplied
    * entity property maps — only metadata definitions declared by connectors.
    *
-   * @return true when connector-specific entries must appear in one of the official registries
+   * @return true when connector-specific entries must appear in one of the registered key sets
    */
-  protected boolean enforceOfficialPropertyRegistration() {
+  protected boolean enforceRegisteredPropertyKeys() {
     return true;
   }
 
   /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
    * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
-   * OfficialGravitinoProperties#isSharedBaseOrCloudProperty}), or {@link
-   * OfficialGravitinoProperties} connector keys. Does not validate user-supplied entity property
-   * maps.
+   * RegisteredPropertyKeys#isSharedBaseOrCloudProperty}), or {@link RegisteredPropertyKeys}
+   * connector keys. Does not validate user-supplied entity property maps.
    */
   private void checkConnectorSpecificPropertiesRegistered(
       Map<String, PropertyEntry<?>> specificEntries) {
-    if (!enforceOfficialPropertyRegistration()
-        || specificEntries == null
-        || specificEntries.isEmpty()) {
+    if (!enforceRegisteredPropertyKeys() || specificEntries == null || specificEntries.isEmpty()) {
       return;
     }
     for (String name : specificEntries.keySet()) {
       if (BASIC_PROPERTY_ENTRIES.containsKey(name)
-          || OfficialGravitinoProperties.isSharedBaseOrCloudProperty(name)
-          || OfficialGravitinoProperties.isDefined(name)) {
+          || RegisteredPropertyKeys.isSharedBaseOrCloudProperty(name)
+          || RegisteredPropertyKeys.isRegistered(name)) {
         continue;
       }
       Preconditions.checkArgument(
           false,
           "Connector-defined property '%s' in %s must be registered in base properties,"
-              + " shared cloud/credential metadata, or OfficialGravitinoProperties."
+              + " shared cloud/credential metadata, or RegisteredPropertyKeys."
               + " User entity custom properties are not blocked by this check.",
           name,
           getClass().getName());

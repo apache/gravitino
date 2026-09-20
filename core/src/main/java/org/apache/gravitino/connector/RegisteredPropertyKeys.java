@@ -33,7 +33,7 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * and connector metadata.
  *
  * <p>Name-based (fuzzy) masking and secret recovery treat only keys <em>not</em> in this registry
- * as unknown. Official keys follow {@link #isHidden(String)} / {@link #isReserved(String)} even
+ * as unknown. Registered keys follow {@link #isHidden(String)} / {@link #isReserved(String)} even
  * when the current catalog's {@link PropertiesMetadata} does not declare them (for example a
  * runtime-copied {@code s3-access-key-id} on Glue).
  *
@@ -44,7 +44,7 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * <p>Keep this list in sync when adding catalog property entries. Connectors may depend on these
  * definitions; {@code core} must not depend on catalog modules.
  */
-public final class OfficialGravitinoProperties {
+public final class RegisteredPropertyKeys {
 
   /** Fileset multi-location property prefix ({@code location-<name>}). */
   public static final String LOCATION_PROPERTY_PREFIX = "location-";
@@ -52,7 +52,7 @@ public final class OfficialGravitinoProperties {
   /**
    * Shared credential-vending and cloud-storage keys already registered via {@link
    * CredentialConfig} / {@code *PropertiesMetadata}. Connector {@code specificPropertyEntries} that
-   * only re-export these are not re-checked against {@link #DEFINED_KEYS}.
+   * only re-export these are not re-checked against {@link #REGISTERED_KEYS}.
    */
   private static final Set<String> SHARED_BASE_AND_CLOUD_KEYS =
       ImmutableSet.<String>builder()
@@ -64,7 +64,7 @@ public final class OfficialGravitinoProperties {
           .addAll(COSPropertiesMetadata.PROPERTY_ENTRIES.keySet())
           .build();
 
-  private static final Set<String> DEFINED_KEYS =
+  private static final Set<String> REGISTERED_KEYS =
       ImmutableSet.<String>builder()
           .add(
               "EXTERNAL",
@@ -251,7 +251,7 @@ public final class OfficialGravitinoProperties {
           .add("totalSize", "transient_lastDdlTime")
           .build();
 
-  private OfficialGravitinoProperties() {}
+  private RegisteredPropertyKeys() {}
 
   /**
    * Returns whether {@code key} is a Gravitino-defined property name (exact or known prefix).
@@ -259,11 +259,11 @@ public final class OfficialGravitinoProperties {
    * @param key property key
    * @return true when Gravitino defines the key
    */
-  public static boolean isDefined(@Nullable String key) {
+  public static boolean isRegistered(@Nullable String key) {
     if (key == null || key.isEmpty()) {
       return false;
     }
-    return DEFINED_KEYS.contains(key) || key.startsWith(LOCATION_PROPERTY_PREFIX);
+    return REGISTERED_KEYS.contains(key) || key.startsWith(LOCATION_PROPERTY_PREFIX);
   }
 
   /**
@@ -271,8 +271,8 @@ public final class OfficialGravitinoProperties {
    *
    * <p>Used when registering connector metadata: shared keys need not be listed again as
    * connector-specific entries in this registry for the build-time check (they are already defined
-   * by credential/cloud modules). Fuzzy masking still treats them as official via {@link
-   * #isDefined(String)}.
+   * by credential/cloud modules). Fuzzy masking still treats them as registered via {@link
+   * #isRegistered(String)}.
    *
    * @param key property key
    * @return true when the key comes from credential or shared cloud metadata
@@ -282,7 +282,7 @@ public final class OfficialGravitinoProperties {
   }
 
   /**
-   * Returns whether an official property is hidden when the catalog metadata does not declare it.
+   * Returns whether an registered property is hidden when the catalog metadata does not declare it.
    *
    * @param key property key
    * @return true when the official definition marks the key hidden
@@ -292,7 +292,8 @@ public final class OfficialGravitinoProperties {
   }
 
   /**
-   * Returns whether an official property is reserved when the catalog metadata does not declare it.
+   * Returns whether an registered property is reserved when the catalog metadata does not declare
+   * it.
    *
    * @param key property key
    * @return true when the official definition marks the key reserved
@@ -301,8 +302,8 @@ public final class OfficialGravitinoProperties {
     return key != null && RESERVED_KEYS.contains(key);
   }
 
-  /** Returns the immutable set of exact official property keys (excludes prefix matches). */
-  public static Set<String> definedKeys() {
-    return DEFINED_KEYS;
+  /** Returns the immutable set of exact registered property keys (excludes prefix matches). */
+  public static Set<String> registeredKeys() {
+    return REGISTERED_KEYS;
   }
 }

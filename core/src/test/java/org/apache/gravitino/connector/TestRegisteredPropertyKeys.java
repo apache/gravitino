@@ -23,37 +23,35 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestOfficialGravitinoProperties {
+public class TestRegisteredPropertyKeys {
 
   @Test
   void testCloudAndConnectorKeysAreDefined() {
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("s3-access-key-id"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("aws-access-key-id"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("dlf-access-key-id"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("credential-providers"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("location-unknown"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isDefined("location-warehouse"));
-    Assertions.assertFalse(OfficialGravitinoProperties.isDefined("typo-access-key"));
-    Assertions.assertFalse(OfficialGravitinoProperties.isDefined(null));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("s3-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("aws-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("dlf-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("credential-providers"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-unknown"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-warehouse"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("typo-access-key"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered(null));
   }
 
   @Test
   void testHiddenMatchesOfficialSecretsNotIdentifiers() {
-    Assertions.assertFalse(OfficialGravitinoProperties.isHidden("s3-access-key-id"));
-    Assertions.assertFalse(OfficialGravitinoProperties.isHidden("aws-access-key-id"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isHidden("s3-secret-access-key"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isHidden("aws-secret-access-key"));
-    Assertions.assertTrue(OfficialGravitinoProperties.isHidden("jdbc-password"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isHidden("s3-access-key-id"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isHidden("aws-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("s3-secret-access-key"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("aws-secret-access-key"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("jdbc-password"));
   }
 
   @Test
   void testSharedBaseOrCloudProperties() {
+    Assertions.assertTrue(RegisteredPropertyKeys.isSharedBaseOrCloudProperty("s3-access-key-id"));
     Assertions.assertTrue(
-        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("s3-access-key-id"));
-    Assertions.assertTrue(
-        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("credential-providers"));
-    Assertions.assertFalse(
-        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("aws-access-key-id"));
+        RegisteredPropertyKeys.isSharedBaseOrCloudProperty("credential-providers"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isSharedBaseOrCloudProperty("aws-access-key-id"));
   }
 
   @Test
@@ -74,7 +72,7 @@ public class TestOfficialGravitinoProperties {
     Assertions.assertTrue(exception.getMessage().contains("connector-only-unregistered-key"));
     Assertions.assertTrue(
         exception.getMessage().contains("base properties")
-            || exception.getMessage().contains("OfficialGravitinoProperties"));
+            || exception.getMessage().contains("RegisteredPropertyKeys"));
   }
 
   @Test

@@ -29,9 +29,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.connector.OfficialGravitinoProperties;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.connector.RegisteredPropertyKeys;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -114,8 +114,8 @@ public final class SecretPropertyUtils {
     if (metadata.containsProperty(key)) {
       return metadata.isHiddenProperty(key);
     }
-    if (OfficialGravitinoProperties.isDefined(key)) {
-      return OfficialGravitinoProperties.isHidden(key);
+    if (RegisteredPropertyKeys.isRegistered(key)) {
+      return RegisteredPropertyKeys.isHidden(key);
     }
     return true;
   }
