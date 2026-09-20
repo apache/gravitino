@@ -71,26 +71,22 @@ public class TopicMetaService {
       fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
       TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the topic cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      topicEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TopicMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertTopicMeta(po);
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              topicEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertTopicMeta(po);
+                        }
+                      }));
       // TODO: insert topic dataLayout version after supporting it
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -123,19 +119,25 @@ public class TopicMetaService {
 
     try {
       TopicPO newTopicPO = POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity);
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // current_version is the decision point for the whole write. Even if another writer
-            // changes the payload and later restores it, that writer still advances the version,
-            // so this stale update changes zero rows.
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.updateTopicMeta(newTopicPO, oldTopicPO));
-            if (updated == 0) {
-              throw topicWriteFailure(ident, oldTopicPO);
-            }
-          });
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              ident,
+              oldTopicPO.getSchemaId(),
+              oldTopicPO.getCatalogId(),
+              oldTopicPO.getMetalakeId(),
+              () -> {
+                // current_version is the decision point for the whole write. Even if another writer
+                // changes the payload and later restores it, that writer still advances the
+                // version,
+                // so this stale update changes zero rows.
+                int updated =
+                    SessionUtils.getWithoutCommit(
+                        TopicMetaMapper.class,
+                        mapper -> mapper.updateTopicMeta(newTopicPO, oldTopicPO));
+                if (updated == 0) {
+                  throw topicWriteFailure(ident, oldTopicPO);
+                }
+              });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
