@@ -170,6 +170,12 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     for (int index = 0; index < mappingOldAndNewMetadata.size(); index++) {
       oldMetadataNames.add(mappingOldAndNewMetadata.get(index).getKey());
       newMetadataNames.add(mappingOldAndNewMetadata.get(index).getValue());
+      // A table rename never changes the schema-level policies. When the table also moves to
+      // another schema, updating them would move every policy of the old schema, so the table's
+      // own policies are updated from the table level down instead.
+      if (index == 0 && newAuthzMetadataObject.type().equals(TABLE)) {
+        continue;
+      }
 
       AuthorizationMetadataObject.Type type;
       if (index == 0) {
@@ -235,16 +241,21 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     // Doesn't need to rename the policy `*`
                     return;
                   }
-                  policyNames.set(index, newAuthzMetaObject.names().get(index));
+                  // Every level up to the renamed one takes its new name, because a renamed
+                  // table may also have moved to another schema.
+                  for (int i = 0; i <= index; i++) {
+                    policyNames.set(i, newAuthzMetaObject.names().get(i));
+                  }
                   policy.setName(AuthorizationSecurableObject.DOT_JOINER.join(policyNames));
                 }
-                // Update the policy resource name to new name
-                policy
-                    .getResources()
-                    .put(
-                        policyResourceDefinesRule().get(index),
-                        new RangerPolicy.RangerPolicyResource(
-                            newAuthzMetaObject.names().get(index)));
+                // Update the policy resource names, up to the renamed level, to the new names
+                for (int i = 0; i <= index; i++) {
+                  policy
+                      .getResources()
+                      .put(
+                          policyResourceDefinesRule().get(i),
+                          new RangerPolicy.RangerPolicyResource(newAuthzMetaObject.names().get(i)));
+                }
 
                 boolean alreadyExist =
                     existNewPolicies.stream()

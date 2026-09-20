@@ -831,6 +831,9 @@ public class ExceptionHandlers {
       } else if (e instanceof TagAlreadyAssociatedException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof PolicyAlreadyAssociatedException) {
+        return Utils.alreadyExists(errorMsg, e);
+
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 
