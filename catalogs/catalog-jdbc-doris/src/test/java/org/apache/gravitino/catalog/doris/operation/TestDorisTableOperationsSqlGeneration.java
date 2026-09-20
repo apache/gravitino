@@ -297,7 +297,8 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "ALTER TABLE `test_table`\n"
             + "ADD COLUMN `col2` varchar(255) DEFAULT "
-            + new DorisColumnDefaultValueConverter().fromGravitinoForAddColumn(defaultValue, true)
+            + new DorisColumnDefaultValueConverter()
+                .fromGravitinoForAddColumn(defaultValue, true, true)
             + " ;",
         sql);
   }
@@ -313,11 +314,12 @@ public class TestDorisTableOperationsSqlGeneration {
               TableChange.addColumn(
                   new String[] {"col2"}, Types.VarCharType.of(255), defaultValue));
 
+      boolean useSingleQuoteDelimiter = version.startsWith("doris-1.2.");
       Assertions.assertEquals(
           "ALTER TABLE `test_table`\n"
               + "ADD COLUMN `col2` varchar(255) DEFAULT "
               + new DorisColumnDefaultValueConverter()
-                  .fromGravitinoForAddColumn(defaultValue, false)
+                  .fromGravitinoForAddColumn(defaultValue, false, useSingleQuoteDelimiter)
               + " ;",
           sql);
     }
@@ -337,9 +339,27 @@ public class TestDorisTableOperationsSqlGeneration {
             TableChange.addColumn(
                 new String[] {"col2"},
                 Types.VarCharType.of(255),
-                Literals.of("owner's \"value\"", Types.VarCharType.of(255))));
+                Literals.of("owner's value", Types.VarCharType.of(255))));
 
-    Assertions.assertTrue(sql.contains("DEFAULT \"owner's \\\"value\\\"\""), sql);
+    Assertions.assertTrue(sql.contains("DEFAULT \"owner's value\""), sql);
+  }
+
+  @Test
+  public void testAddColumnQueriesVersionForAdjacentDoubleQuotes() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = mockVersionDataSource("doris-1.2.7-1-Unknown");
+    ops.setDataSource(versionDataSource);
+
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"col2"},
+                Types.VarCharType.of(255),
+                Literals.of("before\"\"after", Types.VarCharType.of(255))));
+
+    Assertions.assertTrue(sql.contains("DEFAULT 'before\"\"after'"), sql);
+    Mockito.verify(versionDataSource).getConnection();
   }
 
   @Test
@@ -360,6 +380,78 @@ public class TestDorisTableOperationsSqlGeneration {
             Literals.of("second\\value", Types.VarCharType.of(255))));
 
     Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+  }
+
+  @Test
+  public void testAddColumnFallsBackToShowFrontendsWhenTableFunctionIsUnavailable()
+      throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Statement statement = Mockito.mock(Statement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSetMetaData metadata = Mockito.mock(ResultSetMetaData.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.executeQuery("SELECT Version FROM FRONTENDS()"))
+        .thenThrow(new SQLException("FRONTENDS table-valued function is unavailable"));
+    Mockito.when(statement.executeQuery("SHOW FRONTENDS")).thenReturn(resultSet);
+    Mockito.when(resultSet.getMetaData()).thenReturn(metadata);
+    Mockito.when(metadata.getColumnCount()).thenReturn(1);
+    Mockito.when(metadata.getColumnLabel(1)).thenReturn("Version");
+    Mockito.when(resultSet.next()).thenReturn(true);
+    Mockito.when(resultSet.getString(1)).thenReturn("doris-1.2.7-1-Unknown");
+    ops.setDataSource(dataSource);
+
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"col2"},
+                Types.VarCharType.of(255),
+                Literals.of("value\\path", Types.VarCharType.of(255))));
+
+    Assertions.assertTrue(
+        sql.contains(
+            new DorisColumnDefaultValueConverter()
+                .fromGravitinoForAddColumn(
+                    Literals.of("value\\path", Types.VarCharType.of(255)), false, true)),
+        sql);
+    Mockito.verify(statement).executeQuery("SELECT Version FROM FRONTENDS()");
+    Mockito.verify(statement).executeQuery("SHOW FRONTENDS");
+  }
+
+  @Test
+  public void testAddColumnFailsClosedWhenBothVersionQueriesFail() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Statement statement = Mockito.mock(Statement.class);
+    SQLException frontendsFailure = new SQLException("FRONTENDS() denied");
+    SQLException showFailure = new SQLException("SHOW FRONTENDS denied");
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.executeQuery("SELECT Version FROM FRONTENDS()"))
+        .thenThrow(frontendsFailure);
+    Mockito.when(statement.executeQuery("SHOW FRONTENDS")).thenThrow(showFailure);
+    ops.setDataSource(dataSource);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"col2"},
+                        Types.VarCharType.of(255),
+                        Literals.of("value\\path", Types.VarCharType.of(255)))));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("ADD COLUMN default literal compatibility check"),
+        exception.getMessage());
+    Assertions.assertSame(showFailure, exception.getCause());
+    Assertions.assertArrayEquals(new Throwable[] {frontendsFailure}, showFailure.getSuppressed());
   }
 
   @Test
@@ -1159,18 +1251,14 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   private static DataSource mockVersionDataSource(String dorisVersion) throws Exception {
-    // SHOW FRONTENDS exposes the Doris version instead of the MySQL protocol version.
+    // FRONTENDS() exposes the Doris version instead of the MySQL protocol version.
     DataSource dataSource = Mockito.mock(DataSource.class);
     Connection connection = Mockito.mock(Connection.class);
     Statement statement = Mockito.mock(Statement.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
-    ResultSetMetaData metadata = Mockito.mock(ResultSetMetaData.class);
     Mockito.when(dataSource.getConnection()).thenReturn(connection);
     Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.executeQuery("SHOW FRONTENDS")).thenReturn(resultSet);
-    Mockito.when(resultSet.getMetaData()).thenReturn(metadata);
-    Mockito.when(metadata.getColumnCount()).thenReturn(1);
-    Mockito.when(metadata.getColumnLabel(1)).thenReturn("Version");
+    Mockito.when(statement.executeQuery("SELECT Version FROM FRONTENDS()")).thenReturn(resultSet);
     Mockito.when(resultSet.next()).thenReturn(true);
     Mockito.when(resultSet.getString(1)).thenReturn(dorisVersion);
     return dataSource;

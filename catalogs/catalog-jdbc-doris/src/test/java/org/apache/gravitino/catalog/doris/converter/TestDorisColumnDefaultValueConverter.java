@@ -81,6 +81,32 @@ public class TestDorisColumnDefaultValueConverter {
   }
 
   @Test
+  public void testSingleQuotedLegacyLiteralPreservesAdjacentDoubleQuotes() {
+    Literal<?> defaultValue =
+        Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255));
+
+    Assertions.assertEquals(
+        "'owner''s a\"\"b \"value\"\\\\path'",
+        CONVERTER.fromGravitinoForAddColumn(defaultValue, false, true));
+    Assertions.assertEquals(
+        "'owner''s a\"\"b \"value\"\\\\\\\\path'",
+        CONVERTER.fromGravitinoForAddColumn(defaultValue, true, true));
+  }
+
+  @Test
+  public void testRepeatedApostrophesRemainLiteralDuringWriteAndRead() {
+    Literal<?> defaultValue = Literals.of("owner''s", Types.VarCharType.of(255));
+    JdbcTypeConverter.JdbcTypeBean varcharType =
+        new JdbcTypeConverter.JdbcTypeBean(JdbcTypeConverter.VARCHAR);
+    varcharType.setColumnSize(255);
+
+    Assertions.assertEquals(
+        "'owner''''s'", CONVERTER.fromGravitinoForAddColumn(defaultValue, false, true));
+    Assertions.assertEquals(
+        defaultValue, CONVERTER.toGravitino(varcharType, "owner''s", false, false));
+  }
+
+  @Test
   public void testUnescapeStringLikeDefaultValues() {
     JdbcTypeConverter.JdbcTypeBean varcharType =
         new JdbcTypeConverter.JdbcTypeBean(JdbcTypeConverter.VARCHAR);
@@ -108,5 +134,8 @@ public class TestDorisColumnDefaultValueConverter {
     Assertions.assertEquals(
         Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's \"value\"\\path", false, false));
+    Assertions.assertEquals(
+        Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255)),
+        CONVERTER.toGravitino(varcharType, "owner's a\"\"b \"value\"\\\\path", false, false));
   }
 }

@@ -683,6 +683,7 @@ public class CatalogDorisIT extends BaseIT {
   void testAddColumnPreservesDefaultValue() throws SQLException {
     String defaultedColumnName = "defaulted_col";
     String nullableDefaultColumnName = "nullable_default_col";
+    String requestedDefaultValue = "owner's a\"\"b \"value\"\\path";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             schemaName, GravitinoITUtils.genRandomName("test_add_column_preserves_default"));
@@ -706,7 +707,94 @@ public class CatalogDorisIT extends BaseIT {
             TableChange.ColumnPosition.defaultPos(),
             false,
             false,
-            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255))));
+            Literals.of(requestedDefaultValue, Types.VarCharType.of(255))));
+
+    String diagnosticQualifiedTableName = schemaName + "." + tableIdentifier.name();
+    String[] rawDefaults = new String[3];
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(
+                          jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+                  Statement statement = connection.createStatement();
+                  ResultSet columns =
+                      connection
+                          .getMetaData()
+                          .getColumns(
+                              schemaName, null, tableIdentifier.name(), defaultedColumnName)) {
+                String jdbcColumnDefault = null;
+                while (columns.next()) {
+                  if (defaultedColumnName.equals(columns.getString("COLUMN_NAME"))) {
+                    jdbcColumnDefault = columns.getString("COLUMN_DEF");
+                    break;
+                  }
+                }
+                Assertions.assertNotNull(jdbcColumnDefault, "JDBC COLUMN_DEF was not returned");
+                rawDefaults[0] = jdbcColumnDefault;
+
+                try (ResultSet showColumns =
+                    statement.executeQuery(
+                        "SHOW FULL COLUMNS FROM " + diagnosticQualifiedTableName)) {
+                  while (showColumns.next()) {
+                    if (defaultedColumnName.equals(showColumns.getString("Field"))) {
+                      rawDefaults[1] = showColumns.getString("Default");
+                      break;
+                    }
+                  }
+                }
+                Assertions.assertNotNull(
+                    rawDefaults[1], "SHOW FULL COLUMNS did not return the string default");
+
+                String infoSchemaQuery =
+                    String.format(
+                        "SELECT COLUMN_DEFAULT FROM information_schema.columns "
+                            + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' "
+                            + "AND COLUMN_NAME = '%s'",
+                        schemaName, tableIdentifier.name(), defaultedColumnName);
+                try (ResultSet infoSchema = statement.executeQuery(infoSchemaQuery)) {
+                  Assertions.assertTrue(
+                      infoSchema.next(), "information_schema.columns row was not returned");
+                  rawDefaults[2] = infoSchema.getString("COLUMN_DEFAULT");
+                }
+              }
+            });
+
+    String metadataDiagnostic =
+        String.format(
+            "JDBC COLUMN_DEF=[%s], SHOW FULL COLUMNS Default=[%s], "
+                + "information_schema.COLUMN_DEFAULT=[%s]",
+            rawDefaults[0], rawDefaults[1], rawDefaults[2]);
+    DorisContainer.LOG.info("Doris default metadata diagnostic: {}", metadataDiagnostic);
+    String[] insertedDefaultValue = new String[1];
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (%s, %s, %s, %s) " + "VALUES (102, 'data-1', 'data-2', '2024-01-01')",
+              diagnosticQualifiedTableName,
+              DORIS_COL_NAME1,
+              DORIS_COL_NAME2,
+              DORIS_COL_NAME3,
+              DORIS_COL_NAME4));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT %s FROM %s WHERE %s = 102",
+                  defaultedColumnName, diagnosticQualifiedTableName, DORIS_COL_NAME1))) {
+        Assertions.assertTrue(resultSet.next());
+        insertedDefaultValue[0] = resultSet.getString(1);
+        Assertions.assertFalse(resultSet.next());
+      }
+    }
+    Assertions.assertEquals(
+        requestedDefaultValue,
+        insertedDefaultValue[0],
+        metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
 
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
@@ -719,8 +807,9 @@ public class CatalogDorisIT extends BaseIT {
               Assertions.assertFalse(addedColumn.nullable());
               Assertions.assertEquals("defaulted column", addedColumn.comment());
               Assertions.assertEquals(
-                  Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)),
-                  addedColumn.defaultValue());
+                  Literals.of(requestedDefaultValue, Types.VarCharType.of(255)),
+                  addedColumn.defaultValue(),
+                  metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
             });
 
     tableCatalog.alterTable(
@@ -771,7 +860,7 @@ public class CatalogDorisIT extends BaseIT {
                   qualifiedTableName,
                   DORIS_COL_NAME1))) {
         Assertions.assertTrue(resultSet.next());
-        Assertions.assertEquals("owner's \"value\"\\path", resultSet.getString(1));
+        Assertions.assertEquals(requestedDefaultValue, resultSet.getString(1));
         Assertions.assertEquals(9, resultSet.getInt(2));
         Assertions.assertFalse(resultSet.wasNull());
         Assertions.assertFalse(resultSet.next());

@@ -276,26 +276,39 @@ public class DorisTableOperations extends JdbcTableOperations {
   private String getDorisVersion(String purpose) {
     Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
     String version = null;
-    // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
-    // SHOW FRONTENDS returns the actual Doris version in the "Version" column
-    // (e.g. "doris-3.0.6.2-rc01-910c4249c5").
-    try (Connection connection = dataSource.getConnection();
-        Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
-      ResultSetMetaData meta = rs.getMetaData();
-      int versionCol = -1;
-      for (int i = 1; i <= meta.getColumnCount(); i++) {
-        if ("Version".equals(meta.getColumnLabel(i))) {
-          versionCol = i;
-          break;
+    SQLException frontendsQueryFailure = null;
+    try (Connection connection = dataSource.getConnection()) {
+      // FRONTENDS() is readable with the default information_schema SELECT privilege on Doris
+      // 3.0.6.2, while SHOW FRONTENDS requires ADMIN/OPERATOR there. Older Doris releases such as
+      // 1.2.x do not support the table-valued function, so retain SHOW FRONTENDS as a fallback.
+      try (Statement stmt = connection.createStatement();
+          ResultSet rs = stmt.executeQuery("SELECT Version FROM FRONTENDS()")) {
+        if (rs.next()) {
+          version = extractDorisVersion(rs.getString(1));
         }
+      } catch (SQLException e) {
+        frontendsQueryFailure = e;
       }
-      if (rs.next() && versionCol > 0) {
-        String versionStr = rs.getString(versionCol);
-        // Extract X.Y.Z from "doris-X.Y.Z-suffix-commit" using regex for robustness
-        Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionStr);
-        if (matcher.find()) {
-          version = matcher.group(1);
+
+      if (version == null) {
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
+          ResultSetMetaData meta = rs.getMetaData();
+          int versionCol = -1;
+          for (int i = 1; i <= meta.getColumnCount(); i++) {
+            if ("Version".equalsIgnoreCase(meta.getColumnLabel(i))) {
+              versionCol = i;
+              break;
+            }
+          }
+          if (rs.next() && versionCol > 0) {
+            version = extractDorisVersion(rs.getString(versionCol));
+          }
+        } catch (SQLException e) {
+          if (frontendsQueryFailure != null) {
+            e.addSuppressed(frontendsQueryFailure);
+          }
+          throw e;
         }
       }
     } catch (SQLException e) {
@@ -303,8 +316,8 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Unable to determine Doris version for "
               + purpose
               + ". "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
-              + "and the Doris FE is reachable.",
+              + "Ensure the connection user can query FRONTENDS() or, on older Doris versions, "
+              + "has permission to execute SHOW FRONTENDS, and the Doris FE is reachable.",
           e);
     }
     if (version == null) {
@@ -312,10 +325,19 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Unable to determine Doris version for "
               + purpose
               + ". "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
-              + "and the Doris FE is reachable.");
+              + "Ensure the connection user can query FRONTENDS() or, on older Doris versions, "
+              + "has permission to execute SHOW FRONTENDS, and the Doris FE is reachable.");
     }
     return version;
+  }
+
+  @Nullable
+  private static String extractDorisVersion(@Nullable String versionString) {
+    if (versionString == null) {
+      return null;
+    }
+    Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionString);
+    return matcher.find() ? matcher.group(1) : null;
   }
 
   @VisibleForTesting
@@ -985,7 +1007,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (value == null) {
       return false;
     }
-    return String.valueOf(value).contains("\\");
+    String stringValue = String.valueOf(value);
+    return stringValue.contains("\\") || stringValue.contains("\"\"");
   }
 
   private String serializeAddColumnDefaultValue(
@@ -1001,9 +1024,10 @@ public class DorisTableOperations extends JdbcTableOperations {
                 version ->
                     isVersionAtLeast(version, 3, 0, 0) && !isVersionAtLeast(version, 4, 0, 0))
             .orElse(false);
-    return requiresDoubleEscaping
-        ? converter.fromGravitinoForAddColumn(defaultValue, true)
-        : converter.fromGravitinoForAddColumn(defaultValue, false);
+    boolean useSingleQuoteDelimiter =
+        dorisVersion.map(version -> !isVersionAtLeast(version, 4, 0, 0)).orElse(false);
+    return converter.fromGravitinoForAddColumn(
+        defaultValue, requiresDoubleEscaping, useSingleQuoteDelimiter);
   }
 
   private String updateColumnPositionFieldDefinition(
