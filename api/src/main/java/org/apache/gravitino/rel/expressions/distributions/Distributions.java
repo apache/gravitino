@@ -38,17 +38,18 @@ public class Distributions {
       new DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION);
 
   /**
-   * Returns true if the distribution is the NONE distribution. The comparison is structural so both
-   * the built-in implementation and DTO representations of NONE match.
+   * Returns true if the distribution is the NONE distribution. A null distribution means "no
+   * distribution specified" and is therefore treated as NONE. For non-null values the comparison is
+   * structural, so both the built-in implementation and DTO representations of NONE match.
    *
    * @param distribution The distribution to check; may be null.
-   * @return true if the distribution is not null and represents the NONE distribution.
+   * @return true if the distribution is null or represents the NONE distribution.
    */
   public static boolean isNone(@Nullable Distribution distribution) {
-    return distribution != null
-        && distribution.strategy() == Strategy.NONE
-        && distribution.number() == 0
-        && Arrays.equals(distribution.expressions(), Expression.EMPTY_EXPRESSION);
+    return distribution == null
+        || (distribution.strategy() == Strategy.NONE
+            && distribution.number() == 0
+            && Arrays.equals(distribution.expressions(), Expression.EMPTY_EXPRESSION));
   }
 
   /** List bucketing strategy hash, TODO: #1505 Separate the bucket number from the Distribution. */

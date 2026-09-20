@@ -57,7 +57,8 @@ public class TestDistributions {
     Assertions.assertTrue(
         Distributions.isNone(distributionOf(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION)));
 
-    Assertions.assertFalse(Distributions.isNone(null));
+    // A null distribution means "no distribution specified", which is treated as NONE.
+    Assertions.assertTrue(Distributions.isNone(null));
     Assertions.assertFalse(Distributions.isNone(Distributions.HASH));
     Assertions.assertFalse(Distributions.isNone(Distributions.RANGE));
     Assertions.assertFalse(
