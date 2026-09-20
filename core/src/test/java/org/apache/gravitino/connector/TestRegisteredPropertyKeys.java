@@ -90,11 +90,12 @@ public class TestRegisteredPropertyKeys {
   }
 
   @Test
-  void testCatalogKeysAreRegisteredUnderStrictPolicy() {
-    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("key1"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("key5-abc"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("hidden_key"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("reserved_key"));
+  void testCatalogOnlyKeysAreNotInProductionRegistry() {
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("key1"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("key5-abc"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isHidden("hidden_key"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isReserved("reserved_key"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("fail-create"));
   }
 
   @Test

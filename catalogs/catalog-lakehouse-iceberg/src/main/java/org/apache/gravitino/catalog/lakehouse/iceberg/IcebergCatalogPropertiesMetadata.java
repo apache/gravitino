@@ -36,6 +36,7 @@ import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.config.CredentialConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
@@ -140,6 +141,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
+    result.putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
     result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES);

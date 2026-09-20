@@ -27,7 +27,6 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 /**
  * An abstract class representing a base properties metadata for entities. Developers should extend
@@ -37,7 +36,10 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * <p>Note: For catalog related properties metadata, use {@link BaseCatalogPropertiesMetadata}.
  *
  * <p>This class defines reserved properties metadata for Gravitino use only. Developers should not
- * override these properties.
+ * override these properties. Connectors that support credential vending should {@code putAll}
+ * {@link org.apache.gravitino.credential.config.CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES} in
+ * their own {@code specificPropertyEntries()}; cross-catalog masking uses {@link
+ * RegisteredPropertyKeys}.
  */
 @Evolving
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
@@ -71,8 +73,8 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
   }
 
   /**
-   * Builds specific + shared base property entries (including {@link CredentialConfig}) without
-   * caching. Catalog metadata subclasses add catalog-only entries on top of this map.
+   * Builds specific + shared base property entries without caching. Catalog metadata subclasses add
+   * catalog-only entries on top of this map.
    *
    * @return an immutable property entry map
    */
@@ -89,25 +91,19 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
           builder.put(name, entry);
         });
 
-    // Credential vending keys (e.g. credential-providers) are valid on schema / fileset / table as
-    // well as catalog. Register once so catalog metadata includes the official entries.
-    CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
-        (name, entry) -> {
-          Preconditions.checkArgument(
-              !properties.containsKey(name), "Property metadata already exists: " + name);
-          builder.put(name, entry);
-        });
-
     return builder.build();
   }
 
   /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
    * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
-   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}. No
-   * exemptions for test catalogs — keep the registry strongly consistent with metadata.
+   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}.
+   *
+   * <p>Production connectors must keep this behavior. Test-only {@code PropertiesMetadata}
+   * subclasses may override with a no-op when their keys are intentionally absent from the
+   * production registry.
    */
-  private void checkConnectorSpecificPropertiesRegistered(
+  protected void checkConnectorSpecificPropertiesRegistered(
       Map<String, PropertyEntry<?>> specificEntries) {
     if (specificEntries == null || specificEntries.isEmpty()) {
       return;

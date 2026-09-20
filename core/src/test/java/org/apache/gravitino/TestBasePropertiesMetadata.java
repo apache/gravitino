@@ -37,11 +37,9 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String COMMENT_KEY = "comment";
 
-  /** Registered key reused as a required property in tests. */
-  public static final String TEST_REQUIRED_KEY = "uri";
+  public static final String TEST_REQUIRED_KEY = "k1";
 
-  /** Registered key reused as an immutable property in tests. */
-  public static final String TEST_IMMUTABLE_KEY = "format";
+  public static final String TEST_IMMUTABLE_KEY = "immutableKey";
 
   private static final Map<String, PropertyEntry<?>> TEST_BASE_PROPERTY;
 
@@ -49,7 +47,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> tablePropertyMetadata =
         ImmutableList.of(
             PropertyEntry.stringRequiredPropertyEntry(
-                TEST_REQUIRED_KEY, "test required uri property", false, false),
+                TEST_REQUIRED_KEY, "test required k1 property", false, false),
             PropertyEntry.stringReservedPropertyEntry(COMMENT_KEY, "table comment", true),
             PropertyEntry.stringImmutablePropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
@@ -62,6 +60,12 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     return TEST_BASE_PROPERTY;
   }
 
+  @Override
+  protected void checkConnectorSpecificPropertiesRegistered(
+      Map<String, PropertyEntry<?>> specificEntries) {
+    // Test-only keys (k1 / immutableKey) are not part of the production RegisteredPropertyKeys.
+  }
+
   @Test
   public void testGetPropertyEntryWithExistingProperty() {
     TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
@@ -70,7 +74,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
         metadata.getPropertyEntry(TestBasePropertiesMetadata.TEST_REQUIRED_KEY);
     assertNotNull(entry);
     assertEquals(TestBasePropertiesMetadata.TEST_REQUIRED_KEY, entry.getName());
-    assertEquals("test required uri property", entry.getDescription());
+    assertEquals("test required k1 property", entry.getDescription());
     assertTrue(entry.isRequired());
   }
 
@@ -99,12 +103,10 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
   }
 
   @Test
-  public void testCredentialPropertyEntriesAreDeclaredForAllEntities() {
+  public void testCredentialPropertyEntriesAreNotInjectedByBase() {
     TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
 
-    assertTrue(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
-    assertTrue(metadata.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
-    assertFalse(metadata.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
-    assertFalse(metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+    assertFalse(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(metadata.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
   }
 }

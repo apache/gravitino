@@ -107,8 +107,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
     if (propertyEntries == null) {
       synchronized (this) {
         if (propertyEntries == null) {
-          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add
-          // catalog-only entries.
+          // Reuse BasePropertiesMetadata (specific + BASIC), then add catalog-only entries.
           Map<String, PropertyEntry<?>> base = buildBasePropertyEntries();
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
           builder.putAll(base);

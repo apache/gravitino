@@ -86,6 +86,12 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     return new BaseCatalogPropertiesMetadata() {
       @Override
+      protected void checkConnectorSpecificPropertiesRegistered(
+          Map<String, PropertyEntry<?>> specificEntries) {
+        // Test-only keys (key1/key2/...) are not part of the production RegisteredPropertyKeys.
+      }
+
+      @Override
       protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
         return ImmutableMap.<String, PropertyEntry<?>>builder()
             .put(

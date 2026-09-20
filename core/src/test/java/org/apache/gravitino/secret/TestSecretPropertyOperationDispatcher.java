@@ -192,7 +192,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
     Assertions.assertFalse(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
-    // Declared hidden secrets and undeclared sensitive names still fuzzy-recover.
+    // Official hidden secrets and undeclared sensitive names still fuzzy-recover.
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
     Assertions.assertTrue(

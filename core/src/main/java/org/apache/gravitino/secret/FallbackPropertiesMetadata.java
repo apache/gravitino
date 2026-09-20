@@ -18,44 +18,27 @@
  */
 package org.apache.gravitino.secret;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
-import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.connector.RegisteredPropertyKeys;
 
 /**
  * Fallback {@link org.apache.gravitino.connector.PropertiesMetadata} when a catalog does not
  * support properties metadata for an entity type ({@link UnsupportedOperationException}).
  *
- * <p>Registers the shared base + credential-vending + cloud-storage property entries so officially
- * non-hidden keys (for example {@code credential-providers}, {@code s3-access-key-id}) are present
- * when a catalog does not expose entity metadata. Cross-catalog masking consistency for official
- * keys is handled by {@link org.apache.gravitino.connector.RegisteredPropertyKeys}. Undeclared
- * sensitive-named keys still use fuzzy recovery; declared or official hidden secrets (for example
- * {@code s3-secret-access-key}) remain recoverable.
+ * <p>Inherits shared base entries from {@link BasePropertiesMetadata}. Cross-catalog masking and
+ * secret recovery for credential, cloud, and other official keys use {@link
+ * RegisteredPropertyKeys}; undeclared sensitive-named keys still use fuzzy recovery.
  */
 final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
   static final FallbackPropertiesMetadata INSTANCE = new FallbackPropertiesMetadata();
 
-  private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
-      ImmutableMap.<String, PropertyEntry<?>>builder()
-          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
-          .build();
-
   private FallbackPropertiesMetadata() {}
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return CLOUD_PROPERTY_ENTRIES;
+    return Map.of();
   }
 }

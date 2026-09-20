@@ -26,15 +26,14 @@ import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_OPERATION_IMPL;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
-import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyPrefixEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -60,10 +59,11 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * copying {@code s3-access-key-id}) are declared in {@link #CONNECTOR_PROPERTY_ENTRIES}. Prefer
  * shared {@code *PropertiesMetadata} for cloud credentials instead of duplicating them there.
  *
- * <p>{@link BasePropertiesMetadata} requires every connector {@code specificPropertyEntries()} key
- * to appear in shared cloud/credential metadata, base catalog keys, or this registry (including
- * test catalogs). Prefer shared {@code *PropertiesMetadata} for cloud credentials instead of
- * duplicating them in {@link #CONNECTOR_PROPERTY_ENTRIES}.
+ * <p>{@link BasePropertiesMetadata} requires every production connector {@code
+ * specificPropertyEntries()} key to appear in shared cloud/credential metadata, base catalog keys,
+ * or this registry. Do not register test-only keys here — test catalogs should override the check
+ * in their own {@code PropertiesMetadata}. Prefer shared {@code *PropertiesMetadata} for cloud
+ * credentials instead of duplicating them in {@link #CONNECTOR_PROPERTY_ENTRIES}.
  */
 public final class RegisteredPropertyKeys {
 
@@ -86,974 +86,158 @@ public final class RegisteredPropertyKeys {
 
   /**
    * Connector and shared catalog/entity keys not covered by {@link
-   * #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}. Descriptions are abbreviated; authoritative definitions
-   * remain in each connector's {@code *PropertiesMetadata}.
+   * #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}. Descriptions reuse the key name; authoritative
+   * definitions remain in each connector's {@code *PropertiesMetadata}.
    */
   private static final Map<String, PropertyEntry<?>> CONNECTOR_PROPERTY_ENTRIES =
-      ImmutableMap.<String, PropertyEntry<?>>builder()
-          // Shared catalog / metalake base
-          .put(ID_KEY, stringReservedPropertyEntry(ID_KEY, ID_KEY, true /* hidden */))
-          .put(
-              PROPERTY_PACKAGE,
-              stringOptionalPropertyEntry(
-                  PROPERTY_PACKAGE,
-                  PROPERTY_PACKAGE,
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              CATALOG_OPERATION_IMPL,
-              stringOptionalPropertyEntry(
-                  CATALOG_OPERATION_IMPL,
-                  CATALOG_OPERATION_IMPL,
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              AUTHORIZATION_PROVIDER,
-              stringOptionalPropertyEntry(
-                  AUTHORIZATION_PROVIDER,
-                  AUTHORIZATION_PROVIDER,
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              CLOUD_NAME,
-              stringOptionalPropertyEntry(
-                  CLOUD_NAME,
-                  CLOUD_NAME,
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              CLOUD_REGION_CODE,
-              stringOptionalPropertyEntry(
-                  CLOUD_REGION_CODE,
-                  CLOUD_REGION_CODE,
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              PROPERTY_IN_USE,
-              stringReservedPropertyEntry(PROPERTY_IN_USE, PROPERTY_IN_USE, false /* hidden */))
-          .put(
-              PROPERTY_METALAKE_IN_USE,
-              stringReservedPropertyEntry(
-                  PROPERTY_METALAKE_IN_USE, PROPERTY_METALAKE_IN_USE, true /* hidden */))
-          .put(
-              PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
-              stringReservedPropertyEntry(
-                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
-                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
-                  true /* hidden */))
-          .put(
-              PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
-              stringImmutablePropertyPrefixEntry(
-                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
-                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
-                  false /* required */,
-                  null /* defaultValue */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .put(
-              PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
-              stringImmutablePropertyPrefixEntry(
-                  PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
-                  PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
-                  false /* required */,
-                  null /* defaultValue */,
-                  false /* hidden */,
-                  false /* reserved */))
-          // Hive / Kafka catalog connection
-          .put(
-              "metastore.uris",
-              stringOptionalPropertyEntry(
-                  "metastore.uris",
-                  "metastore.uris",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "bootstrap.servers",
-              stringOptionalPropertyEntry(
-                  "bootstrap.servers",
-                  "bootstrap.servers",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Glue
-          .put(
-              "aws-access-key-id",
-              stringOptionalPropertyEntry(
-                  "aws-access-key-id",
-                  "aws-access-key-id",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "aws-glue-catalog-id",
-              stringOptionalPropertyEntry(
-                  "aws-glue-catalog-id",
-                  "aws-glue-catalog-id",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "aws-glue-endpoint",
-              stringOptionalPropertyEntry(
-                  "aws-glue-endpoint",
-                  "aws-glue-endpoint",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "aws-region",
-              stringOptionalPropertyEntry(
-                  "aws-region",
-                  "aws-region",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "aws-secret-access-key",
-              stringOptionalPropertyEntry(
-                  "aws-secret-access-key",
-                  "aws-secret-access-key",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "default-table-format",
-              stringOptionalPropertyEntry(
-                  "default-table-format",
-                  "default-table-format",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-format",
-              stringOptionalPropertyEntry(
-                  "table-format",
-                  "table-format",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-format-filter",
-              stringOptionalPropertyEntry(
-                  "table-format-filter",
-                  "table-format-filter",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "format",
-              stringOptionalPropertyEntry(
-                  "format",
-                  "format",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "input-format",
-              stringReservedPropertyEntry("input-format", "input-format", false /* hidden */))
-          .put(
-              "output-format",
-              stringReservedPropertyEntry("output-format", "output-format", false /* hidden */))
-          .put(
-              "serde-lib",
-              stringOptionalPropertyEntry(
-                  "serde-lib",
-                  "serde-lib",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "metadata_location",
-              stringOptionalPropertyEntry(
-                  "metadata_location",
-                  "metadata_location",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Hive / Hudi client + auth
-          .put(
-              "client.pool-size",
-              stringOptionalPropertyEntry(
-                  "client.pool-size",
-                  "client.pool-size",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "client.pool-cache.eviction-interval-ms",
-              stringOptionalPropertyEntry(
-                  "client.pool-cache.eviction-interval-ms",
-                  "client.pool-cache.eviction-interval-ms",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "default.catalog",
-              stringOptionalPropertyEntry(
-                  "default.catalog",
-                  "default.catalog",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "impersonation-enable",
-              stringOptionalPropertyEntry(
-                  "impersonation-enable",
-                  "impersonation-enable",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "list-all-tables",
-              stringOptionalPropertyEntry(
-                  "list-all-tables",
-                  "list-all-tables",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "kerberos.keytab-uri",
-              stringOptionalPropertyEntry(
-                  "kerberos.keytab-uri",
-                  "kerberos.keytab-uri",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "kerberos.principal",
-              stringOptionalPropertyEntry(
-                  "kerberos.principal",
-                  "kerberos.principal",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "kerberos.check-interval-sec",
-              stringOptionalPropertyEntry(
-                  "kerberos.check-interval-sec",
-                  "kerberos.check-interval-sec",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "kerberos.keytab-fetch-timeout-sec",
-              stringOptionalPropertyEntry(
-                  "kerberos.keytab-fetch-timeout-sec",
-                  "kerberos.keytab-fetch-timeout-sec",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.type",
-              stringOptionalPropertyEntry(
-                  "authentication.type",
-                  "authentication.type",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.impersonation-enable",
-              stringOptionalPropertyEntry(
-                  "authentication.impersonation-enable",
-                  "authentication.impersonation-enable",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.kerberos.keytab-uri",
-              stringOptionalPropertyEntry(
-                  "authentication.kerberos.keytab-uri",
-                  "authentication.kerberos.keytab-uri",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.kerberos.principal",
-              stringOptionalPropertyEntry(
-                  "authentication.kerberos.principal",
-                  "authentication.kerberos.principal",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Fileset
-          .put(
-              "location",
-              stringOptionalPropertyEntry(
-                  "location",
-                  "location",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "warehouse",
-              stringOptionalPropertyEntry(
-                  "warehouse",
-                  "warehouse",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "default-location-name",
-              stringOptionalPropertyEntry(
-                  "default-location-name",
-                  "default-location-name",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "default-filesystem-provider",
-              stringOptionalPropertyEntry(
-                  "default-filesystem-provider",
-                  "default-filesystem-provider",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "disable-filesystem-ops",
-              stringOptionalPropertyEntry(
-                  "disable-filesystem-ops",
-                  "disable-filesystem-ops",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "filesystem-providers",
-              stringOptionalPropertyEntry(
-                  "filesystem-providers",
-                  "filesystem-providers",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "placeholder-catalog",
-              stringReservedPropertyEntry(
-                  "placeholder-catalog", "placeholder-catalog", true /* hidden */))
-          .put(
-              "placeholder-fileset",
-              stringReservedPropertyEntry(
-                  "placeholder-fileset", "placeholder-fileset", true /* hidden */))
-          .put(
-              "placeholder-schema",
-              stringReservedPropertyEntry(
-                  "placeholder-schema", "placeholder-schema", true /* hidden */))
-          // Hive / Hudi / Iceberg / Paimon table & schema
-          .put("comment", stringReservedPropertyEntry("comment", "comment", true /* hidden */))
-          .put("EXTERNAL", stringReservedPropertyEntry("EXTERNAL", "EXTERNAL", true /* hidden */))
-          .put(
-              "external",
-              stringOptionalPropertyEntry(
-                  "external",
-                  "external",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put("numFiles", stringReservedPropertyEntry("numFiles", "numFiles", false /* hidden */))
-          .put(
-              "totalSize",
-              stringReservedPropertyEntry("totalSize", "totalSize", false /* hidden */))
-          .put(
-              "transient_lastDdlTime",
-              stringReservedPropertyEntry(
-                  "transient_lastDdlTime", "transient_lastDdlTime", false /* hidden */))
-          .put(
-              "presto_view",
-              stringReservedPropertyEntry("presto_view", "presto_view", true /* hidden */))
-          .put(
-              "serde-name",
-              stringOptionalPropertyEntry(
-                  "serde-name",
-                  "serde-name",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put("owner", stringReservedPropertyEntry("owner", "owner", false /* hidden */))
-          .put("creator", stringReservedPropertyEntry("creator", "creator", false /* hidden */))
-          .put(
-              "current-snapshot-id",
-              stringReservedPropertyEntry(
-                  "current-snapshot-id", "current-snapshot-id", false /* hidden */))
-          .put(
-              "cherry-pick-snapshot-id",
-              stringReservedPropertyEntry(
-                  "cherry-pick-snapshot-id", "cherry-pick-snapshot-id", false /* hidden */))
-          .put(
-              "identifier-fields",
-              stringReservedPropertyEntry(
-                  "identifier-fields", "identifier-fields", false /* hidden */))
-          .put(
-              "sort-order",
-              stringReservedPropertyEntry("sort-order", "sort-order", false /* hidden */))
-          .put(
-              "provider",
-              stringOptionalPropertyEntry(
-                  "provider",
-                  "provider",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "io-impl",
-              stringOptionalPropertyEntry(
-                  "io-impl",
-                  "io-impl",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "data-access",
-              stringOptionalPropertyEntry(
-                  "data-access",
-                  "data-access",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-metadata-cache-impl",
-              stringOptionalPropertyEntry(
-                  "table-metadata-cache-impl",
-                  "table-metadata-cache-impl",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "jdbc-user",
-              stringOptionalPropertyEntry(
-                  "jdbc-user",
-                  "jdbc-user",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "jdbc-password",
-              stringOptionalPropertyEntry(
-                  "jdbc-password",
-                  "jdbc-password",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "jdbc-driver",
-              stringOptionalPropertyEntry(
-                  "jdbc-driver",
-                  "jdbc-driver",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "uri",
-              stringOptionalPropertyEntry(
-                  "uri", "uri", false /* immutable */, null /* defaultValue */, false /* hidden */))
-          .put(
-              "token",
-              stringOptionalPropertyEntry(
-                  "token",
-                  "token",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "token-provider",
-              stringOptionalPropertyEntry(
-                  "token-provider",
-                  "token-provider",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "dlf-access-key-id",
-              stringOptionalPropertyEntry(
-                  "dlf-access-key-id",
-                  "dlf-access-key-id",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "dlf-access-key-secret",
-              stringOptionalPropertyEntry(
-                  "dlf-access-key-secret",
-                  "dlf-access-key-secret",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "dlf-security-token",
-              stringOptionalPropertyEntry(
-                  "dlf-security-token",
-                  "dlf-security-token",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "dlf-token-loader",
-              stringOptionalPropertyEntry(
-                  "dlf-token-loader",
-                  "dlf-token-loader",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "dlf-token-path",
-              stringOptionalPropertyEntry(
-                  "dlf-token-path",
-                  "dlf-token-path",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put("bucket", stringReservedPropertyEntry("bucket", "bucket", false /* hidden */))
-          .put(
-              "bucket-key",
-              stringReservedPropertyEntry("bucket-key", "bucket-key", false /* hidden */))
-          .put(
-              "partition",
-              stringReservedPropertyEntry("partition", "partition", false /* hidden */))
-          .put(
-              "primary-key",
-              stringReservedPropertyEntry("primary-key", "primary-key", false /* hidden */))
-          .put(
-              "merge-engine",
-              stringOptionalPropertyEntry(
-                  "merge-engine",
-                  "merge-engine",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "rowkind.field",
-              stringOptionalPropertyEntry(
-                  "rowkind.field",
-                  "rowkind.field",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "sequence.field",
-              stringOptionalPropertyEntry(
-                  "sequence.field",
-                  "sequence.field",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "gravitino.view.default-catalog",
-              stringReservedPropertyEntry(
-                  "gravitino.view.default-catalog",
-                  "gravitino.view.default-catalog",
-                  true /* hidden */))
-          .put(
-              "gravitino.view.default-schema",
-              stringReservedPropertyEntry(
-                  "gravitino.view.default-schema",
-                  "gravitino.view.default-schema",
-                  true /* hidden */))
-          // Lance
-          .put(
-              "lance",
-              stringOptionalPropertyEntry(
-                  "lance",
-                  "lance",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "lance.creation-mode",
-              stringOptionalPropertyEntry(
-                  "lance.creation-mode",
-                  "lance.creation-mode",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "lance.declared",
-              stringOptionalPropertyEntry(
-                  "lance.declared",
-                  "lance.declared",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "lance.register",
-              stringOptionalPropertyEntry(
-                  "lance.register",
-                  "lance.register",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "lance.schema-refresh-mode",
-              stringOptionalPropertyEntry(
-                  "lance.schema-refresh-mode",
-                  "lance.schema-refresh-mode",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "lance.version",
-              stringOptionalPropertyEntry(
-                  "lance.version",
-                  "lance.version",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Doris
-          .put(
-              "bloom_filter_columns",
-              stringOptionalPropertyEntry(
-                  "bloom_filter_columns",
-                  "bloom_filter_columns",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "compression",
-              stringOptionalPropertyEntry(
-                  "compression",
-                  "compression",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "enable_unique_key_merge_on_write",
-              stringOptionalPropertyEntry(
-                  "enable_unique_key_merge_on_write",
-                  "enable_unique_key_merge_on_write",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "light_schema_change",
-              stringOptionalPropertyEntry(
-                  "light_schema_change",
-                  "light_schema_change",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "replication_allocation",
-              stringOptionalPropertyEntry(
-                  "replication_allocation",
-                  "replication_allocation",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "storage_policy",
-              stringOptionalPropertyEntry(
-                  "storage_policy",
-                  "storage_policy",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "PartitionName",
-              stringReservedPropertyEntry("PartitionName", "PartitionName", false /* hidden */))
-          .put(
-              "PartitionId",
-              stringReservedPropertyEntry("PartitionId", "PartitionId", false /* hidden */))
-          .put(
-              "PartitionKey",
-              stringReservedPropertyEntry("PartitionKey", "PartitionKey", false /* hidden */))
-          .put("Range", stringReservedPropertyEntry("Range", "Range", false /* hidden */))
-          .put(
-              "VisibleVersion",
-              stringReservedPropertyEntry("VisibleVersion", "VisibleVersion", false /* hidden */))
-          .put(
-              "VisibleVersionTime",
-              stringReservedPropertyEntry(
-                  "VisibleVersionTime", "VisibleVersionTime", false /* hidden */))
-          .put("State", stringReservedPropertyEntry("State", "State", false /* hidden */))
-          .put("DataSize", stringReservedPropertyEntry("DataSize", "DataSize", false /* hidden */))
-          .put(
-              "IsInMemory",
-              stringReservedPropertyEntry("IsInMemory", "IsInMemory", false /* hidden */))
-          .put("file", stringReservedPropertyEntry("file", "file", false /* hidden */))
-          // ClickHouse
-          .put(
-              "cluster-name",
-              stringOptionalPropertyEntry(
-                  "cluster-name",
-                  "cluster-name",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "cluster-remote-database",
-              stringOptionalPropertyEntry(
-                  "cluster-remote-database",
-                  "cluster-remote-database",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "cluster-remote-table",
-              stringOptionalPropertyEntry(
-                  "cluster-remote-table",
-                  "cluster-remote-table",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "cluster-sharding-key",
-              stringOptionalPropertyEntry(
-                  "cluster-sharding-key",
-                  "cluster-sharding-key",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "engine_parameters",
-              stringOptionalPropertyEntry(
-                  "engine_parameters",
-                  "engine_parameters",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "graphite.config",
-              stringOptionalPropertyEntry(
-                  "graphite.config",
-                  "graphite.config",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "on-cluster",
-              stringOptionalPropertyEntry(
-                  "on-cluster",
-                  "on-cluster",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "partition-key",
-              stringOptionalPropertyEntry(
-                  "partition-key",
-                  "partition-key",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Hive / Iceberg / Paimon / Hudi / Kafka / Doris / MySQL / Fileset (previously missing)
-          .put(
-              "catalog-backend",
-              stringOptionalPropertyEntry(
-                  "catalog-backend",
-                  "catalog-backend",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-type",
-              stringOptionalPropertyEntry(
-                  "table-type",
-                  "table-type",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "format-version",
-              stringOptionalPropertyEntry(
-                  "format-version",
-                  "format-version",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "replication_num",
-              stringOptionalPropertyEntry(
-                  "replication_num",
-                  "replication_num",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "engine",
-              stringOptionalPropertyEntry(
-                  "engine",
-                  "engine",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "partition-count",
-              stringOptionalPropertyEntry(
-                  "partition-count",
-                  "partition-count",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "replication-factor",
-              stringOptionalPropertyEntry(
-                  "replication-factor",
-                  "replication-factor",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "auto-increment-offset",
-              stringOptionalPropertyEntry(
-                  "auto-increment-offset",
-                  "auto-increment-offset",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "fileset-cache-max-size",
-              stringOptionalPropertyEntry(
-                  "fileset-cache-max-size",
-                  "fileset-cache-max-size",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "fileset-cache-eviction-interval-ms",
-              stringOptionalPropertyEntry(
-                  "fileset-cache-eviction-interval-ms",
-                  "fileset-cache-eviction-interval-ms",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "filesystem-conn-timeout-secs",
-              stringOptionalPropertyEntry(
-                  "filesystem-conn-timeout-secs",
-                  "filesystem-conn-timeout-secs",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-metadata-cache-capacity",
-              stringOptionalPropertyEntry(
-                  "table-metadata-cache-capacity",
-                  "table-metadata-cache-capacity",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "table-metadata-cache-expire-minutes",
-              stringOptionalPropertyEntry(
-                  "table-metadata-cache-expire-minutes",
-                  "table-metadata-cache-expire-minutes",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "rest-client-connection-timeout-ms",
-              stringOptionalPropertyEntry(
-                  "rest-client-connection-timeout-ms",
-                  "rest-client-connection-timeout-ms",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "rest-client-socket-timeout-ms",
-              stringOptionalPropertyEntry(
-                  "rest-client-socket-timeout-ms",
-                  "rest-client-socket-timeout-ms",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.kerberos.check-interval-sec",
-              stringOptionalPropertyEntry(
-                  "authentication.kerberos.check-interval-sec",
-                  "authentication.kerberos.check-interval-sec",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "authentication.kerberos.keytab-fetch-timeout-sec",
-              stringOptionalPropertyEntry(
-                  "authentication.kerberos.keytab-fetch-timeout-sec",
-                  "authentication.kerberos.keytab-fetch-timeout-sec",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Model
-          .put(
-              "default-uri-name",
-              stringOptionalPropertyEntry(
-                  "default-uri-name",
-                  "default-uri-name",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          // Core unit-test catalog (TestCatalog) — same strict registration as production
-          .put(
-              "key1",
-              stringOptionalPropertyEntry(
-                  "key1",
-                  "key1",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "key2",
-              stringOptionalPropertyEntry(
-                  "key2",
-                  "key2",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "key3",
-              stringOptionalPropertyEntry(
-                  "key3",
-                  "key3",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "key4",
-              stringOptionalPropertyEntry(
-                  "key4",
-                  "key4",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "reserved_key",
-              stringReservedPropertyEntry("reserved_key", "reserved_key", false /* hidden */))
-          .put(
-              "hidden_key",
-              stringOptionalPropertyEntry(
-                  "hidden_key",
-                  "hidden_key",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
-          .put(
-              "fail-create",
-              stringOptionalPropertyEntry(
-                  "fail-create",
-                  "fail-create",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              "key5-",
-              stringImmutablePropertyPrefixEntry(
-                  "key5-",
-                  "key5-",
-                  false /* required */,
-                  null /* defaultValue */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .put(
-              "key6-",
-              stringImmutablePropertyPrefixEntry(
-                  "key6-",
-                  "key6-",
-                  false /* required */,
-                  null /* defaultValue */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .build();
+      Maps.uniqueIndex(
+          ImmutableList.of(
+              // Shared catalog / metalake base
+              reservedHidden(ID_KEY),
+              optional(PROPERTY_PACKAGE),
+              optional(CATALOG_OPERATION_IMPL),
+              optional(AUTHORIZATION_PROVIDER),
+              optional(CLOUD_NAME),
+              optional(CLOUD_REGION_CODE),
+              reserved(PROPERTY_IN_USE),
+              reservedHidden(PROPERTY_METALAKE_IN_USE),
+              reservedHidden(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN),
+              prefix(PROPERTY_MULTIPLE_LOCATIONS_PREFIX),
+              prefix(PROPERTY_LOCATION_PLACEHOLDER_PREFIX),
+              // Hive / Kafka catalog connection
+              optional("metastore.uris"),
+              optional("bootstrap.servers"),
+              // Glue
+              optional("aws-access-key-id"),
+              optional("aws-glue-catalog-id"),
+              optional("aws-glue-endpoint"),
+              optional("aws-region"),
+              optionalHidden("aws-secret-access-key"),
+              optional("default-table-format"),
+              optional("table-format"),
+              optional("table-format-filter"),
+              optional("format"),
+              reserved("input-format"),
+              reserved("output-format"),
+              optional("serde-lib"),
+              optional("metadata_location"),
+              // Hive / Hudi client + auth
+              optional("client.pool-size"),
+              optional("client.pool-cache.eviction-interval-ms"),
+              optional("default.catalog"),
+              optional("impersonation-enable"),
+              optional("list-all-tables"),
+              optional("kerberos.keytab-uri"),
+              optional("kerberos.principal"),
+              optional("kerberos.check-interval-sec"),
+              optional("kerberos.keytab-fetch-timeout-sec"),
+              optional("authentication.type"),
+              optional("authentication.impersonation-enable"),
+              optional("authentication.kerberos.keytab-uri"),
+              optional("authentication.kerberos.principal"),
+              // Fileset
+              optional("location"),
+              optional("warehouse"),
+              optional("default-location-name"),
+              optional("default-filesystem-provider"),
+              optional("disable-filesystem-ops"),
+              optional("filesystem-providers"),
+              reservedHidden("placeholder-catalog"),
+              reservedHidden("placeholder-fileset"),
+              reservedHidden("placeholder-schema"),
+              // Hive / Hudi / Iceberg / Paimon table & schema
+              reservedHidden("comment"),
+              reservedHidden("EXTERNAL"),
+              optional("external"),
+              reserved("numFiles"),
+              reserved("totalSize"),
+              reserved("transient_lastDdlTime"),
+              reservedHidden("presto_view"),
+              optional("serde-name"),
+              reserved("owner"),
+              reserved("creator"),
+              reserved("current-snapshot-id"),
+              reserved("cherry-pick-snapshot-id"),
+              reserved("identifier-fields"),
+              reserved("sort-order"),
+              optional("provider"),
+              optional("io-impl"),
+              optional("data-access"),
+              optional("table-metadata-cache-impl"),
+              optional("jdbc-user"),
+              optionalHidden("jdbc-password"),
+              optional("jdbc-driver"),
+              optional("uri"),
+              optionalHidden("token"),
+              optional("token-provider"),
+              optional("dlf-access-key-id"),
+              optionalHidden("dlf-access-key-secret"),
+              optionalHidden("dlf-security-token"),
+              optional("dlf-token-loader"),
+              optional("dlf-token-path"),
+              reserved("bucket"),
+              reserved("bucket-key"),
+              reserved("partition"),
+              reserved("primary-key"),
+              optional("merge-engine"),
+              optional("rowkind.field"),
+              optional("sequence.field"),
+              reservedHidden("gravitino.view.default-catalog"),
+              reservedHidden("gravitino.view.default-schema"),
+              // Lance
+              optional("lance"),
+              optional("lance.creation-mode"),
+              optional("lance.declared"),
+              optional("lance.register"),
+              optional("lance.schema-refresh-mode"),
+              optional("lance.version"),
+              // Doris
+              optional("bloom_filter_columns"),
+              optional("compression"),
+              optional("enable_unique_key_merge_on_write"),
+              optional("light_schema_change"),
+              optional("replication_allocation"),
+              optional("storage_policy"),
+              reserved("PartitionName"),
+              reserved("PartitionId"),
+              reserved("PartitionKey"),
+              reserved("Range"),
+              reserved("VisibleVersion"),
+              reserved("VisibleVersionTime"),
+              reserved("State"),
+              reserved("DataSize"),
+              reserved("IsInMemory"),
+              reserved("file"),
+              // ClickHouse
+              optional("cluster-name"),
+              optional("cluster-remote-database"),
+              optional("cluster-remote-table"),
+              optional("cluster-sharding-key"),
+              optional("engine_parameters"),
+              optional("graphite.config"),
+              optional("on-cluster"),
+              optional("partition-key"),
+              // Hive / Iceberg / Paimon / Hudi / Kafka / Doris / MySQL / Fileset
+              optional("catalog-backend"),
+              optional("table-type"),
+              optional("format-version"),
+              optional("replication_num"),
+              optional("engine"),
+              optional("partition-count"),
+              optional("replication-factor"),
+              optional("auto-increment-offset"),
+              optional("fileset-cache-max-size"),
+              optional("fileset-cache-eviction-interval-ms"),
+              optional("filesystem-conn-timeout-secs"),
+              optional("table-metadata-cache-capacity"),
+              optional("table-metadata-cache-expire-minutes"),
+              optional("rest-client-connection-timeout-ms"),
+              optional("rest-client-socket-timeout-ms"),
+              optional("authentication.kerberos.check-interval-sec"),
+              optional("authentication.kerberos.keytab-fetch-timeout-sec"),
+              // Model
+              optional("default-uri-name")),
+          PropertyEntry::getName);
 
   /**
    * All registered Gravitino property entries used for cross-catalog fuzzy-mask and secret-recovery
@@ -1139,5 +323,33 @@ public final class RegisteredPropertyKeys {
   /** Returns the immutable map of exact registered property entries (excludes prefix matches). */
   public static Map<String, PropertyEntry<?>> propertyEntries() {
     return PROPERTY_ENTRIES;
+  }
+
+  /**
+   * Optional mutable string property used only for registry membership / masking flags. Description
+   * reuses {@code name}; connectors keep the authoritative entry.
+   */
+  private static PropertyEntry<String> optional(String name) {
+    return PropertyEntry.stringOptionalPropertyEntry(name, name, false, null, false);
+  }
+
+  /** Like {@link #optional(String)} but marked hidden. */
+  private static PropertyEntry<String> optionalHidden(String name) {
+    return PropertyEntry.stringOptionalPropertyEntry(name, name, false, null, true);
+  }
+
+  /** Reserved visible string property for registry membership / masking flags. */
+  private static PropertyEntry<String> reserved(String name) {
+    return PropertyEntry.stringReservedPropertyEntry(name, name, false);
+  }
+
+  /** Reserved hidden string property for registry membership / masking flags. */
+  private static PropertyEntry<String> reservedHidden(String name) {
+    return PropertyEntry.stringReservedPropertyEntry(name, name, true);
+  }
+
+  /** Immutable property-prefix entry for registry membership / prefix matching. */
+  private static PropertyEntry<String> prefix(String name) {
+    return PropertyEntry.stringImmutablePropertyPrefixEntry(name, name, false, null, false, false);
   }
 }

@@ -95,9 +95,10 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * Loads raw properties and matching properties metadata in one catalog lease when possible.
    *
    * <p>If the catalog does not expose properties metadata for the entity type ({@link
-   * UnsupportedOperationException}), uses {@link FallbackPropertiesMetadata} which still registers
-   * shared base / credential / cloud entries so official non-hidden keys are not fuzzy-recovered,
-   * while undeclared sensitive-named keys keep fuzzy recovery.
+   * UnsupportedOperationException}), uses {@link FallbackPropertiesMetadata} (shared base entries).
+   * Official credential, cloud, and connector keys are classified via {@link
+   * org.apache.gravitino.connector.RegisteredPropertyKeys}; undeclared sensitive-named keys keep
+   * fuzzy recovery.
    */
   private RawPropertiesAndMetadata loadRawPropertiesAndMetadata(
       NameIdentifier identifier, Entity.EntityType entityType) {

@@ -21,14 +21,16 @@ package org.apache.gravitino.connector;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.config.CredentialConfig;
 import org.junit.jupiter.api.Test;
 
 public class TestBaseCatalogPropertiesMetadata {
 
-  private final PropertiesMetadata metadata =
+  private final PropertiesMetadata emptySpecific =
       new BaseCatalogPropertiesMetadata() {
         @Override
         protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
@@ -36,11 +38,25 @@ public class TestBaseCatalogPropertiesMetadata {
         }
       };
 
+  private final PropertiesMetadata withCredentials =
+      new BaseCatalogPropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return ImmutableMap.copyOf(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
+        }
+      };
+
   @Test
-  void testCredentialPropertyEntriesAreDeclaredForAllCatalogs() {
-    assertTrue(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
-    assertTrue(metadata.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
-    assertFalse(metadata.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
-    assertFalse(metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+  void testCredentialPropertyEntriesAreNotInjectedByBase() {
+    assertFalse(emptySpecific.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(emptySpecific.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+  }
+
+  @Test
+  void testCatalogCanDeclareCredentialPropertyEntries() {
+    assertTrue(withCredentials.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertTrue(withCredentials.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+    assertFalse(withCredentials.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(withCredentials.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
   }
 }
