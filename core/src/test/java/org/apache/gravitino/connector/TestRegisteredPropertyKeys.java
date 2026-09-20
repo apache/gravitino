@@ -71,6 +71,16 @@ public class TestRegisteredPropertyKeys {
   }
 
   @Test
+  void testOfficialPropertyKeyWrapsSharedAndRegistered() {
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("s3-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("credential-providers"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("aws-access-key-id"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("location-warehouse"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("typo-access-key"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey(null));
+  }
+
+  @Test
   void testConnectorSpecificPropertyMustBeRegistered() {
     BasePropertiesMetadata missingOfficial =
         new BasePropertiesMetadata() {

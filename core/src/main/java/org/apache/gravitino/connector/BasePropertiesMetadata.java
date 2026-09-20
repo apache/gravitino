@@ -96,8 +96,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
   /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
-   * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
-   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}.
+   * #BASIC_PROPERTY_ENTRIES}) or {@link RegisteredPropertyKeys#isOfficialPropertyKey}.
    *
    * <p>Production connectors must keep this behavior. Test-only {@code PropertiesMetadata}
    * subclasses may override with a no-op when their keys are intentionally absent from the
@@ -110,14 +109,13 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
     }
     for (String name : specificEntries.keySet()) {
       if (BASIC_PROPERTY_ENTRIES.containsKey(name)
-          || RegisteredPropertyKeys.isSharedCloudOrCredentialKey(name)
-          || RegisteredPropertyKeys.isRegistered(name)) {
+          || RegisteredPropertyKeys.isOfficialPropertyKey(name)) {
         continue;
       }
       Preconditions.checkArgument(
           false,
-          "Connector-defined property '%s' in %s must be registered in base properties,"
-              + " shared cloud/credential metadata, or RegisteredPropertyKeys.",
+          "Connector-defined property '%s' in %s must be registered in base properties"
+              + " or RegisteredPropertyKeys.",
           name,
           getClass().getName());
     }

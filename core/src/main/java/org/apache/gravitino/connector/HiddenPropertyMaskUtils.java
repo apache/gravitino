@@ -106,23 +106,17 @@ public final class HiddenPropertyMaskUtils {
       if (key == null || value == null) {
         continue;
       }
-      boolean definedInCatalog = metadata.containsProperty(key);
-      boolean registered = RegisteredPropertyKeys.isRegistered(key);
+      boolean inMetadata = metadata.containsProperty(key);
       boolean hidden =
-          definedInCatalog
-              ? metadata.isHiddenProperty(key)
-              : registered && RegisteredPropertyKeys.isHidden(key);
+          inMetadata ? metadata.isHiddenProperty(key) : RegisteredPropertyKeys.isHidden(key);
       boolean reserved =
-          definedInCatalog
-              ? metadata.isReservedProperty(key)
-              : registered && RegisteredPropertyKeys.isReserved(key);
+          inMetadata ? metadata.isReservedProperty(key) : RegisteredPropertyKeys.isReserved(key);
+      boolean unknown = !inMetadata && !RegisteredPropertyKeys.isRegistered(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
       } else if (hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
-          || (!definedInCatalog
-              && !registered
-              && SecretPropertyUtils.isSensitivePropertyKey(key))) {
+          || (unknown && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);
       }
     }

@@ -37,6 +37,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
 import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
@@ -267,7 +268,7 @@ public final class RegisteredPropertyKeys {
    * @return true when the key is registered
    */
   public static boolean isRegistered(@Nullable String key) {
-    if (key == null || key.isEmpty()) {
+    if (StringUtils.isEmpty(key)) {
       return false;
     }
     if (PROPERTY_ENTRIES.containsKey(key)) {
@@ -289,6 +290,18 @@ public final class RegisteredPropertyKeys {
    */
   public static boolean isSharedCloudOrCredentialKey(@Nullable String key) {
     return key != null && SHARED_CLOUD_AND_CREDENTIAL_ENTRIES.containsKey(key);
+  }
+
+  /**
+   * Returns whether {@code key} is an official Gravitino property for connector metadata checks —
+   * either a shared cloud/credential key or any {@linkplain #isRegistered(String) registered} key
+   * (exact or prefix).
+   *
+   * @param key property key
+   * @return true when the key is known to Gravitino
+   */
+  public static boolean isOfficialPropertyKey(@Nullable String key) {
+    return isSharedCloudOrCredentialKey(key) || isRegistered(key);
   }
 
   /**
