@@ -1753,24 +1753,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           }
 
           Map<String, String> parameterProperties = Collections.emptyMap();
-          if (indexType == Index.IndexType.DATA_SKIPPING_SET) {
-            try {
-              parameterProperties =
-                  parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
-            } catch (IllegalArgumentException e) {
-              throw new IllegalArgumentException(
-                  "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
-                      .formatted(
-                          name,
-                          databaseName,
-                          tableName,
-                          parameterSourceName,
-                          parameterSource,
-                          e.getMessage()),
-                  e);
-            }
-          }
-
           String[][] fields;
           try {
             fields = parseIndexFields(expression);
@@ -1788,7 +1770,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             continue;
           }
 
-          if (isParameterizedBloomFilterIndex(indexType)) {
+          if (indexType == Index.IndexType.DATA_SKIPPING_SET
+              || isParameterizedBloomFilterIndex(indexType)) {
             try {
               parameterProperties =
                   parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);

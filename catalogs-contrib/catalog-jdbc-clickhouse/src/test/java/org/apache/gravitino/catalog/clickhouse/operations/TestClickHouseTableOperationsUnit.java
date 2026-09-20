@@ -893,14 +893,21 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
-  void testGetIndexesFailsOnMalformedSetMetadataBeforeUnsupportedExpression() throws Exception {
-    IllegalArgumentException exception =
-        getIndexesFailureForSetMetadata("set(abc)", "cityHash64(col_1) % 16");
+  void testGetIndexesFailsOnMalformedSetMetadataWithSupportedExpression() throws Exception {
+    IllegalArgumentException exception = getIndexesFailureForSetMetadata("set(abc)", "col_1");
 
     Assertions.assertTrue(exception.getMessage().contains("idx_bad_set_metadata"));
     Assertions.assertTrue(exception.getMessage().contains("type_full"));
     Assertions.assertTrue(exception.getMessage().contains("set(abc)"));
     Assertions.assertTrue(exception.getMessage().contains("SET metadata"));
+  }
+
+  @Test
+  void testGetIndexesSkipsUnsupportedExpressionBeforeParsingOutOfRangeSetMetadata()
+      throws Exception {
+    List<Index> indexes = getIndexesForSetMetadata("set(2147483648)", "cityHash64(col_1) % 16");
+
+    Assertions.assertTrue(indexes.isEmpty());
   }
 
   @Test
@@ -1115,8 +1122,8 @@ public class TestClickHouseTableOperationsUnit {
         IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
   }
 
-  private IllegalArgumentException getIndexesFailureForSetMetadata(
-      String typeFull, String expression) throws Exception {
+  private List<Index> getIndexesForSetMetadata(String typeFull, String expression)
+      throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
     PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
     ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
@@ -1138,7 +1145,12 @@ public class TestClickHouseTableOperationsUnit {
         .thenReturn(primaryKeyStmt)
         .thenReturn(secondaryStmt);
 
+    return ops.callGetIndexes(connection, "db", "tbl");
+  }
+
+  private IllegalArgumentException getIndexesFailureForSetMetadata(
+      String typeFull, String expression) throws Exception {
     return Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+        IllegalArgumentException.class, () -> getIndexesForSetMetadata(typeFull, expression));
   }
 }
