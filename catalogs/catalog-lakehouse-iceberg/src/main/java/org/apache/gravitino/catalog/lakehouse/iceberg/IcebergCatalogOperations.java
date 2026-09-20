@@ -609,7 +609,7 @@ public class IcebergCatalogOperations
 
       // Gravitino NONE distribution means the client side doesn't specify distribution, which is
       // not the same as none distribution in Iceberg.
-      if (Distributions.NONE.equals(distribution)) {
+      if (Distributions.isNone(distribution)) {
         distribution =
             getIcebergDefaultDistribution(sortOrders.length > 0, partitioning.length > 0);
       }
