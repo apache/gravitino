@@ -195,6 +195,12 @@ public class CatalogDorisIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
   }
 
+  @Test
+  void testDropMissingTableReturnsFalse() {
+    String missingTable = GravitinoITUtils.genRandomName("missing_table");
+    assertFalse(catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, missingTable)));
+  }
+
   private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     String propKey = "key";
