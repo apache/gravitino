@@ -173,12 +173,53 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertEquals("s3://bucket/prefix", masked.get("warehouse"));
     Assertions.assertEquals("abs-account", masked.get("azure-storage-account-name"));
     Assertions.assertEquals("s3-token", masked.get("credential-providers"));
-    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-access-key-id"));
+    // Official non-hidden key stays visible even when this catalog metadata omits it
+    Assertions.assertEquals("AKIA...", masked.get("s3-access-key-id"));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-secret-access-key"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("custom-token"));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-key"));
+  }
+
+  @Test
+  void testMaskHiddenPropertiesOfficialKeysConsistentAcrossCatalogMetadata() {
+    // Glue-like metadata: declares aws-access-key-id but not s3-access-key-id (runtime copy).
+    PropertiesMetadata glueLike =
+        new PropertiesMetadata() {
+          @Override
+          public Map<String, PropertyEntry<?>> propertyEntries() {
+            return ImmutableMap.of(
+                "aws-access-key-id",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "aws-access-key-id", "ak", false, null, false),
+                "aws-secret-access-key",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "aws-secret-access-key", "sk", false, null, true));
+          }
+        };
+
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "aws-access-key-id",
+            "AKIA...",
+            "s3-access-key-id",
+            "AKIA...",
+            "aws-secret-access-key",
+            "secret",
+            "s3-secret-access-key",
+            "secret",
+            "typo-access-key",
+            "wild");
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, glueLike);
+
+    Assertions.assertEquals("AKIA...", masked.get("aws-access-key-id"));
+    Assertions.assertEquals("AKIA...", masked.get("s3-access-key-id"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("aws-secret-access-key"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-secret-access-key"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("typo-access-key"));
   }
 
   @Test

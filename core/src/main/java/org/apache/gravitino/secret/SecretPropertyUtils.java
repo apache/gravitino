@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.OfficialGravitinoProperties;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -88,14 +89,15 @@ public final class SecretPropertyUtils {
    * <ul>
    *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
    *       catalog does not expose properties metadata for the entity type.
-   *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
-   *       non-hidden configuration (for example {@code credential-providers}, {@code
-   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   *   <li>otherwise: recover unknown sensitive-named keys, or official / catalog-declared {@code
+   *       hidden} keys. Official or declared non-hidden configuration (for example {@code
+   *       credential-providers}, {@code s3-access-key-id}) stays in {@code properties()} and is
+   *       excluded here, even when the current catalog metadata omits the key.
    * </ul>
    *
    * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty
-   * {@link PropertiesMetadata} (every key is undeclared) — see the two-argument {@link
-   * #buildSecrets(SecretManager, Map)}.
+   * {@link PropertiesMetadata} (catalog declares nothing; official keys still apply) — see the
+   * two-argument {@link #buildSecrets(SecretManager, Map)}.
    *
    * @param key the property key
    * @param metadata entity properties metadata, or null when unavailable
@@ -109,7 +111,13 @@ public final class SecretPropertyUtils {
     if (metadata == null) {
       return false;
     }
-    return !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
+    if (metadata.containsProperty(key)) {
+      return metadata.isHiddenProperty(key);
+    }
+    if (OfficialGravitinoProperties.isDefined(key)) {
+      return OfficialGravitinoProperties.isHidden(key);
+    }
+    return true;
   }
 
   /**
@@ -149,10 +157,10 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
    *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
-   *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (undeclared or
-   *       declared hidden). Declared non-hidden keys are excluded even when the name looks
-   *       sensitive. When {@code metadata} is {@code null}, sensitive-named plaintext is not
-   *       recovered (URN-only).
+   *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (unknown
+   *       sensitive names, or official / declared hidden keys). Official or declared non-hidden
+   *       keys are excluded even when the name looks sensitive. When {@code metadata} is {@code
+   *       null}, sensitive-named plaintext is not recovered (URN-only).
    * </ol>
    *
    * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are

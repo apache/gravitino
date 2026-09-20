@@ -89,7 +89,8 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
         });
 
     // Credential vending keys (e.g. credential-providers) are valid on schema / fileset / table as
-    // well as catalog. Register once so official non-hidden keys are not fuzzy-masked.
+    // well as catalog. Register once so catalog metadata includes the official entries; cross-
+    // catalog fuzzy-mask consistency also uses OfficialGravitinoProperties.
     CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
         (name, entry) -> {
           Preconditions.checkArgument(

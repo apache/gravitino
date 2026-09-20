@@ -121,8 +121,8 @@ public class TestSecretPropertyUtils {
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
       Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
       Assertions.assertEquals("s3-secret-value", secrets.get("s3-secret-access-key"));
-      // Inline sensitive-named plaintext is also returned for getSecrets clients
-      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
+      // Official non-hidden access key ID stays in properties(), not getSecrets
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
       Assertions.assertFalse(secrets.containsKey("jdbc-user"));
       Assertions.assertFalse(secrets.containsKey("jdbc-url"));
       Assertions.assertFalse(secrets.containsKey("visible"));
@@ -171,10 +171,15 @@ public class TestSecretPropertyUtils {
               "s3-access-key-id",
               "AKIA...",
               "s3-secret-access-key",
-              "super-secret");
+              "super-secret",
+              "custom-token",
+              "tok");
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
-      Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
+      // Official non-hidden ID is not fuzzy-recovered; official hidden secret and unknown
+      // sensitive names are.
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
       Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
+      Assertions.assertEquals("tok", secrets.get("custom-token"));
       Assertions.assertFalse(secrets.containsKey("warehouse"));
       Assertions.assertFalse(secrets.containsKey("aws-region"));
     }
