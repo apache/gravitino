@@ -90,8 +90,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
         });
 
     // Credential vending keys (e.g. credential-providers) are valid on schema / fileset / table as
-    // well as catalog. Register once so catalog metadata includes the official entries; cross-
-    // catalog fuzzy-mask consistency also uses RegisteredPropertyKeys.
+    // well as catalog. Register once so catalog metadata includes the official entries.
     CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.forEach(
         (name, entry) -> {
           Preconditions.checkArgument(
@@ -105,8 +104,8 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
   /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
    * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
-   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}
-   * connector keys. Does not validate user-supplied entity property maps.
+   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}. No
+   * exemptions for test catalogs — keep the registry strongly consistent with metadata.
    */
   private void checkConnectorSpecificPropertiesRegistered(
       Map<String, PropertyEntry<?>> specificEntries) {
@@ -122,8 +121,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
       Preconditions.checkArgument(
           false,
           "Connector-defined property '%s' in %s must be registered in base properties,"
-              + " shared cloud/credential metadata, or RegisteredPropertyKeys."
-              + " User entity custom properties are not blocked by this check.",
+              + " shared cloud/credential metadata, or RegisteredPropertyKeys.",
           name,
           getClass().getName());
     }

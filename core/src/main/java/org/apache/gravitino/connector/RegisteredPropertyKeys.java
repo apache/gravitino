@@ -27,13 +27,13 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_OPERATION_IMPL;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
 import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
@@ -46,18 +46,21 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * Registry of property keys that Gravitino defines in base, credential, cloud-storage, and
  * connector metadata.
  *
- * <p>Name-based (fuzzy) masking and secret recovery treat only keys that are <em>not</em>
- * registered here as unknown. For registered keys omitted from the current catalog {@link
- * PropertiesMetadata}, {@link #isHidden(String)} / {@link #isReserved(String)} still apply (for
- * example a Glue runtime copy of {@code s3-access-key-id}).
+ * <p>Like {@link CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES}, this class exposes a {@link
+ * #PROPERTY_ENTRIES} map. Name-based (fuzzy) masking and secret recovery treat only keys that are
+ * <em>not</em> in this map (and not matching {@link #LOCATION_PROPERTY_PREFIX}) as unknown. For
+ * registered keys omitted from the current catalog {@link PropertiesMetadata}, {@link
+ * PropertyEntry#isHidden()} / {@link PropertyEntry#isReserved()} from this map still apply.
+ *
+ * <p>Shared credential and cloud-storage entries are reused from existing metadata modules.
+ * Connector-specific keys that may appear outside their owning catalog metadata (for example Glue
+ * copying {@code s3-access-key-id}) are declared in {@link #CONNECTOR_PROPERTY_ENTRIES}. Prefer
+ * shared {@code *PropertiesMetadata} for cloud credentials instead of duplicating them there.
  *
  * <p>{@link BasePropertiesMetadata} requires every connector {@code specificPropertyEntries()} key
- * to appear in shared cloud/credential metadata, base catalog keys, or this registry. User-supplied
- * entity property maps are not restricted by that check.
- *
- * <p>When adding a connector-defined {@link PropertyEntry}, update {@link #CONNECTOR_KEYS} (and
- * {@link #CONNECTOR_HIDDEN_KEYS} / {@link #CONNECTOR_RESERVED_KEYS} when applicable). Prefer shared
- * {@code *PropertiesMetadata} for cloud credentials instead of duplicating them here.
+ * to appear in shared cloud/credential metadata, base catalog keys, or this registry (including
+ * test catalogs). Prefer shared {@code *PropertiesMetadata} for cloud credentials instead of
+ * duplicating them in {@link #CONNECTOR_PROPERTY_ENTRIES}.
  */
 public final class RegisteredPropertyKeys {
 
@@ -65,9 +68,8 @@ public final class RegisteredPropertyKeys {
   public static final String LOCATION_PROPERTY_PREFIX = PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
   /**
-   * Credential-vending and shared cloud-storage {@link PropertyEntry} definitions from core
-   * metadata modules. Connectors that only re-export these entries do not need to list them again
-   * in {@link #CONNECTOR_KEYS}.
+   * Credential-vending and shared cloud-storage entries from core metadata modules. Connectors that
+   * only re-export these do not need to list them again in {@link #CONNECTOR_PROPERTY_ENTRIES}.
    */
   private static final Map<String, PropertyEntry<?>> SHARED_CLOUD_AND_CREDENTIAL_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -79,220 +81,185 @@ public final class RegisteredPropertyKeys {
           .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
           .build();
 
-  private static final Set<String> SHARED_CLOUD_AND_CREDENTIAL_KEYS =
-      SHARED_CLOUD_AND_CREDENTIAL_ENTRIES.keySet();
-
   /**
-   * Catalog/entity keys defined by connectors (and shared catalog base fields) that are not covered
-   * by {@link #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}. Grouped by area for maintenance.
+   * Connector and shared catalog/entity keys not covered by {@link
+   * #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}. Descriptions are abbreviated; authoritative definitions
+   * remain in each connector's {@code *PropertiesMetadata}.
    */
-  private static final Set<String> CONNECTOR_KEYS =
-      ImmutableSet.<String>builder()
+  private static final Map<String, PropertyEntry<?>> CONNECTOR_PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
           // Shared catalog / metalake base
-          .add(ID_KEY)
-          .add(PROPERTY_PACKAGE)
-          .add(CATALOG_OPERATION_IMPL)
-          .add(AUTHORIZATION_PROVIDER)
-          .add(CLOUD_NAME)
-          .add(CLOUD_REGION_CODE)
-          .add(PROPERTY_IN_USE)
-          .add(PROPERTY_METALAKE_IN_USE)
-          .add(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN)
+          .put(ID_KEY, reserved(ID_KEY, true))
+          .put(PROPERTY_PACKAGE, optional(PROPERTY_PACKAGE))
+          .put(CATALOG_OPERATION_IMPL, optional(CATALOG_OPERATION_IMPL))
+          .put(AUTHORIZATION_PROVIDER, optional(AUTHORIZATION_PROVIDER))
+          .put(CLOUD_NAME, optional(CLOUD_NAME))
+          .put(CLOUD_REGION_CODE, optional(CLOUD_REGION_CODE))
+          .put(PROPERTY_IN_USE, reserved(PROPERTY_IN_USE, false))
+          .put(PROPERTY_METALAKE_IN_USE, reserved(PROPERTY_METALAKE_IN_USE, true))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
+              reserved(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN, true))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
+              optionalPrefix(PROPERTY_MULTIPLE_LOCATIONS_PREFIX))
+          .put(
+              PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
+              optionalPrefix(PROPERTY_LOCATION_PLACEHOLDER_PREFIX))
+          // Hive / Kafka catalog connection
+          .put("metastore.uris", optional("metastore.uris"))
+          .put("bootstrap.servers", optional("bootstrap.servers"))
           // Glue
-          .add(
-              "aws-access-key-id",
-              "aws-glue-catalog-id",
-              "aws-glue-endpoint",
-              "aws-region",
-              "aws-secret-access-key")
-          .add("default-table-format", "table-format", "table-format-filter")
-          .add("format", "input-format", "output-format", "serde-lib", "metadata_location")
+          .put("aws-access-key-id", optional("aws-access-key-id"))
+          .put("aws-glue-catalog-id", optional("aws-glue-catalog-id"))
+          .put("aws-glue-endpoint", optional("aws-glue-endpoint"))
+          .put("aws-region", optional("aws-region"))
+          .put("aws-secret-access-key", optionalHidden("aws-secret-access-key"))
+          .put("default-table-format", optional("default-table-format"))
+          .put("table-format", optional("table-format"))
+          .put("table-format-filter", optional("table-format-filter"))
+          .put("format", optional("format"))
+          .put("input-format", reserved("input-format", false))
+          .put("output-format", reserved("output-format", false))
+          .put("serde-lib", optional("serde-lib"))
+          .put("metadata_location", optional("metadata_location"))
           // Hive / Hudi client + auth
-          .add(
-              "client.pool-size",
+          .put("client.pool-size", optional("client.pool-size"))
+          .put(
               "client.pool-cache.eviction-interval-ms",
-              "default.catalog",
-              "impersonation-enable",
-              "list-all-tables")
-          .add(
-              "kerberos.keytab-uri",
-              "kerberos.principal",
-              "kerberos.check-interval-sec",
-              "kerberos.keytab-fetch-timeout-sec")
-          .add(
-              "authentication.type",
+              optional("client.pool-cache.eviction-interval-ms"))
+          .put("default.catalog", optional("default.catalog"))
+          .put("impersonation-enable", optional("impersonation-enable"))
+          .put("list-all-tables", optional("list-all-tables"))
+          .put("kerberos.keytab-uri", optional("kerberos.keytab-uri"))
+          .put("kerberos.principal", optional("kerberos.principal"))
+          .put("kerberos.check-interval-sec", optional("kerberos.check-interval-sec"))
+          .put("kerberos.keytab-fetch-timeout-sec", optional("kerberos.keytab-fetch-timeout-sec"))
+          .put("authentication.type", optional("authentication.type"))
+          .put(
               "authentication.impersonation-enable",
-              "authentication.kerberos.keytab-uri",
-              "authentication.kerberos.principal")
+              optional("authentication.impersonation-enable"))
+          .put("authentication.kerberos.keytab-uri", optional("authentication.kerberos.keytab-uri"))
+          .put("authentication.kerberos.principal", optional("authentication.kerberos.principal"))
           // Fileset
-          .add(
-              "location",
-              "warehouse",
-              "default-location-name",
-              "default-filesystem-provider",
-              "disable-filesystem-ops",
-              "filesystem-providers")
-          .add("placeholder-catalog", "placeholder-fileset", "placeholder-schema")
+          .put("location", optional("location"))
+          .put("warehouse", optional("warehouse"))
+          .put("default-location-name", optional("default-location-name"))
+          .put("default-filesystem-provider", optional("default-filesystem-provider"))
+          .put("disable-filesystem-ops", optional("disable-filesystem-ops"))
+          .put("filesystem-providers", optional("filesystem-providers"))
+          .put("placeholder-catalog", reserved("placeholder-catalog", true))
+          .put("placeholder-fileset", reserved("placeholder-fileset", true))
+          .put("placeholder-schema", reserved("placeholder-schema", true))
           // Hive / Hudi / Iceberg / Paimon table & schema
-          .add("comment", "EXTERNAL", "external", "numFiles", "totalSize")
-          .add("transient_lastDdlTime", "presto_view", "serde-name", "owner", "creator")
-          .add(
-              "current-snapshot-id",
-              "cherry-pick-snapshot-id",
-              "identifier-fields",
-              "sort-order",
-              "provider")
-          .add("io-impl", "data-access", "table-metadata-cache-impl", "jdbc-user", "jdbc-password")
-          .add("jdbc-driver", "uri")
-          .add(
-              "token",
-              "token-provider",
-              "dlf-access-key-id",
-              "dlf-access-key-secret",
-              "dlf-security-token")
-          .add("dlf-token-loader", "dlf-token-path")
-          .add(
-              "bucket",
-              "bucket-key",
-              "partition",
-              "primary-key",
-              "merge-engine",
-              "rowkind.field",
-              "sequence.field")
-          .add("gravitino.view.default-catalog", "gravitino.view.default-schema")
+          .put("comment", reserved("comment", true))
+          .put("EXTERNAL", reserved("EXTERNAL", true))
+          .put("external", optional("external"))
+          .put("numFiles", reserved("numFiles", false))
+          .put("totalSize", reserved("totalSize", false))
+          .put("transient_lastDdlTime", reserved("transient_lastDdlTime", false))
+          .put("presto_view", reserved("presto_view", true))
+          .put("serde-name", optional("serde-name"))
+          .put("owner", reserved("owner", false))
+          .put("creator", reserved("creator", false))
+          .put("current-snapshot-id", reserved("current-snapshot-id", false))
+          .put("cherry-pick-snapshot-id", reserved("cherry-pick-snapshot-id", false))
+          .put("identifier-fields", reserved("identifier-fields", false))
+          .put("sort-order", reserved("sort-order", false))
+          .put("provider", optional("provider"))
+          .put("io-impl", optional("io-impl"))
+          .put("data-access", optional("data-access"))
+          .put("table-metadata-cache-impl", optional("table-metadata-cache-impl"))
+          .put("jdbc-user", optional("jdbc-user"))
+          .put("jdbc-password", optionalHidden("jdbc-password"))
+          .put("jdbc-driver", optional("jdbc-driver"))
+          .put("uri", optional("uri"))
+          .put("token", optionalHidden("token"))
+          .put("token-provider", optional("token-provider"))
+          .put("dlf-access-key-id", optional("dlf-access-key-id"))
+          .put("dlf-access-key-secret", optionalHidden("dlf-access-key-secret"))
+          .put("dlf-security-token", optionalHidden("dlf-security-token"))
+          .put("dlf-token-loader", optional("dlf-token-loader"))
+          .put("dlf-token-path", optional("dlf-token-path"))
+          .put("bucket", reserved("bucket", false))
+          .put("bucket-key", reserved("bucket-key", false))
+          .put("partition", reserved("partition", false))
+          .put("primary-key", reserved("primary-key", false))
+          .put("merge-engine", optional("merge-engine"))
+          .put("rowkind.field", optional("rowkind.field"))
+          .put("sequence.field", optional("sequence.field"))
+          .put("gravitino.view.default-catalog", reserved("gravitino.view.default-catalog", true))
+          .put("gravitino.view.default-schema", reserved("gravitino.view.default-schema", true))
           // Lance
-          .add(
-              "lance",
-              "lance.creation-mode",
-              "lance.declared",
-              "lance.register",
-              "lance.schema-refresh-mode",
-              "lance.version")
+          .put("lance", optional("lance"))
+          .put("lance.creation-mode", optional("lance.creation-mode"))
+          .put("lance.declared", optional("lance.declared"))
+          .put("lance.register", optional("lance.register"))
+          .put("lance.schema-refresh-mode", optional("lance.schema-refresh-mode"))
+          .put("lance.version", optional("lance.version"))
           // Doris
-          .add(
-              "bloom_filter_columns",
-              "compression",
-              "enable_unique_key_merge_on_write",
-              "light_schema_change",
-              "replication_allocation",
-              "storage_policy")
-          .add(
-              "PartitionName",
-              "PartitionId",
-              "PartitionKey",
-              "Range",
-              "VisibleVersion",
-              "VisibleVersionTime",
-              "State",
-              "DataSize",
-              "IsInMemory",
-              "file")
+          .put("bloom_filter_columns", optional("bloom_filter_columns"))
+          .put("compression", optional("compression"))
+          .put("enable_unique_key_merge_on_write", optional("enable_unique_key_merge_on_write"))
+          .put("light_schema_change", optional("light_schema_change"))
+          .put("replication_allocation", optional("replication_allocation"))
+          .put("storage_policy", optional("storage_policy"))
+          .put("PartitionName", reserved("PartitionName", false))
+          .put("PartitionId", reserved("PartitionId", false))
+          .put("PartitionKey", reserved("PartitionKey", false))
+          .put("Range", reserved("Range", false))
+          .put("VisibleVersion", reserved("VisibleVersion", false))
+          .put("VisibleVersionTime", reserved("VisibleVersionTime", false))
+          .put("State", reserved("State", false))
+          .put("DataSize", reserved("DataSize", false))
+          .put("IsInMemory", reserved("IsInMemory", false))
+          .put("file", reserved("file", false))
           // ClickHouse
-          .add(
-              "cluster-name",
-              "cluster-remote-database",
-              "cluster-remote-table",
-              "cluster-sharding-key",
-              "engine_parameters",
-              "graphite.config",
-              "on-cluster",
-              "partition-key")
+          .put("cluster-name", optional("cluster-name"))
+          .put("cluster-remote-database", optional("cluster-remote-database"))
+          .put("cluster-remote-table", optional("cluster-remote-table"))
+          .put("cluster-sharding-key", optional("cluster-sharding-key"))
+          .put("engine_parameters", optional("engine_parameters"))
+          .put("graphite.config", optional("graphite.config"))
+          .put("on-cluster", optional("on-cluster"))
+          .put("partition-key", optional("partition-key"))
           // Model
-          .add("default-uri-name")
-          .build();
-
-  private static final Set<String> REGISTERED_KEYS =
-      ImmutableSet.<String>builder()
-          .addAll(SHARED_CLOUD_AND_CREDENTIAL_KEYS)
-          .addAll(CONNECTOR_KEYS)
+          .put("default-uri-name", optional("default-uri-name"))
+          // Core unit-test catalog (TestCatalog) — same strict registration as production
+          .put("key1", optional("key1"))
+          .put("key2", optional("key2"))
+          .put("key3", optional("key3"))
+          .put("key4", optional("key4"))
+          .put("reserved_key", reserved("reserved_key", false))
+          .put("hidden_key", optionalHidden("hidden_key"))
+          .put("fail-create", optional("fail-create"))
+          .put("key5-", optionalPrefix("key5-"))
+          .put("key6-", optionalPrefix("key6-"))
           .build();
 
   /**
-   * Connector-defined keys that are hidden when the current catalog metadata does not declare them.
-   * Shared cloud/credential hidden flags are derived from {@link
-   * #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}.
+   * All registered Gravitino property entries used for cross-catalog fuzzy-mask and secret-recovery
+   * fallbacks, and for {@link BasePropertiesMetadata} connector-key registration checks. Shared
+   * cloud/credential maps are included as-is; connector keys are summaries for masking / check
+   * semantics.
    */
-  private static final Set<String> CONNECTOR_HIDDEN_KEYS =
-      ImmutableSet.of(
-          ID_KEY,
-          PROPERTY_METALAKE_IN_USE,
-          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
-          "EXTERNAL",
-          "aws-secret-access-key",
-          "comment",
-          "dlf-access-key-secret",
-          "dlf-security-token",
-          "gravitino.view.default-catalog",
-          "gravitino.view.default-schema",
-          "jdbc-password",
-          "placeholder-catalog",
-          "placeholder-fileset",
-          "placeholder-schema",
-          "presto_view",
-          "token");
-
-  /**
-   * Connector-defined keys that are reserved when the current catalog metadata does not declare
-   * them. Shared cloud/credential reserved flags are derived from {@link
-   * #SHARED_CLOUD_AND_CREDENTIAL_ENTRIES}.
-   */
-  private static final Set<String> CONNECTOR_RESERVED_KEYS =
-      ImmutableSet.of(
-          ID_KEY,
-          PROPERTY_IN_USE,
-          PROPERTY_METALAKE_IN_USE,
-          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
-          "DataSize",
-          "EXTERNAL",
-          "IsInMemory",
-          "PartitionId",
-          "PartitionKey",
-          "PartitionName",
-          "Range",
-          "State",
-          "VisibleVersion",
-          "VisibleVersionTime",
-          "bucket",
-          "bucket-key",
-          "cherry-pick-snapshot-id",
-          "comment",
-          "creator",
-          "current-snapshot-id",
-          "file",
-          "gravitino.view.default-catalog",
-          "gravitino.view.default-schema",
-          "identifier-fields",
-          "input-format",
-          "numFiles",
-          "output-format",
-          "owner",
-          "partition",
-          "placeholder-catalog",
-          "placeholder-fileset",
-          "placeholder-schema",
-          "presto_view",
-          "primary-key",
-          "sort-order",
-          "totalSize",
-          "transient_lastDdlTime");
-
-  private static final Set<String> HIDDEN_KEYS =
-      ImmutableSet.<String>builder()
-          .addAll(keysMatching(SHARED_CLOUD_AND_CREDENTIAL_ENTRIES, PropertyEntry::isHidden))
-          .addAll(CONNECTOR_HIDDEN_KEYS)
+  public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .putAll(SHARED_CLOUD_AND_CREDENTIAL_ENTRIES)
+          .putAll(CONNECTOR_PROPERTY_ENTRIES)
           .build();
 
-  private static final Set<String> RESERVED_KEYS =
-      ImmutableSet.<String>builder()
-          .addAll(keysMatching(SHARED_CLOUD_AND_CREDENTIAL_ENTRIES, PropertyEntry::isReserved))
-          .addAll(CONNECTOR_RESERVED_KEYS)
-          .build();
+  private static final Set<String> REGISTERED_PREFIXES =
+      PROPERTY_ENTRIES.values().stream()
+          .filter(PropertyEntry::isPrefix)
+          .map(PropertyEntry::getName)
+          .collect(ImmutableSet.toImmutableSet());
 
   private RegisteredPropertyKeys() {}
 
   /**
-   * Returns whether {@code key} is a registered Gravitino property name (exact match or fileset
-   * location prefix).
+   * Returns whether {@code key} is a registered Gravitino property name (exact match or a
+   * registered property prefix).
    *
    * @param key property key
    * @return true when the key is registered
@@ -301,7 +268,15 @@ public final class RegisteredPropertyKeys {
     if (key == null || key.isEmpty()) {
       return false;
     }
-    return REGISTERED_KEYS.contains(key) || key.startsWith(LOCATION_PROPERTY_PREFIX);
+    if (PROPERTY_ENTRIES.containsKey(key)) {
+      return true;
+    }
+    for (String prefix : REGISTERED_PREFIXES) {
+      if (key.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -311,7 +286,7 @@ public final class RegisteredPropertyKeys {
    * @return true when the key comes from credential or shared cloud metadata
    */
   public static boolean isSharedCloudOrCredentialKey(@Nullable String key) {
-    return key != null && SHARED_CLOUD_AND_CREDENTIAL_KEYS.contains(key);
+    return key != null && SHARED_CLOUD_AND_CREDENTIAL_ENTRIES.containsKey(key);
   }
 
   /**
@@ -321,7 +296,11 @@ public final class RegisteredPropertyKeys {
    * @return true when the registered definition marks the key hidden
    */
   public static boolean isHidden(@Nullable String key) {
-    return key != null && HIDDEN_KEYS.contains(key);
+    if (key == null) {
+      return false;
+    }
+    PropertyEntry<?> entry = PROPERTY_ENTRIES.get(key);
+    return entry != null && entry.isHidden();
   }
 
   /**
@@ -332,19 +311,39 @@ public final class RegisteredPropertyKeys {
    * @return true when the registered definition marks the key reserved
    */
   public static boolean isReserved(@Nullable String key) {
-    return key != null && RESERVED_KEYS.contains(key);
+    if (key == null) {
+      return false;
+    }
+    PropertyEntry<?> entry = PROPERTY_ENTRIES.get(key);
+    return entry != null && entry.isReserved();
   }
 
-  /** Returns the immutable set of exact registered property keys (excludes prefix matches). */
-  public static Set<String> registeredKeys() {
-    return REGISTERED_KEYS;
+  /** Returns the immutable map of exact registered property entries (excludes prefix matches). */
+  public static Map<String, PropertyEntry<?>> propertyEntries() {
+    return PROPERTY_ENTRIES;
   }
 
-  private static Set<String> keysMatching(
-      Map<String, PropertyEntry<?>> entries, Predicate<PropertyEntry<?>> match) {
-    return entries.values().stream()
-        .filter(match)
-        .map(PropertyEntry::getName)
-        .collect(ImmutableSet.toImmutableSet());
+  private static PropertyEntry<String> optional(String name) {
+    return PropertyEntry.stringOptionalPropertyEntry(
+        name, name, false /* immutable */, null /* defaultValue */, false /* hidden */);
+  }
+
+  private static PropertyEntry<String> optionalHidden(String name) {
+    return PropertyEntry.stringOptionalPropertyEntry(
+        name, name, false /* immutable */, null /* defaultValue */, true /* hidden */);
+  }
+
+  private static PropertyEntry<String> reserved(String name, boolean hidden) {
+    return PropertyEntry.stringReservedPropertyEntry(name, name, hidden);
+  }
+
+  private static PropertyEntry<String> optionalPrefix(String name) {
+    return PropertyEntry.stringImmutablePropertyPrefixEntry(
+        name,
+        name,
+        false /* required */,
+        null /* defaultValue */,
+        false /* hidden */,
+        false /* reserved */);
   }
 }

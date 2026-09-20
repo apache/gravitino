@@ -33,8 +33,11 @@ public class TestRegisteredPropertyKeys {
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("credential-providers"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-unknown"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-warehouse"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("bootstrap.servers"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("metastore.uris"));
     Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("typo-access-key"));
     Assertions.assertFalse(RegisteredPropertyKeys.isRegistered(null));
+    Assertions.assertTrue(RegisteredPropertyKeys.PROPERTY_ENTRIES.containsKey("s3-access-key-id"));
   }
 
   @Test
@@ -83,13 +86,19 @@ public class TestRegisteredPropertyKeys {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, missingOfficial::propertyEntries);
     Assertions.assertTrue(exception.getMessage().contains("connector-only-unregistered-key"));
-    Assertions.assertTrue(
-        exception.getMessage().contains("base properties")
-            || exception.getMessage().contains("RegisteredPropertyKeys"));
+    Assertions.assertTrue(exception.getMessage().contains("RegisteredPropertyKeys"));
   }
 
   @Test
-  void testSharedCloudKeysInSpecificEntriesDoNotRequireConnectorRegistration() {
+  void testCatalogKeysAreRegisteredUnderStrictPolicy() {
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("key1"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("key5-abc"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("hidden_key"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("reserved_key"));
+  }
+
+  @Test
+  void testSharedCloudKeysInSpecificEntriesAreAllowed() {
     BasePropertiesMetadata cloudOnly =
         new BasePropertiesMetadata() {
           @Override
