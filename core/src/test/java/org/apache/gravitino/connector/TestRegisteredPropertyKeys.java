@@ -98,6 +98,33 @@ public class TestRegisteredPropertyKeys {
   }
 
   @Test
+  void testPreviouslyMissingConnectorKeysAreRegistered() {
+    String[] keys = {
+      "catalog-backend",
+      "table-type",
+      "format-version",
+      "replication_num",
+      "engine",
+      "partition-count",
+      "replication-factor",
+      "auto-increment-offset",
+      "fileset-cache-max-size",
+      "fileset-cache-eviction-interval-ms",
+      "filesystem-conn-timeout-secs",
+      "table-metadata-cache-capacity",
+      "table-metadata-cache-expire-minutes",
+      "rest-client-connection-timeout-ms",
+      "rest-client-socket-timeout-ms",
+      "authentication.kerberos.check-interval-sec",
+      "authentication.kerberos.keytab-fetch-timeout-sec",
+      "s3-credential-list-location-prefix"
+    };
+    for (String key : keys) {
+      Assertions.assertTrue(RegisteredPropertyKeys.isRegistered(key), () -> "missing: " + key);
+    }
+  }
+
+  @Test
   void testSharedCloudKeysInSpecificEntriesAreAllowed() {
     BasePropertiesMetadata cloudOnly =
         new BasePropertiesMetadata() {

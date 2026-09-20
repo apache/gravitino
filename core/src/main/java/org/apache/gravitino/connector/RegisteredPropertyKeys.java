@@ -51,7 +51,7 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  *
  * <p>Like {@link CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES}, this class exposes a {@link
  * #PROPERTY_ENTRIES} map. Name-based (fuzzy) masking and secret recovery treat only keys that are
- * <em>not</em> in this map (and not matching {@link #LOCATION_PROPERTY_PREFIX}) as unknown. For
+ * <em>not</em> in this map (and do not match a registered property prefix) as unknown. For
  * registered keys omitted from the current catalog {@link PropertiesMetadata}, the {@link
  * PropertyEntry} hidden / reserved flags from this map still apply.
  *
@@ -834,6 +834,143 @@ public final class RegisteredPropertyKeys {
               stringOptionalPropertyEntry(
                   "partition-key",
                   "partition-key",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          // Hive / Iceberg / Paimon / Hudi / Kafka / Doris / MySQL / Fileset (previously missing)
+          .put(
+              "catalog-backend",
+              stringOptionalPropertyEntry(
+                  "catalog-backend",
+                  "catalog-backend",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "table-type",
+              stringOptionalPropertyEntry(
+                  "table-type",
+                  "table-type",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "format-version",
+              stringOptionalPropertyEntry(
+                  "format-version",
+                  "format-version",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "replication_num",
+              stringOptionalPropertyEntry(
+                  "replication_num",
+                  "replication_num",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "engine",
+              stringOptionalPropertyEntry(
+                  "engine",
+                  "engine",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "partition-count",
+              stringOptionalPropertyEntry(
+                  "partition-count",
+                  "partition-count",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "replication-factor",
+              stringOptionalPropertyEntry(
+                  "replication-factor",
+                  "replication-factor",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "auto-increment-offset",
+              stringOptionalPropertyEntry(
+                  "auto-increment-offset",
+                  "auto-increment-offset",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "fileset-cache-max-size",
+              stringOptionalPropertyEntry(
+                  "fileset-cache-max-size",
+                  "fileset-cache-max-size",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "fileset-cache-eviction-interval-ms",
+              stringOptionalPropertyEntry(
+                  "fileset-cache-eviction-interval-ms",
+                  "fileset-cache-eviction-interval-ms",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "filesystem-conn-timeout-secs",
+              stringOptionalPropertyEntry(
+                  "filesystem-conn-timeout-secs",
+                  "filesystem-conn-timeout-secs",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "table-metadata-cache-capacity",
+              stringOptionalPropertyEntry(
+                  "table-metadata-cache-capacity",
+                  "table-metadata-cache-capacity",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "table-metadata-cache-expire-minutes",
+              stringOptionalPropertyEntry(
+                  "table-metadata-cache-expire-minutes",
+                  "table-metadata-cache-expire-minutes",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "rest-client-connection-timeout-ms",
+              stringOptionalPropertyEntry(
+                  "rest-client-connection-timeout-ms",
+                  "rest-client-connection-timeout-ms",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "rest-client-socket-timeout-ms",
+              stringOptionalPropertyEntry(
+                  "rest-client-socket-timeout-ms",
+                  "rest-client-socket-timeout-ms",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "authentication.kerberos.check-interval-sec",
+              stringOptionalPropertyEntry(
+                  "authentication.kerberos.check-interval-sec",
+                  "authentication.kerberos.check-interval-sec",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "authentication.kerberos.keytab-fetch-timeout-sec",
+              stringOptionalPropertyEntry(
+                  "authentication.kerberos.keytab-fetch-timeout-sec",
+                  "authentication.kerberos.keytab-fetch-timeout-sec",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))

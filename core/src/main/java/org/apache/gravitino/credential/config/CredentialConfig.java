@@ -107,6 +107,16 @@ public class CredentialConfig extends Config {
                   null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX,
+              PropertyEntry.booleanPropertyEntry(
+                  CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX,
+                  "Whether the vended s3:ListBucket statement also allows the bare location prefix",
+                  false /* required */,
+                  false /* immutable */,
+                  false /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .build();
 
   public static final ConfigEntry<List<String>> CREDENTIAL_PROVIDERS =

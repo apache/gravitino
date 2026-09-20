@@ -79,7 +79,9 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
     assertTrue(metadata.containsKey(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS));
     assertTrue(metadata.containsKey(CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS));
+    assertTrue(metadata.containsKey(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
     assertFalse(metadata.get(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS).isHidden());
+    assertFalse(metadata.get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX).isHidden());
   }
 
   @Test
