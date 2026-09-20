@@ -175,7 +175,9 @@ public class ModelVersionMetaService {
         POConverters.initializeModelVersionAliasRelPO(modelVersionEntity, modelId);
 
     try {
-      SessionUtils.doMultipleWithCommit(
+      doWithSchemaWriteLock(
+          modelIdent,
+          modelPO,
           () -> reserveModelVersionRegistration(modelIdent, modelPO),
           () ->
               SessionUtils.doWithoutCommit(
@@ -229,7 +231,9 @@ public class ModelVersionMetaService {
     int modelVersion = observedVersionPOs.get(0).getModelVersion();
 
     try {
-      SessionUtils.doMultipleWithCommit(
+      doWithSchemaWriteLock(
+          modelIdent,
+          modelPO,
           () -> reserveModelVersionWrite(ident, modelPO, modelVersion),
           () -> {
             // An alias was resolved to its numeric version above. Delete every URI row belonging to
@@ -359,7 +363,9 @@ public class ModelVersionMetaService {
         isModelVersionUriUpdated(oldModelVersionEntity, newModelVersionEntity);
 
     try {
-      SessionUtils.doMultipleWithCommit(
+      doWithSchemaWriteLock(
+          modelIdent,
+          modelPO,
           () -> reserveModelVersionUpdate(ident, modelPO, oldModelVersionPOs, oldAliasRelPOs),
           () -> {
             int updated;
@@ -439,21 +445,21 @@ public class ModelVersionMetaService {
     return !oldUris.equals(newUris);
   }
 
-  private void lockSchemaForModelVersionWrite(
-      NameIdentifier modelIdentifier, ModelPO observedModelPO) {
+  private void doWithSchemaWriteLock(
+      NameIdentifier modelIdentifier, ModelPO modelPO, Runnable... modelVersionWriteOperations) {
     SchemaMetaService.getInstance()
-        .lockSchemaForEntityWrite(
+        .doWithSchemaWriteLock(
             modelIdentifier,
-            observedModelPO.getSchemaId(),
-            observedModelPO.getCatalogId(),
-            observedModelPO.getMetalakeId());
+            modelPO.getSchemaId(),
+            modelPO.getCatalogId(),
+            modelPO.getMetalakeId(),
+            modelVersionWriteOperations);
   }
 
   private void reserveModelVersionRegistration(
       NameIdentifier modelIdentifier, ModelPO observedModelPO) {
-    // The schema fence prevents a registration below a schema being dropped. The model update then
-    // allocates the version number and advances the aggregate OCC token in one row write.
-    lockSchemaForModelVersionWrite(modelIdentifier, observedModelPO);
+    // The caller holds the schema fence. Allocate the version number and advance the aggregate
+    // OCC token in one model-row write.
     ModelMetaService.getInstance()
         .bumpModelVersionAndLatestVersion(modelIdentifier, observedModelPO);
   }
@@ -461,9 +467,8 @@ public class ModelVersionMetaService {
   private void reserveModelVersionWrite(
       NameIdentifier modelVersionIdentifier, ModelPO observedModelPO, int observedModelVersion) {
     NameIdentifier modelIdentifier = NameIdentifier.of(modelVersionIdentifier.namespace().levels());
-    // Every model-version mutation follows this order: fence the schema, lock and advance the
-    // parent model row, then validate an alias-based identifier while that row lock is held.
-    lockSchemaForModelVersionWrite(modelIdentifier, observedModelPO);
+    // The caller holds the schema fence. Lock and advance the parent model row, then validate an
+    // alias-based identifier while that row lock is held.
     ModelMetaService.getInstance().bumpModelVersion(modelIdentifier, observedModelPO);
     validateModelVersionIdentifier(
         modelVersionIdentifier, observedModelPO.getModelId(), observedModelVersion);

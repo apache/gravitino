@@ -243,6 +243,7 @@ The Doris catalog supports the following index types. Each index applies to a si
 - `SHOW INDEX` does not escape embedded double quotes in property keys or values. Gravitino therefore does not guarantee their round-trip and rejects metadata that falls outside the supported flat quoted-pair format.
 - Index comments are not currently represented by the Gravitino `Index` API and are not preserved on round-trip.
 - `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+- Native Doris `NGRAM_BF` indexes are detected during table loading but are not currently representable by a Gravitino index type. Loading a table that contains one fails with `UnsupportedOperationException` instead of mapping it to an unrelated Gravitino index type. Creating or altering NGRAM_BF indexes through Gravitino and preserving their `gram_size` or `bf_size` properties are not supported.
 :::
 
 **Primary Key example:**

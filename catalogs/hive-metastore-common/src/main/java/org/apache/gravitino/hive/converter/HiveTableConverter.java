@@ -240,7 +240,7 @@ public class HiveTableConverter {
       }
     }
 
-    if (table.distribution() != null && !Distributions.NONE.equals(table.distribution())) {
+    if (table.distribution() != null && !Distributions.isNone(table.distribution())) {
       strgDesc.setBucketCols(
           Arrays.stream(table.distribution().expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])

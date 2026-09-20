@@ -192,7 +192,7 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | `Float`             | `Float32`                              |
 | `Double`            | `Float64`                              |
 | `Decimal(p,s)`      | `Decimal(p,s)`                         |
-| `String`/`VarChar`  | `String`                               |
+| `String`            | `String`                               |
 | `FixedChar(n)`      | `FixedString(n)`                       |
 | `Date`              | `Date`                                 |
 | `Timestamp[(p)]`    | `DateTime` (precision defaults to `0`) |
@@ -200,6 +200,8 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | `UUID`              | `UUID`                                 |
 
 Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
+`VarChar(n)` is rejected when creating or adding a column because ClickHouse cannot enforce its length limit.
+Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
 
 ### Table Properties
 
