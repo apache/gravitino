@@ -30,7 +30,6 @@ import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
@@ -129,7 +128,6 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   DEFAULT_LIST_ALL_TABLES,
                   false /* hidden */,
                   false /* reserved */))
-          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)

@@ -36,10 +36,9 @@ import org.apache.gravitino.annotation.Evolving;
  * <p>Note: For catalog related properties metadata, use {@link BaseCatalogPropertiesMetadata}.
  *
  * <p>This class defines reserved properties metadata for Gravitino use only. Developers should not
- * override these properties. Connectors that support credential vending should {@code putAll}
- * {@link org.apache.gravitino.credential.config.CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES} in
- * their own {@code specificPropertyEntries()}; cross-catalog masking uses {@link
- * RegisteredPropertyKeys}.
+ * override these properties. Official credential-vending keys are recognized for masking via {@link
+ * RegisteredPropertyKeys}; connectors need not declare {@code CredentialConfig} in metadata solely
+ * for that purpose.
  */
 @Evolving
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
