@@ -79,9 +79,17 @@ public class StatisticMetaService {
             namespacedEntityId.namespaceIds()[0],
             namespacedEntityId.entityId(),
             NameIdentifierUtil.toMetadataObject(entity, type).type());
-    SessionUtils.doWithCommit(
-        StatisticMetaMapper.class,
-        mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
+    // Statistics have their own write API, so they do not inherit the schema fence from the
+    // metadata object update path. Fence schema-scoped targets explicitly to keep a schema cascade
+    // from deleting the target and then missing this independently committed statistic upsert.
+    doWithSchemaWriteLockIfNeeded(
+        entity,
+        type,
+        namespacedEntityId,
+        () ->
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos)));
   }
 
   @Monitored(
@@ -106,5 +114,35 @@ public class StatisticMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,
         mapper -> mapper.deleteStatisticsByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  private void doWithSchemaWriteLockIfNeeded(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      NamespacedEntityId namespacedEntityId,
+      Runnable writeOperation) {
+    long[] namespaceIds = namespacedEntityId.namespaceIds();
+    Long schemaId;
+    switch (type) {
+      case SCHEMA:
+        schemaId = namespacedEntityId.entityId();
+        break;
+      case TABLE:
+      case VIEW:
+      case COLUMN:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+        schemaId = namespaceIds[2];
+        break;
+      default:
+        SessionUtils.doMultipleWithCommit(writeOperation);
+        return;
+    }
+
+    SchemaMetaService.getInstance()
+        .doWithSchemaWriteLock(
+            identifier, schemaId, namespaceIds[1], namespaceIds[0], writeOperation);
   }
 }

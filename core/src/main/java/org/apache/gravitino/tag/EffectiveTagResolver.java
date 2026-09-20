@@ -71,7 +71,9 @@ public class EffectiveTagResolver {
     resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
 
     Map<String, TagEntity> effectiveTags = new LinkedHashMap<>();
-    for (MetadataObject object : resolutionOrder) {
+    for (int index = 0; index < resolutionOrder.size(); index++) {
+      MetadataObject object = resolutionOrder.get(index);
+      boolean inherited = index > 0;
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
       try {
@@ -82,7 +84,8 @@ public class EffectiveTagResolver {
                     SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
                     identifier,
                     entityType);
-        tags.forEach(tag -> effectiveTags.putIfAbsent(tag.name(), tag));
+        tags.forEach(
+            tag -> effectiveTags.putIfAbsent(tag.name(), tag.copyWithInherited(inherited)));
       } catch (NoSuchEntityException e) {
         throw new NoSuchMetadataObjectException(
             e, "Failed to resolve effective tags for metadata object %s due to not found", object);

@@ -29,14 +29,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -53,6 +56,8 @@ import org.mockito.Mockito;
 public class TestClickHouseTableOperationsUnit {
 
   private static final class ExposedClickHouseTableOperations extends ClickHouseTableOperations {
+    private JdbcTable table;
+
     List<Index> callGetIndexes(Connection connection, String databaseName, String tableName)
         throws Exception {
       return getIndexes(connection, databaseName, tableName);
@@ -77,6 +82,10 @@ public class TestClickHouseTableOperationsUnit {
                 .withNullable(false)
                 .build()
           };
+      return callGenerateCreateTableSql(columns, properties);
+    }
+
+    String callGenerateCreateTableSql(JdbcColumn[] columns, Map<String, String> properties) {
       return generateCreateTableSql(
           "test_table",
           columns,
@@ -87,10 +96,42 @@ public class TestClickHouseTableOperationsUnit {
           Indexes.EMPTY_INDEXES,
           getSortOrders("id"));
     }
+
+    void setTable(JdbcTable table) {
+      this.table = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return table;
+    }
+
+    String callGenerateAlterTableSql(TableChange... changes) {
+      return generateAlterTableSql("db", "test_table", changes);
+    }
   }
 
   private ExposedClickHouseTableOperations newOps() {
     return newOps(null);
+  }
+
+  @Test
+  void testCreateTableRejectsVarchar() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("name")
+              .withType(Types.VarCharType.of(64))
+              .withNullable(true)
+              .build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> newOps().callGenerateCreateTableSql(columns, Map.of()));
+    Assertions.assertTrue(exception.getMessage().contains("ClickHouse does not support varchar"));
   }
 
   private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
@@ -102,6 +143,29 @@ public class TestClickHouseTableOperationsUnit {
         new ClickHouseColumnDefaultValueConverter(),
         new HashMap<>());
     return ops;
+  }
+
+  private ExposedClickHouseTableOperations newAlterOps(Map<String, String> properties) {
+    ExposedClickHouseTableOperations ops = newOps();
+    JdbcColumn idColumn =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {idColumn})
+            .withIndexes(Indexes.EMPTY_INDEXES)
+            .withProperties(properties)
+            .withTableOperation(null)
+            .build());
+    return ops;
+  }
+
+  private static String settingProperty(String name) {
+    return TableConstants.SETTINGS_PREFIX + name;
   }
 
   private Map<String, String> loadTableProperties(String engine, String engineFull)
@@ -403,6 +467,114 @@ public class TestClickHouseTableOperationsUnit {
         "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
     Assertions.assertEquals(
         "0", settings.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+  }
+
+  @Test
+  void testParseSettingsPreservesQuotedAndNestedValues() {
+    ExposedClickHouseTableOperations ops = newOps();
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY id SETTINGS "
+                + "quoted =  'id,COMMENT,name,val', "
+                + "escaped = 'a\\'b\\\\c', "
+                + "doubled = 'a''b,c', "
+                + "double_quoted = \"a,b\"\"c\", "
+                + "nested = custom(`a,b`, tuple(1, 2), 'x=y,z')");
+
+    Assertions.assertEquals(5, settings.size());
+    Assertions.assertEquals(
+        "'id,COMMENT,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
+    Assertions.assertEquals(
+        "'a\\'b\\\\c'", settings.get(TableConstants.SETTINGS_PREFIX + "escaped"));
+    Assertions.assertEquals("'a''b,c'", settings.get(TableConstants.SETTINGS_PREFIX + "doubled"));
+    Assertions.assertEquals(
+        "\"a,b\"\"c\"", settings.get(TableConstants.SETTINGS_PREFIX + "double_quoted"));
+    Assertions.assertEquals(
+        "custom(`a,b`, tuple(1, 2), 'x=y,z')",
+        settings.get(TableConstants.SETTINGS_PREFIX + "nested"));
+  }
+
+  @Test
+  void testParseSettingsFindsLastTopLevelClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplacingMergeTree(`SETTINGS version`) ORDER BY id SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplicatedMergeTree('path SETTINGS ignored') ORDER BY id "
+                + "SETTINGS index_granularity = 4096");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY settings SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testParseSettingsRejectsMalformedMetadataBeforeClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] malformedEngineFull = {
+      "MergeTree(broken SETTINGS index_granularity = 8192",
+      "MergeTree('broken SETTINGS index_granularity = 8192",
+      "MergeTree ORDER BY 'oops SETTINGS index_granularity = 1",
+      "MergeTree() ORDER BY id) SETTINGS index_granularity = 8192"
+    };
+
+    for (String engineFull : malformedEngineFull) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> ops.parseSettingsFromEngineFull(engineFull));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
+  }
+
+  @Test
+  void testParseSettingsPreservesLastDuplicateValue() {
+    Map<String, String> settings =
+        newOps()
+            .parseSettingsFromEngineFull(
+                "MergeTree ORDER BY id SETTINGS duplicate = 1, duplicate = 'last,value'");
+
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "'last,value'", settings.get(TableConstants.SETTINGS_PREFIX + "duplicate"));
+  }
+
+  @Test
+  void testParseSettingsRejectsStructurallyInvalidMetadata() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidSettings = {
+      "missing_equals",
+      "= 1",
+      "key = ",
+      ", key = 1",
+      "key = 1,",
+      "key = 1,, other = 2",
+      "key = 'unterminated",
+      "key = custom(1, 2",
+      "key = value)"
+    };
+
+    for (String invalidSetting : invalidSettings) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.parseSettingsFromEngineFull(
+                      "MergeTree ORDER BY id SETTINGS " + invalidSetting));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
   }
 
   @Test
@@ -762,7 +934,7 @@ public class TestClickHouseTableOperationsUnit {
     Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
     Mockito.when(secondaryRs.getString("type_full"))
         .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
-    Mockito.when(secondaryRs.getString("expr")).thenReturn("cityHash64(col_1) % 16", "col_2");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("lower(col_1)", "col_2");
     Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
 
     Connection connection = Mockito.mock(Connection.class);
@@ -846,6 +1018,185 @@ public class TestClickHouseTableOperationsUnit {
             GravitinoRuntimeException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
     Assertions.assertTrue(exception.getCause() instanceof SQLException);
     Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  @Test
+  void testGenerateModifyAndResetTableSettingsSql() {
+    ExposedClickHouseTableOperations ops = newAlterOps(Map.of());
+
+    String modifySql =
+        ops.callGenerateAlterTableSql(
+            TableChange.setProperty(settingProperty("z_setting"), "2"),
+            TableChange.setProperty(settingProperty("a_setting"), "1"));
+    Assertions.assertTrue(
+        modifySql.contains("MODIFY SETTING a_setting = 1, z_setting = 2"), modifySql);
+
+    String resetSql =
+        ops.callGenerateAlterTableSql(
+            TableChange.removeProperty(settingProperty("z_setting")),
+            TableChange.removeProperty(settingProperty("a_setting")));
+    Assertions.assertTrue(resetSql.contains("RESET SETTING a_setting, z_setting"), resetSql);
+  }
+
+  @Test
+  void testGenerateTableSettingsSqlOnCluster() {
+    ExposedClickHouseTableOperations ops =
+        newAlterOps(
+            Map.of(
+                ClusterConstants.ON_CLUSTER,
+                "true",
+                ClusterConstants.CLUSTER_NAME,
+                "test_cluster"));
+
+    String sql =
+        ops.callGenerateAlterTableSql(
+            TableChange.setProperty(settingProperty("merge_with_ttl_timeout"), "3600"));
+
+    Assertions.assertTrue(
+        sql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), sql);
+    Assertions.assertTrue(sql.contains("MODIFY SETTING merge_with_ttl_timeout = 3600"), sql);
+  }
+
+  @Test
+  void testAcceptValidTableSettingLiterals() {
+    ExposedClickHouseTableOperations ops = newAlterOps(Map.of());
+    String[] validLiterals = {
+      "0", "-1", "+1.5", ".25", "1e3", "true", "FALSE", "'default'", "'a,b\\\\c''d'"
+    };
+
+    for (String literal : validLiterals) {
+      String sql =
+          ops.callGenerateAlterTableSql(
+              TableChange.setProperty(settingProperty("test_setting"), literal));
+      Assertions.assertTrue(sql.contains("test_setting = " + literal), sql);
+    }
+  }
+
+  @Test
+  void testRejectInvalidTableSettingNamesAndLiterals() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidNames = {
+      null,
+      settingProperty(""),
+      settingProperty("1setting"),
+      settingProperty("bad-setting"),
+      settingProperty("bad setting"),
+      settingProperty("setting;DROP")
+    };
+    for (String property : invalidNames) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> ops.callGenerateAlterTableSql(TableChange.setProperty(property, "1")));
+    }
+
+    String[] invalidLiterals = {
+      "",
+      "value",
+      "'unterminated",
+      "'bad\\'",
+      "1, RESET SETTING other",
+      "1; DROP TABLE t",
+      "'ok' OR 1"
+    };
+    for (String literal : invalidLiterals) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.callGenerateAlterTableSql(
+                      TableChange.setProperty(settingProperty("test_setting"), literal)));
+      if (!literal.isEmpty()) {
+        Assertions.assertFalse(exception.getMessage().contains(literal));
+      }
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("test_setting"), null)));
+  }
+
+  @Test
+  void testRejectUnsupportedAndMixedTablePropertyChanges() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.callGenerateAlterTableSql(TableChange.setProperty("engine", "MergeTree")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.callGenerateAlterTableSql(TableChange.removeProperty("engine")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.removeProperty(settingProperty("b"))));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.updateComment("new comment")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.removeProperty(settingProperty("a")),
+                TableChange.updateComment("new comment")));
+  }
+
+  @Test
+  void testRejectDuplicateTableSettingChanges() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.setProperty(settingProperty("a"), "2")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.removeProperty(settingProperty("a")),
+                TableChange.removeProperty(settingProperty("a"))));
+  }
+
+  @Test
+  void testInvalidTableSettingChangesFailBeforeJdbcConnection() {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    ClickHouseTableOperations ops = new ClickHouseTableOperations();
+    ops.initialize(
+        dataSource,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.alterTable("db", "test_table", TableChange.setProperty("engine", "MergeTree")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.alterTable(
+                "db",
+                "test_table",
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.removeProperty(settingProperty("b"))));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                "db",
+                "test_table",
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.setProperty(settingProperty("a"), "2")));
+
+    Mockito.verifyNoInteractions(dataSource);
   }
 
   private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {

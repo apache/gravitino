@@ -256,12 +256,18 @@ public class GravitinoInterceptionService implements InterceptionService {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
               NameIdentifier accessMetadataName =
                   metadataContext.get(Entity.EntityType.valueOf(type.name()));
+              // An executor can evaluate a request-specific expression, such as the secondary
+              // expression, so report the expression it evaluated when it recorded one.
+              String evaluatedExpression =
+                  StringUtils.defaultIfBlank(
+                      authorizationRequestContext.getOriginalAuthorizationExpression(), expression);
               dispatchAuthzDenialEvent(
                   PrincipalUtils.getCurrentUserName(),
                   accessMetadataName,
                   method.getName(),
-                  expression);
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+                  evaluatedExpression);
+              return buildNoAuthResponse(
+                  expressionAnnotation, metadataContext, method, evaluatedExpression);
             }
           }
         }
@@ -317,7 +323,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             "User validation failed - User: {}, Metalake: {}, Reason: {}",
             currentUser,
             metalakeIdent.name(),
-            ex.getMessage());
+            ex.getMessage(),
+            ex);
         dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
         return Optional.of(Utils.forbidden(ex.getMessage(), ex));
       } catch (Exception ex) {

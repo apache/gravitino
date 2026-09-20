@@ -165,7 +165,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           "Currently we do not support Partitioning in PostgreSQL");
     }
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "PostgreSQL does not support distribution");
+        Distributions.isNone(distribution), "PostgreSQL does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder

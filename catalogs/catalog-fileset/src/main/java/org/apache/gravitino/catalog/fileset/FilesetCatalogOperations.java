@@ -69,6 +69,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -451,6 +453,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    // Check the comment before the storage locations are created, the entity validation only
+    // happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.FILESET);
+
     storageLocations.forEach(
         (name, path) -> {
           if (StringUtils.isBlank(name)) {
@@ -612,7 +619,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(filesetEntity, true /* overwrite */);
+      // The existence check is advisory; the strict insert decides concurrent creates.
+      store.put(filesetEntity, false /* overwrite */);
+    } catch (EntityAlreadyExistsException exception) {
+      throw new FilesetAlreadyExistsException(exception, "Fileset %s already exists", ident);
     } catch (NoSuchEntityException exception) {
       // The schema can disappear after the check near the start of this method. The relational
       // store detects that race while taking the parent-schema lock; translate its storage-level
@@ -811,6 +821,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Check the comment before the schema directories are created, the entity validation only
+    // happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
+
     if (disableFSOps) {
       return super.createSchema(ident, comment, properties);
     }

@@ -213,7 +213,9 @@ public class LanceTableOperations extends ManagedTableOperations {
           !register, "EXIST_OK mode is not supported for register operation");
 
       try {
-        return super.loadTable(ident);
+        Table table = super.loadTable(ident);
+        validateLanceTable(ident, table);
+        return table;
       } catch (NoSuchTableException e) {
         // Table doesn't exist, proceed with creation
       }
@@ -277,6 +279,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
+      validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -303,6 +306,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
@@ -313,6 +318,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     try {
       // Use super.loadTable to skip schema-refresh overhead when dropping.
       Table table = super.loadTable(ident);
+      validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -337,6 +343,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
     }
@@ -358,6 +366,13 @@ public class LanceTableOperations extends ManagedTableOperations {
       } else {
         throw ExceptionMessages.wrap("Failed to delete Lance dataset at " + location, e);
       }
+    }
+  }
+
+  private static void validateLanceTable(NameIdentifier ident, Table table) {
+    if (!LancePropertiesUtils.isLanceTableFormat(
+        table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
+      throw new IllegalArgumentException("Table is not a Lance table: " + ident);
     }
   }
 
@@ -707,12 +722,36 @@ public class LanceTableOperations extends ManagedTableOperations {
             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
             .withCreateTime(Instant.now())
             .build();
+    // Tags, owners and privileges are attached to a column by id, so a column that is still in the
+    // dataset keeps its id. It also keeps its comment and audit info, which the dataset doesn't
+    // carry.
+    Map<String, ColumnEntity> existingColumns =
+        tableEntity.columns().stream()
+            .collect(
+                Collectors.toMap(
+                    ColumnEntity::name, Function.identity(), (first, second) -> first));
     List<ColumnEntity> columnEntities =
         IntStream.range(0, columns.length)
             .mapToObj(
-                i ->
-                    ColumnEntity.toColumnEntity(
-                        columns[i], i, idGenerator.nextId(), columnAuditInfo))
+                i -> {
+                  ColumnEntity existing = existingColumns.get(columns[i].name());
+                  if (existing == null) {
+                    return ColumnEntity.toColumnEntity(
+                        columns[i], i, idGenerator.nextId(), columnAuditInfo);
+                  }
+                  return ColumnEntity.builder()
+                      .withId(existing.id())
+                      .withName(columns[i].name())
+                      .withPosition(i)
+                      .withDataType(columns[i].dataType())
+                      .withComment(
+                          columns[i].comment() != null ? columns[i].comment() : existing.comment())
+                      .withNullable(columns[i].nullable())
+                      .withAutoIncrement(columns[i].autoIncrement())
+                      .withDefaultValue(columns[i].defaultValue())
+                      .withAuditInfo((AuditInfo) existing.auditInfo())
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return TableEntity.builder()

@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -71,6 +73,7 @@ public class PolicyManager implements PolicyDispatcher {
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
+  private final ObjectPolicyResolver objectPolicyResolver;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
@@ -83,6 +86,7 @@ public class PolicyManager implements PolicyDispatcher {
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
+    this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
   @Override
@@ -295,12 +299,30 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-    return listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject);
+    Map<Long, PolicyEntity> policiesById = new LinkedHashMap<>();
+    Arrays.stream(listDirectPoliciesForMetadataObject(metalake, metadataObject, false))
+        .forEach(policy -> policiesById.put(policy.id(), policy));
+
+    Arrays.stream(objectPolicyResolver.resolve(metalake, metadataObject))
+        .forEach(
+            policy -> {
+              if (policy.inherited().orElse(false)) {
+                policiesById.putIfAbsent(policy.id(), policy);
+              } else {
+                policiesById.put(policy.id(), policy);
+              }
+            });
+
+    for (MetadataObject parent : MetadataObjectUtil.getParentMetadataObjects(metadataObject)) {
+      Arrays.stream(listDirectPoliciesForMetadataObject(metalake, parent, true))
+          .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
+    }
+    return policiesById.values().stream()
+        .filter(PolicyEntity::enabled)
+        .toArray(PolicyEntity[]::new);
   }
 
   @Override
@@ -396,7 +418,9 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   private PolicyEntity[] listDirectPoliciesForMetadataObject(
-      NameIdentifier entityIdent, Entity.EntityType entityType, MetadataObject metadataObject) {
+      String metalake, MetadataObject metadataObject, boolean inherited) {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
@@ -410,7 +434,7 @@ public class PolicyManager implements PolicyDispatcher {
                     entityType,
                     true /* allFields */)
                 .stream()
-                .map(entity -> (PolicyEntity) entity)
+                .map(entity -> ((PolicyEntity) entity).copyWithInherited(inherited))
                 .toArray(PolicyEntity[]::new);
           } catch (NoSuchEntityException e) {
             throw new NoSuchMetadataObjectException(

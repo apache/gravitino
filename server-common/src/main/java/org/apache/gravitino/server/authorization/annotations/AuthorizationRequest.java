@@ -35,6 +35,7 @@ public @interface AuthorizationRequest {
     RUN_JOB,
     LINEAGE,
     LOAD_TABLE,
-    CREATE_SCHEMA
+    CREATE_SCHEMA,
+    TEST_CATALOG_CONNECTION
   }
 }

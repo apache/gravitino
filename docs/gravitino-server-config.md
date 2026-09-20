@@ -173,6 +173,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
+| `gravitino.server.webserver.includeErrorStackTrace`  | Whether HTTP error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. It remains `true` by default only to avoid breaking legacy clients that expect the `stack` field. See [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling) and [CWE-209](https://cwe.mitre.org/data/definitions/209.html). | `true`                                  |
 
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
@@ -345,7 +346,24 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.cache.evictionIntervalMs`        | Interval in milliseconds before an idle catalog is evicted from the catalog cache.                                                                                                                                                                                                                     | `3600000`     |
 | `gravitino.catalog.classloader.isolated`            | Whether to load each catalog's libraries and configuration in an isolated classloader rather than the application classloader.                                                                                                                                                                         | `true`        |
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
-| `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-user` and `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded. | `false`       |
+| `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
+
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. By default, a key matches when its name contains `secret`,
+`password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+`gravitino.secret.sensitiveKeyKeywords` **replaces** that default list. Use it to drop a default
+keyword that masks unrelated properties (for example omit `access` and `account`), to add a typo
+or extra word (for example `passwrod` or `private`), or set it to empty to disable name-based
+matching. The value is a comma-separated list. Each entry is a case-insensitive literal substring
+of the property key, not a regular expression. Keep entries specific; overly broad values such as
+`key` can mask unrelated properties.
+
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
 
 ### Securing the Server
 
@@ -433,16 +451,26 @@ frequently — this can measurably increase audit log volume; size log rotation 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
-`gravitino_audit.log` under the log directory, rotates daily and at 256 MB, gzips what it rotates,
-and deletes anything older than 30 days. Change the path or the retention there:
+`gravitino_audit.log` under the log directory and rotates it daily and at 256 MB into numbered gzip
+archives. It deletes archives older than 30 days and, oldest first, archives beyond 10 GB in total.
+Change the retention or the path there:
 
 ```properties
 # conf/log4j2.properties
+property.auditLogMaxTotalSize = 30GB
+appender.audit_file.strategy.delete.ifFileName.ifAny.ifLastModified.age = 90d
+
 appender.audit_file.fileName    = /var/log/gravitino/my_audit.log
 appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
-
-appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 90d
+# Deletion must look in the new directory and match the new archive names.
+appender.audit_file.strategy.delete.basePath = /var/log/gravitino
+appender.audit_file.strategy.delete.ifFileName.glob = my_audit_*.log.gz
 ```
+
+Earlier releases set the audit retention with
+`appender.audit_file.strategy.delete.ifAll.ifLastModified.age`. That key no longer exists. Log4j2
+rejects a configuration file that still sets it, and the server then writes no log files. See
+[Log rotation and retention](./how-to-install.md#log-rotation-and-retention) for all logs.
 
 Earlier releases configured the writer directly through `gravitino.audit.writer.file.*`. Those
 properties now do nothing, and `FileAuditWriter` logs a warning at startup if it finds any of them.
@@ -645,6 +673,7 @@ means the property is left alone.
 | `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`         | `gravitino.server.webserver.requestHeaderSize`       | `131072`                                             |
 | `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`        | `gravitino.server.webserver.responseHeaderSize`      | `131072`                                             |
 | `GRAVITINO_SERVER_BULK_MAX_ITEMS`                        | `gravitino.server.bulk.maxItems`                     | `100`                                                |
+| `GRAVITINO_SERVER_WEBSERVER_INCLUDE_ERROR_STACK_TRACE`    | `gravitino.server.webserver.includeErrorStackTrace`  | `true`                                               |
 | `GRAVITINO_ENTITY_STORE`                                 | `gravitino.entity.store`                             | `relational`                                         |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL`                      | `gravitino.entity.store.relational`                  | `JDBCBackend`                                        |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            |

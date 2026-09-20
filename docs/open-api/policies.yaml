@@ -365,6 +365,38 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
+  /metalakes/{metalake}/policies/{policy}/tags:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    get:
+      tags:
+        - policy
+      summary: List tags associated with a policy
+      operationId: listTagsForPolicy
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns tag names or detailed policy-tag associations
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TagForPolicyAssociationListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
 components:
   parameters:
     details:
@@ -377,6 +409,47 @@ components:
         default: false
 
   schemas:
+
+    PolicyAssociationSelector:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: The selector type used to match tag assignments
+          enum: ["ALL_VALUES", "TAG_VALUE"]
+        value:
+          type: string
+          description: The assignment value required by a TAG_VALUE selector
+          nullable: true
+          maxLength: 256
+
+    TagForPolicyAssociation:
+      type: object
+      required:
+        - tag
+        - selector
+      properties:
+        tag:
+          $ref: "./tags.yaml#/components/schemas/Tag"
+        selector:
+          $ref: "#/components/schemas/PolicyAssociationSelector"
+
+    TagForPolicyAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        associations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagForPolicyAssociation"
 
     PolicyContentBase:
       type: object
@@ -441,7 +514,8 @@ components:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         inherited:
           type: boolean
-          description: Whether the policy is inherited from the parent metadata object
+          description: Whether the policy is selected only from ancestor metadata objects, either
+            through inherited tags or legacy direct policy associations
           nullable: true
 
     CustomPolicy:
