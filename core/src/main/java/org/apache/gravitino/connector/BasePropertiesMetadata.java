@@ -79,6 +79,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
   protected final Map<String, PropertyEntry<?>> buildBasePropertyEntries() {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
     Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
+    checkConnectorSpecificPropertiesRegistered(properties);
     builder.putAll(properties);
 
     BASIC_PROPERTY_ENTRIES.forEach(
@@ -99,6 +100,50 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
         });
 
     return builder.build();
+  }
+
+  /**
+   * Returns whether connector-specific {@link #specificPropertyEntries()} must be registered in
+   * base, shared cloud/credential metadata, or {@link OfficialGravitinoProperties}.
+   *
+   * <p>Production connectors should leave the default {@code true}. Test stubs that use ad-hoc
+   * property names may return {@code false}. This does <strong>not</strong> restrict user-supplied
+   * entity property maps — only metadata definitions declared by connectors.
+   *
+   * @return true when connector-specific entries must appear in one of the official registries
+   */
+  protected boolean enforceOfficialPropertyRegistration() {
+    return true;
+  }
+
+  /**
+   * Ensures every connector-specific property is registered in at least one of: shared base ({@link
+   * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
+   * OfficialGravitinoProperties#isSharedBaseOrCloudProperty}), or {@link
+   * OfficialGravitinoProperties} connector keys. Does not validate user-supplied entity property
+   * maps.
+   */
+  private void checkConnectorSpecificPropertiesRegistered(
+      Map<String, PropertyEntry<?>> specificEntries) {
+    if (!enforceOfficialPropertyRegistration()
+        || specificEntries == null
+        || specificEntries.isEmpty()) {
+      return;
+    }
+    for (String name : specificEntries.keySet()) {
+      if (BASIC_PROPERTY_ENTRIES.containsKey(name)
+          || OfficialGravitinoProperties.isSharedBaseOrCloudProperty(name)
+          || OfficialGravitinoProperties.isDefined(name)) {
+        continue;
+      }
+      Preconditions.checkArgument(
+          false,
+          "Connector-defined property '%s' in %s must be registered in base properties,"
+              + " shared cloud/credential metadata, or OfficialGravitinoProperties."
+              + " User entity custom properties are not blocked by this check.",
+          name,
+          getClass().getName());
+    }
   }
 
   /**

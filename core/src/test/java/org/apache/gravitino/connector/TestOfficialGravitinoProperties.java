@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,5 +44,52 @@ public class TestOfficialGravitinoProperties {
     Assertions.assertTrue(OfficialGravitinoProperties.isHidden("s3-secret-access-key"));
     Assertions.assertTrue(OfficialGravitinoProperties.isHidden("aws-secret-access-key"));
     Assertions.assertTrue(OfficialGravitinoProperties.isHidden("jdbc-password"));
+  }
+
+  @Test
+  void testSharedBaseOrCloudProperties() {
+    Assertions.assertTrue(
+        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("s3-access-key-id"));
+    Assertions.assertTrue(
+        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("credential-providers"));
+    Assertions.assertFalse(
+        OfficialGravitinoProperties.isSharedBaseOrCloudProperty("aws-access-key-id"));
+  }
+
+  @Test
+  void testConnectorSpecificPropertyMustBeRegistered() {
+    BasePropertiesMetadata missingOfficial =
+        new BasePropertiesMetadata() {
+          @Override
+          protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+            return ImmutableMap.of(
+                "connector-only-unregistered-key",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "connector-only-unregistered-key", "test", false, null, false));
+          }
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, missingOfficial::propertyEntries);
+    Assertions.assertTrue(exception.getMessage().contains("connector-only-unregistered-key"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("base properties")
+            || exception.getMessage().contains("OfficialGravitinoProperties"));
+  }
+
+  @Test
+  void testSharedCloudKeysInSpecificEntriesDoNotRequireConnectorRegistration() {
+    BasePropertiesMetadata cloudOnly =
+        new BasePropertiesMetadata() {
+          @Override
+          protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+            return ImmutableMap.of(
+                "s3-access-key-id",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "s3-access-key-id", "ak", false, null, false));
+          }
+        };
+    Assertions.assertDoesNotThrow(cloudOnly::propertyEntries);
+    Assertions.assertTrue(cloudOnly.containsProperty("s3-access-key-id"));
   }
 }

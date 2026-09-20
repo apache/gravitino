@@ -60,6 +60,12 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     return TEST_BASE_PROPERTY;
   }
 
+  @Override
+  protected boolean enforceOfficialPropertyRegistration() {
+    // Ad-hoc test keys such as "k1" are not production connector definitions.
+    return false;
+  }
+
   @Test
   public void testGetPropertyEntryWithExistingProperty() {
     TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();

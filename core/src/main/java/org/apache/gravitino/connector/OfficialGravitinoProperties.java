@@ -21,6 +21,12 @@ package org.apache.gravitino.connector;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
+import org.apache.gravitino.credential.config.CredentialConfig;
 
 /**
  * Registry of property keys that Gravitino itself defines across base, credential, cloud-storage,
@@ -31,6 +37,10 @@ import javax.annotation.Nullable;
  * when the current catalog's {@link PropertiesMetadata} does not declare them (for example a
  * runtime-copied {@code s3-access-key-id} on Glue).
  *
+ * <p>{@link BasePropertiesMetadata} requires connector-specific {@code PropertyEntry} definitions
+ * that are not shared base/credential/cloud keys to appear here. That check does not apply to
+ * user-supplied entity property maps — callers may still set undeclared custom keys.
+ *
  * <p>Keep this list in sync when adding catalog property entries. Connectors may depend on these
  * definitions; {@code core} must not depend on catalog modules.
  */
@@ -38,6 +48,21 @@ public final class OfficialGravitinoProperties {
 
   /** Fileset multi-location property prefix ({@code location-<name>}). */
   public static final String LOCATION_PROPERTY_PREFIX = "location-";
+
+  /**
+   * Shared credential-vending and cloud-storage keys already registered via {@link
+   * CredentialConfig} / {@code *PropertiesMetadata}. Connector {@code specificPropertyEntries} that
+   * only re-export these are not re-checked against {@link #DEFINED_KEYS}.
+   */
+  private static final Set<String> SHARED_BASE_AND_CLOUD_KEYS =
+      ImmutableSet.<String>builder()
+          .addAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES.keySet())
+          .addAll(S3PropertiesMetadata.PROPERTY_ENTRIES.keySet())
+          .addAll(OSSPropertiesMetadata.PROPERTY_ENTRIES.keySet())
+          .addAll(AzurePropertiesMetadata.PROPERTY_ENTRIES.keySet())
+          .addAll(GCSPropertiesMetadata.PROPERTY_ENTRIES.keySet())
+          .addAll(COSPropertiesMetadata.PROPERTY_ENTRIES.keySet())
+          .build();
 
   private static final Set<String> DEFINED_KEYS =
       ImmutableSet.<String>builder()
@@ -162,6 +187,9 @@ public final class OfficialGravitinoProperties {
               "totalSize",
               "transient_lastDdlTime")
           .add("uri", "warehouse")
+          .add("PartitionName", "Range", "PartitionId", "PartitionKey", "VisibleVersion")
+          .add("VisibleVersionTime", "State", "DataSize", "IsInMemory", "graphite.config")
+          .add("format")
           .build();
 
   private static final Set<String> HIDDEN_KEYS =
@@ -230,6 +258,21 @@ public final class OfficialGravitinoProperties {
       return false;
     }
     return DEFINED_KEYS.contains(key) || key.startsWith(LOCATION_PROPERTY_PREFIX);
+  }
+
+  /**
+   * Returns whether {@code key} is a shared base credential or cloud-storage property.
+   *
+   * <p>Used when registering connector metadata: shared keys need not be listed again as
+   * connector-specific entries in this registry for the build-time check (they are already defined
+   * by credential/cloud modules). Fuzzy masking still treats them as official via {@link
+   * #isDefined(String)}.
+   *
+   * @param key property key
+   * @return true when the key comes from credential or shared cloud metadata
+   */
+  public static boolean isSharedBaseOrCloudProperty(@Nullable String key) {
+    return key != null && SHARED_BASE_AND_CLOUD_KEYS.contains(key);
   }
 
   /**
