@@ -637,7 +637,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("c_varchar")
-            .withType(Types.VarCharType.of(5))
+            .withType(Types.StringType.get())
             .withNullable(false)
             .build());
     columns.add(
