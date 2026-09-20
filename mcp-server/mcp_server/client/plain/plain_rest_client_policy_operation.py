@@ -55,10 +55,3 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
             f"/{encode_path_segment(metadata_full_name)}/policies?details=true",
         )
         return extract_content_from_response(response, "policies", [])
-
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
-            f"/policies/{encode_path_segment(policy_name)}/objects"
-        )
-        return extract_content_from_response(response, "metadataObjects", [])

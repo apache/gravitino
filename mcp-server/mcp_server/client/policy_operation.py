@@ -64,16 +64,3 @@ class PolicyOperation(ABC):
             str: JSON formatted string containing list of policy metadata associated with the metadata
         """
         pass
-
-    @abstractmethod
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        """
-        List all metadata items associated with a specific policy.
-
-        Args:
-            policy_name: Name of the policy to filter metadata by
-
-        Returns:
-            str: JSON formatted string containing list of metadata items associated with the policy
-        """
-        pass

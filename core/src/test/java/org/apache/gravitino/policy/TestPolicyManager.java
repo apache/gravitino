@@ -70,7 +70,6 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
@@ -484,230 +483,6 @@ public class TestPolicyManager {
   }
 
   @Test
-  public void testAssociatePoliciesForMetadataObject() {
-    Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
-    String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName1, content);
-    String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName2, content);
-    String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName3, content);
-
-    // Test associate policies for catalog
-    MetadataObject catalogObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog(METALAKE, CATALOG), Entity.EntityType.CATALOG);
-    String[] policiesToAdd = new String[] {policyName1, policyName2, policyName3};
-
-    String[] policies =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, catalogObject, policiesToAdd, null);
-
-    Assertions.assertEquals(3, policies.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName2, policyName3), ImmutableSet.copyOf(policies));
-
-    // Test disassociate policies for catalog
-    String[] policiesToRemove = new String[] {policyName1};
-    String[] policies1 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, catalogObject, null, policiesToRemove);
-
-    Assertions.assertEquals(2, policies1.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName2, policyName3), ImmutableSet.copyOf(policies1));
-
-    // Test associate and disassociate no policies for catalog
-    String[] policies2 =
-        policyManager.associatePoliciesForMetadataObject(METALAKE, catalogObject, null, null);
-
-    Assertions.assertEquals(2, policies2.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName2, policyName3), ImmutableSet.copyOf(policies2));
-
-    // Test re-associate policies for catalog
-    Throwable e =
-        Assertions.assertThrows(
-            PolicyAlreadyAssociatedException.class,
-            () ->
-                policyManager.associatePoliciesForMetadataObject(
-                    METALAKE, catalogObject, policiesToAdd, null));
-    Assertions.assertTrue(
-        e.getMessage().contains("Failed to associate policies for metadata object"));
-
-    // Test associate and disassociate non-existent policies for catalog
-    String[] policies3 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, catalogObject, new String[] {"policy4", "policy5"}, new String[] {"policy6"});
-
-    Assertions.assertEquals(2, policies3.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName2, policyName3), ImmutableSet.copyOf(policies3));
-
-    // Test associate policies for non-existent metadata object
-    MetadataObject nonExistentObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog(METALAKE, "non_existent_catalog"),
-            Entity.EntityType.CATALOG);
-    Throwable e1 =
-        Assertions.assertThrows(
-            NotFoundException.class,
-            () ->
-                policyManager.associatePoliciesForMetadataObject(
-                    METALAKE, nonExistentObject, policiesToAdd, null));
-    Assertions.assertTrue(
-        e1.getMessage().contains("Failed to associate policies for metadata object"));
-
-    // Test associate policies for unsupported metadata object
-    MetadataObject metalakeObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofMetalake(METALAKE), Entity.EntityType.METALAKE);
-    Throwable e2 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                policyManager.associatePoliciesForMetadataObject(
-                    METALAKE, metalakeObject, policiesToAdd, null));
-    Assertions.assertTrue(
-        e2.getMessage().contains("Cannot associate policies for unsupported metadata object type"),
-        "Actual message: " + e2.getMessage());
-
-    Assertions.assertTrue(
-        e2.getMessage().contains("Cannot associate policies for unsupported metadata object type"),
-        "Actual message: " + e2.getMessage());
-
-    // Test associate policies for schema
-    MetadataObject schemaObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
-    String[] policies4 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, schemaObject, policiesToAdd, null);
-
-    Assertions.assertEquals(3, policies4.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName2, policyName3), ImmutableSet.copyOf(policies4));
-
-    // Test associate policies for table
-    String[] policiesToAdd1 = new String[] {policyName1};
-    MetadataObject tableObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-    String[] policies5 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, tableObject, policiesToAdd1, null);
-
-    Assertions.assertEquals(1, policies5.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies5));
-
-    // Test associate and disassociate same policies for table
-    String[] policiesToAdd2 = new String[] {policyName2, policyName3};
-    String[] policiesToRemove1 = new String[] {policyName2};
-    String[] policies6 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, tableObject, policiesToAdd2, policiesToRemove1);
-
-    Assertions.assertEquals(2, policies6.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies6));
-
-    // Test associate policies for view
-    MetadataObject viewObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
-    String[] policies7 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, viewObject, new String[] {policyName1}, null);
-
-    Assertions.assertEquals(1, policies7.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies7));
-
-    // Test associate and disassociate policies for view
-    String[] policies8 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, viewObject, new String[] {policyName2}, new String[] {policyName1});
-
-    Assertions.assertEquals(1, policies8.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName2), ImmutableSet.copyOf(policies8));
-
-    // Test associate policies for function
-    MetadataObject functionObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
-            Entity.EntityType.FUNCTION);
-    String[] policies9 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, functionObject, new String[] {policyName1}, null);
-
-    Assertions.assertEquals(1, policies9.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies9));
-
-    // Test associate and disassociate policies for function
-    String[] policies10 =
-        policyManager.associatePoliciesForMetadataObject(
-            METALAKE, functionObject, new String[] {policyName3}, new String[] {policyName1});
-
-    Assertions.assertEquals(1, policies10.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName3), ImmutableSet.copyOf(policies10));
-  }
-
-  @Test
-  public void testListMetadataObjectsForPolicy() {
-    Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
-    String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName1, content);
-    String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName2, content);
-    String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName3, content);
-
-    MetadataObject catalogObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog(METALAKE, CATALOG), Entity.EntityType.CATALOG);
-    MetadataObject schemaObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
-    MetadataObject tableObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, catalogObject, new String[] {policyName1, policyName2, policyName3}, null);
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, schemaObject, new String[] {policyName1, policyName2}, null);
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, tableObject, new String[] {policyName1}, null);
-
-    MetadataObject[] objects = policyManager.listMetadataObjectsForPolicy(METALAKE, policyName1);
-    Assertions.assertEquals(3, objects.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(catalogObject, schemaObject, tableObject), ImmutableSet.copyOf(objects));
-
-    MetadataObject[] objects1 = policyManager.listMetadataObjectsForPolicy(METALAKE, policyName2);
-    Assertions.assertEquals(2, objects1.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(catalogObject, schemaObject), ImmutableSet.copyOf(objects1));
-
-    MetadataObject[] objects2 = policyManager.listMetadataObjectsForPolicy(METALAKE, policyName3);
-    Assertions.assertEquals(1, objects2.length);
-    Assertions.assertEquals(ImmutableSet.of(catalogObject), ImmutableSet.copyOf(objects2));
-
-    // List metadata objects for non-existent policy
-    Throwable e =
-        Assertions.assertThrows(
-            NoSuchPolicyException.class,
-            () -> policyManager.listMetadataObjectsForPolicy(METALAKE, "non_existent_policy"));
-    Assertions.assertTrue(
-        e.getMessage()
-            .contains(
-                "Policy with name non_existent_policy under metalake "
-                    + METALAKE
-                    + " does not exist"));
-  }
-
-  @Test
   public void testListPoliciesForMetadataObject() {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
@@ -732,30 +507,24 @@ public class TestPolicyManager {
     associatePolicyThroughTag(policy2, schemaObject);
     associatePolicyThroughTag(policy3, tableObject);
 
-    // Legacy direct object-policy relations remain readable during the compatibility window.
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, catalogObject, new String[] {policy3.name()}, null);
-
     String[] policies = policyManager.listPoliciesForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(2, policies.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName3), ImmutableSet.copyOf(policies));
+    Assertions.assertEquals(1, policies.length);
+    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies));
 
     PolicyEntity[] policiesInfo =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, catalogObject);
-    Assertions.assertEquals(2, policiesInfo.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1, policy3), ImmutableSet.copyOf(policiesInfo));
+    Assertions.assertEquals(1, policiesInfo.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1), ImmutableSet.copyOf(policiesInfo));
 
     String[] policies1 = policyManager.listPoliciesForMetadataObject(METALAKE, schemaObject);
-    Assertions.assertEquals(3, policies1.length);
+    Assertions.assertEquals(2, policies1.length);
     Assertions.assertEquals(
-        ImmutableSet.of(policyName1, policyName2, policyName3), ImmutableSet.copyOf(policies1));
+        ImmutableSet.of(policyName1, policyName2), ImmutableSet.copyOf(policies1));
 
     PolicyEntity[] policiesInfo1 =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject);
-    Assertions.assertEquals(3, policiesInfo1.length);
-    Assertions.assertEquals(
-        ImmutableSet.of(policy1, policy2, policy3), ImmutableSet.copyOf(policiesInfo1));
+    Assertions.assertEquals(2, policiesInfo1.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo1));
 
     String[] policies2 = policyManager.listPoliciesForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(3, policies2.length);
@@ -785,37 +554,22 @@ public class TestPolicyManager {
   public void testDisabledPoliciesAreExcludedFromMetadataObjectResults() {
     PolicyContent content =
         PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
-    String directPolicyName = "disabled_direct_" + UUID.randomUUID().toString().replace("-", "");
-    PolicyEntity directPolicy =
+    String policyName = "disabled_tag_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyEntity policy =
         policyManager.createPolicy(
-            METALAKE, directPolicyName, Policy.BuiltInType.CUSTOM, null, false, content);
-    String tagPolicyName = "disabled_tag_" + UUID.randomUUID().toString().replace("-", "");
-    PolicyEntity tagPolicy =
-        policyManager.createPolicy(
-            METALAKE, tagPolicyName, Policy.BuiltInType.CUSTOM, null, false, content);
+            METALAKE, policyName, Policy.BuiltInType.CUSTOM, null, false, content);
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
 
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, tableObject, new String[] {directPolicy.name()}, null);
-    associatePolicyThroughTag(tagPolicy, tableObject);
-
+    associatePolicyThroughTag(policy, tableObject);
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
-    Assertions.assertThrows(
-        NoSuchPolicyException.class,
-        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, directPolicy.name()));
-    Assertions.assertThrows(
-        NoSuchPolicyException.class,
-        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, tagPolicy.name()));
 
-    policyManager.enablePolicy(METALAKE, directPolicy.name());
-    policyManager.enablePolicy(METALAKE, tagPolicy.name());
-
-    Assertions.assertEquals(
-        ImmutableSet.of(directPolicy.name(), tagPolicy.name()),
-        ImmutableSet.copyOf(policyManager.listPoliciesForMetadataObject(METALAKE, tableObject)));
+    policyManager.enablePolicy(METALAKE, policy.name());
+    Assertions.assertArrayEquals(
+        new String[] {policy.name()},
+        policyManager.listPoliciesForMetadataObject(METALAKE, tableObject));
   }
 
   @Test
@@ -846,102 +600,6 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
-    Assertions.assertThrows(
-        NoSuchPolicyException.class,
-        () -> policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policyName));
-  }
-
-  @Test
-  public void testGetPolicyForMetadataObject() {
-    Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
-    String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    PolicyEntity policy1 = createCustomPolicy(METALAKE, policyName1, content);
-    String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    PolicyEntity policy2 = createCustomPolicy(METALAKE, policyName2, content);
-    String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    PolicyEntity policy3 = createCustomPolicy(METALAKE, policyName3, content);
-
-    MetadataObject catalogObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog(METALAKE, CATALOG), Entity.EntityType.CATALOG);
-    MetadataObject schemaObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
-    MetadataObject tableObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-
-    associatePolicyThroughTag(policy1, catalogObject);
-    associatePolicyThroughTag(policy2, schemaObject);
-    associatePolicyThroughTag(policy3, tableObject);
-
-    // Keep one legacy direct relation to verify it remains readable during the compatibility
-    // window.
-    policyManager.associatePoliciesForMetadataObject(
-        METALAKE, catalogObject, new String[] {policyName3}, null);
-
-    PolicyEntity result =
-        policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policyName1);
-    Assertions.assertEquals(policy1, result);
-    Assertions.assertFalse(result.inherited().orElseThrow());
-
-    PolicyEntity result1 =
-        policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policyName1);
-    Assertions.assertEquals(policy1, result1);
-    Assertions.assertTrue(result1.inherited().orElseThrow());
-
-    PolicyEntity result2 =
-        policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy2.name());
-    Assertions.assertEquals(policy2, result2);
-    Assertions.assertTrue(result2.inherited().orElseThrow());
-
-    PolicyEntity result3 =
-        policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy3.name());
-    Assertions.assertEquals(policy3, result3);
-    Assertions.assertFalse(result3.inherited().orElseThrow());
-
-    PolicyEntity result4 =
-        policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policy1.name());
-    Assertions.assertEquals(policy1, result4);
-    Assertions.assertTrue(result4.inherited().orElseThrow());
-
-    // Test get non-existent policy for metadata object
-    Throwable e =
-        Assertions.assertThrows(
-            NoSuchPolicyException.class,
-            () ->
-                policyManager.getPolicyForMetadataObject(
-                    METALAKE, catalogObject, "non_existent_policy"));
-    Assertions.assertTrue(e.getMessage().contains("Policy non_existent_policy does not exist"));
-
-    PolicyEntity directResult =
-        policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy3.name());
-    Assertions.assertEquals(policy3, directResult);
-    Assertions.assertFalse(directResult.inherited().orElseThrow());
-
-    Throwable e2 =
-        Assertions.assertThrows(
-            NoSuchPolicyException.class,
-            () ->
-                policyManager.getPolicyForMetadataObject(METALAKE, catalogObject, policy2.name()));
-    Assertions.assertTrue(
-        e2.getMessage().contains("Policy " + policyName2 + " does not exist"),
-        "Actual message: " + e2.getMessage());
-
-    // Test get policy for non-existent metadata object
-    MetadataObject nonExistentObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog(METALAKE, "non_existent_catalog"),
-            Entity.EntityType.CATALOG);
-    Throwable e3 =
-        Assertions.assertThrows(
-            NotFoundException.class,
-            () ->
-                policyManager.getPolicyForMetadataObject(
-                    METALAKE, nonExistentObject, policy1.name()));
-    Assertions.assertTrue(
-        e3.getMessage().contains("Failed to get policy for metadata object " + nonExistentObject));
   }
 
   private PolicyEntity createCustomPolicy(

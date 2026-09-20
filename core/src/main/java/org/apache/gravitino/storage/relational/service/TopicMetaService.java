@@ -37,7 +37,6 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -378,11 +377,6 @@ public class TopicMetaService {
                 topicId, MetadataObject.Type.TOPIC.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper ->
-            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                topicId, MetadataObject.Type.TOPIC.name()));
   }
 
   private RuntimeException topicWriteFailure(NameIdentifier identifier, TopicPO observedTopicPO) {

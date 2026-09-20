@@ -35,15 +35,12 @@ import org.apache.gravitino.rest.RESTUtils;
  */
 class MetadataObjectPolicyOperations implements SupportsPolicies {
 
-  private final String metalakeName;
-
   private final RESTClient restClient;
 
   private final String policyRequestPath;
 
   MetadataObjectPolicyOperations(
       String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
-    this.metalakeName = metalakeName;
     this.restClient = restClient;
     this.policyRequestPath =
         String.format(
@@ -78,7 +75,7 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
 
     resp.validate();
     return Arrays.stream(resp.getPolicies())
-        .map(policyDTO -> new GenericPolicy(policyDTO, restClient, metalakeName))
+        .map(policyDTO -> new GenericPolicy(policyDTO))
         .toArray(Policy[]::new);
   }
 }

@@ -232,9 +232,6 @@ class MockPolicyOperation(PolicyOperation):
             f"list_policies_for_metadata: {metadata_full_name}, {metadata_type}"
         )
 
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        return f"list_metadata_by_policy: {policy_name}"
-
     async def get_list_of_policies(self) -> str:
         return "mock_policies"
 

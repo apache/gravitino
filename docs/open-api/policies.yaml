@@ -248,40 +248,6 @@ paths:
 
 
 
-  /metalakes/{metalake}/policies/{policy}/objects:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/policy"
-    get:
-      tags:
-        - policy
-      summary: list metadata objects for policy
-      operationId: listMetadataObjectsForPolicy
-      responses:
-        "200":
-          description: Returns the list of metadata objects associated with specified policy
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "#/components/schemas/MetadataObjectListResponse"
-              examples:
-                PolicyResponse:
-                  $ref: "#/components/examples/MetadataObjectListResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The specified policy does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchPolicyException:
-                  $ref: "#/components/examples/NoSuchPolicyException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
   /metalakes/{metalake}/policies/{policy}/tags:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -660,21 +626,6 @@ components:
         policy:
           $ref: "#/components/schemas/Policy"
 
-    MetadataObjectListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        metadataObjects:
-          type: array
-          description: A list of metadata objects
-          items:
-            $ref: "#/components/schemas/MetadataObject"
-
   examples:
     NameListResponse:
       value: {
@@ -770,25 +721,6 @@ components:
             "createTime": "2025-08-04T10:29:23.463Z"
           }
         }
-      }
-
-    MetadataObjectListResponse:
-      value: {
-        "code": 0,
-        "metadataObjects": [
-          {
-            "type": "CATALOG",
-            "fullName":"my_catalog",
-          },
-          {
-            "type": "SCHEMA",
-            "fullName":"my_catalog.my_schema",
-          },
-          {
-            "type": "TABLE",
-            "fullName":"my_catalog.my_schema.my_table",
-          }
-        ]
       }
 
     PolicyAlreadyExistsException:

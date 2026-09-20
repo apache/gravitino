@@ -694,16 +694,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
         }
 
-      case POLICY_METADATA_OBJECT_REL:
-        if (identType == Entity.EntityType.POLICY) {
-          return (List<E>)
-              PolicyMetaService.getInstance().listAssociatedEntitiesForPolicy(nameIdentifier);
-        } else {
-          return (List<E>)
-              PolicyMetaService.getInstance()
-                  .listPoliciesForMetadataObject(nameIdentifier, identType);
-        }
-
       case TAG_METADATA_OBJECT_REL:
         if (identType == Entity.EntityType.TAG) {
           return (List<E>)
@@ -790,11 +780,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return (List<E>)
-            PolicyMetaService.getInstance()
-                .associatePoliciesWithMetadataObject(
-                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       case TAG_METADATA_OBJECT_REL:
         return (List<E>)
             TagMetaService.getInstance()
@@ -905,10 +890,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return (E)
-            PolicyMetaService.getInstance()
-                .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       case TAG_METADATA_OBJECT_REL:
         return (E)
             TagMetaService.getInstance()

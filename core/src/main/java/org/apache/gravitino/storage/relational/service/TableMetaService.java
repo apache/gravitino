@@ -38,7 +38,6 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -432,9 +431,6 @@ public class TableMetaService {
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class,
         mapper -> mapper.softDeleteStatisticsByEntityId(tablePO.getTableId()));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tablePO.getTableId()));
     SessionUtils.doWithoutCommit(
         TableVersionMapper.class,
         mapper ->

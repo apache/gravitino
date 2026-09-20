@@ -71,20 +71,6 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_list_policies_for_metadata(self.mcp))
 
-    def test_list_metadata_for_policy(self):
-        async def _test_list_metadata_for_policy(mcp_server):
-            async with Client(mcp_server) as client:
-                result = await client.call_tool(
-                    "list_metadata_by_policy",
-                    {"policy_name": "mock_policy"},
-                )
-                self.assertEqual(
-                    "list_metadata_by_policy: mock_policy",
-                    result.content[0].text,
-                )
-
-        asyncio.run(_test_list_metadata_for_policy(self.mcp))
-
     def test_removed_object_policy_tools_are_not_exposed(self):
         async def _test():
             async with Client(self.mcp) as client:
@@ -93,6 +79,7 @@ class TestPolicyTool(unittest.TestCase):
                     "associate_policy_with_metadata",
                     "disassociate_policy_from_metadata",
                     "get_policy_for_metadata",
+                    "list_metadata_by_policy",
                 ):
                     with self.subTest(tool=name):
                         self.assertNotIn(name, names)
