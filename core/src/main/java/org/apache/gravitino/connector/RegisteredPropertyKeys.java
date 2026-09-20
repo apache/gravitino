@@ -52,8 +52,8 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  * <p>Like {@link CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES}, this class exposes a {@link
  * #PROPERTY_ENTRIES} map. Name-based (fuzzy) masking and secret recovery treat only keys that are
  * <em>not</em> in this map (and not matching {@link #LOCATION_PROPERTY_PREFIX}) as unknown. For
- * registered keys omitted from the current catalog {@link PropertiesMetadata}, {@link
- * PropertyEntry#isHidden()} / {@link PropertyEntry#isReserved()} from this map still apply.
+ * registered keys omitted from the current catalog {@link PropertiesMetadata}, the {@link
+ * PropertyEntry} hidden / reserved flags from this map still apply.
  *
  * <p>Shared credential and cloud-storage entries are reused from existing metadata modules.
  * Connector-specific keys that may appear outside their owning catalog metadata (for example Glue
