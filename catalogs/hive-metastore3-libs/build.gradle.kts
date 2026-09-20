@@ -29,6 +29,15 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
+  // Only needed to compile HiveShimV3 against the shared HiveShim base class, Gravitino's own
+  // Column/HiveTable types (HiveTable extends core's BaseTable) and RandomNameUtils; compileOnly
+  // keeps these classes out of the shaded runtime jar produced by copyDepends.
+  compileOnly(project(":catalogs:hive-metastore-common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+  compileOnly(libs.slf4j.api)
+
   // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
   constraints {
     implementation(libs.thrift)

@@ -32,22 +32,35 @@ import org.apache.hadoop.security.UserGroupInformation;
  */
 public class HiveClientImpl implements HiveClient {
 
+  // Fully-qualified name of the HiveShim implementation for each Hive version. Each one lives in
+  // its own module (hive-metastore{2,3}-libs), compiled directly against that version's real
+  // metastore client jar, so it cannot be constructed with `new` from this class: the isolated
+  // Hive-version classloader that is already active for this HiveClientImpl instance is asked to
+  // load and construct it instead.
+  private static final String HIVE2_SHIM_CLASS =
+      "org.apache.gravitino.hive.client.hive2.HiveShimV2";
+  private static final String HIVE3_SHIM_CLASS =
+      "org.apache.gravitino.hive.client.hive3.HiveShimV3";
+
   private final HiveShim shim;
 
   public HiveClientImpl(HiveClientClassLoader.HiveVersion hiveVersion, Properties properties) {
+    String shimClassName;
     switch (hiveVersion) {
       case HIVE2:
-        {
-          shim = new HiveShimV2(properties);
-          break;
-        }
+        shimClassName = HIVE2_SHIM_CLASS;
+        break;
       case HIVE3:
-        {
-          shim = new HiveShimV3(properties);
-          break;
-        }
+        shimClassName = HIVE3_SHIM_CLASS;
+        break;
       default:
         throw new IllegalArgumentException("Unsupported Hive version: " + hiveVersion);
+    }
+    try {
+      Class<?> shimClass = getClass().getClassLoader().loadClass(shimClassName);
+      this.shim = (HiveShim) shimClass.getConstructor(Properties.class).newInstance(properties);
+    } catch (Exception e) {
+      throw ExceptionMessages.wrap("Failed to create Hive metastore shim for " + hiveVersion, e);
     }
   }
 

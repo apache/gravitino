@@ -46,14 +46,14 @@ public class HiveCatalogCapability implements Capability {
   public CapabilityResult columnNotNull() {
     // The NOT NULL constraint for column is supported since Hive 3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    return hive3Only("NOT NULL");
+    return requireHive3("NOT NULL");
   }
 
   @Override
   public CapabilityResult columnDefaultValue() {
     // The DEFAULT constraint for column is supported since Hive 3.0, see
     // https://issues.apache.org/jira/browse/HIVE-18726
-    return hive3Only("DEFAULT");
+    return requireHive3("DEFAULT");
   }
 
   @Override
@@ -70,7 +70,7 @@ public class HiveCatalogCapability implements Capability {
     }
   }
 
-  private CapabilityResult hive3Only(String constraint) {
+  private CapabilityResult requireHive3(String constraint) {
     HiveVersion version = hiveVersion.get();
     if (version == HIVE3) {
       return CapabilityResult.SUPPORTED;
