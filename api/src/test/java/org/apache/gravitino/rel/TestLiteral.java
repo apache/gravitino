@@ -39,6 +39,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
@@ -115,5 +118,65 @@ public class TestLiteral {
     literal = decimalLiteral(Decimal.of("0.00"));
     Assertions.assertEquals(Decimal.of(new BigDecimal("0.00")), literal.value());
     Assertions.assertEquals(Types.DecimalType.of(2, 2), literal.dataType());
+  }
+
+  @Test
+  public void testBinaryLiteralsWithEqualContentAreEqual() {
+    Literal<?> first = Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get());
+    Literal<?> second = Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get());
+
+    // Before the fix, LiteralImpl.equals fell back to value.toString(), so structurally identical
+    // binary literals were never equal (Objects.equals on arrays is reference equality and the
+    // toString fallback renders identity hashes).
+    Assertions.assertEquals(first, second);
+    Assertions.assertEquals(first.hashCode(), second.hashCode());
+    Assertions.assertNotEquals(first, Literals.of(new byte[] {1, 2}, Types.BinaryType.get()));
+
+    Set<Literal<?>> literals = new HashSet<>(Collections.singletonList(first));
+    Assertions.assertTrue(
+        literals.contains(Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get())));
+  }
+
+  @Test
+  public void testArrayLiteralsWithEqualContentAreEqual() {
+    Types.ListType listType = Types.ListType.of(Types.IntegerType.get(), false);
+    Literal<?> first = Literals.of(new Object[] {1, 2, 3}, listType);
+    Literal<?> second = Literals.of(new Object[] {1, 2, 3}, listType);
+
+    // Object[] values need Arrays.deepEquals: Objects.equals is reference equality for arrays and
+    // the toString() fallback renders identity hashes, so equal-content array literals must match.
+    Assertions.assertEquals(first, second);
+    Assertions.assertEquals(first.hashCode(), second.hashCode());
+    Assertions.assertNotEquals(first, Literals.of(new Object[] {1, 2}, listType));
+
+    Set<Literal<?>> literals = new HashSet<>(Collections.singletonList(first));
+    Assertions.assertTrue(literals.contains(Literals.of(new Object[] {1, 2, 3}, listType)));
+  }
+
+  @Test
+  public void testNestedArrayLiteralsUseDeepEquality() {
+    Types.ListType listType =
+        Types.ListType.of(Types.ListType.of(Types.IntegerType.get(), false), false);
+    Literal<?> first = Literals.of(new Object[] {new Object[] {1, 2}, new Object[] {3}}, listType);
+    Literal<?> second = Literals.of(new Object[] {new Object[] {1, 2}, new Object[] {3}}, listType);
+
+    // Arrays.deepEquals/deepHashCode recurse into nested arrays; a shallow Arrays.equals would
+    // compare the inner arrays by reference and report these literals as unequal.
+    Assertions.assertEquals(first, second);
+    Assertions.assertEquals(first.hashCode(), second.hashCode());
+    Assertions.assertNotEquals(
+        first, Literals.of(new Object[] {new Object[] {1, 2}, new Object[] {4}}, listType));
+  }
+
+  @Test
+  public void testArrayLiteralNeverEqualsNonArrayLiteral() {
+    // Even when they share a dataType, an array value must not match a non-array value through the
+    // toString() fallback, keeping equals() consistent with the array-aware hashCode.
+    Types.BinaryType binary = Types.BinaryType.get();
+    Literal<?> arrayLiteral = Literals.of(new byte[] {1, 2, 3}, binary);
+    Literal<?> nonArrayLiteral = Literals.of("1, 2, 3", binary);
+
+    Assertions.assertNotEquals(arrayLiteral, nonArrayLiteral);
+    Assertions.assertNotEquals(nonArrayLiteral, arrayLiteral);
   }
 }
