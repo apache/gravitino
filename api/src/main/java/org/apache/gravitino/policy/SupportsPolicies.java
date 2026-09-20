@@ -19,7 +19,6 @@
 package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 
 /**
  * Interface for policy operations on a metadata object.
@@ -38,13 +37,4 @@ public interface SupportsPolicies {
    * @return The policies that apply to the metadata object.
    */
   Policy[] listPolicyInfos();
-
-  /**
-   * Get an applicable policy by its name for the metadata object.
-   *
-   * @param name The name of the policy.
-   * @return The policy.
-   * @throws NoSuchPolicyException If the policy does not apply to the object.
-   */
-  Policy getPolicy(String name) throws NoSuchPolicyException;
 }

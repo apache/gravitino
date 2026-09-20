@@ -30,7 +30,6 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.file.FilesetDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.policy.Policy;
@@ -163,11 +162,6 @@ class GenericFileset
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
   }
 
   @Override

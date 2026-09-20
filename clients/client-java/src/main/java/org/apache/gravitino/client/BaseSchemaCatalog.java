@@ -45,7 +45,6 @@ import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.dto.secret.SecretBindingDTO;
 import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -340,11 +339,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
   }
 
   @Override

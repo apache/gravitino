@@ -27,7 +27,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.model.ModelDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.model.Model;
@@ -162,10 +161,5 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
   }
 }

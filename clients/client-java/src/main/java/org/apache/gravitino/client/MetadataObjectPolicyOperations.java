@@ -18,16 +18,13 @@
  */
 package org.apache.gravitino.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
@@ -83,18 +80,5 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
     return Arrays.stream(resp.getPolicies())
         .map(policyDTO -> new GenericPolicy(policyDTO, restClient, metalakeName))
         .toArray(Policy[]::new);
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(name), "Policy name must not be null or empty");
-
-    return Arrays.stream(listPolicyInfos())
-        .filter(policy -> policy.name().equals(name))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new NoSuchPolicyException("Policy %s does not apply to the metadata object", name));
   }
 }

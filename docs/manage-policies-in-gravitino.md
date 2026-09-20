@@ -247,26 +247,6 @@ Policy[] policies = catalog.supportsPolicies().listPolicyInfos();
 </TabItem>
 </Tabs>
 
-### Get One Policy on an Object
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="REST">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/policies/retention_30d
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Policy policy = catalog.supportsPolicies().getPolicy("retention_30d");
-```
-
-</TabItem>
-</Tabs>
-
 ### List Objects Carrying a Policy
 
 The response lists direct attachments only, so a policy attached to a catalog returns that catalog
