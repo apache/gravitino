@@ -246,7 +246,7 @@ public class CatalogClickHouseIT extends BaseIT {
           FunctionExpression.of("now")),
       Column.of(
           CLICKHOUSE_COL_NAME3,
-          Types.VarCharType.of(255),
+          Types.StringType.get(),
           "col_3_comment",
           true,
           false,
@@ -882,7 +882,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col3 =
         Column.of(
             CLICKHOUSE_COL_NAME3,
-            Types.VarCharType.of(255),
+            Types.StringType.get(),
             "col_3_comment",
             true,
             false,
@@ -893,7 +893,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col5 =
         Column.of(
             CLICKHOUSE_COL_NAME5,
-            Types.VarCharType.of(255),
+            Types.StringType.get(),
             "col_5_comment",
             true,
             false,
@@ -942,7 +942,7 @@ public class CatalogClickHouseIT extends BaseIT {
               Literals.doubleLiteral(123.45)),
           Column.of(
               "string_col",
-              Types.VarCharType.of(255),
+              Types.StringType.get(),
               "string",
               false,
               false,
@@ -1631,13 +1631,13 @@ public class CatalogClickHouseIT extends BaseIT {
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")));
-    // Change default value of varchar
+    // Change default value of string
     catalog
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))));
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")));
 
     // Change default value of int
     catalog
@@ -1664,7 +1664,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -1681,7 +1681,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -1698,7 +1698,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -2104,7 +2104,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
+    Column col4 = Column.of("status", Types.StringType.get(), "code", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
     TableCatalog tableCatalog = catalog.asTableCatalog();
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "table");
@@ -2539,8 +2539,8 @@ public class CatalogClickHouseIT extends BaseIT {
   @Test
   void testClickHouseSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column col2 = Column.of("col_2", Types.StringType.get(), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.StringType.get(), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
