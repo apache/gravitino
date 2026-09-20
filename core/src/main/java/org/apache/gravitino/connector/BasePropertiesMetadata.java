@@ -105,7 +105,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
   /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
    * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
-   * RegisteredPropertyKeys#isSharedBaseOrCloudProperty}), or {@link RegisteredPropertyKeys}
+   * RegisteredPropertyKeys#isSharedCloudOrCredentialKey}), or {@link RegisteredPropertyKeys}
    * connector keys. Does not validate user-supplied entity property maps.
    */
   private void checkConnectorSpecificPropertiesRegistered(
@@ -115,7 +115,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
     }
     for (String name : specificEntries.keySet()) {
       if (BASIC_PROPERTY_ENTRIES.containsKey(name)
-          || RegisteredPropertyKeys.isSharedBaseOrCloudProperty(name)
+          || RegisteredPropertyKeys.isSharedCloudOrCredentialKey(name)
           || RegisteredPropertyKeys.isRegistered(name)) {
         continue;
       }

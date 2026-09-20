@@ -44,14 +44,27 @@ public class TestRegisteredPropertyKeys {
     Assertions.assertTrue(RegisteredPropertyKeys.isHidden("s3-secret-access-key"));
     Assertions.assertTrue(RegisteredPropertyKeys.isHidden("aws-secret-access-key"));
     Assertions.assertTrue(RegisteredPropertyKeys.isHidden("jdbc-password"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("location-unknown"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isHidden("presto_view"));
   }
 
   @Test
-  void testSharedBaseOrCloudProperties() {
-    Assertions.assertTrue(RegisteredPropertyKeys.isSharedBaseOrCloudProperty("s3-access-key-id"));
+  void testReservedMatchesConnectorDefinitions() {
+    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("in-use"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("PartitionName"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("presto_view"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isReserved("s3-access-key-id"));
+  }
+
+  @Test
+  void testSharedCloudOrCredentialKeys() {
+    Assertions.assertTrue(RegisteredPropertyKeys.isSharedCloudOrCredentialKey("s3-access-key-id"));
     Assertions.assertTrue(
-        RegisteredPropertyKeys.isSharedBaseOrCloudProperty("credential-providers"));
-    Assertions.assertFalse(RegisteredPropertyKeys.isSharedBaseOrCloudProperty("aws-access-key-id"));
+        RegisteredPropertyKeys.isSharedCloudOrCredentialKey("credential-providers"));
+    Assertions.assertTrue(
+        RegisteredPropertyKeys.isSharedCloudOrCredentialKey("adls-token-expire-in-secs"));
+    Assertions.assertFalse(
+        RegisteredPropertyKeys.isSharedCloudOrCredentialKey("aws-access-key-id"));
   }
 
   @Test
