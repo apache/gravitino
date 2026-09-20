@@ -17,8 +17,25 @@
  * under the License.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
-import authReducer, { getAuthMe, setAuthUser } from '@/lib/store/auth'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { configureStore } from '@reduxjs/toolkit'
+
+import { loginApi } from '@/lib/api/auth'
+import authReducer, { getAuthMe, refreshToken, setAuthUser } from '@/lib/store/auth'
+
+// The store reaches `@/lib/utils/axios`, which imports the JSX provider in
+// `@/lib/provider/session.js`. Mock the request layer so these tests stay
+// independent of it.
+vi.mock('@/lib/api/auth', () => ({
+  getAuthConfigsApi: vi.fn(),
+  getAuthMeApi: vi.fn(),
+  loginApi: vi.fn(),
+  basicLoginApi: vi.fn()
+}))
+
+vi.mock('@/lib/store/sys', () => ({
+  initialVersion: vi.fn(() => ({ type: 'sys/initialVersion/mock' }))
+}))
 
 describe('auth store', () => {
   beforeEach(() => {
@@ -49,5 +66,28 @@ describe('auth store', () => {
     state = authReducer(state, getAuthMe.fulfilled({ principal: 'admin', serviceAdmin: true }, 'request-id'))
     state = authReducer(state, setAuthUser(null))
     expect(state.isServiceAdmin).toBe(false)
+  })
+})
+
+describe('refreshToken', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  it('reads the token from the response body, as the login flow does', async () => {
+    // `loginApi` resolves to the response body, not to the Axios envelope.
+    loginApi.mockResolvedValue({ access_token: 'refreshed-token', expires_in: 499 })
+
+    const store = configureStore({ reducer: { auth: authReducer } })
+
+    const action = await store.dispatch(refreshToken())
+
+    expect(action.type).toBe(refreshToken.fulfilled.type)
+    expect(action.payload).toEqual({ token: 'refreshed-token', expiredIn: 499 })
+    expect(store.getState().auth.authToken).toBe('refreshed-token')
+    expect(localStorage.getItem('accessToken')).toBe('refreshed-token')
+    expect(localStorage.getItem('expiredIn')).toBe('499')
   })
 })
