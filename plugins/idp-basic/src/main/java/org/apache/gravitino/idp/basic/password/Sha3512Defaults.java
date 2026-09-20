@@ -28,11 +28,12 @@ public final class Sha3512Defaults {
   /**
    * Default iteration count for salted SHA3-512 password stretching.
    *
-   * <p>Reduced from {@code 100_000} to keep Basic authentication latency acceptable on typical
-   * server hardware while retaining a self-describing PHC cost parameter. Hashes stored with the
-   * previous iteration count are not accepted; users must reset their passwords after upgrade.
+   * <p>Reduced from {@code 100_000} to {@code 5_000} to keep Basic authentication latency
+   * acceptable on typical server hardware while retaining a self-describing PHC cost parameter.
+   * Hashes stored with the previous iteration count are not accepted; users must reset their
+   * passwords after upgrade.
    */
-  public static final int DEFAULT_ITERATIONS = 10_000;
+  public static final int DEFAULT_ITERATIONS = 5_000;
 
   /** PHC-style prefix for stored password hashes. */
   public static final String PHC_PREFIX = "$sha3-512$";
