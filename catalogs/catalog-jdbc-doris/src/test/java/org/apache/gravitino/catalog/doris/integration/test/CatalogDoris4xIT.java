@@ -155,6 +155,24 @@ public class CatalogDoris4xIT extends BaseIT {
   }
 
   @Test
+  void testTableCommentRoundTrip() {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "comment_roundtrip");
+    String comment = "crud probe";
+
+    tables.createTable(
+        tableIdentifier,
+        basicColumns(),
+        comment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null);
+
+    assertEquals(comment, tables.loadTable(tableIdentifier).comment());
+  }
+
+  @Test
   void testCreateTableWithInvertedIndex() {
     TableCatalog tc = catalog.asTableCatalog();
     NameIdentifier tid = NameIdentifier.of(schemaName, "t_inverted");
