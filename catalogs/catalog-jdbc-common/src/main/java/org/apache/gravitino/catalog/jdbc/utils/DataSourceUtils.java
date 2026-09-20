@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -76,11 +77,14 @@ public class DataSourceUtils {
     // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
     // to execute at connection time, and the H2 driver class must also be blocked to prevent
     // bypassing this check via a mismatched driver and URL combination.
-    String decodedUrl = recursiveDecode(jdbcConfig.getJdbcUrl().toLowerCase());
-    if (decodedUrl.startsWith("jdbc:h2")) {
+    String lowerUrl = jdbcConfig.getJdbcUrl().toLowerCase(Locale.ROOT);
+    boolean isH2Url =
+        JdbcUrlUtils.decodedFormsForScan(lowerUrl).stream()
+            .anyMatch(form -> form.startsWith("jdbc:h2"));
+    if (isH2Url) {
       throw new GravitinoRuntimeException("H2 JDBC URL is not allowed in catalog configuration");
     }
-    if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
+    if (jdbcConfig.getJdbcDriver().toLowerCase(Locale.ROOT).startsWith("org.h2.")) {
       throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
     }
     // Reject DBCP2 pool properties that load arbitrary classes via reflection before handing the
@@ -203,23 +207,6 @@ public class DataSourceUtils {
         }
       }
     }
-  }
-
-  private static String recursiveDecode(String url) {
-    String prev;
-    String decoded = url;
-    int max = 5;
-
-    do {
-      prev = decoded;
-      try {
-        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
-      }
-    } while (!prev.equals(decoded) && --max > 0);
-
-    return decoded;
   }
 
   public static void closeDataSource(DataSource dataSource) {
