@@ -381,14 +381,18 @@ public class TestGravitinoConfig {
   }
 
   @Test
-  public void testIcebergRestConfigRejectsSimpleAndKerberosAuthWithoutExplicitSecurity() {
+  public void testIcebergRestConfigMapsSimpleAuthToNone() {
     GravitinoConfig simpleConfig =
         new GravitinoConfig(
             ImmutableMap.of(
                 "gravitino.metalake", "user_001",
                 "gravitino.client.authType", "simple"));
-    assertThrows(TrinoException.class, simpleConfig::getIcebergRestCatalogConfig);
+    assertEquals(
+        "NONE", simpleConfig.getIcebergRestCatalogConfig().get("iceberg.rest-catalog.security"));
+  }
 
+  @Test
+  public void testIcebergRestConfigRejectsKerberosAuthWithoutExplicitSecurity() {
     GravitinoConfig kerberosConfig =
         new GravitinoConfig(
             ImmutableMap.of(

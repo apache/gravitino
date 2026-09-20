@@ -81,6 +81,15 @@ public class GravitinoConfig {
   /** The Trino Iceberg REST catalog property prefix. */
   private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
 
+  /**
+   * {@code gravitino.client.authType} values that authenticate the connector's own Gravitino client
+   * but have no representation in Trino's Iceberg REST security modes ({@code NONE}/{@code
+   * OAUTH2}). A catalog routed through the Iceberg REST server under one of these types sends no
+   * credentials to it unless {@code gravitino.iceberg.rest-catalog.security} is set explicitly.
+   */
+  private static final Set<String> AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT =
+      Set.of("basic", "kerberos");
+
   /** Prefix for environment-variable references propagated to dynamic catalogs. */
   static final String GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX =
       "gravitino.dynamic-catalog.environment-variable.";
@@ -822,15 +831,6 @@ public class GravitinoConfig {
   }
 
   /**
-   * {@code gravitino.client.authType} values that authenticate the connector's own Gravitino client
-   * but have no representation in Trino's Iceberg REST security modes ({@code NONE}/{@code
-   * OAUTH2}). A catalog routed through the Iceberg REST server under one of these types sends no
-   * credentials to it unless {@code gravitino.iceberg.rest-catalog.security} is set explicitly.
-   */
-  private static final Set<String> AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT =
-      Set.of("simple", "basic", "kerberos");
-
-  /**
    * Retrieves the properties passed through to the internal Trino Iceberg REST catalog, with the
    * {@code gravitino.iceberg.rest-catalog.} prefix rewritten to {@code iceberg.rest-catalog.}.
    *
@@ -843,7 +843,10 @@ public class GravitinoConfig {
     String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
     Map<String, String> restCatalogConfig = new HashMap<>();
 
-    if ("oauth2".equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))) {
+    String authType = config.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if ("simple".equalsIgnoreCase(authType)) {
+      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "NONE");
+    } else if ("oauth2".equalsIgnoreCase(authType)) {
       restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "OAUTH2");
       putIfNotBlank(
           restCatalogConfig,
@@ -877,11 +880,10 @@ public class GravitinoConfig {
 
   /**
    * Fails fast when the resolved Iceberg REST catalog config would send no credentials to the
-   * Iceberg REST server, yet the connector authenticates to Gravitino itself with a type — {@code
-   * simple}, {@code basic}, or {@code kerberos} — that Trino's Iceberg REST client cannot carry
-   * over. Left unchecked, such a catalog registers successfully and every query against it fails at
-   * {@code fetchConfig} once the REST server requires authentication, an error far removed from its
-   * cause.
+   * Iceberg REST server, yet the connector authenticates to Gravitino itself with {@code basic} or
+   * {@code kerberos}, which Trino's Iceberg REST client cannot carry over. Left unchecked, such a
+   * catalog registers successfully and every query against it fails at {@code fetchConfig} once the
+   * REST server requires authentication, an error far removed from its cause.
    */
   private void validateRestCatalogAuthentication(Map<String, String> restCatalogConfig) {
     if (restCatalogConfig.containsKey(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security")) {
