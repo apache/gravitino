@@ -27,7 +27,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class TestFilesetPropertiesMetadata extends TestBasePropertiesMetadata {
 
-  public static final String TEST_FILESET_HIDDEN_KEY = "fileset_key";
+  public static final String TEST_FILESET_HIDDEN_KEY = "jdbc-password";
 
   private static final Map<String, PropertyEntry<?>> TEST_FILESET_PROPERTY;
 
@@ -36,7 +36,7 @@ public class TestFilesetPropertiesMetadata extends TestBasePropertiesMetadata {
         ImmutableList.of(
             PropertyEntry.stringPropertyEntry(
                 TEST_FILESET_HIDDEN_KEY,
-                "test fileset required k1 property",
+                "test fileset hidden property",
                 false,
                 false,
                 "test",

@@ -103,20 +103,6 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
   }
 
   /**
-   * Returns whether connector-specific {@link #specificPropertyEntries()} must be registered in
-   * base, shared cloud/credential metadata, or {@link RegisteredPropertyKeys}.
-   *
-   * <p>Production connectors should leave the default {@code true}. Test stubs that use ad-hoc
-   * property names may return {@code false}. This does <strong>not</strong> restrict user-supplied
-   * entity property maps — only metadata definitions declared by connectors.
-   *
-   * @return true when connector-specific entries must appear in one of the registered key sets
-   */
-  protected boolean enforceRegisteredPropertyKeys() {
-    return true;
-  }
-
-  /**
    * Ensures every connector-specific property is registered in at least one of: shared base ({@link
    * #BASIC_PROPERTY_ENTRIES}), credential/cloud metadata ({@link
    * RegisteredPropertyKeys#isSharedBaseOrCloudProperty}), or {@link RegisteredPropertyKeys}
@@ -124,7 +110,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
    */
   private void checkConnectorSpecificPropertiesRegistered(
       Map<String, PropertyEntry<?>> specificEntries) {
-    if (!enforceRegisteredPropertyKeys() || specificEntries == null || specificEntries.isEmpty()) {
+    if (specificEntries == null || specificEntries.isEmpty()) {
       return;
     }
     for (String name : specificEntries.keySet()) {

@@ -37,9 +37,11 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String COMMENT_KEY = "comment";
 
-  public static final String TEST_REQUIRED_KEY = "k1";
+  /** Registered key reused as a required property in tests. */
+  public static final String TEST_REQUIRED_KEY = "uri";
 
-  public static final String TEST_IMMUTABLE_KEY = "immutableKey";
+  /** Registered key reused as an immutable property in tests. */
+  public static final String TEST_IMMUTABLE_KEY = "format";
 
   private static final Map<String, PropertyEntry<?>> TEST_BASE_PROPERTY;
 
@@ -47,7 +49,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> tablePropertyMetadata =
         ImmutableList.of(
             PropertyEntry.stringRequiredPropertyEntry(
-                TEST_REQUIRED_KEY, "test required k1 property", false, false),
+                TEST_REQUIRED_KEY, "test required uri property", false, false),
             PropertyEntry.stringReservedPropertyEntry(COMMENT_KEY, "table comment", true),
             PropertyEntry.stringImmutablePropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
@@ -60,12 +62,6 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     return TEST_BASE_PROPERTY;
   }
 
-  @Override
-  protected boolean enforceRegisteredPropertyKeys() {
-    // Ad-hoc test keys such as "k1" are not production connector definitions.
-    return false;
-  }
-
   @Test
   public void testGetPropertyEntryWithExistingProperty() {
     TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
@@ -74,7 +70,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
         metadata.getPropertyEntry(TestBasePropertiesMetadata.TEST_REQUIRED_KEY);
     assertNotNull(entry);
     assertEquals(TestBasePropertiesMetadata.TEST_REQUIRED_KEY, entry.getName());
-    assertEquals("test required k1 property", entry.getDescription());
+    assertEquals("test required uri property", entry.getDescription());
     assertTrue(entry.isRequired());
   }
 
