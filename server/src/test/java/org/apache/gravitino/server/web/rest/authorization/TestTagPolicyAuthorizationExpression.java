@@ -19,8 +19,10 @@
 package org.apache.gravitino.server.web.rest.authorization;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.APPLY_TAG_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -73,24 +75,17 @@ public class TestTagPolicyAuthorizationExpression {
   }
 
   @Test
-  public void testGetMetadataObjectPolicyWithViewOrApplyPrivilege()
-      throws ReflectiveOperationException, OgnlException {
+  public void testListMetadataObjectPoliciesRequiresMetadataAccess()
+      throws ReflectiveOperationException {
     Method method =
         MetadataObjectPolicyOperations.class.getDeclaredMethod(
-            "getPolicyForObject", String.class, String.class, String.class, String.class);
-    assertFalse(method.isAnnotationPresent(Deprecated.class));
+            "listPoliciesForMetadataObject",
+            String.class,
+            String.class,
+            String.class,
+            boolean.class);
 
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
-    MockAuthorizationExpressionEvaluator evaluator =
-        new MockAuthorizationExpressionEvaluator(
-            annotation.expression().replace("CAN_ACCESS_METADATA", "CATALOG::OWNER"));
-
-    assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::VIEW_POLICY", "CATALOG::OWNER")));
-    assertTrue(evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY", "CATALOG::OWNER")));
-    assertFalse(
-        evaluator.getResult(
-            ImmutableSet.of(
-                "POLICY::APPLY_POLICY", "POLICY::DENY_APPLY_POLICY", "CATALOG::OWNER")));
-    assertFalse(evaluator.getResult(ImmutableSet.of("POLICY::APPLY_POLICY")));
+    assertEquals(CAN_ACCESS_METADATA, annotation.expression());
   }
 }
