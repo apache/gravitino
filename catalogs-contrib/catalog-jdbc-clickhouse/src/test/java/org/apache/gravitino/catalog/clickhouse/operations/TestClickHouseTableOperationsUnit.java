@@ -82,6 +82,10 @@ public class TestClickHouseTableOperationsUnit {
                 .withNullable(false)
                 .build()
           };
+      return callGenerateCreateTableSql(columns, properties);
+    }
+
+    String callGenerateCreateTableSql(JdbcColumn[] columns, Map<String, String> properties) {
       return generateCreateTableSql(
           "test_table",
           columns,
@@ -110,6 +114,24 @@ public class TestClickHouseTableOperationsUnit {
 
   private ExposedClickHouseTableOperations newOps() {
     return newOps(null);
+  }
+
+  @Test
+  void testCreateTableRejectsVarchar() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("name")
+              .withType(Types.VarCharType.of(64))
+              .withNullable(true)
+              .build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> newOps().callGenerateCreateTableSql(columns, Map.of()));
+    Assertions.assertTrue(exception.getMessage().contains("ClickHouse does not support varchar"));
   }
 
   private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
@@ -445,6 +467,114 @@ public class TestClickHouseTableOperationsUnit {
         "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
     Assertions.assertEquals(
         "0", settings.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+  }
+
+  @Test
+  void testParseSettingsPreservesQuotedAndNestedValues() {
+    ExposedClickHouseTableOperations ops = newOps();
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY id SETTINGS "
+                + "quoted =  'id,COMMENT,name,val', "
+                + "escaped = 'a\\'b\\\\c', "
+                + "doubled = 'a''b,c', "
+                + "double_quoted = \"a,b\"\"c\", "
+                + "nested = custom(`a,b`, tuple(1, 2), 'x=y,z')");
+
+    Assertions.assertEquals(5, settings.size());
+    Assertions.assertEquals(
+        "'id,COMMENT,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
+    Assertions.assertEquals(
+        "'a\\'b\\\\c'", settings.get(TableConstants.SETTINGS_PREFIX + "escaped"));
+    Assertions.assertEquals("'a''b,c'", settings.get(TableConstants.SETTINGS_PREFIX + "doubled"));
+    Assertions.assertEquals(
+        "\"a,b\"\"c\"", settings.get(TableConstants.SETTINGS_PREFIX + "double_quoted"));
+    Assertions.assertEquals(
+        "custom(`a,b`, tuple(1, 2), 'x=y,z')",
+        settings.get(TableConstants.SETTINGS_PREFIX + "nested"));
+  }
+
+  @Test
+  void testParseSettingsFindsLastTopLevelClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplacingMergeTree(`SETTINGS version`) ORDER BY id SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplicatedMergeTree('path SETTINGS ignored') ORDER BY id "
+                + "SETTINGS index_granularity = 4096");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY settings SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testParseSettingsRejectsMalformedMetadataBeforeClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] malformedEngineFull = {
+      "MergeTree(broken SETTINGS index_granularity = 8192",
+      "MergeTree('broken SETTINGS index_granularity = 8192",
+      "MergeTree ORDER BY 'oops SETTINGS index_granularity = 1",
+      "MergeTree() ORDER BY id) SETTINGS index_granularity = 8192"
+    };
+
+    for (String engineFull : malformedEngineFull) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> ops.parseSettingsFromEngineFull(engineFull));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
+  }
+
+  @Test
+  void testParseSettingsPreservesLastDuplicateValue() {
+    Map<String, String> settings =
+        newOps()
+            .parseSettingsFromEngineFull(
+                "MergeTree ORDER BY id SETTINGS duplicate = 1, duplicate = 'last,value'");
+
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "'last,value'", settings.get(TableConstants.SETTINGS_PREFIX + "duplicate"));
+  }
+
+  @Test
+  void testParseSettingsRejectsStructurallyInvalidMetadata() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidSettings = {
+      "missing_equals",
+      "= 1",
+      "key = ",
+      ", key = 1",
+      "key = 1,",
+      "key = 1,, other = 2",
+      "key = 'unterminated",
+      "key = custom(1, 2",
+      "key = value)"
+    };
+
+    for (String invalidSetting : invalidSettings) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.parseSettingsFromEngineFull(
+                      "MergeTree ORDER BY id SETTINGS " + invalidSetting));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
   }
 
   @Test

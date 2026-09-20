@@ -1712,6 +1712,60 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testAliasConflictRollsBackModelVersionRegistration() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity first =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "first_path"),
+            ImmutableList.of("taken_alias"),
+            "first",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(first);
+    ModelPO beforeFailure = ModelMetaService.getInstance().getModelPOById(model.id());
+    ModelVersionEntity conflicting =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "second_path"),
+            ImmutableList.of("taken_alias"),
+            "must roll back",
+            properties,
+            AUDIT_INFO);
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(conflicting));
+
+    ModelPO afterFailure = ModelMetaService.getInstance().getModelPOById(model.id());
+    Assertions.assertEquals(beforeFailure.getCurrentVersion(), afterFailure.getCurrentVersion());
+    Assertions.assertEquals(beforeFailure.getLastVersion(), afterFailure.getLastVersion());
+    Assertions.assertEquals(
+        beforeFailure.getModelLatestVersion(), afterFailure.getModelLatestVersion());
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.selectModelVersionMeta(model.id(), conflicting.version()))
+            .isEmpty());
+    ModelVersionEntity unchanged =
+        ModelVersionMetaService.getInstance().getModelVersionByIdentifier(first.nameIdentifier());
+    Assertions.assertEquals(ImmutableList.of("taken_alias"), unchanged.aliases());
+    Assertions.assertEquals("first", unchanged.comment());
+  }
+
+  @TestTemplate
   void testDeleteModelVersionsByLegacyTimeline() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
