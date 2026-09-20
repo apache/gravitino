@@ -557,7 +557,9 @@ public class TestIcebergCatalogPropertyConverter {
 
     // With authType=simple no iceberg.rest-catalog.security is emitted, so the REST catalog has no
     // token endpoint to exchange Trino's subject JWT at and the per-user session mode must stay
-    // off.
+    // off. The explicit security=NONE override stands in for a deployment that confirmed its REST
+    // server needs no authentication; without it, authType=simple now fails catalog registration
+    // rather than silently sending no credentials.
     Map<String, String> config =
         buildConnectorConfig(
             "catalog1",
@@ -565,7 +567,8 @@ public class TestIcebergCatalogPropertyConverter {
             icebergRestConfiguredConfig(
                 ImmutableMap.of(
                     "gravitino.client.session.forwardUser", "true",
-                    "gravitino.client.authType", "simple")));
+                    "gravitino.client.authType", "simple",
+                    "gravitino.iceberg.rest-catalog.security", "NONE")));
     Assertions.assertNull(config.get("iceberg.rest-catalog.session"));
   }
 

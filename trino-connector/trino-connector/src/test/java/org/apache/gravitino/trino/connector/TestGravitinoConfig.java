@@ -366,6 +366,51 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void testIcebergRestConfigRejectsBasicAuthWithoutExplicitSecurity() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "basic",
+                "gravitino.client.basic.username", "admin",
+                "gravitino.client.basic.password", "admin-pass"));
+
+    TrinoException e = assertThrows(TrinoException.class, config::getIcebergRestCatalogConfig);
+    assertTrue(e.getMessage().contains("gravitino.client.authType=basic"));
+    assertTrue(e.getMessage().contains("gravitino.iceberg.rest-catalog.security"));
+  }
+
+  @Test
+  public void testIcebergRestConfigRejectsSimpleAndKerberosAuthWithoutExplicitSecurity() {
+    GravitinoConfig simpleConfig =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "simple"));
+    assertThrows(TrinoException.class, simpleConfig::getIcebergRestCatalogConfig);
+
+    GravitinoConfig kerberosConfig =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "KERBEROS"));
+    assertThrows(TrinoException.class, kerberosConfig::getIcebergRestCatalogConfig);
+  }
+
+  @Test
+  public void testIcebergRestConfigAllowsBasicAuthWithExplicitSecurityOverride() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "basic",
+                "gravitino.iceberg.rest-catalog.security", "NONE"));
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals("NONE", restCatalogConfig.get("iceberg.rest-catalog.security"));
+  }
+
+  @Test
   public void testIcebergRestOAuthDefaultsToGravitinoClientOAuth() {
     GravitinoConfig config =
         new GravitinoConfig(
