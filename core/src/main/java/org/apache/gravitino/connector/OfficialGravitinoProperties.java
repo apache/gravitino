@@ -79,24 +79,30 @@ public final class OfficialGravitinoProperties {
               "aws-glue-catalog-id",
               "aws-glue-endpoint")
           .add(
+              "aws-region",
               "aws-secret-access-key",
               "azure-client-id",
               "azure-client-secret",
-              "azure-storage-account-key",
-              "azure-storage-account-name")
+              "azure-storage-account-key")
           .add(
+              "azure-storage-account-name",
               "azure-tenant-id",
               "bloom_filter_columns",
               "bucket",
-              "bucket-key",
-              "cherry-pick-snapshot-id")
+              "bucket-key")
           .add(
+              "cherry-pick-snapshot-id",
               "cloud.name",
               "cloud.region-code",
               "cluster-name",
-              "cluster-remote-database",
-              "cluster-remote-table")
-          .add("cluster-sharding-key", "comment", "compression", "cos-access-key-id", "cos-app-id")
+              "cluster-remote-database")
+          .add(
+              "cluster-remote-table",
+              "cluster-sharding-key",
+              "comment",
+              "compression",
+              "cos-access-key-id")
+          .add("cos-app-id")
           .add(
               "cos-endpoint",
               "cos-external-id",
