@@ -575,14 +575,14 @@ public class DorisTableOperations extends JdbcTableOperations {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
         String dorisIndexType = hasIndexType ? resultSet.getString("Index_type") : null;
-        // Doris always names the primary key index "PRIMARY"; detect it first.
+        // Preserve the legacy PRIMARY mapping unless authoritative metadata identifies NGRAM_BF,
+        // which must fail closed.
         Index.IndexType gravitinoIndexType;
-        if ("PRIMARY".equals(indexName)) {
+        if ("PRIMARY".equals(indexName) && !"NGRAM_BF".equalsIgnoreCase(dorisIndexType)) {
           gravitinoIndexType = Index.IndexType.PRIMARY_KEY;
         } else if (hasIndexType) {
           gravitinoIndexType = mapDorisIndexType(dorisIndexType, indexName);
         } else {
-          // Doris 1.2.x: no Index_type column, infer from index name
           gravitinoIndexType = mapDorisIndexType(null, indexName);
         }
         Map<String, String> indexProperties = Collections.emptyMap();
@@ -633,6 +633,10 @@ public class DorisTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case "ANN":
         return Index.IndexType.VECTOR;
+      case "NGRAM_BF":
+        throw new UnsupportedOperationException(
+            String.format(
+                "Doris index '%s' uses unsupported native index type 'NGRAM_BF'", indexName));
       default:
         LOG.warn(
             "Unknown Doris index type '{}' for index '{}', falling back to INVERTED",
