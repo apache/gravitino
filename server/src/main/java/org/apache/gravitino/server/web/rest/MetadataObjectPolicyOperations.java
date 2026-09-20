@@ -139,5 +139,4 @@ public class MetadataObjectPolicyOperations {
       return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", fullName, e);
     }
   }
-
 }

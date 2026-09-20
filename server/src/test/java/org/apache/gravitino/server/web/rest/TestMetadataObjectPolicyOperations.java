@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -400,6 +401,23 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     }
     Mockito.verify(policyManager, Mockito.never())
         .listPolicyInfosForMetadataObject(metalake, schema);
+  }
+
+  @Test
+  public void testRemovedObjectPolicyEndpoints() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    String path =
+        basePath(metalake) + "/" + catalog.type() + "/" + catalog.fullName() + "/policies";
+
+    Response singlePolicyResponse =
+        target(path).path("policy1").request(MediaType.APPLICATION_JSON_TYPE).get();
+    Assertions.assertEquals(
+        Response.Status.NOT_FOUND.getStatusCode(), singlePolicyResponse.getStatus());
+
+    Response associationResponse =
+        target(path).request(MediaType.APPLICATION_JSON_TYPE).post(Entity.json("{}"));
+    Assertions.assertEquals(
+        Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), associationResponse.getStatus());
   }
 
   private String basePath(String metalake) {
