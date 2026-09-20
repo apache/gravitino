@@ -67,17 +67,21 @@ public class TestCloudStorageCredentialPropertyKeys {
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_REGION));
 
-    // Secret-bearing keys from Glue/Paimon-DLF are static credentials.
+    // Azure client secret is a cloud-storage static credential and is stripped.
     assertTrue(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
-    assertTrue(
+
+    // Glue/Paimon-DLF secrets are catalog/metastore-connection credentials, not cloud-storage
+    // secrets in the fileset properties map this filter governs; they never reach it (declared
+    // hidden and outside FilesetCatalogPropertiesMetadata), so this set must not claim them.
+    assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             GlueConstants.AWS_SECRET_ACCESS_KEY));
-    assertTrue(
+    assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
-    assertTrue(
+    assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
 
@@ -90,24 +94,18 @@ public class TestCloudStorageCredentialPropertyKeys {
   }
 
   @Test
-  void testModuleSecretKeysStrippedButAccessKeyIdsSurvive() {
+  void testAzureClientSecretStrippedButAccessKeyIdsSurvive() {
     Map<String, String> input =
         Map.of(
             AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "aad-secret",
             GlueConstants.AWS_ACCESS_KEY_ID, "ak",
-            GlueConstants.AWS_SECRET_ACCESS_KEY, "sk",
-            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak",
-            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk",
-            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, "dlf-token");
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
 
     Map<String, String> filtered =
         CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
 
-    // The four secret-bearing keys must be stripped.
+    // azure-client-secret is the sole branch-added cloud-storage secret this filter strips.
     assertFalse(filtered.containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
-    assertFalse(filtered.containsKey(GlueConstants.AWS_SECRET_ACCESS_KEY));
-    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
-    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
 
     // Access key IDs are non-hidden identifiers and must survive in properties().
     assertEquals("ak", filtered.get(GlueConstants.AWS_ACCESS_KEY_ID));
