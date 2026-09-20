@@ -197,4 +197,9 @@ public class HiveClientImpl implements HiveClient {
       throw ExceptionMessages.wrap("Failed to get current user", e);
     }
   }
+
+  @Override
+  public HiveClientClassLoader.HiveVersion hiveVersion() {
+    return shim.hiveVersion();
+  }
 }

@@ -22,26 +22,54 @@ import static org.apache.gravitino.hive.client.Util.updateConfigurationFromPrope
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
+import org.apache.gravitino.hive.converter.HiveColumnDefaultValueConverter;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.utils.RandomNameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class HiveShimV3 extends HiveShimV2 {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HiveShimV3.class);
+
   private static final String CATALOG_CLASS = "org.apache.hadoop.hive.metastore.api.Catalog";
+  private static final String NOT_NULL_CONSTRAINT_CLASS =
+      "org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint";
+  private static final String DEFAULT_CONSTRAINT_CLASS =
+      "org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint";
+  private static final String NOT_NULL_CONSTRAINTS_REQUEST_CLASS =
+      "org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest";
+  private static final String DEFAULT_CONSTRAINTS_REQUEST_CLASS =
+      "org.apache.hadoop.hive.metastore.api.DefaultConstraintsRequest";
+  // Keeps generated constraint names well within the metastore's 400 character limit
+  private static final int MAX_CONSTRAINT_PREFIX = 128;
+  // Constraints are recorded for metadata only: enabled, not validated against existing data,
+  // and relied upon by the optimizer
+  private static final boolean CONSTRAINT_ENABLE = true;
+  private static final boolean CONSTRAINT_VALIDATE = false;
+  private static final boolean CONSTRAINT_RELY = true;
 
   private final Method createDatabaseMethod;
   private final Method getDatabaseMethod;
@@ -73,6 +101,23 @@ class HiveShimV3 extends HiveShimV2 {
 
   private final Class<?> catalogClass;
   private final Constructor<?> catalogCreator;
+
+  // Column constraint support (NOT NULL / DEFAULT), available since Hive 3.0
+  private final Method createTableWithConstraintsMethod;
+  private final Method getNotNullConstraintsMethod;
+  private final Method getDefaultConstraintsMethod;
+  private final Method addNotNullConstraintMethod;
+  private final Method addDefaultConstraintMethod;
+  private final Method dropConstraintMethod;
+  private final Constructor<?> notNullConstraintCreator;
+  private final Constructor<?> defaultConstraintCreator;
+  private final Constructor<?> notNullConstraintsRequestCreator;
+  private final Constructor<?> defaultConstraintsRequestCreator;
+  private final Method notNullConstraintColumnNameMethod;
+  private final Method notNullConstraintNameMethod;
+  private final Method defaultConstraintColumnNameMethod;
+  private final Method defaultConstraintNameMethod;
+  private final Method defaultConstraintValueMethod;
 
   HiveShimV3(Properties properties) {
     super(HIVE3, properties);
@@ -158,6 +203,66 @@ class HiveShimV3 extends HiveShimV2 {
       this.catalogCreator = this.catalogClass.getDeclaredConstructor(String.class, String.class);
       this.createCatalogMethod = IMetaStoreClient.class.getMethod("createCatalog", catalogClass);
       this.catalogSetDescriptionMethod = catalogClass.getMethod("setDescription", String.class);
+
+      ClassLoader classLoader = this.getClass().getClassLoader();
+      Class<?> notNullConstraintClass = classLoader.loadClass(NOT_NULL_CONSTRAINT_CLASS);
+      Class<?> defaultConstraintClass = classLoader.loadClass(DEFAULT_CONSTRAINT_CLASS);
+      Class<?> notNullRequestClass = classLoader.loadClass(NOT_NULL_CONSTRAINTS_REQUEST_CLASS);
+      Class<?> defaultRequestClass = classLoader.loadClass(DEFAULT_CONSTRAINTS_REQUEST_CLASS);
+      this.createTableWithConstraintsMethod =
+          IMetaStoreClient.class.getMethod(
+              "createTableWithConstraints",
+              Table.class,
+              List.class,
+              List.class,
+              List.class,
+              List.class,
+              List.class,
+              List.class);
+      this.getNotNullConstraintsMethod =
+          IMetaStoreClient.class.getMethod("getNotNullConstraints", notNullRequestClass);
+      this.getDefaultConstraintsMethod =
+          IMetaStoreClient.class.getMethod("getDefaultConstraints", defaultRequestClass);
+      this.addNotNullConstraintMethod =
+          IMetaStoreClient.class.getMethod("addNotNullConstraint", List.class);
+      this.addDefaultConstraintMethod =
+          IMetaStoreClient.class.getMethod("addDefaultConstraint", List.class);
+      this.dropConstraintMethod =
+          IMetaStoreClient.class.getMethod(
+              "dropConstraint", String.class, String.class, String.class, String.class);
+      // (catName, dbName, tableName, columnName, constraintName, enable, validate, rely)
+      this.notNullConstraintCreator =
+          notNullConstraintClass.getConstructor(
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              boolean.class,
+              boolean.class,
+              boolean.class);
+      // (catName, dbName, tableName, columnName, defaultValue, constraintName, enable, validate,
+      // rely)
+      this.defaultConstraintCreator =
+          defaultConstraintClass.getConstructor(
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              boolean.class,
+              boolean.class,
+              boolean.class);
+      this.notNullConstraintsRequestCreator =
+          notNullRequestClass.getConstructor(String.class, String.class, String.class);
+      this.defaultConstraintsRequestCreator =
+          defaultRequestClass.getConstructor(String.class, String.class, String.class);
+      this.notNullConstraintColumnNameMethod = notNullConstraintClass.getMethod("getColumn_name");
+      this.notNullConstraintNameMethod = notNullConstraintClass.getMethod("getNn_name");
+      this.defaultConstraintColumnNameMethod = defaultConstraintClass.getMethod("getColumn_name");
+      this.defaultConstraintNameMethod = defaultConstraintClass.getMethod("getDc_name");
+      this.defaultConstraintValueMethod = defaultConstraintClass.getMethod("getDefault_value");
 
       // SetCatalogName methods for Hive3
       this.databaseSetCatalogNameMethod =
@@ -298,7 +403,9 @@ class HiveShimV3 extends HiveShimV2 {
                 catalogName,
                 databaseName,
                 tableName);
-    return HiveTableConverter.fromHiveTable(tb);
+    ColumnConstraints constraints = loadColumnConstraints(catalogName, databaseName, tableName);
+    return HiveTableConverter.fromHiveTable(
+        tb, notNullColumns(tableName, constraints), defaultValues(tableName, constraints));
   }
 
   @Override
@@ -311,8 +418,9 @@ class HiveShimV3 extends HiveShimV2 {
     var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
     invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
     if (skipStatsUpdate) {
-      // Instruct the metastore not to recompute statistics for this alter, so it does not access
-      // the table's storage location.
+      // Property-only and comment-only alters cannot change columns, so the constraints stay as
+      // they are. Instruct the metastore not to recompute statistics for this alter, so it does
+      // not access the table's storage location.
       invoke(
           ExceptionTarget.table(tableName),
           client,
@@ -322,7 +430,23 @@ class HiveShimV3 extends HiveShimV2 {
           tableName,
           tb,
           doNotUpdateStatsContext());
-    } else {
+      return;
+    }
+
+    // The Thrift Table passed to alter_table carries no constraint information, so constraints
+    // are rewritten around it: the existing ones are dropped first (while their columns and the
+    // old table name still exist) and the desired set is added after the alter (once new columns
+    // and names are in place). The desired set is built before the first metastore write so that
+    // an unconvertible default value leaves the table untouched.
+    ColumnConstraints existing = loadColumnConstraints(catalogName, databaseName, tableName);
+    ColumnConstraints desired =
+        buildColumnConstraints(
+            catalogName,
+            alteredHiveTable.databaseName(),
+            alteredHiveTable.name(),
+            alteredHiveTable.columns());
+    dropColumnConstraints(catalogName, databaseName, tableName, existing);
+    try {
       invoke(
           ExceptionTarget.table(tableName),
           client,
@@ -331,6 +455,22 @@ class HiveShimV3 extends HiveShimV2 {
           databaseName,
           tableName,
           tb);
+    } catch (RuntimeException e) {
+      // The table is unchanged, so the dropped constraints can be put back as they were.
+      restoreColumnConstraints(databaseName, tableName, existing, e);
+      throw e;
+    }
+    try {
+      addColumnConstraints(alteredHiveTable.name(), desired);
+    } catch (RuntimeException e) {
+      LOG.error(
+          "Table {}.{} was altered but its column constraints {} could not be re-created; "
+              + "the NOT NULL and DEFAULT constraints must be re-applied manually",
+          alteredHiveTable.databaseName(),
+          alteredHiveTable.name(),
+          desired.names,
+          e);
+      throw e;
     }
   }
 
@@ -357,7 +497,24 @@ class HiveShimV3 extends HiveShimV2 {
     String catalogName = hiveTable.catalogName();
     var tb = HiveTableConverter.toHiveTable(hiveTable);
     invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
-    invoke(ExceptionTarget.table(hiveTable.name()), client, createTableMethod, tb);
+    ColumnConstraints constraints =
+        buildColumnConstraints(
+            catalogName, hiveTable.databaseName(), hiveTable.name(), hiveTable.columns());
+    if (constraints.isEmpty()) {
+      invoke(ExceptionTarget.table(hiveTable.name()), client, createTableMethod, tb);
+      return;
+    }
+    invoke(
+        ExceptionTarget.table(hiveTable.name()),
+        client,
+        createTableWithConstraintsMethod,
+        tb,
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        constraints.notNulls,
+        constraints.defaults,
+        Collections.emptyList());
   }
 
   @Override
@@ -495,6 +652,155 @@ class HiveShimV3 extends HiveShimV2 {
       invoke(ExceptionTarget.other(catalogName), catalog, catalogSetDescriptionMethod, description);
     }
     invoke(ExceptionTarget.catalog(catalogName), client, createCatalogMethod, catalog);
+  }
+
+  /** NOT NULL and DEFAULT constraints of a table, as Hive metastore constraint objects. */
+  private static class ColumnConstraints {
+    // SQLNotNullConstraint objects
+    final List<Object> notNulls = new ArrayList<>();
+    // SQLDefaultConstraint objects
+    final List<Object> defaults = new ArrayList<>();
+    // constraint names of both kinds
+    final Set<String> names = new HashSet<>();
+
+    boolean isEmpty() {
+      return notNulls.isEmpty() && defaults.isEmpty();
+    }
+  }
+
+  private ColumnConstraints loadColumnConstraints(
+      String catalogName, String databaseName, String tableName) {
+    ExceptionTarget target = ExceptionTarget.table(tableName);
+    ColumnConstraints constraints = new ColumnConstraints();
+    Object notNullRequest =
+        invoke(target, notNullConstraintsRequestCreator, catalogName, databaseName, tableName);
+    for (Object constraint : invokeList(target, getNotNullConstraintsMethod, notNullRequest)) {
+      constraints.notNulls.add(constraint);
+      constraints.names.add((String) invoke(target, constraint, notNullConstraintNameMethod));
+    }
+    Object defaultRequest =
+        invoke(target, defaultConstraintsRequestCreator, catalogName, databaseName, tableName);
+    for (Object constraint : invokeList(target, getDefaultConstraintsMethod, defaultRequest)) {
+      constraints.defaults.add(constraint);
+      constraints.names.add((String) invoke(target, constraint, defaultConstraintNameMethod));
+    }
+    return constraints;
+  }
+
+  private Set<String> notNullColumns(String tableName, ColumnConstraints constraints) {
+    ExceptionTarget target = ExceptionTarget.table(tableName);
+    Set<String> columns = new HashSet<>();
+    for (Object constraint : constraints.notNulls) {
+      columns.add((String) invoke(target, constraint, notNullConstraintColumnNameMethod));
+    }
+    return columns;
+  }
+
+  private Map<String, String> defaultValues(String tableName, ColumnConstraints constraints) {
+    ExceptionTarget target = ExceptionTarget.table(tableName);
+    Map<String, String> values = new HashMap<>();
+    for (Object constraint : constraints.defaults) {
+      values.put(
+          (String) invoke(target, constraint, defaultConstraintColumnNameMethod),
+          (String) invoke(target, constraint, defaultConstraintValueMethod));
+    }
+    return values;
+  }
+
+  private void dropColumnConstraints(
+      String catalogName, String databaseName, String tableName, ColumnConstraints constraints) {
+    for (String constraintName : constraints.names) {
+      invoke(
+          ExceptionTarget.table(tableName),
+          client,
+          dropConstraintMethod,
+          catalogName,
+          databaseName,
+          tableName,
+          constraintName);
+    }
+  }
+
+  private void addColumnConstraints(String tableName, ColumnConstraints constraints) {
+    ExceptionTarget target = ExceptionTarget.table(tableName);
+    if (!constraints.notNulls.isEmpty()) {
+      invoke(target, client, addNotNullConstraintMethod, constraints.notNulls);
+    }
+    if (!constraints.defaults.isEmpty()) {
+      invoke(target, client, addDefaultConstraintMethod, constraints.defaults);
+    }
+  }
+
+  private void restoreColumnConstraints(
+      String databaseName, String tableName, ColumnConstraints constraints, Exception cause) {
+    try {
+      addColumnConstraints(tableName, constraints);
+    } catch (RuntimeException restoreFailure) {
+      cause.addSuppressed(restoreFailure);
+      LOG.error(
+          "Failed to restore column constraints {} of table {}.{} after a failed alter; "
+              + "the NOT NULL and DEFAULT constraints must be re-applied manually",
+          constraints.names,
+          databaseName,
+          tableName,
+          restoreFailure);
+    }
+  }
+
+  private ColumnConstraints buildColumnConstraints(
+      String catalogName, String databaseName, String tableName, Column[] columns) {
+    ExceptionTarget target = ExceptionTarget.table(tableName);
+    ColumnConstraints constraints = new ColumnConstraints();
+    for (Column column : columns) {
+      if (!column.nullable()) {
+        String name = constraintName(tableName, column.name(), "nn");
+        constraints.notNulls.add(
+            invoke(
+                target,
+                notNullConstraintCreator,
+                catalogName,
+                databaseName,
+                tableName,
+                column.name(),
+                name,
+                CONSTRAINT_ENABLE,
+                CONSTRAINT_VALIDATE,
+                CONSTRAINT_RELY));
+        constraints.names.add(name);
+      }
+      String defaultValue = HiveColumnDefaultValueConverter.fromGravitino(column.defaultValue());
+      if (defaultValue != null) {
+        String name = constraintName(tableName, column.name(), "dv");
+        constraints.defaults.add(
+            invoke(
+                target,
+                defaultConstraintCreator,
+                catalogName,
+                databaseName,
+                tableName,
+                column.name(),
+                defaultValue,
+                name,
+                CONSTRAINT_ENABLE,
+                CONSTRAINT_VALIDATE,
+                CONSTRAINT_RELY));
+        constraints.names.add(name);
+      }
+    }
+    return constraints;
+  }
+
+  private static String constraintName(String tableName, String columnName, String suffix) {
+    // Constraint names are unique across the whole metastore and the prefix does not include the
+    // database name, so a random suffix keeps same-named tables in different databases apart.
+    // The prefix is bounded so the name fits the metastore's constraint name column.
+    String prefix = StringUtils.left(tableName + "_" + columnName, MAX_CONSTRAINT_PREFIX);
+    return RandomNameUtils.genRandomName(prefix + "_" + suffix);
+  }
+
+  private List<?> invokeList(ExceptionTarget target, Method method, Object request) {
+    List<?> result = (List<?>) invoke(target, client, method, request);
+    return result == null ? Collections.emptyList() : result;
   }
 
   /**

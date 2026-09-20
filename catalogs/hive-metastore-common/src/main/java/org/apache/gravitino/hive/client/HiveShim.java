@@ -51,6 +51,16 @@ public abstract class HiveShim {
 
   public abstract IMetaStoreClient createMetaStoreClient(Properties properties);
 
+  /**
+   * Returns the Hive version this shim was created for, which is the version Gravitino detected for
+   * the connected metastore.
+   *
+   * @return The Hive version of this shim.
+   */
+  public HiveClientClassLoader.HiveVersion hiveVersion() {
+    return version;
+  }
+
   public List<String> getAllDatabases(String catalogName) {
     try {
       return client.getAllDatabases();

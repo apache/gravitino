@@ -23,14 +23,17 @@ import static org.apache.gravitino.catalog.hive.HiveCatalog.SCHEMA_PROPERTIES_ME
 import static org.apache.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -105,6 +108,30 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
       Assertions.assertTrue(dbs.contains("default"));
       Assertions.assertTrue(dbs.contains(DB_NAME));
     }
+  }
+
+  @Test
+  void testCapabilityResolvedBeforeOps() {
+    // The capability is preloaded by the catalog manager before the operations are created, so
+    // it must be able to resolve the metastore version on its own.
+    HiveCatalog catalog = TestHiveTable.initHiveCatalog();
+    CapabilityResult notNull = catalog.capability().columnNotNull();
+    Assertions.assertFalse(notNull.supported());
+    Assertions.assertTrue(
+        notNull.unsupportedMessage().contains("HIVE2"), notNull.unsupportedMessage());
+    Assertions.assertFalse(catalog.capability().columnDefaultValue().supported());
+  }
+
+  @Test
+  void testCapabilityWithCustomOperations() {
+    HiveCatalog catalog =
+        TestHiveTable.initHiveCatalog(
+            ImmutableMap.of(
+                BaseCatalog.CATALOG_OPERATION_IMPL, HiveCatalogOperations.class.getName()));
+    CapabilityResult notNull = catalog.capability().columnNotNull();
+    Assertions.assertFalse(notNull.supported());
+    Assertions.assertTrue(
+        notNull.unsupportedMessage().contains("HIVE2"), notNull.unsupportedMessage());
   }
 
   @Test

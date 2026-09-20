@@ -23,6 +23,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
@@ -54,13 +55,12 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HiveCatalogOperations ops = new HiveCatalogOperations();
-    return ops;
+    return new HiveCatalogOperations();
   }
 
   @Override
   public Capability newCapability() {
-    return new HiveCatalogCapability();
+    return new HiveCatalogCapability(this::hiveVersion);
   }
 
   @Override
@@ -76,5 +76,18 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return TABLE_PROPERTIES_METADATA;
+  }
+
+  /**
+   * Resolves the Hive Metastore version through the catalog operations. The capability may be
+   * queried before the operations are created (they are initialized on first use), so this goes
+   * through {@link #ops()} to force initialization. Custom catalog operations (ops-impl) do not
+   * expose the metastore version, so only what every supported Hive version accepts is allowed.
+   */
+  private HiveVersion hiveVersion() {
+    CatalogOperations ops = ops();
+    return ops instanceof HiveCatalogOperations
+        ? ((HiveCatalogOperations) ops).hiveVersion()
+        : HiveVersion.HIVE2;
   }
 }
