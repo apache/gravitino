@@ -419,7 +419,7 @@ public class HiveTableConverter {
             .withType(type)
             .withNullable(!notNullColumns.contains(name))
             .withDefaultValue(
-                HiveColumnDefaultValueConverter.toGravitino(type, defaultValues.get(name)));
+                HiveColumnDefaultValueConverter.toGravitino(type, defaultValues.get(name), name));
     if (comment != null) {
       builder.withComment(comment);
     }

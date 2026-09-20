@@ -93,7 +93,17 @@ public class HiveColumnDefaultValueConverter {
       if (type instanceof Types.TimestampType && literal.value() instanceof LocalDateTime) {
         return quote(((LocalDateTime) literal.value()).format(DATE_TIME_FORMATTER));
       }
-      return quote(literal.value().toString());
+      if (type instanceof Types.StringType
+          || type instanceof Types.VarCharType
+          || type instanceof Types.FixedCharType
+          || type instanceof Types.DateType) {
+        return quote(literal.value().toString());
+      }
+      throw new IllegalArgumentException(
+          "Hive catalog does not support column default value literal of type "
+              + type
+              + ": "
+              + defaultValue);
     }
 
     throw new IllegalArgumentException("Not a supported column default value: " + defaultValue);
@@ -107,6 +117,19 @@ public class HiveColumnDefaultValueConverter {
    * @return The Gravitino default value expression.
    */
   public static Expression toGravitino(Type type, String defaultValue) {
+    return toGravitino(type, defaultValue, null);
+  }
+
+  /**
+   * Parses a Hive SQL default value expression into a Gravitino {@link Expression}.
+   *
+   * @param type The Gravitino type of the column that owns the default value.
+   * @param defaultValue The Hive SQL expression string.
+   * @param columnName The name of the column that owns the default value, used only to give context
+   *     in log messages; may be {@code null} when unknown.
+   * @return The Gravitino default value expression.
+   */
+  public static Expression toGravitino(Type type, String defaultValue, String columnName) {
     if (defaultValue == null) {
       return DEFAULT_VALUE_NOT_SET;
     }
@@ -165,7 +188,13 @@ public class HiveColumnDefaultValueConverter {
     } catch (IllegalArgumentException | DateTimeParseException e) {
       // The metastore stores arbitrary SQL text; whatever cannot be modeled as a literal of the
       // column type is deliberately kept verbatim instead of failing the table load.
-      LOG.debug("Cannot parse Hive default value '{}' for type {}", defaultValue, type, e);
+      LOG.warn(
+          "Cannot parse Hive default value '{}' as a literal of type {} for column '{}'; keeping "
+              + "it as an unparsed expression",
+          defaultValue,
+          type,
+          columnName == null ? "<unknown>" : columnName,
+          e);
     }
     return UnparsedExpression.of(defaultValue);
   }

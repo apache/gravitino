@@ -90,6 +90,22 @@ dependencies {
     exclude(group = "org.openjdk.jol")
     exclude(group = "org.slf4j")
   }
+
+  // compileOnly is not inherited by the test compile classpath, so the same set of Gravitino
+  // modules used to compile HiveShimV3 needs to be redeclared for the test sources.
+  testImplementation(project(":catalogs:hive-metastore-common"))
+  testImplementation(project(":catalogs:catalog-common"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(libs.slf4j.api)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform()
 }
 
 tasks {

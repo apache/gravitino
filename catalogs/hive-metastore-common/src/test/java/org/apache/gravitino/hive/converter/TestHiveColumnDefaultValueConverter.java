@@ -73,6 +73,13 @@ public class TestHiveColumnDefaultValueConverter {
         "CAST('x' AS STRING)",
         HiveColumnDefaultValueConverter.fromGravitino(
             UnparsedExpression.of("CAST('x' AS STRING)")));
+    // Literal types with no defined Hive SQL rendering must not be silently serialized via
+    // Object#toString()
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            HiveColumnDefaultValueConverter.fromGravitino(
+                Literals.of(new byte[] {1, 2, 3}, Types.BinaryType.get())));
   }
 
   @Test

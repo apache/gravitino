@@ -24,9 +24,13 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(HiveCatalog.class);
 
   static final HiveCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
       new HiveCatalogPropertiesMetadata();
@@ -86,8 +90,13 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   private HiveVersion hiveVersion() {
     CatalogOperations ops = ops();
-    return ops instanceof HiveCatalogOperations
-        ? ((HiveCatalogOperations) ops).hiveVersion()
-        : HiveVersion.HIVE2;
+    if (!(ops instanceof HiveCatalogOperations)) {
+      LOG.debug(
+          "Catalog operations {} do not expose a Hive Metastore version; defaulting to {}",
+          ops.getClass(),
+          HiveVersion.HIVE2);
+      return HiveVersion.HIVE2;
+    }
+    return ((HiveCatalogOperations) ops).hiveVersion();
   }
 }

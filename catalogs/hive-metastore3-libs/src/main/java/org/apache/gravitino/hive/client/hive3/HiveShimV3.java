@@ -66,11 +66,12 @@ public class HiveShimV3 extends HiveShim {
 
   // Keeps generated constraint names well within the metastore's 400 character limit
   private static final int MAX_CONSTRAINT_PREFIX = 128;
-  // Constraints are recorded for metadata only: enabled, not validated against existing data,
-  // and relied upon by the optimizer
+  // Constraints are recorded for metadata only: enabled and not validated against existing data.
+  // rely_cstr is deliberately false: Gravitino never validates existing data against newly added
+  // constraints, so telling the query optimizer to rely on them could produce incorrect results.
   private static final boolean CONSTRAINT_ENABLE = true;
   private static final boolean CONSTRAINT_VALIDATE = false;
-  private static final boolean CONSTRAINT_RELY = true;
+  private static final boolean CONSTRAINT_RELY = false;
 
   public HiveShimV3(Properties properties) {
     super(HIVE3, properties);
@@ -205,14 +206,14 @@ public class HiveShimV3 extends HiveShim {
     try {
       addColumnConstraints(desired);
     } catch (RuntimeException e) {
-      LOG.error(
-          "Table {}.{} was altered but its column constraints {} could not be re-created; "
-              + "the NOT NULL and DEFAULT constraints must be re-applied manually",
-          alteredHiveTable.databaseName(),
-          alteredHiveTable.name(),
-          desired.names,
-          e);
-      throw e;
+      String message =
+          String.format(
+              "Table %s.%s was altered but its column constraints %s were dropped and could not "
+                  + "be re-created; the NOT NULL and DEFAULT constraints must be re-applied "
+                  + "manually",
+              alteredHiveTable.databaseName(), alteredHiveTable.name(), desired.names);
+      LOG.error(message, e);
+      throw new RuntimeException(message, e);
     }
   }
 
@@ -337,7 +338,15 @@ public class HiveShimV3 extends HiveShim {
         invoke(
             ExceptionTarget.schema(databaseName),
             () -> client.getTableObjectsByName(catalogName, databaseName, allTables));
-    return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
+    return tables.stream()
+        .map(
+            tb -> {
+              ColumnConstraints constraints =
+                  loadColumnConstraints(catalogName, databaseName, tb.getTableName());
+              return HiveTableConverter.fromHiveTable(
+                  tb, notNullColumns(constraints), defaultValues(constraints));
+            })
+        .toList();
   }
 
   @Override
