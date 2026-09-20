@@ -29,16 +29,23 @@ val scalaVersion: String =
 val sparkVersion: String = libs.versions.spark35.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 // Comma-separated list of lance-spark-bundle versions to test against.
-// The default is the latest supported version; the integration test matrix
-// (`:lance:lance-rest-server:lanceSparkMatrixTest`) covers every version in
-// this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.4.0`.
+// Without an explicit property, the integration test matrix covers every
+// declared version and the normal test task uses 0.5.1 as its primary bundle.
+// An explicit property is a targeted diagnostic override; its first version
+// remains the primary bundle for compatibility with the existing behavior.
+val lanceSparkBundleVersionsProperty = project.properties["lanceSparkBundleVersions"] as? String
 val lanceSparkBundleVersions: List<String> =
-  ((project.properties["lanceSparkBundleVersions"] as? String) ?: "0.4.0")
+  (lanceSparkBundleVersionsProperty ?: "0.2.0,0.4.0,0.5.1")
     .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 if (lanceSparkBundleVersions.isEmpty()) {
   throw GradleException("lanceSparkBundleVersions must contain at least one version")
 }
-val primaryLanceSparkBundleVersion: String = lanceSparkBundleVersions.first()
+val primaryLanceSparkBundleVersion: String =
+  if (lanceSparkBundleVersionsProperty == null) {
+    "0.5.1"
+  } else {
+    lanceSparkBundleVersions.first()
+  }
 val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
 
 fun lanceSparkBundleConfigName(version: String): String =
@@ -262,7 +269,7 @@ tasks {
     group = "verification"
     description =
       "Run LanceSparkRESTServiceIT against every version in -PlanceSparkBundleVersions " +
-      "(default: $primaryLanceSparkBundleVersion). Reports land under " +
+      "(default: ${lanceSparkBundleVersions.joinToString(", ")}). Reports land under " +
       "build/reports/lance-spark-matrix/<version>/."
     dependsOn(
       lanceSparkBundleVersions.map { named(lanceSparkTestTaskName(it)) }
