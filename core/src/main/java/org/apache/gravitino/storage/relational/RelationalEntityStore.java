@@ -278,7 +278,7 @@ public class RelationalEntityStore
     // Keep shutting the remaining components down even if one of them fails, and tolerate a
     // half-finished initialize() that left some of them null.
     IOException failure = null;
-    failure = closeComponent(failure, "entity cache", cache == null ? null : cache::clear);
+    failure = closeComponent(failure, "entity cache", cache == null ? null : cache::close);
     failure = closeComponent(failure, "entity change log poller", entityChangeLogPoller);
     failure = closeComponent(failure, "entity change log cleaner", entityChangeLogCleaner);
     failure = closeComponent(failure, "relational garbage collector", garbageCollector);

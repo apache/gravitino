@@ -573,18 +573,18 @@ public class Configs {
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(
-              value ->
-                  StringUtils.isNotBlank(value) && !value.contains("{") && !value.contains("}"),
-              "The Redis cache namespace must not be blank and must not contain '{' or '}'.")
+              value -> value != null && value.matches("[A-Za-z0-9._:-]+"),
+              "The Redis cache namespace must contain only letters, digits and '.', '_', '-', ':'.")
           .createWithDefault("gravitino");
 
   public static final ConfigEntry<Long> CACHE_REDIS_FENCE_TTL_MS =
       new ConfigBuilder("gravitino.cache.redis.fenceTtlMs")
           .doc(
               "Lifetime in milliseconds of the version fence the Redis entity cache keeps for an "
-                  + "invalidated key. It must outlive gravitino.cache.expireTimeInMs so that a "
-                  + "slow read that began before an invalidation cannot refill the key after the "
-                  + "value expired. 0 means twice gravitino.cache.expireTimeInMs.")
+                  + "invalidated key. It must outlive gravitino.cache.expireTimeInMs. A cache fill "
+                  + "whose read began more than this long ago is discarded, so a fence may expire "
+                  + "safely: no fill it could have guarded is still acceptable. 0 means twice "
+                  + "gravitino.cache.expireTimeInMs.")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)

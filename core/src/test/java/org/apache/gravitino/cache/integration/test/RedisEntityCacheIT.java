@@ -18,12 +18,17 @@
  */
 package org.apache.gravitino.cache.integration.test;
 
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.RedisEntityCache;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -97,5 +102,33 @@ public class RedisEntityCacheIT extends RedisEntityCacheTestBase {
     RuntimeException e =
         Assertions.assertThrows(RuntimeException.class, () -> CacheFactory.getEntityCache(config));
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause().getCause());
+  }
+
+  @Test
+  void testReadFailureThenRecoveryNeverFillsUnguarded() {
+    Assumptions.assumeTrue(container != null, "needs a container this test can pause");
+    Config config = config(60_000L);
+    config.set(Configs.CACHE_REDIS_TIMEOUT_MS, 300);
+    RedisEntityCache nodeA = newNode(config);
+    RedisEntityCache nodeB = newNode();
+    CatalogEntity catalog = catalog("m1", "c1");
+
+    // Redis is unreachable while node A reads: a miss that recorded nothing.
+    container.getDockerClient().pauseContainerCmd(container.getContainerId()).exec();
+    try {
+      Assertions.assertEquals(
+          Optional.empty(), get(nodeA, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    } finally {
+      container.getDockerClient().unpauseContainerCmd(container.getContainerId()).exec();
+    }
+    // Redis is back, node B invalidates, and node A's fill from the failed read arrives.
+    nodeB.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    nodeA.put(catalog);
+    Assertions.assertFalse(nodeB.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+
+    // Recovery: a fresh miss on node A bounds a new load, which is accepted.
+    load(nodeA, catalog);
+    Assertions.assertEquals(
+        Optional.of(catalog), get(nodeB, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 }

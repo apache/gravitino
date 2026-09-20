@@ -46,6 +46,7 @@ public class TestRedisKeyspace {
     Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefix(metalake));
     Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefix(table));
     Assertions.assertEquals("ns:{m1}:IDX", keyspace.indexKey(table));
+    Assertions.assertEquals("ns:{m1}:G", keyspace.generationKey(table));
     Assertions.assertEquals(
         "ns:{m1}:D:m1.c1.s1.t1:TABLE",
         keyspace.valueKey(EntityCacheKey.of(table, Entity.EntityType.TABLE)));
@@ -109,17 +110,41 @@ public class TestRedisKeyspace {
   }
 
   @Test
-  void testScanPatternsAndFenceDetection() {
-    Assertions.assertEquals("ns:*", keyspace.allKeysPattern());
+  void testScanPatternIsAnchoredOnTheHashTagBoundary() {
     Assertions.assertEquals("ns:{*}:IDX", keyspace.allIndexKeysPattern());
-    Assertions.assertTrue(RedisKeyspace.isFenceKey("ns:{m1}:F:m1.c1"));
-    Assertions.assertFalse(RedisKeyspace.isFenceKey("ns:{m1}:D:m1.c1:CATALOG"));
-    Assertions.assertFalse(RedisKeyspace.isFenceKey("ns:{m1}:IDX"));
+    // A namespace that merely starts with this one lives behind a different boundary.
+    Assertions.assertFalse(keyspace.ownsKey("ns:other:{m1}:IDX"));
+    Assertions.assertFalse(keyspace.ownsKey("nsx:{m1}:IDX"));
+    Assertions.assertTrue(keyspace.ownsKey("ns:{m1}:IDX"));
+    Assertions.assertTrue(keyspace.ownsKey("ns:{m1}:D:m1.c1:CATALOG"));
+    Assertions.assertTrue(keyspace.isIndexKey("ns:{m1}:IDX"));
+    Assertions.assertFalse(keyspace.isIndexKey("ns:{m1}:D:m1.c1:CATALOG"));
+    Assertions.assertFalse(keyspace.isIndexKey("ns:other:{m1}:IDX"));
   }
 
   @Test
-  void testNamespaceMustNotContainHashTagBraces() {
+  void testKeysOfAScannedIndexDeriveFromIt() {
+    Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefixOf("ns:{m1}:IDX"));
+    Assertions.assertEquals("ns:{m1}:F:m1", keyspace.metalakeFenceKeyOf("ns:{m1}:IDX"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> keyspace.slotPrefixOf("other:{m1}:IDX"));
+  }
+
+  @Test
+  void testGlobMetacharactersAreEscaped() {
+    Assertions.assertEquals("a\\*b\\?c\\[d\\]e\\\\f", RedisKeyspace.globEscape("a*b?c[d]e\\f"));
+    Assertions.assertEquals("plain.name-1:x", RedisKeyspace.globEscape("plain.name-1:x"));
+  }
+
+  @Test
+  void testNamespaceIsRestrictedToSafeCharacters() {
+    Assertions.assertDoesNotThrow(() -> new RedisKeyspace("prod.eu-1:cache_2"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace("a{b}"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace(" "));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace("a*b"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace("a?b"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace("a[b]"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace("a b"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new RedisKeyspace(null));
   }
 }

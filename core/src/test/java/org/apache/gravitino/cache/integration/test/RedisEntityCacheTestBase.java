@@ -58,11 +58,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * Behavior of {@link RedisEntityCache} against a real Redis, shared by the standalone and cluster
  * suites. Each test uses its own key namespace, and "nodes" are separate cache instances over the
  * same Redis, which is exactly what two Gravitino servers sharing one cache are.
+ *
+ * <p>A fill is only performed after a miss on the same thread, the shape of every store read, so
+ * the tests populate the cache through {@link #load} rather than a bare {@code put}.
  */
 public abstract class RedisEntityCacheTestBase {
 
@@ -91,6 +96,8 @@ public abstract class RedisEntityCacheTestBase {
     for (RedisEntityCache cache : caches) {
       try {
         cache.clear();
+      } catch (RuntimeException e) {
+        // A node closed by the test itself cannot clear; its namespace is unique anyway.
       } finally {
         cache.close();
       }
@@ -114,19 +121,50 @@ public abstract class RedisEntityCacheTestBase {
   }
 
   protected RedisEntityCache newNode(long ttlMs) {
-    EntityCache cache = CacheFactory.getEntityCache(config(ttlMs));
+    return newNode(config(ttlMs));
+  }
+
+  protected RedisEntityCache newNode(long ttlMs, long fenceTtlMs) {
+    Config config = config(ttlMs);
+    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, fenceTtlMs);
+    return newNode(config);
+  }
+
+  protected RedisEntityCache newNode(Config config) {
+    EntityCache cache = CacheFactory.getEntityCache(config);
     Assertions.assertInstanceOf(RedisEntityCache.class, cache);
     caches.add((RedisEntityCache) cache);
     return (RedisEntityCache) cache;
   }
 
   protected String valueKey(NameIdentifier ident, Entity.EntityType type) {
-    String metalake = ident.hasNamespace() ? ident.namespace().level(0) : ident.name();
-    return namespace + ":{" + metalake + "}:D:" + ident + ":" + type;
+    return slotPrefix(ident) + "D:" + ident + ":" + type;
   }
 
   protected String indexKey(String metalake) {
     return namespace + ":{" + metalake + "}:IDX";
+  }
+
+  protected String fenceKey(NameIdentifier ident) {
+    return slotPrefix(ident) + "F:" + ident;
+  }
+
+  private String slotPrefix(NameIdentifier ident) {
+    String metalake = ident.hasNamespace() ? ident.namespace().level(0) : ident.name();
+    return namespace + ":{" + metalake + "}:";
+  }
+
+  /** Every value key of this namespace, scanned through the raw client. */
+  protected List<String> valueKeys() {
+    List<String> keys = new ArrayList<>();
+    ScanParams params = new ScanParams().match(namespace + ":{*}:D:*").count(500);
+    String cursor = ScanParams.SCAN_POINTER_START;
+    do {
+      ScanResult<String> result = rawClient().scan(cursor, params);
+      keys.addAll(result.getResult());
+      cursor = result.getCursor();
+    } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+    return keys;
   }
 
   protected static BaseMetalake metalake(String name) {
@@ -177,9 +215,16 @@ public abstract class RedisEntityCacheTestBase {
         .build();
   }
 
-  private static <E extends Entity & HasIdentifier> Optional<E> get(
+  protected static <E extends Entity & HasIdentifier> Optional<E> get(
       EntityCache cache, NameIdentifier ident, Entity.EntityType type) {
     return cache.getIfPresent(ident, type);
+  }
+
+  /** The store read shape: a miss that records the fences, then the fill it bounds. */
+  protected static <E extends Entity & HasIdentifier> void load(RedisEntityCache cache, E entity) {
+    Assertions.assertEquals(
+        Optional.empty(), get(cache, entity.nameIdentifier(), entity.type()), "expected a miss");
+    cache.put(entity);
   }
 
   @Test
@@ -195,7 +240,7 @@ public abstract class RedisEntityCacheTestBase {
     RedisEntityCache nodeB = newNode();
     CatalogEntity catalog = catalog("m1", "c1");
 
-    nodeA.put(catalog);
+    load(nodeA, catalog);
     Assertions.assertEquals(
         Optional.of(catalog), get(nodeB, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     Assertions.assertTrue(nodeB.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
@@ -215,11 +260,11 @@ public abstract class RedisEntityCacheTestBase {
     SchemaEntity schema = schema("m1", "catalog1", "s1");
     TableEntity table = table("m1", "catalog1", "s1", "t1", "v1");
 
-    cache.put(metalake);
-    cache.put(catalog1);
-    cache.put(catalog10);
-    cache.put(schema);
-    cache.put(table);
+    load(cache, metalake);
+    load(cache, catalog1);
+    load(cache, catalog10);
+    load(cache, schema);
+    load(cache, table);
     Assertions.assertEquals(5, cache.size());
 
     cache.invalidate(catalog1.nameIdentifier(), Entity.EntityType.CATALOG);
@@ -235,12 +280,12 @@ public abstract class RedisEntityCacheTestBase {
   @Test
   void testMetalakeDropRemovesEverythingUnderIt() {
     RedisEntityCache cache = newNode();
-    cache.put(metalake("m1"));
-    cache.put(catalog("m1", "c1"));
-    cache.put(schema("m1", "c1", "s1"));
-    cache.put(table("m1", "c1", "s1", "t1", "v1"));
-    cache.put(metalake("m2"));
-    cache.put(catalog("m2", "c1"));
+    load(cache, metalake("m1"));
+    load(cache, catalog("m1", "c1"));
+    load(cache, schema("m1", "c1", "s1"));
+    load(cache, table("m1", "c1", "s1", "t1", "v1"));
+    load(cache, metalake("m2"));
+    load(cache, catalog("m2", "c1"));
 
     cache.invalidate(NameIdentifier.of("m1"), Entity.EntityType.METALAKE);
 
@@ -260,11 +305,11 @@ public abstract class RedisEntityCacheTestBase {
     SchemaEntity raw2 = schema("m1", "c1", "raw2");
     TableEntity raw2Table = table("m1", "c1", "raw2", "t1", "v1");
 
-    cache.put(raw);
-    cache.put(rawEvents);
-    cache.put(nestedTable);
-    cache.put(raw2);
-    cache.put(raw2Table);
+    load(cache, raw);
+    load(cache, rawEvents);
+    load(cache, nestedTable);
+    load(cache, raw2);
+    load(cache, raw2Table);
 
     cache.invalidate(raw.nameIdentifier(), Entity.EntityType.SCHEMA);
 
@@ -285,14 +330,14 @@ public abstract class RedisEntityCacheTestBase {
 
     // Node B misses and starts loading the old row from the store...
     Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
-    // ...while node A commits an update and invalidates.
-    nodeA.put(newTable);
+    // ...while node A commits an update, invalidates, and serves the new row.
     nodeA.invalidate(ident, Entity.EntityType.TABLE);
-    // Node B's late fill must not resurrect the old row.
+    load(nodeA, newTable);
+    // Node B's late fill must not overwrite the new row with the old one.
     nodeB.put(oldTable);
 
-    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
-    Assertions.assertEquals(Optional.empty(), get(nodeA, ident, Entity.EntityType.TABLE));
+    Assertions.assertEquals(Optional.of(newTable), get(nodeA, ident, Entity.EntityType.TABLE));
+    Assertions.assertEquals(Optional.of(newTable), get(nodeB, ident, Entity.EntityType.TABLE));
   }
 
   @Test
@@ -341,16 +386,210 @@ public abstract class RedisEntityCacheTestBase {
   }
 
   @Test
-  void testWriteWithoutAPrecedingMissIsUnconditional() {
+  void testWriteWithoutAPrecedingMissIsNotCached() {
     RedisEntityCache cache = newNode();
     CatalogEntity catalog = catalog("m1", "c1");
 
-    cache.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
-    // Caching a freshly inserted entity has no load window to guard.
+    // Caching a freshly inserted entity has no miss that bounded its load window, so it fails
+    // closed; the next read loads it under a fresh record.
     cache.put(catalog);
 
+    Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    Assertions.assertEquals(0, cache.size());
+    load(cache, catalog);
     Assertions.assertEquals(
         Optional.of(catalog), get(cache, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testInsertTimeWarmingCannotResurrectAConcurrentDelete() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    CatalogEntity catalog = catalog("m1", "c1");
+
+    // The store insert shape on node A: commit, then cache.put with no miss before it. Node B
+    // deletes the row and invalidates in between; the delayed warming must not bring it back.
+    nodeB.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    nodeA.put(catalog);
+
+    Assertions.assertFalse(nodeB.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    Assertions.assertEquals(
+        Optional.empty(), get(nodeB, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testMissesBeyondThePendingBoundFailClosed() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    int misses = 1025;
+    List<CatalogEntity> catalogs = new ArrayList<>(misses);
+    for (int i = 0; i < misses; i++) {
+      catalogs.add(catalog("m1", "c" + i));
+    }
+
+    // The batchGet shape: every miss is recorded before any fill, one more than the bound.
+    for (CatalogEntity catalog : catalogs) {
+      Assertions.assertEquals(
+          Optional.empty(), get(nodeA, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    }
+    // The first record was evicted; node B invalidates that key in the meantime.
+    nodeB.invalidate(catalogs.get(0).nameIdentifier(), Entity.EntityType.CATALOG);
+    nodeA.put(catalogs.get(0));
+    nodeA.put(catalogs.get(misses - 1));
+
+    Assertions.assertFalse(
+        nodeB.contains(catalogs.get(0).nameIdentifier(), Entity.EntityType.CATALOG));
+    Assertions.assertTrue(
+        nodeB.contains(catalogs.get(misses - 1).nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testDecodeFailureThenInvalidationCannotBeRefilled() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    CatalogEntity catalog = catalog("m1", "c1");
+    NameIdentifier ident = catalog.nameIdentifier();
+    String key = valueKey(ident, Entity.EntityType.CATALOG);
+
+    rawClient().set(key, "not a serialized entity");
+    rawClient().zadd(indexKey("m1"), 0, "m1.c1:CATALOG");
+
+    // The undecodable entry is discarded, which is a miss that recorded no fences...
+    Assertions.assertEquals(Optional.empty(), get(nodeA, ident, Entity.EntityType.CATALOG));
+    Assertions.assertFalse(rawClient().exists(key));
+    // ...so the fill that follows it, racing an invalidation on node B, is not performed.
+    nodeB.invalidate(ident, Entity.EntityType.CATALOG);
+    nodeA.put(catalog);
+
+    Assertions.assertFalse(nodeB.contains(ident, Entity.EntityType.CATALOG));
+    Assertions.assertEquals(0, nodeA.size());
+    // A fresh read then loads it normally.
+    load(nodeA, catalog);
+    Assertions.assertEquals(Optional.of(catalog), get(nodeB, ident, Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testRecreatedFenceNeverRepeatsTheGenerationAnOlderReadObserved() throws Exception {
+    long valueTtlMs = 100L;
+    long fenceTtlMs = 200L;
+    RedisEntityCache nodeA = newNode(valueTtlMs, fenceTtlMs);
+    RedisEntityCache nodeB = newNode(valueTtlMs, fenceTtlMs);
+    TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
+    NameIdentifier ident = oldTable.nameIdentifier();
+
+    // Node A drops the table once: the fence exists with the first generation.
+    nodeA.invalidate(ident, Entity.EntityType.TABLE);
+    String firstFence = rawClient().get(fenceKey(ident));
+    // Node B misses just before that fence expires and starts a slow load of the old row.
+    Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(20, TimeUnit.MILLISECONDS)
+        .until(() -> !rawClient().exists(fenceKey(ident)));
+    // Another node commits an update and invalidates again, recreating the fence.
+    nodeA.invalidate(ident, Entity.EntityType.TABLE);
+    String secondFence = rawClient().get(fenceKey(ident));
+    Assertions.assertNotEquals(firstFence, secondFence, "generations must never be reused");
+    Assertions.assertTrue(Long.parseLong(secondFence) > Long.parseLong(firstFence));
+
+    // Node B's stale fill: rejected both because its record is older than the fence lifetime and
+    // because the fence it would compare against carries a new generation.
+    nodeB.put(oldTable);
+    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testAbsentFenceThatWasSetAndExpiredCannotAdmitAnOlderRead() throws Exception {
+    long valueTtlMs = 100L;
+    long fenceTtlMs = 200L;
+    RedisEntityCache nodeA = newNode(valueTtlMs, fenceTtlMs);
+    RedisEntityCache nodeB = newNode(valueTtlMs, fenceTtlMs);
+    TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
+    NameIdentifier ident = oldTable.nameIdentifier();
+
+    // Node B misses while no fence exists at all, and starts a slow load of the old row.
+    Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
+    // Node A commits an update and invalidates; the fence is set, then expires again.
+    nodeA.invalidate(ident, Entity.EntityType.TABLE);
+    Assertions.assertTrue(rawClient().exists(fenceKey(ident)));
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(20, TimeUnit.MILLISECONDS)
+        .until(() -> !rawClient().exists(fenceKey(ident)));
+
+    // Absent before, absent now: only the record's age tells the two apart, and it is too old.
+    nodeB.put(oldTable);
+    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testClearRejectsAnInFlightFillAndLeavesNoOrphanValue() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    TableEntity table = table("m1", "c1", "s1", "t1", "v1");
+    load(nodeA, catalog("m1", "c1"));
+
+    // Node B misses and starts loading; node A clears in between; node B's fill arrives late.
+    Assertions.assertEquals(
+        Optional.empty(), get(nodeB, table.nameIdentifier(), Entity.EntityType.TABLE));
+    nodeA.clear();
+    nodeB.put(table);
+
+    Assertions.assertFalse(nodeA.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertEquals(0, nodeA.size());
+    // Nothing survives that a later hierarchical invalidation could not find.
+    load(nodeB, table);
+    nodeA.invalidate(NameIdentifier.of("m1"), Entity.EntityType.METALAKE);
+    Assertions.assertEquals(ImmutableList.of(), valueKeys());
+  }
+
+  @Test
+  void testExpiredIndexMembersAreReclaimedAndRefillsSurvive() {
+    RedisEntityCache cache = newNode(200L);
+    CatalogEntity c1 = catalog("m1", "c1");
+    CatalogEntity c2 = catalog("m1", "c2");
+    CatalogEntity c3 = catalog("m1", "c3");
+    load(cache, c1);
+    load(cache, c2);
+    load(cache, c3);
+    Assertions.assertEquals(3, cache.size());
+
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(50, TimeUnit.MILLISECONDS)
+        .until(() -> !cache.contains(c3.nameIdentifier(), Entity.EntityType.CATALOG));
+    // The values expired on their own; sizing reaps the members they left behind.
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(50, TimeUnit.MILLISECONDS)
+        .until(() -> cache.size() == 0);
+    Assertions.assertEquals(0, rawClient().zcard(indexKey("m1")));
+
+    // A refill after expiry is indexed again and is not reaped while its value is live.
+    load(cache, c2);
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(c2.nameIdentifier(), Entity.EntityType.CATALOG));
+    Assertions.assertEquals(1, rawClient().zcard(indexKey("m1")));
+  }
+
+  @Test
+  void testCloseReleasesThisNodeAndKeepsTheSharedEntries() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    CatalogEntity catalog = catalog("m1", "c1");
+    load(nodeA, catalog);
+
+    nodeB.close();
+
+    // Node B's client is released: it can no longer reach Redis at all.
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> nodeB.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    // Node A's entry is untouched.
+    Assertions.assertTrue(
+        rawClient().exists(valueKey(catalog.nameIdentifier(), Entity.EntityType.CATALOG)));
+    Assertions.assertEquals(
+        Optional.of(catalog), get(nodeA, catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
   @Test
@@ -392,17 +631,19 @@ public abstract class RedisEntityCacheTestBase {
   }
 
   @Test
-  void testConcurrentReadersAndWriters() throws Exception {
+  void testConcurrentReadersNeverObserveAVersionOlderThanACompletedInvalidation() throws Exception {
     RedisEntityCache nodeA = newNode();
     RedisEntityCache nodeB = newNode();
-    TableEntity table = table("m1", "c1", "s1", "t1", "v1");
-    NameIdentifier ident = table.nameIdentifier();
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", "s1", "t1");
     EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TABLE);
     int readers = 6;
     int iterations = 150;
     ExecutorService pool = Executors.newFixedThreadPool(readers + 1);
     CountDownLatch start = new CountDownLatch(1);
     AtomicInteger hits = new AtomicInteger();
+    // The "database": the version last committed, and the version whose invalidation completed.
+    AtomicInteger committed = new AtomicInteger();
+    AtomicInteger invalidated = new AtomicInteger();
     List<Future<?>> futures = new ArrayList<>();
     try {
       for (int r = 0; r < readers; r++) {
@@ -412,6 +653,7 @@ public abstract class RedisEntityCacheTestBase {
                 () -> {
                   start.await();
                   for (int i = 0; i < iterations; i++) {
+                    int floor = invalidated.get();
                     TableEntity seen =
                         node.withCacheLock(
                             key,
@@ -422,10 +664,17 @@ public abstract class RedisEntityCacheTestBase {
                                 hits.incrementAndGet();
                                 return cached.get();
                               }
-                              node.put(table);
-                              return table;
+                              TableEntity loaded =
+                                  table("m1", "c1", "s1", "t1", "v" + committed.get());
+                              node.put(loaded);
+                              return loaded;
                             });
-                    Assertions.assertEquals(table, seen);
+                    int seenVersion = Integer.parseInt(seen.comment().substring(1));
+                    // An invalidation that completed before this read began must not be undone:
+                    // whatever is cached now was loaded after it, so it carries a newer version.
+                    Assertions.assertTrue(
+                        seenVersion >= floor,
+                        "read version " + seenVersion + " older than invalidated " + floor);
                   }
                   return null;
                 }));
@@ -434,8 +683,10 @@ public abstract class RedisEntityCacheTestBase {
           pool.submit(
               () -> {
                 start.await();
-                for (int i = 0; i < iterations; i++) {
+                for (int i = 1; i <= iterations; i++) {
+                  committed.set(i);
                   nodeB.invalidate(ident, Entity.EntityType.TABLE);
+                  invalidated.set(i);
                 }
                 return null;
               }));
@@ -457,7 +708,7 @@ public abstract class RedisEntityCacheTestBase {
     RedisEntityCache cache = newNode(300L);
     CatalogEntity catalog = catalog("m1", "c1");
 
-    cache.put(catalog);
+    load(cache, catalog);
     Assertions.assertTrue(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
 
     Awaitility.await()
@@ -472,15 +723,16 @@ public abstract class RedisEntityCacheTestBase {
   void testClearAndSizeSpanEveryMetalake() {
     RedisEntityCache cache = newNode();
     for (int m = 1; m <= 5; m++) {
-      cache.put(metalake("m" + m));
-      cache.put(catalog("m" + m, "c1"));
-      cache.put(schema("m" + m, "c1", "s1"));
+      load(cache, metalake("m" + m));
+      load(cache, catalog("m" + m, "c1"));
+      load(cache, schema("m" + m, "c1", "s1"));
     }
     Assertions.assertEquals(15, cache.size());
 
     cache.clear();
 
     Assertions.assertEquals(0, cache.size());
+    Assertions.assertEquals(ImmutableList.of(), valueKeys());
     for (int m = 1; m <= 5; m++) {
       Assertions.assertFalse(
           cache.contains(NameIdentifier.of("m" + m, "c1"), Entity.EntityType.CATALOG));
@@ -514,11 +766,39 @@ public abstract class RedisEntityCacheTestBase {
   void testNamespacesAreIsolated() {
     RedisEntityCache first = newNode();
     CatalogEntity catalog = catalog("m1", "c1");
-    first.put(catalog);
+    load(first, catalog);
 
     namespace = namespace + "-other";
     RedisEntityCache second = newNode();
     Assertions.assertFalse(second.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     Assertions.assertTrue(first.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testClearingANamespaceLeavesALongerNamespaceItPrefixesAlone() {
+    RedisEntityCache first = newNode();
+    CatalogEntity catalog = catalog("m1", "c1");
+    load(first, catalog);
+    String firstNamespace = namespace;
+
+    namespace = firstNamespace + ":other";
+    RedisEntityCache second = newNode();
+    load(second, catalog);
+    Assertions.assertEquals(1, second.size());
+
+    first.clear();
+
+    Assertions.assertEquals(0, first.size());
+    Assertions.assertFalse(first.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    Assertions.assertEquals(1, second.size());
+    Assertions.assertTrue(second.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testNamespaceWithGlobMetacharactersIsRejected() {
+    namespace = namespace + "*";
+    Assertions.assertThrows(RuntimeException.class, this::newNode);
+    namespace = "it-[a]";
+    Assertions.assertThrows(RuntimeException.class, this::newNode);
   }
 }

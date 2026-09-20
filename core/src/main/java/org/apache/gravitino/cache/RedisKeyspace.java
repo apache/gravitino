@@ -35,7 +35,8 @@ import org.apache.gravitino.Namespace;
  *   <caption>Keys written under one namespace</caption>
  *   <tr><th>Purpose</th><th>Key</th><th>Redis type</th></tr>
  *   <tr><td>Value</td><td>{@code <ns>:{<metalake>}:D:<identifier>:<TYPE>}</td><td>string</td></tr>
- *   <tr><td>Fence</td><td>{@code <ns>:{<metalake>}:F:<identifier>}</td><td>string (counter)</td></tr>
+ *   <tr><td>Fence</td><td>{@code <ns>:{<metalake>}:F:<identifier>}</td><td>string (generation)</td></tr>
+ *   <tr><td>Generation</td><td>{@code <ns>:{<metalake>}:G}</td><td>string (counter)</td></tr>
  *   <tr><td>Index</td><td>{@code <ns>:{<metalake>}:IDX}</td><td>sorted set, all scores 0</td></tr>
  * </table>
  *
@@ -46,30 +47,42 @@ import org.apache.gravitino.Namespace;
  * the lexicographic range starting with {@code <identifier>.} (and, for a schema, {@code
  * <identifier><schema separator>}).
  *
- * <p>A fence is a counter keyed by the identifier alone, without the type. A container drop
- * increments the fence of the dropped identifier; a write compares the fences of the identifier and
- * of every ancestor against the values it observed before it loaded the entity, so a load that
- * began before a drop anywhere above it cannot refill the key afterwards.
+ * <p>A fence is keyed by the identifier alone, without the type, and holds the generation at which
+ * that identifier was last dropped. Generations are drawn from the metalake's counter, which never
+ * expires, so no two drops ever produce the same fence value even if the fence key itself expired
+ * in between. A write compares the fences of the identifier and of every ancestor against the
+ * values it observed before it loaded the entity, so a load that began before a drop anywhere above
+ * it cannot refill the key afterwards.
+ *
+ * <p>The namespace is restricted to letters, digits and {@code . _ - :} so that it can never carry
+ * a hash tag or a {@code SCAN} glob metacharacter, and every pattern matches the colon and opening
+ * brace that always follow it, so the namespace {@code a} never matches keys of the namespace
+ * {@code a:b}.
  */
 final class RedisKeyspace {
 
   /** Separates {@link NameIdentifier} levels inside a key. */
   static final String NAME_LEVEL_BOUNDARY = ".";
 
+  /** Characters a namespace may contain: no braces, no glob metacharacters, no whitespace. */
+  static final Pattern NAMESPACE_PATTERN = Pattern.compile("[A-Za-z0-9._:-]+");
+
   /** Index of the schema level in a fully qualified identifier: metalake, catalog, schema. */
   private static final int SCHEMA_LEVEL = 2;
 
   private static final String VALUE_MARKER = "D:";
   private static final String FENCE_MARKER = "F:";
+  private static final String GENERATION_NAME = "G";
   private static final String INDEX_NAME = "IDX";
+  private static final String TAG_OPEN = ":{";
+  private static final String TAG_CLOSE = "}:";
 
   private final String namespace;
 
   RedisKeyspace(String namespace) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(namespace), "namespace must not be blank");
     Preconditions.checkArgument(
-        !namespace.contains("{") && !namespace.contains("}"),
-        "namespace must not contain '{' or '}'");
+        namespace != null && NAMESPACE_PATTERN.matcher(namespace).matches(),
+        "namespace must be non-empty and contain only letters, digits and '.', '_', '-', ':'");
     this.namespace = namespace;
   }
 
@@ -85,7 +98,7 @@ final class RedisKeyspace {
 
   /** Prefix shared by every key of the identifier's metalake: {@code <ns>:{<metalake>}:}. */
   String slotPrefix(NameIdentifier ident) {
-    return namespace + ":{" + hashTag(ident) + "}:";
+    return namespace + TAG_OPEN + hashTag(ident) + TAG_CLOSE;
   }
 
   String indexKey(NameIdentifier ident) {
@@ -94,6 +107,11 @@ final class RedisKeyspace {
 
   String valueKey(EntityCacheKey key) {
     return slotPrefix(key.identifier()) + VALUE_MARKER + member(key);
+  }
+
+  /** The per-metalake generation counter every fence value is drawn from. Never expires. */
+  String generationKey(NameIdentifier ident) {
+    return slotPrefix(ident) + GENERATION_NAME;
   }
 
   /**
@@ -106,19 +124,42 @@ final class RedisKeyspace {
     return slotPrefix(ident) + FENCE_MARKER + identifierPath;
   }
 
-  /** Glob pattern matching every key this namespace writes, for {@code SCAN}. */
-  String allKeysPattern() {
-    return namespace + ":*";
-  }
-
-  /** Glob pattern matching every index key this namespace writes, for {@code SCAN}. */
+  /**
+   * Glob pattern matching every index key this namespace writes, for {@code SCAN}. Anchored on the
+   * colon and opening brace that follow the namespace, so a longer namespace sharing this one as a
+   * prefix does not match.
+   */
   String allIndexKeysPattern() {
-    return namespace + ":{*}:" + INDEX_NAME;
+    return globEscape(namespace) + TAG_OPEN + "*" + TAG_CLOSE + INDEX_NAME;
   }
 
-  /** Whether a key returned by {@code SCAN} is a fence key. */
-  static boolean isFenceKey(String key) {
-    return key.contains("}:" + FENCE_MARKER);
+  /** Whether a key returned by {@code SCAN} belongs to this namespace, checked exactly. */
+  boolean ownsKey(String key) {
+    return key != null
+        && key.startsWith(namespace + TAG_OPEN)
+        && key.indexOf(TAG_CLOSE, namespace.length() + TAG_OPEN.length()) > 0;
+  }
+
+  /** Whether a key this namespace owns is an index key. */
+  boolean isIndexKey(String key) {
+    return ownsKey(key) && key.endsWith(TAG_CLOSE + INDEX_NAME);
+  }
+
+  /** The slot prefix, {@code <ns>:{<metalake>}:}, of a key this namespace owns. */
+  String slotPrefixOf(String key) {
+    Preconditions.checkArgument(
+        ownsKey(key), "key %s is not owned by namespace %s", key, namespace);
+    int end = key.indexOf(TAG_CLOSE, namespace.length() + TAG_OPEN.length());
+    return key.substring(0, end + TAG_CLOSE.length());
+  }
+
+  /** The fence key of the metalake itself for a key this namespace owns. */
+  String metalakeFenceKeyOf(String key) {
+    String slotPrefix = slotPrefixOf(key);
+    String metalake =
+        slotPrefix.substring(
+            namespace.length() + TAG_OPEN.length(), slotPrefix.length() - TAG_CLOSE.length());
+    return slotPrefix + FENCE_MARKER + metalake;
   }
 
   /**
@@ -172,5 +213,18 @@ final class RedisKeyspace {
       prefixes.add(identifier + schemaSeparator);
     }
     return prefixes;
+  }
+
+  /** Escapes the {@code SCAN} glob metacharacters, a second line of defense behind the pattern. */
+  static String globEscape(String literal) {
+    StringBuilder escaped = new StringBuilder(literal.length());
+    for (int i = 0; i < literal.length(); i++) {
+      char c = literal.charAt(i);
+      if (c == '*' || c == '?' || c == '[' || c == ']' || c == '\\') {
+        escaped.append('\\');
+      }
+      escaped.append(c);
+    }
+    return escaped.toString();
   }
 }

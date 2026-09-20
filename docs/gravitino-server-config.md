@@ -320,8 +320,8 @@ that cannot tolerate that must read the database directly.
 |-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
 | `gravitino.cache.redis.address`     | Comma-separated `host:port` list. Required when the implementation is `redis`. A standalone Redis takes exactly one address; a Redis Cluster takes one or more seed nodes and `cluster = true`. | (none)                                 |
 | `gravitino.cache.redis.cluster`     | Whether the address points at a Redis Cluster.                                                                                                                                                  | `false`                                |
-| `gravitino.cache.redis.namespace`   | Prefix of every key the cache writes, so several Gravitino clusters can share one Redis. Must not contain `{` or `}`.                                                                          | `gravitino`                            |
-| `gravitino.cache.redis.fenceTtlMs`  | Lifetime of the version fence kept for an invalidated key. Must exceed `gravitino.cache.expireTimeInMs`; `0` means twice that value.                                                             | `0`                                    |
+| `gravitino.cache.redis.namespace`   | Prefix of every key the cache writes, so several Gravitino clusters can share one Redis. Letters, digits and `.`, `_`, `-`, `:` only; a namespace never matches keys of a longer namespace it prefixes. | `gravitino`                            |
+| `gravitino.cache.redis.fenceTtlMs`  | Lifetime of the version fence kept for an invalidated key. Must exceed `gravitino.cache.expireTimeInMs`; a cache fill whose read began longer ago than this is discarded, so an expired fence is safe. `0` means twice `expireTimeInMs`. | `0`                                    |
 | `gravitino.cache.redis.serializer`  | Serialization format for cached entities. Only `kryo` is supported.                                                                                                                             | `kryo`                                 |
 | `gravitino.cache.redis.timeoutMs`   | Connection and command timeout in milliseconds. A read or write that exceeds it is treated as a miss.                                                                                           | `1000`                                 |
 | `gravitino.cache.redis.username`    | Optional Redis ACL user name.                                                                                                                                                                   | (none)                                 |
@@ -333,6 +333,15 @@ one metalake share a Redis Cluster hash slot, so a metalake's entries live on on
 server that cannot reach Redis at startup fails to start rather than running uncached; a failed
 invalidation at runtime is reported as an error on the write, because a silently dropped
 invalidation would leave a stale entry readable by every server.
+
+A cache fill is only performed when a read miss on the same thread bounded the load that produced
+it, so a load that began before an invalidation can never refill the key afterwards. Fills with no
+such bound, including caching a freshly inserted entity, are skipped and the next read loads the
+entity instead. Invalidation fences carry generations from a per-metalake counter that never
+expires, so a recreated fence never repeats a value an older read observed. Values that expire leave
+their index members behind; a bounded reaper reclaims them as the cache is written to and sized.
+Stopping a server releases only its own Redis client and leaves the shared entries for the other
+servers; clearing the shared cache is a separate, explicit operation.
 
 Two eviction limits apply at once. Time to live always applies: an entry older than
 `expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
