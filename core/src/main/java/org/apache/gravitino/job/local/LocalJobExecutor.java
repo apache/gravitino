@@ -40,9 +40,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -105,6 +107,10 @@ public class LocalJobExecutor implements JobExecutor {
   // JobManager has removed the job's staging directory, so it lives exactly as long as the output.
   private static final long OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS = TimeUnit.HOURS.toMillis(1);
 
+  // A newer index is never removed: on shared storage, a server may see a new index before it sees
+  // the job's staging directory created by another server.
+  private static final long OUTPUT_INDEX_MIN_AGE_IN_MS = TimeUnit.HOURS.toMillis(1);
+
   private static final Pattern JOB_ID_PATTERN =
       Pattern.compile(
           LOCAL_JOB_PREFIX
@@ -146,6 +152,8 @@ public class LocalJobExecutor implements JobExecutor {
   private Path outputIndexDir;
 
   private final AtomicBoolean missingOutputIndexWarned = new AtomicBoolean(false);
+
+  private final AtomicBoolean invalidOutputIndexWarned = new AtomicBoolean(false);
 
   @Override
   public void initialize(Map<String, String> configs) {
@@ -494,12 +502,20 @@ public class LocalJobExecutor implements JobExecutor {
    */
   @VisibleForTesting
   void cleanupOutputIndexes() {
+    long now = System.currentTimeMillis();
     // An exception escaping a scheduled task would cancel all its later runs.
     try (DirectoryStream<Path> indexFiles =
         Files.newDirectoryStream(
             outputIndexDir, LOCAL_JOB_PREFIX + "*" + OUTPUT_INDEX_FILE_SUFFIX)) {
       for (Path indexFile : indexFiles) {
+        // close() interrupts this thread, and every later read would then fail as well.
+        if (Thread.currentThread().isInterrupted()) {
+          return;
+        }
         try {
+          if (now - Files.getLastModifiedTime(indexFile).toMillis() < OUTPUT_INDEX_MIN_AGE_IN_MS) {
+            continue;
+          }
           Path workingDir = parseOutputIndex(Files.readAllBytes(indexFile));
           // An index this server can't interpret may come from a newer server, so keep it. Only
           // a confirmed missing directory counts: notExists() is false on I/O errors too, so a
@@ -508,6 +524,8 @@ public class LocalJobExecutor implements JobExecutor {
             Files.deleteIfExists(indexFile);
             LOG.debug("Removed output index {} of a deleted job staging directory", indexFile);
           }
+        } catch (ClosedByInterruptException e) {
+          return;
         } catch (NoSuchFileException e) {
           // Removed concurrently, e.g. by another server sharing the staging directory.
         } catch (IOException | RuntimeException e) {
@@ -580,7 +598,14 @@ public class LocalJobExecutor implements JobExecutor {
     try {
       content = Files.readAllBytes(indexFile);
     } catch (NoSuchFileException e) {
-      warnMissingOutputIndex(jobId);
+      warnOnce(
+          missingOutputIndexWarned,
+          "No output index found for job {} under {}, so its output can't be retrieved. The job "
+              + "may have been submitted before this Gravitino version, or run on another "
+              + "Gravitino server that doesn't share gravitino.job.stagingDir with this one. In a "
+              + "multi-node deployment, gravitino.job.stagingDir must be shared by all servers.",
+          jobId,
+          outputIndexDir);
       return null;
     } catch (IOException e) {
       // Same as reading the output itself: an unexpected I/O failure must not be reported as
@@ -590,7 +615,12 @@ public class LocalJobExecutor implements JobExecutor {
 
     Path workingDir = parseOutputIndex(content);
     if (workingDir == null) {
-      LOG.warn("The output index {} of job {} is invalid or unsupported", indexFile, jobId);
+      warnOnce(
+          invalidOutputIndexWarned,
+          "The output index {} of job {} is invalid or unsupported, so its output can't be "
+              + "retrieved. It may have been written by a newer Gravitino version.",
+          indexFile,
+          jobId);
     }
     return workingDir;
   }
@@ -626,8 +656,13 @@ public class LocalJobExecutor implements JobExecutor {
     // that normalizes to outside of it (e.g. "../../etc") or to the staging directory itself: the
     // index lives on shared storage and must never make this server read an arbitrary file.
     Path workingDir = stagingRoot;
-    for (String segment : Splitter.on('/').omitEmptyStrings().split(relativePath.textValue())) {
-      workingDir = workingDir.resolve(segment);
+    try {
+      for (String segment : Splitter.on('/').omitEmptyStrings().split(relativePath.textValue())) {
+        workingDir = workingDir.resolve(segment);
+      }
+    } catch (InvalidPathException e) {
+      // E.g. a NUL character, which no file name can contain.
+      return null;
     }
     workingDir = workingDir.normalize();
     return workingDir.startsWith(stagingRoot) && !workingDir.equals(stagingRoot)
@@ -639,19 +674,12 @@ public class LocalJobExecutor implements JobExecutor {
     return outputIndexDir.resolve(jobId + OUTPUT_INDEX_FILE_SUFFIX);
   }
 
-  private void warnMissingOutputIndex(String jobId) {
-    // Warn once per executor instance, a client polling the output would otherwise flood the log.
-    if (missingOutputIndexWarned.compareAndSet(false, true)) {
-      LOG.warn(
-          "No output index found for job {} under {}, so its output can't be retrieved. The job "
-              + "may have been submitted before this Gravitino version, or run on another "
-              + "Gravitino server that doesn't share gravitino.job.stagingDir with this one. In a "
-              + "multi-node deployment, gravitino.job.stagingDir must be shared by all servers. "
-              + "Later occurrences are logged at DEBUG level.",
-          jobId,
-          outputIndexDir);
+  // Warns once per executor instance, a client polling the output would otherwise flood the log.
+  private static void warnOnce(AtomicBoolean warned, String message, Object... args) {
+    if (warned.compareAndSet(false, true)) {
+      LOG.warn(message + " Later occurrences are logged at DEBUG level.", args);
     } else {
-      LOG.debug("No output index found for job {} under {}", jobId, outputIndexDir);
+      LOG.debug(message, args);
     }
   }
 

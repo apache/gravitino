@@ -29,6 +29,7 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,14 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.AbstractConfiguration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -58,6 +67,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 public class TestLocalJobExecutor {
 
@@ -789,7 +799,8 @@ public class TestLocalJobExecutor {
   @Test
   public void testOutputIndexKeepsSpecialCharactersInWorkingDir() throws IOException {
     // Job template names are not restricted, so the staging directory may contain any character a
-    // file name can. They must survive the JSON encoding and the '/'-joining unchanged.
+    // file name can. They must survive the JSON encoding and the '/'-joining unchanged. Some of
+    // these characters are only valid in POSIX file names, like the shell job itself.
     String specialName =
         "a b \"quoted\" back\\slash 中文 \t tab \n newline %20 #!$&'()*+,;=@[]{}~`^|<>?";
     File jobDir =
@@ -884,6 +895,8 @@ public class TestLocalJobExecutor {
               "{\"version\":1,\"workingDir\":\"\"}",
               "{\"version\":2,\"workingDir\":\"" + workingDir.getName() + "\"}",
               "{\"workingDir\":\"" + workingDir.getName() + "\"}",
+              // No file name can contain a NUL character.
+              "{\"version\":1,\"workingDir\":\"a\\u0000b\"}",
               // Truncated by a crash while being written.
               "{\"version\":1,\"workingDir\":\"",
               "");
@@ -927,21 +940,31 @@ public class TestLocalJobExecutor {
   public void testCleanupOutputIndexes() throws IOException {
     File keptDir = Files.createTempDirectory(stagingRoot.toPath(), "kept").toFile();
     File removedDir = Files.createTempDirectory(stagingRoot.toPath(), "removed").toFile();
+    File recentDir = Files.createTempDirectory(stagingRoot.toPath(), "recent").toFile();
     String keptJobId = runSucceededJob(keptDir);
     String removedJobId = runSucceededJob(removedDir);
+    String recentJobId = runSucceededJob(recentDir);
     // Like JobManager removing the staging directory of an expired job.
     FileUtils.deleteDirectory(removedDir);
+    // A new index whose staging directory this server doesn't see yet, e.g. through a stale cache
+    // of the shared storage.
+    FileUtils.deleteDirectory(recentDir);
 
     // An index this server can't interpret, e.g. written by a newer server, and an unrelated file.
     File unsupportedIndex = outputIndexFile("local-job-00000000-" + UUID.randomUUID());
     FileUtils.writeStringToFile(unsupportedIndex, "{\"version\":2}", StandardCharsets.UTF_8);
     File unrelatedFile = new File(stagingRoot, OUTPUT_INDEX_DIR_NAME + File.separator + "README");
     FileUtils.writeStringToFile(unrelatedFile, "keep me", StandardCharsets.UTF_8);
+    for (String jobId : ImmutableList.of(keptJobId, removedJobId)) {
+      ageOutputIndex(outputIndexFile(jobId));
+    }
+    ageOutputIndex(unsupportedIndex);
     try {
       ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes();
 
       Assertions.assertFalse(outputIndexFile(removedJobId).exists());
       Assertions.assertTrue(outputIndexFile(keptJobId).exists());
+      Assertions.assertTrue(outputIndexFile(recentJobId).exists());
       Assertions.assertTrue(unsupportedIndex.exists());
       Assertions.assertTrue(unrelatedFile.exists());
       Assertions.assertEquals(
@@ -950,6 +973,100 @@ public class TestLocalJobExecutor {
       FileUtils.deleteQuietly(unsupportedIndex);
       FileUtils.deleteQuietly(unrelatedFile);
       FileUtils.deleteDirectory(keptDir);
+    }
+  }
+
+  @Test
+  public void testCleanupOutputIndexesStopsWhenInterrupted() throws Throwable {
+    List<File> removedIndexes = Lists.newArrayList();
+    for (int i = 0; i < 3; i++) {
+      File removedDir = Files.createTempDirectory(stagingRoot.toPath(), "removed").toFile();
+      File removedIndex = outputIndexFile(runSucceededJob(removedDir));
+      FileUtils.deleteDirectory(removedDir);
+      ageOutputIndex(removedIndex);
+      removedIndexes.add(removedIndex);
+    }
+
+    // close() interrupts the cleanup thread. Each read of an index would then fail, and log a
+    // warning, if the cleanup didn't stop.
+    List<String> warnings =
+        captureWarnings(
+            () -> {
+              Thread.currentThread().interrupt();
+              try {
+                ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes();
+              } finally {
+                Assertions.assertTrue(Thread.interrupted());
+              }
+            });
+    Assertions.assertEquals(Collections.emptyList(), warnings);
+    removedIndexes.forEach(index -> Assertions.assertTrue(index.exists()));
+
+    ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes();
+    removedIndexes.forEach(index -> Assertions.assertFalse(index.exists()));
+  }
+
+  @Test
+  public void testInvalidOutputIndexIsWarnedOnce() throws Throwable {
+    String jobId = runSucceededJob(workingDir);
+    FileUtils.writeStringToFile(
+        outputIndexFile(jobId), "{\"version\":2,\"workingDir\":\"x\"}", StandardCharsets.UTF_8);
+
+    // A fresh executor, which hasn't warned about an invalid index yet. A client polling the
+    // output must not flood the log.
+    LocalJobExecutor exec = new LocalJobExecutor();
+    try {
+      exec.initialize(withStagingDir(Collections.emptyMap()));
+      List<String> warnings =
+          captureWarnings(
+              () -> {
+                for (int i = 0; i < 3; i++) {
+                  Assertions.assertEquals(
+                      Collections.emptyList(),
+                      exec.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES));
+                }
+              });
+      Assertions.assertEquals(1, warnings.size(), warnings.toString());
+      Assertions.assertTrue(warnings.get(0).contains("is invalid or unsupported"), warnings.get(0));
+    } finally {
+      exec.close();
+    }
+  }
+
+  @Test
+  public void testCleanupOutputIndexesWithoutIndexDir() throws IOException {
+    FileUtils.deleteDirectory(new File(stagingRoot, OUTPUT_INDEX_DIR_NAME));
+    Assertions.assertDoesNotThrow(() -> ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes());
+  }
+
+  @Test
+  public void testSubmitJobSucceedsWhenOutputIndexCannotBeWritten() throws IOException {
+    // A regular file where the index directory is expected makes writing the index fail.
+    File indexDir = new File(stagingRoot, OUTPUT_INDEX_DIR_NAME);
+    FileUtils.deleteDirectory(indexDir);
+    FileUtils.writeStringToFile(indexDir, "not a directory", StandardCharsets.UTF_8);
+    try {
+      String jobId = runSucceededJob(workingDir);
+      Assertions.assertTrue(new File(workingDir, "output.log").length() > 0);
+      Assertions.assertFalse(outputIndexFile(jobId).exists());
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  @Test
+  public void testGetJobOutputFailsWhenOutputIndexCannotBeRead() throws IOException {
+    String jobId = runSucceededJob(workingDir);
+    // A directory where the index file is expected can't be read, unlike a missing index.
+    File indexFile = outputIndexFile(jobId);
+    Assertions.assertTrue(indexFile.delete());
+    Assertions.assertTrue(indexFile.mkdir());
+    try {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () -> jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES));
+    } finally {
+      FileUtils.deleteDirectory(indexFile);
     }
   }
 
@@ -997,9 +1114,53 @@ public class TestLocalJobExecutor {
     return new File(stagingRoot, OUTPUT_INDEX_DIR_NAME + File.separator + jobId + ".json");
   }
 
+  // Returns the warnings LocalJobExecutor logs while running the action.
+  private static List<String> captureWarnings(Executable action) throws Throwable {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(LocalJobExecutor.class.getClassLoader(), false);
+    AbstractConfiguration configuration = (AbstractConfiguration) context.getConfiguration();
+    WarningCollector collector = new WarningCollector();
+    collector.start();
+    configuration.addAppender(collector);
+    LoggerConfig loggerConfig =
+        new LoggerConfig(LocalJobExecutor.class.getName(), Level.WARN, false);
+    loggerConfig.addAppender(collector, Level.WARN, null);
+    configuration.addLogger(LocalJobExecutor.class.getName(), loggerConfig);
+    context.updateLoggers();
+    try {
+      action.execute();
+    } finally {
+      configuration.removeLogger(LocalJobExecutor.class.getName());
+      collector.stop();
+      configuration.removeAppender(collector.getName());
+      context.updateLoggers();
+    }
+    return ImmutableList.copyOf(collector.messages);
+  }
+
+  // Makes the index old enough for the cleanup to consider it.
+  private static void ageOutputIndex(File indexFile) throws IOException {
+    Files.setLastModifiedTime(
+        indexFile.toPath(),
+        FileTime.fromMillis(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(2)));
+  }
+
   private static int outputIndexFileCount() {
     File[] indexFiles = new File(stagingRoot, OUTPUT_INDEX_DIR_NAME).listFiles();
     return indexFiles == null ? 0 : indexFiles.length;
+  }
+
+  private static class WarningCollector extends AbstractAppender {
+    private final List<String> messages = Collections.synchronizedList(Lists.newArrayList());
+
+    WarningCollector() {
+      super("localJobExecutorWarnings", null, PatternLayout.createDefaultLayout(), true, null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      messages.add(event.getMessage().getFormattedMessage());
+    }
   }
 
   private JobTemplate newSleepJobTemplate(String name) throws IOException {
