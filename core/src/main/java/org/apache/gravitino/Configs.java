@@ -585,6 +585,31 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_LINES =
+      new ConfigBuilder("gravitino.job.outputMaxLines")
+          .doc(
+              "The maximum number of lines returned by JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr. This is resolved by JobManager and passed as an "
+                  + "argument to those two APIs, so all executors honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
+      new ConfigBuilder("gravitino.job.outputMaxBytes")
+          .doc(
+              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
+                  + "when retrieving its output. Bounds both the read cost and the response size "
+                  + "regardless of how the content is shaped (e.g. a single very long line). "
+                  + "This is resolved by JobManager and passed as an argument to "
+                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
+                  + "honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(256 * 1024); // 256KB
+
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
       new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
           .doc(
