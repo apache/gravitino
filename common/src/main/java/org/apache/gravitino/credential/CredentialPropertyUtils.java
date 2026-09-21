@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -38,56 +37,82 @@ public class CredentialPropertyUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(CredentialPropertyUtils.class);
 
-  @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
-  @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
-  @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
+  /** Iceberg S3 access key id property. */
+  public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
 
-  @VisibleForTesting
-  static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
+  /** Iceberg S3 secret access key property. */
+  public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
 
-  @VisibleForTesting
-  static final String ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
+  /** Iceberg S3 session token property. */
+  public static final String ICEBERG_S3_TOKEN = "s3.session-token";
+
+  /** Iceberg S3 session token expiry property. */
+  public static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
+
+  /** Iceberg client credential refresh endpoint property. */
+  public static final String ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
       "client.refresh-credentials-endpoint";
 
-  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
-  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
-  @VisibleForTesting static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
+  /** Iceberg OSS access key id property. */
+  public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
 
-  @VisibleForTesting
-  static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
+  /** Iceberg OSS access key secret property. */
+  public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
+
+  /** Iceberg OSS security token property. */
+  public static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
+
+  /** Iceberg OSS security token expiry property. */
+  public static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
       "client.security-token-expires-at-ms";
 
-  @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
+  /**
+   * Iceberg ADLS SAS token property prefix. The concrete key appends {@code .} and the storage
+   * account host.
+   */
+  public static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
 
-  @VisibleForTesting
-  static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
+  /** Iceberg ADLS shared-key account name property. */
+  public static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
 
-  @VisibleForTesting
-  static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+  /** Iceberg ADLS shared-key account key property. */
+  public static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
-  @VisibleForTesting
-  static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
+  /** Iceberg ADLS SAS token expiry property prefix, including the trailing dot. */
+  public static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX =
+      "adls.sas-token-expires-at-ms.";
 
-  @VisibleForTesting
-  static final String ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT =
+  /** Iceberg ADLS credential refresh endpoint property. */
+  public static final String ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT =
       "adls.refresh-credentials-endpoint";
 
-  @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
+  /** Iceberg GCS OAuth2 token property. */
+  public static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
 
-  @VisibleForTesting
-  static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+  /** Iceberg GCS OAuth2 token expiry property. */
+  public static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
-  @VisibleForTesting
-  static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
+  /** Iceberg GCS OAuth2 credential refresh endpoint property. */
+  public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
       "gcs.oauth2.refresh-credentials-endpoint";
 
-  @VisibleForTesting static final String ICEBERG_JDBC_USER = "jdbc.user";
-  @VisibleForTesting static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
+  /** Iceberg JDBC user property. */
+  public static final String ICEBERG_JDBC_USER = "jdbc.user";
 
-  private static final String PAIMON_S3_ACCESS_KEY = "s3.access-key";
-  private static final String PAIMON_S3_SECRET_KEY = "s3.secret-key";
-  private static final String PAIMON_OSS_ACCESS_KEY_ID = "fs.oss.accessKeyId";
-  private static final String PAIMON_OSS_ACCESS_KEY_SECRET = "fs.oss.accessKeySecret";
+  /** Iceberg JDBC password property. */
+  public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
+
+  /** Paimon S3 access key property. */
+  public static final String PAIMON_S3_ACCESS_KEY = "s3.access-key";
+
+  /** Paimon S3 secret key property. */
+  public static final String PAIMON_S3_SECRET_KEY = "s3.secret-key";
+
+  /** Paimon OSS access key id property. */
+  public static final String PAIMON_OSS_ACCESS_KEY_ID = "fs.oss.accessKeyId";
+
+  /** Paimon OSS access key secret property. */
+  public static final String PAIMON_OSS_ACCESS_KEY_SECRET = "fs.oss.accessKeySecret";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()

@@ -221,6 +221,73 @@ public final class PropertyEntry<T> {
     return decoder.apply(value);
   }
 
+  /**
+   * Returns a copy of this entry with a different required flag. Hidden and the other flags stay as
+   * defined on this entry.
+   *
+   * @param required whether the copy is required
+   * @return a copy of this entry with the given required flag
+   */
+  public PropertyEntry<T> withRequired(boolean required) {
+    return new PropertyEntry<>(
+        name,
+        description,
+        required,
+        immutable,
+        javaType,
+        defaultValue,
+        decoder,
+        encoder,
+        hidden,
+        reserved,
+        prefix);
+  }
+
+  /**
+   * Returns a copy of this entry with a different name. The hidden flag and the other flags stay as
+   * defined on this entry.
+   *
+   * @param newName property name for the copy
+   * @return a copy of this entry under {@code newName}
+   */
+  public PropertyEntry<T> withName(String newName) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(newName), "name cannot be null or empty");
+    return new PropertyEntry<>(
+        newName,
+        description,
+        required,
+        immutable,
+        javaType,
+        defaultValue,
+        decoder,
+        encoder,
+        hidden,
+        reserved,
+        prefix);
+  }
+
+  /**
+   * Optional string property whose hidden flag is taken from this entry.
+   *
+   * @param name property name
+   * @param propertyDescription property description
+   * @return an optional string property with this entry's hidden flag
+   */
+  public PropertyEntry<String> asOptionalString(String name, String propertyDescription) {
+    return stringOptionalPropertyEntry(name, propertyDescription, false, null, hidden);
+  }
+
+  /**
+   * Optional string prefix property whose hidden flag is taken from this entry.
+   *
+   * @param name property prefix, including the trailing separator
+   * @param propertyDescription property description
+   * @return an optional string prefix property with this entry's hidden flag
+   */
+  public PropertyEntry<String> asOptionalStringPrefix(String name, String propertyDescription) {
+    return stringOptionalPropertyPrefixEntry(name, propertyDescription, false, null, hidden, false);
+  }
+
   public static PropertyEntry<String> stringPropertyPrefixEntry(
       String name,
       String description,

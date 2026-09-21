@@ -35,6 +35,7 @@ import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
@@ -87,18 +88,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 true /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
-                GRAVITINO_JDBC_USER,
-                "JDBC user for Iceberg JDBC backend",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                GRAVITINO_JDBC_PASSWORD,
-                "JDBC password for Iceberg JDBC backend",
-                false /* immutable */,
-                null /* defaultValue */,
-                true /* hidden */),
+            CatalogCredentialPropertiesMetadata.JDBC_USER,
+            CatalogCredentialPropertiesMetadata.JDBC_PASSWORD,
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "
