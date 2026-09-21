@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -255,6 +256,7 @@ public class TestMetadataObjectUtil {
     TagDispatcher tagDispatcher = mock(TagDispatcher.class);
     PolicyDispatcher policyDispatcher = mock(PolicyDispatcher.class);
     JobOperationDispatcher jobDispatcher = mock(JobOperationDispatcher.class);
+    SemanticModelDispatcher semanticModelDispatcher = mock(SemanticModelDispatcher.class);
 
     when(env.internalMetalakeDispatcher()).thenReturn(metalakeDispatcher);
     when(env.internalCatalogDispatcher()).thenReturn(catalogDispatcher);
@@ -269,6 +271,7 @@ public class TestMetadataObjectUtil {
     when(env.internalTagDispatcher()).thenReturn(tagDispatcher);
     when(env.internalPolicyDispatcher()).thenReturn(policyDispatcher);
     when(env.internalJobOperationDispatcher()).thenReturn(jobDispatcher);
+    when(env.semanticModelDispatcher()).thenReturn(semanticModelDispatcher);
 
     NameIdentifier metalakeIdent = NameIdentifier.of("metalake");
     NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");
@@ -325,6 +328,9 @@ public class TestMetadataObjectUtil {
           "metalake", MetadataObjects.of(null, "job", MetadataObject.Type.JOB));
       MetadataObjectUtil.checkMetadataObject(
           "metalake", MetadataObjects.of(null, "template", MetadataObject.Type.JOB_TEMPLATE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema", "sm", MetadataObject.Type.SEMANTIC_MODEL));
     }
 
     verify(metalakeDispatcher).metalakeExists(metalakeIdent);
@@ -341,6 +347,8 @@ public class TestMetadataObjectUtil {
     verify(policyDispatcher).getPolicy("metalake", "policy");
     verify(jobDispatcher).getJob("metalake", "job", false);
     verify(jobDispatcher).getJobTemplate("metalake", "template");
+    verify(semanticModelDispatcher)
+        .loadSemanticModel(NameIdentifier.of("metalake", "catalog", "schema", "sm"));
   }
 
   private static List<String> describe(List<MetadataObject> objects) {

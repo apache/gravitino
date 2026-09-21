@@ -41,6 +41,7 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
 public class MetadataObjectUtil {
@@ -343,6 +344,15 @@ public class MetadataObjectUtil {
         try {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        try {
+          env.semanticModelDispatcher().loadSemanticModel(identifier);
+        } catch (NoSuchSemanticModelException e) {
           throw exceptionToThrowSupplier.get();
         }
         break;
