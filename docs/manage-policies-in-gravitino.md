@@ -195,7 +195,7 @@ client.enablePolicy("retention_30d");
 
 ### Delete a Policy
 
-Deleting a policy also removes it from every object it was attached to.
+Deleting a policy also removes its associations with tags.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -226,6 +226,8 @@ operations.
 
 The response includes policies derived from effective tags assigned to the object or its ancestors.
 With `details=true`, the response returns full policy objects instead of policy names.
+Each policy includes an `inherited` field, which is `true` when it matches only through a tag
+assigned to an ancestor of the object.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

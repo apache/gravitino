@@ -116,18 +116,26 @@ public abstract class AbstractGravitinoOptimizerEnvIT extends BaseIT {
                 GravitinoStrategy.JOB_TEMPLATE_NAME_KEY,
                 "template-name"));
     metalakeClient.createPolicy(policyName, "custom", "comment", true, content);
+  }
+
+  /**
+   * Creates a tag associated with the named policy.
+   *
+   * @param policyName The name of the policy to associate with the tag.
+   */
+  protected void createTagForPolicy(String policyName) {
     String tagName = policyTagName(policyName);
     metalakeClient.createTag(tagName, "comment", Map.of());
     metalakeClient.addPolicyForTag(tagName, policyName, AllValuesSelector.get());
   }
 
-  protected void associatePoliciesToTable(String policyName, String tableName) {
+  protected void associatePolicyTagToTable(String policyName, String tableName) {
     Table table =
         catalogClient.asTableCatalog().loadTable(NameIdentifier.of(TEST_SCHEMA, tableName));
     table.supportsTags().associateTags(new String[] {policyTagName(policyName)}, null);
   }
 
-  protected void associatePoliciesToSchema(String policyName, String schemaName) {
+  protected void associatePolicyTagToSchema(String policyName, String schemaName) {
     Schema schema = catalogClient.asSchemas().loadSchema(schemaName);
     schema.supportsTags().associateTags(new String[] {policyTagName(policyName)}, null);
   }

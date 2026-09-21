@@ -252,6 +252,7 @@ public class PolicyManager implements PolicyDispatcher {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
+    // Tag-derived policy reads are best-effort across the object and its ancestors.
     return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
