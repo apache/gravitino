@@ -62,6 +62,19 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     def sourceOwners = modules.collectEntries { module ->
       [(module): module.extensions.getByType(SourceSetContainer).getByName('main').allJava.files.collect { it.canonicalFile }.toSet()]
     }
+    // Trino may be explicitly omitted from the build, but its listed files must still exist.
+    def skippedSourceRoots = gradle.startParameter.projectProperties['skipTrinoConnector']?.equalsIgnoreCase('true')
+      ? [file('trino-connector/trino-connector/src/main/java').canonicalFile.toPath()] : []
+    def requireOwnedSources = { Collection sources ->
+      def compiled = sources.findAll { source -> sourceOwners.values().any { it.contains(source) } }
+      def unowned = sources.findAll { source ->
+        !source.isFile() || (!compiled.contains(source) && !skippedSourceRoots.any { source.toPath().startsWith(it) })
+      }
+      if (!unowned.isEmpty()) {
+        throw new IllegalArgumentException("LICENSE lists missing or uncompiled production sources: ${unowned}")
+      }
+      compiled
+    }
     def reviewedWithoutNotice = [
       // These upstream trees contain LICENSE but no NOTICE:
       // https://github.com/lance-format/lance-namespace/tree/v0.0.20
@@ -96,7 +109,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     file('LICENSE').text.split(/\n\s*\n/).each { section ->
       def lines = section.readLines().collect { it.trim() }
       def sources = lines.findAll { it.startsWith('./') && it.contains('/src/main/java/') }.collect { file(it).canonicalFile }
-      def compiledSources = sources.findAll { source -> sourceOwners.values().any { it.contains(source) } }
+      def compiledSources = requireOwnedSources(sources)
       if (compiledSources.isEmpty()) return
       def notice = sourceNoticeFor(lines.first(), compiledSources)
       if (notice == null) return
@@ -105,6 +118,19 @@ def legalTests = tasks.register('testMavenLegalFiles') {
         if (compiledSources.any { files.contains(it) }) {
           assert module.tasks.named('generateMavenLegalFiles').get().sourceNotices.get().contains(name): "${module.path} compiles ${name} sources but omits its notice"
         }
+      }
+    }
+    // The Javadoc exclusion relies on the copied findWidth implementation remaining private.
+    def requirePrivateFindWidth = { String source ->
+      if (!(source =~ /(?m)^\s*private\s+static\s+int\s+findWidth\s*\(/).find()) {
+        throw new IllegalArgumentException('Review the Spark Javadoc Iceberg notice: findWidth is no longer private or its declaration changed')
+      }
+    }
+    def sparkTransforms = file('spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/SparkTransformConverter.java').text
+    requirePrivateFindWidth(sparkTransforms)
+    ['public', 'protected', ''].each { visibility ->
+      expectFailure('Review the Spark Javadoc Iceberg notice') {
+        requirePrivateFindWidth(sparkTransforms.replace('private static int findWidth', "${visibility} static int findWidth"))
       }
     }
     def selector = generatorType.getField('Companion').get(null)
@@ -136,6 +162,13 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     delete(fixtureDir)
     def fixtureTemplates = new File(fixtureDir, 'templates')
     fixtureTemplates.mkdirs()
+    def unownedSource = new File(fixtureDir, 'Unowned.java').canonicalFile
+    expectFailure('LICENSE lists missing or uncompiled production sources') { requireOwnedSources([unownedSource]) }
+    unownedSource.text = 'class Unowned {}'
+    expectFailure('LICENSE lists missing or uncompiled production sources') { requireOwnedSources([unownedSource]) }
+    expectFailure('LICENSE lists missing or uncompiled production sources') {
+      requireOwnedSources([file('trino-connector/trino-connector/src/main/java/MissingLegalFixture.java').canonicalFile])
+    }
     ['LICENSE': 'Fixture license', 'NOTICE': 'Fixture notice', 'LICENSE.exact': 'Exact version terms',
      'terms.txt': 'Fallback terms', 'LICENSE.group': 'Group terms'].each { name, text ->
       new File(fixtureTemplates, name).text = text
@@ -180,7 +213,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     }
     mapping.text = 'example:*=LICENSE.group\nexample:component:1=LICENSE.exact\n'
     generator.dependencyIds.set(['component.jar': 'example/component/2'])
-    expectFailure('Unaudited Maven legal supplement version: example:component:2') { generator.generate() }
+    expectFailure("Unaudited Maven legal supplement version: example:component:2 in ${generator.path}") { generator.generate() }
     mapping.append('example:component:2=\n')
     generator.generate()
     assert !readZip(output).containsKey('META-INF/licenses/example/component/2/LICENSE.group'): 'Audited empty rule must not inherit group supplements'

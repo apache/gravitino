@@ -163,7 +163,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
       val coordinate = "${parts[0]}:${parts[1]}"
       val selected = overrides["$coordinate:${parts[2]}"] ?: overrides[coordinate]
       require(selected != null || overrides.keys.none { it.startsWith("$coordinate:") }) {
-        "Unaudited Maven legal supplement version: $coordinate:${parts[2]}. Review dependencies.txt and upstream legal documents."
+        "Unaudited Maven legal supplement version: $coordinate:${parts[2]} in $path. Review dependencies.txt and upstream legal documents."
       }
       return selected ?: overrides["${parts[0]}:*"] ?: ""
     }
