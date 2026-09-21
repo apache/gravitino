@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import org.apache.gravitino.storage.AWSProperties;
+
 /** Constant keys for the AWS Glue Data Catalog connector configuration and table properties. */
 public final class GlueConstants {
 
@@ -35,10 +37,10 @@ public final class GlueConstants {
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
 
   /** AWS access key ID for static credential authentication (optional, sensitive). */
-  public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
+  public static final String AWS_ACCESS_KEY_ID = AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID;
 
   /** AWS secret access key for static credential authentication (optional, sensitive). */
-  public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
+  public static final String AWS_SECRET_ACCESS_KEY = AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY;
 
   /**
    * Custom Glue endpoint URL (optional). Used for VPC endpoints or LocalStack testing. Example:

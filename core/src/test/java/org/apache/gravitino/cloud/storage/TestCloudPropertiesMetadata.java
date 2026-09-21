@@ -19,13 +19,17 @@
 package org.apache.gravitino.cloud.storage;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.config.CredentialConfig;
 import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Test;
@@ -103,5 +107,42 @@ public class TestCloudPropertiesMetadata {
     assertTrue(
         SecretPropertyUtils.isSensitivePropertyKey(
             AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+  }
+
+  @Test
+  void testAwsCredentialPropertiesAreDeclared() {
+    var metadata = AWSPropertiesMetadata.PROPERTY_ENTRIES;
+    assertTrue(metadata.containsKey(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertTrue(metadata.containsKey(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY));
+    assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isHidden());
+    assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isRequired());
+    assertTrue(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isHidden());
+    assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isRequired());
+    assertSame(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID, GlueConstants.AWS_ACCESS_KEY_ID);
+    assertSame(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY, GlueConstants.AWS_SECRET_ACCESS_KEY);
+  }
+
+  @Test
+  void testCombinedCloudEntriesKeepAwsOffStorageMetadata() {
+    var storage = CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES;
+    var all = CloudPropertiesMetadata.ALL_PROPERTY_ENTRIES;
+
+    assertTrue(storage.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(storage.containsKey(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    assertTrue(storage.containsKey(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+    assertTrue(storage.containsKey(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE));
+    assertTrue(storage.containsKey(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    assertFalse(storage.containsKey(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(storage.containsKey(GlueConstants.AWS_REGION));
+
+    assertTrue(all.containsKey(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertTrue(all.containsKey(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY));
+    assertSame(
+        S3PropertiesMetadata.PROPERTY_ENTRIES.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID),
+        all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertSame(
+        AWSPropertiesMetadata.PROPERTY_ENTRIES.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID),
+        all.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(all.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isRequired());
   }
 }

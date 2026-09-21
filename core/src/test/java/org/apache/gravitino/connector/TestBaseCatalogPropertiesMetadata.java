@@ -101,4 +101,26 @@ public class TestBaseCatalogPropertiesMetadata {
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
+
+  @Test
+  void testCatalogDeclarationWinsOverSharedCloudEntry() {
+    PropertiesMetadata catalogMetadata =
+        new BaseCatalogPropertiesMetadata() {
+          @Override
+          protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+            return ImmutableMap.of(
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                PropertyEntry.stringOptionalPropertyEntry(
+                    S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                    "Catalog-owned S3 access key ID",
+                    false,
+                    null,
+                    true));
+          }
+        };
+
+    assertTrue(catalogMetadata.containsProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(catalogMetadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+  }
 }
