@@ -24,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +73,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -91,6 +95,98 @@ public class TestTableMetaService extends TestJDBCBackend {
   private List<EntityChangeRecord> listEntityChanges(long lastConsumedId) {
     return SessionUtils.doWithCommitAndFetchResult(
         EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastConsumedId, 100));
+  }
+
+  @TestTemplate
+  public void testLegacyTimelineDeleteKeepsLiveVersionsOfSameTable() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_legacy_delete",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    long tableId =
+        SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
+                mapper ->
+                    mapper.selectTableByFullQualifiedName(
+                        metalakeName, catalogName, schemaName, "table_legacy_delete"))
+            .getTableId();
+
+    // Soft-delete ONE old version with an expired timeline directly, leaving the
+    // current live version row (deleted_at = 0) in place.
+    long expired = System.currentTimeMillis() - 10_000;
+    try (Connection connection =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .openSession(true)
+            .getConnection()) {
+      try (Statement st = connection.createStatement()) {
+        st.execute(
+            "UPDATE table_version_info SET deleted_at = "
+                + expired
+                + " WHERE table_id = "
+                + tableId
+                + " AND version = 1");
+      }
+    }
+
+    // Seed a second LIVE version row (deleted_at = 0) for the same table: the
+    // legacy cleanup must remove only the expired tombstone, never live rows.
+    try (Connection c2 =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .openSession(true)
+            .getConnection()) {
+      try (Statement s2 = c2.createStatement()) {
+        s2.execute(
+            "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES ("
+                + tableId
+                + ", 2, 0)");
+      }
+    }
+
+    StringBuilder dumpRows = new StringBuilder();
+    try (Connection c5 =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .openSession(true)
+            .getConnection()) {
+      try (Statement s5 = c5.createStatement()) {
+        ResultSet r5 =
+            s5.executeQuery(
+                "SELECT version, deleted_at FROM table_version_info WHERE table_id = " + tableId);
+        while (r5.next()) {
+          dumpRows.append("v").append(r5.getLong(1)).append("/d").append(r5.getLong(2)).append(";");
+        }
+      }
+    }
+    int deleted =
+        TableMetaService.getInstance()
+            .deleteTableVersionByLegacyTimeline(System.currentTimeMillis(), 100);
+
+    Assertions.assertEquals(
+        1, deleted, "only the expired tombstone row is deleted; ROWS " + dumpRows);
+    try (Connection c3 =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .openSession(true)
+            .getConnection()) {
+      try (Statement s3 = c3.createStatement()) {
+        ResultSet rs =
+            s3.executeQuery(
+                "SELECT COUNT(*) FROM table_version_info WHERE table_id = "
+                    + tableId
+                    + " AND deleted_at = 0");
+        Assertions.assertTrue(rs.next());
+        Assertions.assertEquals(1, rs.getLong(1), "the live version row must survive");
+      }
+    }
   }
 
   @TestTemplate
