@@ -775,16 +775,15 @@ public class TestLocalJobExecutor {
 
   @Test
   public void testSubmitJobWritesOutputIndexRelativeToStagingDir() throws IOException {
-    // Laid out like the {metalake}/{template}/gravitino-job-{id} staging directory of JobManager.
-    File jobDir = new File(workingDir, "metalake/template/gravitino-job-1");
+    // Laid out like the {metalake}/{template}/job-{id} staging directory of JobManager.
+    File jobDir = new File(workingDir, "metalake/template/job-1");
     Assertions.assertTrue(jobDir.mkdirs());
     String jobId = runSucceededJob(jobDir);
 
     JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
     Assertions.assertEquals(1, index.get("version").intValue());
     Assertions.assertEquals(
-        workingDir.getName() + "/metalake/template/gravitino-job-1",
-        index.get("workingDir").textValue());
+        workingDir.getName() + "/metalake/template/job-1", index.get("workingDir").textValue());
   }
 
   @Test
@@ -794,15 +793,13 @@ public class TestLocalJobExecutor {
     String specialName =
         "a b \"quoted\" back\\slash 中文 \t tab \n newline %20 #!$&'()*+,;=@[]{}~`^|<>?";
     File jobDir =
-        new File(
-            workingDir,
-            "metalake" + File.separator + specialName + File.separator + "gravitino-job-1");
+        new File(workingDir, "metalake" + File.separator + specialName + File.separator + "job-1");
     Assertions.assertTrue(jobDir.mkdirs());
     String jobId = runSucceededJob(jobDir);
 
     JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
     Assertions.assertEquals(
-        workingDir.getName() + "/metalake/" + specialName + "/gravitino-job-1",
+        workingDir.getName() + "/metalake/" + specialName + "/job-1",
         index.get("workingDir").textValue());
 
     LocalJobExecutor anotherExecutor = new LocalJobExecutor();
