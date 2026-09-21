@@ -47,6 +47,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DefaultConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
@@ -297,10 +298,13 @@ class TestHiveShimV3 {
     MockHiveShimV3 shim = new MockHiveShimV3();
     IMetaStoreClient client = shim.metaStoreClient();
 
+    SQLDefaultConstraint existingDefault =
+        new SQLDefaultConstraint(
+            CATALOG, DB, TABLE, "old_column", "'old'", "existing_default", true, false, false);
     when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
         .thenReturn(List.of());
     when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of());
+        .thenReturn(List.of(existingDefault));
     doThrow(new MetaException("add failed")).when(client).addNotNullConstraint(any());
 
     Column notNullColumn = Column.of("id", Types.IntegerType.get(), null, false, false, null);
@@ -311,10 +315,28 @@ class TestHiveShimV3 {
             RuntimeException.class, () -> shim.alterTable(CATALOG, DB, TABLE, alteredTable, false));
 
     // alter_table itself succeeded (no stub failure), so the table was altered but constraints
-    // could not be re-created; the surfaced message must make that unambiguous.
+    // could not be fully created; the surfaced message distinguishes the old and desired sets.
     verify(client).alter_table(eq(CATALOG), eq(DB), eq(TABLE), any(Table.class));
-    assertTrue(thrown.getMessage().contains("dropped"));
-    assertTrue(thrown.getMessage().contains("could not be re-created"));
+    assertTrue(thrown.getMessage().contains("existing_default"));
+    assertTrue(thrown.getMessage().contains("tbl_id_nn"));
+    assertTrue(thrown.getMessage().contains("could not be fully created"));
+  }
+
+  @Test
+  void testGetViewDoesNotLoadConstraints() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+
+    Column plainColumn = Column.of("id", Types.IntegerType.get(), null, true, false, null);
+    Table hiveView = HiveTableConverter.toHiveTable(testTable(plainColumn));
+    hiveView.setCatName(CATALOG);
+    hiveView.setTableType(TableType.VIRTUAL_VIEW.name());
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(hiveView);
+
+    shim.getTable(CATALOG, DB, TABLE);
+
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
   }
 
   @Test

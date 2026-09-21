@@ -53,6 +53,11 @@ public class CatalogHive3IT extends CatalogHive2IT {
             HiveContainer.HIVE_METASTORE_PORT);
   }
 
+  /** Returns the Hive container used by this test suite. */
+  protected HiveContainer hiveContainer() {
+    return containerSuite.getHiveContainer();
+  }
+
   /** Hive 3.x metastores support NOT NULL and DEFAULT constraints, which must round-trip to HMS. */
   @Override
   protected void checkColumnConstraintsOnCreate(
@@ -92,6 +97,17 @@ public class CatalogHive3IT extends CatalogHive2IT {
     assertColumnConstraints(loaded.columns());
     // Read back straight from HMS to make sure the constraints were persisted
     assertColumnConstraints(loadHiveTableColumns(schemaName, constraintsIdent.name()));
+    executeHiveSql(
+        String.format(
+            "INSERT INTO TABLE %s.%s (not_null_column, plain_column) "
+                + "VALUES ('required', 'plain')",
+            schemaName, constraintsIdent.name()));
+    ExecResult queryResult =
+        executeHiveSql(
+            String.format(
+                "SELECT default_column, default_string_column FROM %s.%s",
+                schemaName, constraintsIdent.name()));
+    Assertions.assertEquals("42\tit's", queryResult.getStdout().trim());
 
     // Property-only alters must leave the constraints untouched
     catalog.asTableCatalog().alterTable(constraintsIdent, TableChange.setProperty("k1", "v1"));
@@ -145,18 +161,15 @@ public class CatalogHive3IT extends CatalogHive2IT {
     }
   }
 
-  private void executeHiveSql(String sql) {
-    HiveContainer hiveContainer = containerSuite.getHiveContainer();
-    if (hiveContainer == null) {
-      hiveContainer = containerSuite.getHiveContainerWithS3();
-    }
-    ExecResult result = hiveContainer.executeInContainer("hive", "-S", "-e", sql);
+  private ExecResult executeHiveSql(String sql) {
+    ExecResult result = hiveContainer().executeInContainer("hive", "-S", "-e", sql);
     Assertions.assertEquals(
         0,
         result.getExitCode(),
         String.format(
             "Failed to execute SQL with hive cli. SQL: %s, stdout: %s, stderr: %s",
             sql, result.getStdout(), result.getStderr()));
+    return result;
   }
 
   private Column[] loadHiveTableColumns(String schema, String table) {

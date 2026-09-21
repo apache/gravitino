@@ -200,6 +200,9 @@ public class HiveColumnDefaultValueConverter {
   }
 
   private static String quote(String value) {
+    // Hive 3 evaluates default values read directly from the metastore with backslash escaping.
+    // SQL-standard doubled quotes are accepted by the DDL parser, but storing them in HMS causes
+    // an omitted-column INSERT to lose the quote (for example, "it's" becomes "its").
     return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
   }
 

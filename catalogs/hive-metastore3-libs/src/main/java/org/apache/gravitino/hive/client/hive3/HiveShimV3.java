@@ -155,6 +155,9 @@ public class HiveShimV3 extends HiveShim {
         invoke(
             ExceptionTarget.table(tableName),
             () -> client.getTable(catalogName, databaseName, tableName));
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tb.getTableType())) {
+      return HiveTableConverter.fromHiveTable(tb);
+    }
     ColumnConstraints constraints = loadColumnConstraints(catalogName, databaseName, tableName);
     return HiveTableConverter.fromHiveTable(
         tb, notNullColumns(constraints), defaultValues(constraints));
@@ -209,10 +212,13 @@ public class HiveShimV3 extends HiveShim {
     } catch (RuntimeException e) {
       String message =
           String.format(
-              "Table %s.%s was altered but its column constraints %s were dropped and could not "
-                  + "be re-created; the NOT NULL and DEFAULT constraints must be re-applied "
-                  + "manually",
-              alteredHiveTable.databaseName(), alteredHiveTable.name(), desired.names);
+              "Table %s.%s was altered, but its existing column constraints %s were dropped and "
+                  + "the desired column constraints %s could not be fully created; inspect the "
+                  + "metastore and re-apply any missing NOT NULL and DEFAULT constraints manually",
+              alteredHiveTable.databaseName(),
+              alteredHiveTable.name(),
+              existing.names,
+              desired.names);
       LOG.error(message, e);
       throw new RuntimeException(message, e);
     }
