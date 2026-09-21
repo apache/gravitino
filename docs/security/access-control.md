@@ -288,17 +288,17 @@ owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
-|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
-| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
-| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
-| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
-| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object    |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                                |
+|------------------|-------------------------|----------------------------------------|-----------------|----------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                    |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                    |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                    |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                   |
+| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object       |
 | Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
-| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
-| Job              |                         | Owner                                  | Owner           |                                                 |
-| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`        |
+| Job              |                         | Owner                                  | Owner           |                                                    |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                    |
 
 The secrets-provider registry is process-global server configuration; the metalake path only scopes
 authorization. Listing providers does not return secret material.

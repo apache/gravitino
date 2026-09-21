@@ -34,10 +34,10 @@ policy. A table with only `data_domain=risk` does not.
 
 ### Policy Types and Content
 
-| Type | Rules | Consumer |
-|------|-------|----------|
+| Type                        | Rules                                | Consumer                  |
+|-----------------------------|--------------------------------------|---------------------------|
 | `system_iceberg_compaction` | Compaction thresholds and scheduling | Table maintenance service |
-| `custom` | A free-form map that you define | A system that you provide |
+| `custom`                    | A free-form map that you define      | A system that you provide |
 
 A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
 it does not interpret their names or values. Built-in types have a defined content shape. See
@@ -54,10 +54,10 @@ consumer decides whether a policy type applies to the object it is processing.
 Each association connects one policy to one tag and stores a selector. The selector determines
 whether that association contributes the policy to an object's lookup result.
 
-| Selector | When it matches |
-|----------|-----------------|
+| Selector     | When it matches                                                        |
+|--------------|------------------------------------------------------------------------|
 | `ALL_VALUES` | The effective tag is present, including an assignment without a value. |
-| `TAG_VALUE` | The effective tag has the specified exact assignment value. |
+| `TAG_VALUE`  | The effective tag has the specified exact assignment value.            |
 
 A policy may be associated with multiple tags. Association listings show those direct relations
 and their selectors, even if no object currently matches them. An object policy lookup returns each

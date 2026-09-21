@@ -222,10 +222,10 @@ client.deletePolicy("retention_30d");
 Create a policy and a tag in the same metalake before associating them. Each policy-to-tag
 association has a selector:
 
-| Selector | Match condition |
-|----------|-----------------|
+| Selector     | Match condition                                                  |
+|--------------|------------------------------------------------------------------|
 | `ALL_VALUES` | The effective tag is present, with or without assignment values. |
-| `TAG_VALUE` | The effective tag has the specified exact assignment value. |
+| `TAG_VALUE`  | The effective tag has the specified exact assignment value.      |
 
 The selector belongs to the association, not to the policy or the tag. An existing association
 cannot be replaced by another add request. Remove it and add it again to change its selector.

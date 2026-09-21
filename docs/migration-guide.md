@@ -33,13 +33,13 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ### REST and client API changes
 
-| Previous API or call | Migration |
-|----------------------|-----------|
-| `POST /objects/{type}/{fullName}/policies` | Associate the policy with a tag using `POST /tags/{tag}/policies/{policy}`, then assign the tag using `POST /objects/{type}/{fullName}/tags`. |
-| `GET /objects/{type}/{fullName}/policies/{policy}` | List resolved policies with `GET /objects/{type}/{fullName}/policies?details=true` and select the policy by name. |
-| `GET /policies/{policy}/objects` | Use `GET /policies/{policy}/tags` to inspect tag associations. It does not list every object reached through those tags. |
+| Previous API or call                                                  | Migration                                                                                                                                                |
+|-----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `POST /objects/{type}/{fullName}/policies`                            | Associate the policy with a tag using `POST /tags/{tag}/policies/{policy}`, then assign the tag using `POST /objects/{type}/{fullName}/tags`.            |
+| `GET /objects/{type}/{fullName}/policies/{policy}`                    | List resolved policies with `GET /objects/{type}/{fullName}/policies?details=true` and select the policy by name.                                        |
+| `GET /policies/{policy}/objects`                                      | Use `GET /policies/{policy}/tags` to inspect tag associations. It does not list every object reached through those tags.                                 |
 | Java `supportsPolicies().associatePolicies(...)` and `getPolicy(...)` | Use `GravitinoClient.addPolicyForTag(...)` and tag assignment APIs for writes; use `supportsPolicies().listPolicies()` or `listPolicyInfos()` for reads. |
-| Java `Policy.associatedObjects()` | List tag associations with `GravitinoClient.listTagAssociationsForPolicy(...)`, then inspect affected objects separately. |
+| Java `Policy.associatedObjects()`                                     | List tag associations with `GravitinoClient.listTagAssociationsForPolicy(...)`, then inspect affected objects separately.                                |
 
 Paths in this table are relative to `/api/metalakes/{metalake}`. A policy-to-tag association
 requires a selector. `ALL_VALUES` matches tag presence, including an assignment without a
