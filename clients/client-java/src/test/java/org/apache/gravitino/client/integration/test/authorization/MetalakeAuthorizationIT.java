@@ -28,7 +28,6 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -168,37 +167,6 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
           normalUserClient.dropMetalake(testMetalake3, true);
         });
     serviceAdminClient.dropMetalake(testMetalake3, true);
-  }
-
-  @Test
-  @Order(6)
-  public void testMissingMetalakeForServiceAdmin() {
-    String missingMetalake = "missingMetalake";
-
-    // Service admins see the pre-authorization semantics of a missing metalake.
-    assertThrows(
-        NoSuchMetalakeException.class, () -> serviceAdminClient.loadMetalake(missingMetalake));
-    assertThrows(
-        NoSuchMetalakeException.class,
-        () ->
-            serviceAdminClient.alterMetalake(
-                missingMetalake, MetalakeChange.setProperty("key1", "value1")));
-    assertThrows(
-        NoSuchMetalakeException.class, () -> serviceAdminClient.enableMetalake(missingMetalake));
-    assertThrows(
-        NoSuchMetalakeException.class, () -> serviceAdminClient.disableMetalake(missingMetalake));
-    Assertions.assertFalse(serviceAdminClient.dropMetalake(missingMetalake, true));
-
-    // Other callers cannot probe for metalake existence.
-    assertThrows(ForbiddenException.class, () -> normalUserClient.loadMetalake(missingMetalake));
-    assertThrows(
-        ForbiddenException.class,
-        () ->
-            normalUserClient.alterMetalake(
-                missingMetalake, MetalakeChange.setProperty("key1", "value1")));
-    assertThrows(ForbiddenException.class, () -> normalUserClient.enableMetalake(missingMetalake));
-    assertThrows(
-        ForbiddenException.class, () -> normalUserClient.dropMetalake(missingMetalake, true));
   }
 
   private void assertMetalakeEquals(
