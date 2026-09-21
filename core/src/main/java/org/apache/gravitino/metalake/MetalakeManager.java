@@ -401,27 +401,56 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    *
    * <p>Callers typically {@code disableMetalake} before force-drop. {@link
    * CatalogManager#dropCatalog} requires catalog {@code metalake-in-use=true}, so a disabled
-   * metalake is briefly re-enabled for child cleanup. The metalake entity is deleted immediately
-   * afterward, so the temporary enable is not restored.
+   * metalake is briefly re-enabled for child cleanup. On success the metalake entity is deleted
+   * immediately afterward, so the temporary enable is not restored; if the cleanup fails, the
+   * metalake is re-disabled (best effort) so a user-disabled metalake does not stay enabled.
    */
   private void dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
     if (catalogManager == null) {
       return;
     }
     try {
-      if (!metalakeInUse(store, metalakeIdent)) {
-        enableMetalake(metalakeIdent);
-      }
-      List<CatalogEntity> catalogs =
-          store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
-      for (CatalogEntity catalog : catalogs) {
-        catalogManager.dropCatalog(
-            NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
+      boolean wasDisabled = !metalakeInUse(store, metalakeIdent);
+      try {
+        if (wasDisabled) {
+          enableMetalake(metalakeIdent);
+        }
+        List<CatalogEntity> catalogs =
+            store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
+        for (CatalogEntity catalog : catalogs) {
+          catalogManager.dropCatalog(
+              NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
+        }
+      } catch (NoSuchMetalakeException e) {
+        // Metalake is already gone; dropMetalake will return false. Nothing to restore.
+        throw e;
+      } catch (IOException e) {
+        restoreDisabledState(metalakeIdent, wasDisabled);
+        throw e;
+      } catch (RuntimeException e) {
+        restoreDisabledState(metalakeIdent, wasDisabled);
+        throw e;
       }
     } catch (NoSuchMetalakeException e) {
       // Metalake is already gone; dropMetalake will return false.
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /** Best effort: undo the temporary enable so a failed force drop keeps a disabled metalake. */
+  private void restoreDisabledState(NameIdentifier metalakeIdent, boolean wasDisabled) {
+    if (!wasDisabled) {
+      return;
+    }
+    try {
+      disableMetalake(metalakeIdent);
+    } catch (Exception restoreFailure) {
+      LOG.warn(
+          "Failed to restore the disabled state of metalake {} after a failed force drop; "
+              + "the metalake may remain enabled",
+          metalakeIdent,
+          restoreFailure);
     }
   }
 

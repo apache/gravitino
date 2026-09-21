@@ -352,6 +352,48 @@ public class TestMetalakeManager {
     store.close();
   }
 
+  @Test
+  public void testFailedForceDropKeepsDisabledMetalakeDisabled() throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Object originalEnvCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      MetalakeManager manager =
+          new MetalakeManager(entityStore, new RandomIdGenerator(), catalogManager);
+      NameIdentifier ident = NameIdentifier.of("metalake_force_drop_failure");
+      manager.createMetalake(ident, "comment", ImmutableMap.of());
+      manager.disableMetalake(ident);
+      Assertions.assertFalse(MetalakeManager.metalakeInUse(entityStore, ident));
+
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(new RandomIdGenerator().nextId())
+              .withName("catalog1")
+              .withNamespace(Namespace.of(ident.name()))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("hive")
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build(),
+          false);
+
+      Mockito.doThrow(new RuntimeException("catalog drop failed"))
+          .when(catalogManager)
+          .dropCatalog(Mockito.any(), Mockito.anyBoolean());
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      // A failed force drop must not leave a user-disabled metalake re-enabled.
+      Assertions.assertFalse(
+          MetalakeManager.metalakeInUse(entityStore, ident),
+          "failed force drop must keep the user-disabled metalake disabled");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);
+    }
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
