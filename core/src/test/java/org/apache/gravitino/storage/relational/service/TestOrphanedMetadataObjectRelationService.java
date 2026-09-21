@@ -53,10 +53,10 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
     insertRelations("TABLE", liveTable.id(), ORPHAN_ID);
 
     Assertions.assertEquals(
-        5,
+        4,
         OrphanedMetadataObjectRelationService.getInstance()
             .softDeleteOrphanedRelations(MetadataObject.Type.TABLE, 10));
-    Assertions.assertEquals(5, countActiveRelations(liveTable.id()));
+    Assertions.assertEquals(4, countActiveRelations(liveTable.id()));
     Assertions.assertEquals(0, countActiveRelations(ORPHAN_ID));
     Assertions.assertEquals(
         0,
@@ -101,10 +101,10 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
     insertRelations("COLUMN", liveColumn.id(), droppedColumn.id());
 
     Assertions.assertEquals(
-        5,
+        4,
         OrphanedMetadataObjectRelationService.getInstance()
             .softDeleteOrphanedRelations(MetadataObject.Type.COLUMN, 10));
-    Assertions.assertEquals(5, countActiveRelations(liveColumn.id()));
+    Assertions.assertEquals(4, countActiveRelations(liveColumn.id()));
     Assertions.assertEquals(0, countActiveRelations(droppedColumn.id()));
   }
 
@@ -144,16 +144,6 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
                 + type
                 + "', '{}', 0, 0, 0)");
         statement.executeUpdate(
-            "INSERT INTO policy_relation_meta (policy_id, metadata_object_id,"
-                + " metadata_object_type, audit_info, current_version, last_version, deleted_at)"
-                + " VALUES ("
-                + objectId
-                + ", "
-                + objectId
-                + ", '"
-                + type
-                + "', '{}', 0, 0, 0)");
-        statement.executeUpdate(
             "INSERT INTO statistic_meta (statistic_id, statistic_name, statistic_value,"
                 + " metalake_id, metadata_object_id, metadata_object_type, audit_info,"
                 + " current_version, last_version, deleted_at) VALUES ("
@@ -186,9 +176,6 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
             + objectId
             + " AND deleted_at = 0 UNION ALL "
             + "SELECT COUNT(*) FROM tag_relation_meta WHERE metadata_object_id = "
-            + objectId
-            + " AND deleted_at = 0 UNION ALL "
-            + "SELECT COUNT(*) FROM policy_relation_meta WHERE metadata_object_id = "
             + objectId
             + " AND deleted_at = 0 UNION ALL "
             + "SELECT COUNT(*) FROM statistic_meta WHERE metadata_object_id = "

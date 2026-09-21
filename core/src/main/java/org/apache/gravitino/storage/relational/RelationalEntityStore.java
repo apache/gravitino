@@ -353,7 +353,7 @@ public class RelationalEntityStore
       throws IOException {
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
     // Relation query results themselves are not cached, but both endpoints may be cached entities
-    // (OWNER_REL, TAG_/POLICY_METADATA_OBJECT_REL and METADATA_OBJECT_ROLE_REL are keyed by
+    // (OWNER_REL, TAG_METADATA_OBJECT_REL and METADATA_OBJECT_ROLE_REL are keyed by
     // catalog/schema/table/... on the source side), so drop their entries conservatively: a
     // relation write can change data materialized into the endpoint entity. Note this is not free —
     // EntityCache#invalidate cascades over the identifier hierarchy, so invalidating a catalog also
@@ -499,8 +499,6 @@ public class RelationalEntityStore
 
   private static Entity.EntityType relationUpdateTargetType(Type relType) {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
       case POLICY_TAG_REL:

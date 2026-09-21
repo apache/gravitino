@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWNER_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME;
@@ -42,16 +41,6 @@ public class OrphanedMetadataObjectRelationSQLProvider {
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
     return softDeleteOrphans(
         TAG_METADATA_OBJECT_RELATION_TABLE_NAME,
-        "metadata_object_type",
-        entityTable,
-        entityIdColumn);
-  }
-
-  /** Returns SQL that soft-deletes orphaned policy relations. */
-  public static String softDeleteOrphanedPolicyRelations(
-      @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
-    return softDeleteOrphans(
-        POLICY_METADATA_OBJECT_RELATION_TABLE_NAME,
         "metadata_object_type",
         entityTable,
         entityIdColumn);

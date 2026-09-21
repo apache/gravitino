@@ -53,7 +53,6 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -334,10 +333,6 @@ public class SchemaMetaService {
                   mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaIds(schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaIds(schemaIds.get())),
-          () ->
-              SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
                   mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaIds(schemaIds.get())),
           () ->
@@ -393,13 +388,7 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())));
+                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)));
     }
     return true;
   }

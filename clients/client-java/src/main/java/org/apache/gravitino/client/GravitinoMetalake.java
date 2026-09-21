@@ -770,7 +770,7 @@ public class GravitinoMetalake extends MetalakeDTO
         .map(
             association ->
                 new GenericPolicyTagAssociation(
-                    new GenericPolicy(association.getPolicy(), restClient, this.name()),
+                    new GenericPolicy(association.getPolicy()),
                     tag,
                     association.getSelector().toSelector()))
         .toArray(PolicyTagAssociation[]::new);
@@ -848,9 +848,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return Arrays.stream(resp.getPolicies())
-        .map(p -> new GenericPolicy(p, restClient, this.name()))
-        .toArray(Policy[]::new);
+    return Arrays.stream(resp.getPolicies()).map(p -> new GenericPolicy(p)).toArray(Policy[]::new);
   }
 
   /**
@@ -875,7 +873,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -905,7 +903,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -964,7 +962,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
