@@ -62,17 +62,13 @@ public class TestBaseCatalogPropertiesMetadata {
     assertTrue(metadata.isHiddenProperty("aws-secret-access-key"));
     assertFalse(metadata.containsProperty("jdbc-user"));
     assertFalse(metadata.containsProperty("jdbc-password"));
-    assertTrue(metadata.containsProperty("token-provider"));
-    assertFalse(metadata.isHiddenProperty("token-provider"));
-    assertTrue(metadata.isHiddenProperty("token"));
-    assertTrue(metadata.containsProperty("dlf-access-key-id"));
-    assertFalse(metadata.isHiddenProperty("dlf-access-key-id"));
-    assertTrue(metadata.isHiddenProperty("dlf-access-key-secret"));
-    assertTrue(metadata.isHiddenProperty("dlf-security-token"));
-    assertTrue(metadata.containsProperty("dlf-token-path"));
-    assertFalse(metadata.isHiddenProperty("dlf-token-path"));
-    assertTrue(metadata.containsProperty("dlf-token-loader"));
-    assertFalse(metadata.isHiddenProperty("dlf-token-loader"));
+    assertFalse(metadata.containsProperty("token-provider"));
+    assertFalse(metadata.containsProperty("token"));
+    assertFalse(metadata.containsProperty("dlf-access-key-id"));
+    assertFalse(metadata.containsProperty("dlf-access-key-secret"));
+    assertFalse(metadata.containsProperty("dlf-security-token"));
+    assertFalse(metadata.containsProperty("dlf-token-path"));
+    assertFalse(metadata.containsProperty("dlf-token-loader"));
     assertTrue(metadata.containsProperty("gcs.oauth2.token"));
     assertTrue(metadata.isHiddenProperty("gcs.oauth2.token"));
     assertTrue(metadata.containsProperty("gcs.oauth2.token-expires-at"));
@@ -95,9 +91,11 @@ public class TestBaseCatalogPropertiesMetadata {
     assertEquals(
         metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
         metadata.isHiddenProperty("s3.session-token"));
-    assertEquals(metadata.isHiddenProperty("token"), metadata.isHiddenProperty("gcs.oauth2.token"));
     assertEquals(
-        metadata.isHiddenProperty("token"),
+        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
+        metadata.isHiddenProperty("gcs.oauth2.token"));
+    assertEquals(
+        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
         metadata.isHiddenProperty("adls.sas-token.account.dfs.core.windows.net"));
     assertEquals(
         metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_STS_ENDPOINT),
@@ -111,12 +109,10 @@ public class TestBaseCatalogPropertiesMetadata {
     assertEquals(
         metadata.isHiddenProperty(CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS),
         metadata.isHiddenProperty("client.security-token-expires-at-ms"));
-    assertEquals(
-        metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS),
-        metadata.isHiddenProperty("gcs.oauth2.token-expires-at"));
+    assertFalse(metadata.isHiddenProperty("gcs.oauth2.token-expires-at"));
     assertEquals(
         metadata.isHiddenProperty(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS),
-        metadata.isHiddenProperty("gcs.oauth2.token-expires-at"));
+        metadata.isHiddenProperty("adls.sas-token-expires-at-ms.account.dfs.core.windows.net"));
   }
 
   @Test

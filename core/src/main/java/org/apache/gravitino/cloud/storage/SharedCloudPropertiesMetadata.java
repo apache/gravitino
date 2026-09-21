@@ -45,7 +45,6 @@ import static org.apache.gravitino.credential.CredentialPropertyUtils.PAIMON_S3_
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -62,9 +61,9 @@ import org.apache.gravitino.storage.S3Properties;
  * are the definitions those properties already have. Engine keys from {@link
  * org.apache.gravitino.credential.CredentialPropertyUtils} take hidden from the catalog property
  * that stores the same value: an access key from that cloud's access key, a session or SAS token
- * from that cloud's secret or from {@code token}, an expiry from that cloud's {@code
- * *-token-expire-in-secs}, and a refresh endpoint from {@code s3-token-service-endpoint}. A
- * connector that already declares the same key keeps its own entry.
+ * from that cloud's secret, an expiry from that cloud's {@code *-token-expire-in-secs}, and a
+ * refresh endpoint from {@code s3-token-service-endpoint}. A connector that already declares the
+ * same key keeps its own entry.
  */
 public final class SharedCloudPropertiesMetadata {
 
@@ -84,9 +83,6 @@ public final class SharedCloudPropertiesMetadata {
       entry(
           AzurePropertiesMetadata.PROPERTY_ENTRIES,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-  private static final PropertyEntry<?> TOKEN =
-      entry(
-          CatalogCredentialPropertiesMetadata.PAIMON_REST_PROPERTY_ENTRIES, PaimonConstants.TOKEN);
   private static final PropertyEntry<?> S3_TOKEN_EXPIRE =
       entry(
           CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES,
@@ -99,10 +95,6 @@ public final class SharedCloudPropertiesMetadata {
       entry(
           CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES,
           CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS);
-  private static final PropertyEntry<?> COS_TOKEN_EXPIRE =
-      entry(
-          CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES,
-          CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS);
   private static final PropertyEntry<?> S3_TOKEN_SERVICE_ENDPOINT =
       entry(S3PropertiesMetadata.PROPERTY_ENTRIES, S3Properties.GRAVITINO_S3_STS_ENDPOINT);
 
@@ -151,7 +143,7 @@ public final class SharedCloudPropertiesMetadata {
           .put(
               ICEBERG_ADLS_SAS_TOKEN_PREFIX,
               optionalStringPrefix(
-                  TOKEN,
+                  S3_SECRET_ACCESS_KEY,
                   ICEBERG_ADLS_SAS_TOKEN_PREFIX,
                   "Iceberg ADLS SAS token for an account host"))
           .put(ICEBERG_ADLS_ACCOUNT_NAME, renamed(AZURE_ACCOUNT_NAME, ICEBERG_ADLS_ACCOUNT_NAME))
@@ -170,7 +162,10 @@ public final class SharedCloudPropertiesMetadata {
                   "Iceberg endpoint for refreshing ADLS credentials"))
           .put(
               ICEBERG_GCS_TOKEN,
-              optionalString(TOKEN, ICEBERG_GCS_TOKEN, "OAuth2 access token for Iceberg GCSFileIO"))
+              optionalString(
+                  S3_SECRET_ACCESS_KEY,
+                  ICEBERG_GCS_TOKEN,
+                  "OAuth2 access token for Iceberg GCSFileIO"))
           .put(
               ICEBERG_GCS_TOKEN_EXPIRES_AT,
               stringOptionalPropertyEntry(
@@ -178,7 +173,7 @@ public final class SharedCloudPropertiesMetadata {
                   "Epoch millis when the Iceberg GCS OAuth2 token expires",
                   false /* immutable */,
                   null /* defaultValue */,
-                  tokenExpireHidden()))
+                  false /* hidden */))
           .put(
               ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT,
               optionalString(
@@ -230,20 +225,5 @@ public final class SharedCloudPropertiesMetadata {
       PropertyEntry<?> hiddenSource, String name, String description) {
     return stringOptionalPropertyPrefixEntry(
         name, description, false, null, hiddenSource.isHidden(), false);
-  }
-
-  /**
-   * GCS has no {@code gcs-token-expire-in-secs} property. Expiry stays visible only when every
-   * existing {@code *-token-expire-in-secs} entry agrees, so one cloud's flag cannot move GCS by
-   * itself.
-   */
-  private static boolean tokenExpireHidden() {
-    boolean hidden = S3_TOKEN_EXPIRE.isHidden();
-    Preconditions.checkState(
-        hidden == OSS_TOKEN_EXPIRE.isHidden()
-            && hidden == ADLS_TOKEN_EXPIRE.isHidden()
-            && hidden == COS_TOKEN_EXPIRE.isHidden(),
-        "Token expire properties disagree on hidden");
-    return hidden;
   }
 }

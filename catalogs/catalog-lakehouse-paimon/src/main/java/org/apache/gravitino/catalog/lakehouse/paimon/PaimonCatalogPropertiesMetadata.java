@@ -38,7 +38,6 @@ import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
-import org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.storage.OSSProperties;
@@ -114,7 +113,64 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
 
   public static final Map<String, PropertyEntry<?>> REST_PROPERTY_ENTRIES =
-      CatalogCredentialPropertiesMetadata.PAIMON_REST_PROPERTY_ENTRIES;
+      new ImmutableMap.Builder<String, PropertyEntry<?>>()
+          .put(
+              PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
+                  "The token provider type for Paimon",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.TOKEN,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.TOKEN,
+                  "The bearer token for REST catalog authentication",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+                  "The access key ID for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+                  "The access key secret for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+                  "The security token for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
+                  "The token path for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER,
+                  "The token loader for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .build();
 
   static {
     List<PropertyEntry<?>> propertyEntries =

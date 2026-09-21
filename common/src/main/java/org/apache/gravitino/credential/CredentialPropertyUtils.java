@@ -66,10 +66,7 @@ public class CredentialPropertyUtils {
   public static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
       "client.security-token-expires-at-ms";
 
-  /**
-   * Iceberg ADLS SAS token property prefix. The concrete key appends {@code .} and the storage
-   * account host.
-   */
+  /** Iceberg ADLS SAS token property. */
   public static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
 
   /** Iceberg ADLS shared-key account name property. */
@@ -96,11 +93,11 @@ public class CredentialPropertyUtils {
   public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
       "gcs.oauth2.refresh-credentials-endpoint";
 
-  /** Iceberg JDBC user property. */
-  public static final String ICEBERG_JDBC_USER = "jdbc.user";
+  /** AWS access key ID catalog property. */
+  public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
 
-  /** Iceberg JDBC password property. */
-  public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
+  /** AWS secret access key catalog property. */
+  public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
 
   /** Paimon S3 access key property. */
   public static final String PAIMON_S3_ACCESS_KEY = "s3.access-key";
@@ -166,8 +163,8 @@ public class CredentialPropertyUtils {
     for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbc = (JdbcCredential) credential;
-        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
-        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
+        props.put("jdbc.user", jdbc.jdbcUser());
+        props.put("jdbc.password", jdbc.jdbcPassword());
       } else {
         Map<String, String> converted = toIcebergProperties(credential);
         if (converted.isEmpty()) {
@@ -192,8 +189,8 @@ public class CredentialPropertyUtils {
     for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbc = (JdbcCredential) credential;
-        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
-        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
+        props.put("jdbc.user", jdbc.jdbcUser());
+        props.put("jdbc.password", jdbc.jdbcPassword());
       } else if (credential instanceof S3SecretKeyCredential) {
         S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
         props.put(PAIMON_S3_ACCESS_KEY, s3.accessKeyId());
