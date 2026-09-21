@@ -157,6 +157,57 @@ public class TestSecretManagerAlter {
     }
   }
 
+  @Test
+  void testDropCleanupDeletesWriteThroughButKeepsExternalReference() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      // Seed a material whose URN has three identifier segments shaped like an
+      // external reference (entity type "path" is not a Gravitino entity type) —
+      // a conforming provider may emit exactly this shape.
+      String externalUrn =
+          secretManager
+              .getRegistry()
+              .getProvider("memory")
+              .writeSecret(
+                  "external-value",
+                  Map.of(
+                      SecretConstants.ATTR_ENTITY_TYPE, "path",
+                      SecretConstants.ATTR_ENTITY_ID, "7",
+                      SecretConstants.ATTR_PROPERTY_KEY, "my-key"))
+              .toString();
+
+      Map<String, String> props = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      String writeThroughUrn =
+          secretManager.alterSetSecretBinding(
+              new HashMap<>(),
+              "catalog",
+              12L,
+              "owned-key",
+              new SecretBinding("memory", "owned"),
+              written);
+      props.put("owned-key", writeThroughUrn);
+      props.put("my-key", externalUrn);
+
+      secretManager.deleteSecretsFromProperties(props);
+
+      // Write-through secret is gone.
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              secretManager
+                  .getRegistry()
+                  .getProvider("memory")
+                  .readSecret(SecretUrn.parse(writeThroughUrn)));
+      // The three-segment external reference material is untouched.
+      Assertions.assertEquals(
+          "external-value",
+          secretManager
+              .getRegistry()
+              .getProvider("memory")
+              .readSecret(SecretUrn.parse(externalUrn)));
+    }
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

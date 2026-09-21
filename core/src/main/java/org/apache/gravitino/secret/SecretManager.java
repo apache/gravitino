@@ -350,17 +350,10 @@ public class SecretManager implements Closeable {
     }
     List<SecretUrn> writeThrough = new ArrayList<>();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      if (!SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
-        continue;
-      }
-      try {
-        SecretUrn urn = SecretUrn.parse(entry.getValue());
-        // Write-through URNs are entityType:entityId:propertyKey (3 segments).
-        if (urn.identifierSegments().size() == 3) {
-          writeThrough.add(urn);
-        }
-      } catch (IllegalArgumentException e) {
-        LOG.warn("Skipping invalid secret URN in properties for key {}", entry.getKey(), e);
+      // Only Gravitino-owned write-through URNs may be deleted; a provider's
+      // external-reference URN can legally have any identifier shape.
+      if (SecretPropertyUtils.isWriteThroughUrn(entry.getKey(), entry.getValue())) {
+        writeThrough.add(SecretUrn.parse(entry.getValue()));
       }
     }
     deleteSecrets(writeThrough);
