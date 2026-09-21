@@ -173,12 +173,32 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(6)
   public void testMissingMetalakeForServiceAdmin() {
+    String missingMetalake = "missingMetalake";
+
+    // Service admins see the pre-authorization semantics of a missing metalake.
     assertThrows(
-        NoSuchMetalakeException.class, () -> serviceAdminClient.loadMetalake(testMetalake3));
-    Assertions.assertFalse(serviceAdminClient.dropMetalake(testMetalake3, true));
-    assertThrows(ForbiddenException.class, () -> normalUserClient.loadMetalake(testMetalake3));
+        NoSuchMetalakeException.class, () -> serviceAdminClient.loadMetalake(missingMetalake));
     assertThrows(
-        ForbiddenException.class, () -> normalUserClient.dropMetalake(testMetalake3, true));
+        NoSuchMetalakeException.class,
+        () ->
+            serviceAdminClient.alterMetalake(
+                missingMetalake, MetalakeChange.setProperty("key1", "value1")));
+    assertThrows(
+        NoSuchMetalakeException.class, () -> serviceAdminClient.enableMetalake(missingMetalake));
+    assertThrows(
+        NoSuchMetalakeException.class, () -> serviceAdminClient.disableMetalake(missingMetalake));
+    Assertions.assertFalse(serviceAdminClient.dropMetalake(missingMetalake, true));
+
+    // Other callers cannot probe for metalake existence.
+    assertThrows(ForbiddenException.class, () -> normalUserClient.loadMetalake(missingMetalake));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            normalUserClient.alterMetalake(
+                missingMetalake, MetalakeChange.setProperty("key1", "value1")));
+    assertThrows(ForbiddenException.class, () -> normalUserClient.enableMetalake(missingMetalake));
+    assertThrows(
+        ForbiddenException.class, () -> normalUserClient.dropMetalake(missingMetalake, true));
   }
 
   private void assertMetalakeEquals(

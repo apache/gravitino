@@ -52,6 +52,8 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.requests.MetalakeSetRequest;
+import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -471,7 +473,7 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-  public void testMissingMetalakeResponseForServiceAdmin() throws Throwable {
+  public void testServiceAdminProceedsOnMissingMetalake() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> authorizerProvider =
             mockStatic(GravitinoAuthorizerProvider.class);
@@ -482,6 +484,7 @@ public class TestGravitinoInterceptionService {
       GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
       authorizerProvider.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      // PassThroughAuthorizer path: the membership check itself reports the missing metalake.
       authorizationUtils
           .when(
               () ->
@@ -491,34 +494,31 @@ public class TestGravitinoInterceptionService {
                       any(AuthorizationRequestContext.class)))
           .thenThrow(new NoSuchMetalakeException("Metalake gone does not exist"));
 
-      Method loadMethod = MetalakeOperations.class.getMethod("loadMetalake", String.class);
-      Method dropMethod =
-          MetalakeOperations.class.getMethod("dropMetalake", String.class, boolean.class);
       GravitinoInterceptionService service = new GravitinoInterceptionService();
+      Response resourceResult = Utils.ok(new DropResponse(false));
 
       for (boolean serviceAdmin : new boolean[] {false, true}) {
         when(authorizer.isServiceAdmin()).thenReturn(serviceAdmin);
-        for (Method method : new Method[] {loadMethod, dropMethod}) {
+        for (Method method : missingMetalakeAwareMethods()) {
           MethodInvocation invocation = mock(MethodInvocation.class);
           when(invocation.getMethod()).thenReturn(method);
-          when(invocation.getArguments())
-              .thenReturn(
-                  method.equals(loadMethod) ? new Object[] {"gone"} : new Object[] {"gone", false});
+          when(invocation.getArguments()).thenReturn(missingMetalakeArguments(method, "gone"));
+          when(invocation.proceed()).thenReturn(resourceResult);
           MethodInterceptor interceptor = service.getMethodInterceptors(method).get(0);
 
-          Response response = (Response) interceptor.invoke(invocation);
+          Object result = interceptor.invoke(invocation);
 
-          if (!serviceAdmin) {
-            assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-          } else if (method.equals(loadMethod)) {
-            assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-            assertEquals(
-                "NoSuchMetalakeException", ((ErrorResponse) response.getEntity()).getType());
+          if (serviceAdmin) {
+            // The resource method reports the missing metalake itself (404 or dropped=false).
+            Assertions.assertSame(resourceResult, result, method.getName());
+            verify(invocation).proceed();
           } else {
-            assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-            Assertions.assertFalse(((DropResponse) response.getEntity()).dropped());
+            assertEquals(
+                Response.Status.FORBIDDEN.getStatusCode(),
+                ((Response) result).getStatus(),
+                method.getName());
+            verify(invocation, never()).proceed();
           }
-          verify(invocation, never()).proceed();
         }
       }
     }
@@ -537,6 +537,7 @@ public class TestGravitinoInterceptionService {
       authorizerProvider.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
       when(authorizer.isServiceAdmin()).thenReturn(true);
+      // JCasbin path: non-membership is reported for missing and inaccessible metalakes alike.
       authorizationUtils
           .when(
               () ->
@@ -556,16 +557,43 @@ public class TestGravitinoInterceptionService {
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);
       when(invocation.getArguments()).thenReturn(new Object[] {"metalake"});
+      Response resourceResult = Utils.ok(new DropResponse(false));
+      when(invocation.proceed()).thenReturn(resourceResult);
       MethodInterceptor interceptor =
           new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
 
-      Response missingResponse = (Response) interceptor.invoke(invocation);
-      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), missingResponse.getStatus());
+      when(metalakeDispatcher.metalakeExists(ArgumentMatchers.any())).thenReturn(false);
+      Assertions.assertSame(resourceResult, interceptor.invoke(invocation));
+      verify(invocation).proceed();
 
       when(metalakeDispatcher.metalakeExists(ArgumentMatchers.any())).thenReturn(true);
       Response existingResponse = (Response) interceptor.invoke(invocation);
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), existingResponse.getStatus());
-      verify(invocation, never()).proceed();
+      // Still exactly one proceed(): an existing metalake the admin cannot access stays denied.
+      verify(invocation).proceed();
+    }
+  }
+
+  private static Method[] missingMetalakeAwareMethods() throws NoSuchMethodException {
+    return new Method[] {
+      MetalakeOperations.class.getMethod("loadMetalake", String.class),
+      MetalakeOperations.class.getMethod("setMetalake", String.class, MetalakeSetRequest.class),
+      MetalakeOperations.class.getMethod(
+          "alterMetalake", String.class, MetalakeUpdatesRequest.class),
+      MetalakeOperations.class.getMethod("dropMetalake", String.class, boolean.class)
+    };
+  }
+
+  private static Object[] missingMetalakeArguments(Method method, String metalake) {
+    switch (method.getName()) {
+      case "setMetalake":
+        return new Object[] {metalake, new MetalakeSetRequest(true)};
+      case "alterMetalake":
+        return new Object[] {metalake, new MetalakeUpdatesRequest()};
+      case "dropMetalake":
+        return new Object[] {metalake, false};
+      default:
+        return new Object[] {metalake};
     }
   }
 
