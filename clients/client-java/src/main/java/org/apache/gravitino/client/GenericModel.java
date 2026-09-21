@@ -27,24 +27,24 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.model.ModelDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic model. */
-class GenericModel implements Model, SupportsTags, SupportsPolicies {
+class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSecrets {
 
   private final ModelDTO modelDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericModel(ModelDTO modelDTO, RESTClient restClient, Namespace modelNs) {
     this.modelDTO = modelDTO;
@@ -55,6 +55,8 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies {
         new MetadataObjectTagOperations(modelNs.level(0), modelObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(modelNs.level(0), modelObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(modelNs.level(0), modelObject, restClient);
   }
 
   @Override
@@ -90,6 +92,16 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies {
   @Override
   public SupportsPolicies supportsPolicies() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override
@@ -149,16 +161,5 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies {
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 }

@@ -39,11 +39,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -51,7 +51,10 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -709,8 +712,8 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals("creator", grantRevokeGroup.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeGroup.auditInfo().lastModifier());
 
-    // no update
-    Function<GroupEntity, GroupEntity> noUpdater =
+    // metadata-only update
+    Function<GroupEntity, GroupEntity> metadataUpdater =
         group -> {
           AuditInfo updateAuditInfo =
               AuditInfo.builder()
@@ -732,19 +735,20 @@ class TestGroupMetaService extends TestJDBCBackend {
               .withAuditInfo(updateAuditInfo)
               .build();
         };
-    long beforeNoUpdate = getGroupUpdatedAt(group1.name()).getUpdatedAt();
-    Assertions.assertNotNull(groupMetaService.updateGroup(group1.nameIdentifier(), noUpdater));
-    Assertions.assertEquals(beforeNoUpdate, getGroupUpdatedAt(group1.name()).getUpdatedAt());
-    GroupEntity noUpdaterGroup =
+    long beforeMetadataUpdate = getGroupUpdatedAt(group1.name()).getUpdatedAt();
+    Assertions.assertNotNull(
+        groupMetaService.updateGroup(group1.nameIdentifier(), metadataUpdater));
+    Assertions.assertTrue(getGroupUpdatedAt(group1.name()).getUpdatedAt() >= beforeMetadataUpdate);
+    GroupEntity metadataUpdatedGroup =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
-    Assertions.assertEquals(group1.id(), noUpdaterGroup.id());
-    Assertions.assertEquals(group1.name(), noUpdaterGroup.name());
+    Assertions.assertEquals(group1.id(), metadataUpdatedGroup.id());
+    Assertions.assertEquals(group1.name(), metadataUpdatedGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterGroup.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(metadataUpdatedGroup.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterGroup.roleIds()));
-    Assertions.assertEquals("creator", noUpdaterGroup.auditInfo().creator());
-    Assertions.assertEquals("grantRevokeUser", noUpdaterGroup.auditInfo().lastModifier());
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(metadataUpdatedGroup.roleIds()));
+    Assertions.assertEquals("creator", metadataUpdatedGroup.auditInfo().creator());
+    Assertions.assertEquals("noUpdateUser", metadataUpdatedGroup.auditInfo().lastModifier());
 
     // Delete a role, the group entity won't contain this role.
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
@@ -1068,38 +1072,136 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testGroupExtId() throws IOException {
-    GroupMetaService svc = groupMetaService();
-    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
-    GroupEntity found = svc.getGroupByExternalId(groupExtIdent("ext-1"));
-    Assertions.assertEquals("g1", found.name());
-    Assertions.assertEquals("ext-1", found.externalId());
-    assertThrowsExt(
-        NoSuchEntityException.class,
-        () -> svc.getGroupByExternalId(groupExtIdent("missing-ext-id")));
-    assertThrowsExt(
-        IllegalArgumentException.class, () -> svc.getGroupByExternalId(groupExtIdent("")));
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            catalogName);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            catalogName);
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "concurrent-group",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupMetaService.getInstance().insertGroup(group, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            GroupMetaService.getInstance()
+                .updateGroup(
+                    group.nameIdentifier(),
+                    (GroupEntity oldGroup) -> {
+                      advanceGroupVersion(group.id());
+                      List<String> roleNames = Lists.newArrayList(oldGroup.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldGroup.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return GroupEntity.builder()
+                          .withId(oldGroup.id())
+                          .withName(oldGroup.name())
+                          .withNamespace(oldGroup.namespace())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldGroup.auditInfo())
+                          .build();
+                    }));
+
+    GroupEntity storedGroup =
+        GroupMetaService.getInstance().getGroupByIdentifier(group.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedGroup.roleIds()));
   }
 
   @TestTemplate
-  void testExtDup() throws IOException {
-    GroupMetaService svc = groupMetaService();
-    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
-    assertThrowsExt(
-        EntityAlreadyExistsException.class,
-        () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    GroupMetaService service = GroupMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "fenced-group",
+            AUDIT_INFO);
+
+    service.insertGroup(group, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    GroupEntity duplicate =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            group.name(),
+            AUDIT_INFO);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertGroup(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
   }
 
   @TestTemplate
-  void testGroupExtDel() throws IOException {
-    GroupMetaService svc = groupMetaService();
-    svc.insertGroup(groupWithExtId("g1", "ext-del-by"), false);
-    GroupEntity group = svc.getGroupByExternalId(groupExtIdent("ext-del-by"));
-    Assertions.assertEquals("g1", group.name());
-    Assertions.assertTrue(svc.deleteGroup(group.nameIdentifier()));
-    assertThrowsExt(
-        NoSuchEntityException.class, () -> svc.getGroupByExternalId(groupExtIdent("ext-del-by")));
-    assertThrowsExt(NoSuchEntityException.class, () -> svc.deleteGroup(group.nameIdentifier()));
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    GroupMetaService service = groupMetaService();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "overwrite-group",
+            AUDIT_INFO);
+    service.insertGroup(group, false);
+    GroupPO initialPO = getGroupPO(group.name());
+
+    service.insertGroup(group, true);
+
+    GroupPO overwrittenPO = getGroupPO(group.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            GroupMetaMapper.class,
+            mapper ->
+                mapper.softDeleteGroupMetaByGroupId(group.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    GroupMetaService service = groupMetaService();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "stale-delete-group",
+            AUDIT_INFO);
+    service.insertGroup(group, false);
+    GroupPO staleGroupPO = getGroupPO(group.name());
+    advanceGroupVersion(group.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteGroupWithVersion(group.nameIdentifier(), staleGroupPO));
+    assertEquals(group.id(), service.getGroupByIdentifier(group.nameIdentifier()).id());
   }
 
   @TestTemplate
@@ -1231,27 +1333,25 @@ class TestGroupMetaService extends TestJDBCBackend {
         Sets.newHashSet(page.items().get(0).roleNames()));
   }
 
-  private NameIdentifier groupExtIdent(String externalId) {
-    return AuthorizationUtils.ofGroupExternalId(metalakeName, externalId);
-  }
-
   private GroupMetaService groupMetaService() throws IOException {
     createAndInsertMakeLake(metalakeName);
     return GroupMetaService.getInstance();
   }
 
-  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
-    Assertions.assertThrows(type, executable);
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
   }
 
-  private GroupEntity groupWithExtId(String name, String externalId) {
-    return GroupEntity.builder()
-        .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName(name)
-        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalakeName))
-        .withExternalId(externalId)
-        .withAuditInfo(AUDIT_INFO)
-        .build();
+  private GroupPO getGroupPO(String groupName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        GroupMetaMapper.class,
+        mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), groupName));
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
   }
 
   private GroupEntity createGroupEntity(
@@ -1264,5 +1364,20 @@ class TestGroupMetaService extends TestJDBCBackend {
         .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private void advanceGroupVersion(long groupId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE group_meta SET current_version = current_version + 1 WHERE group_id = "
+                  + groupId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance group version failed", e);
+    }
   }
 }

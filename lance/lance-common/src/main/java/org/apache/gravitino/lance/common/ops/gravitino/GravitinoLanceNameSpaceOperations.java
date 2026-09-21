@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
@@ -47,6 +48,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.LanceNamespaceException;
@@ -91,19 +93,26 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
+    // Unauthorized entries are removed before the page is cut, so pagination stays consistent with
+    // what the caller is allowed to see.
+    LanceMetadataFilter metadataFilter = namespaceWrapper.metadataFilter();
     List<String> namespaces;
     switch (nsId.levels()) {
       case 0:
         namespaces =
-            Arrays.stream(namespaceWrapper.listCatalogsInfo())
-                .filter(namespaceWrapper::isLakehouseCatalog)
-                .map(Catalog::name)
-                .collect(Collectors.toList());
+            metadataFilter.filterCatalogs(
+                Arrays.stream(namespaceWrapper.listCatalogsInfo())
+                    .filter(namespaceWrapper::isLakehouseCatalog)
+                    .map(Catalog::name)
+                    .collect(Collectors.toList()));
         break;
 
       case 1:
-        Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
-        namespaces = Lists.newArrayList(namespaceWrapper.listSchemas(catalog));
+        String catalogName = nsId.levelAtListPos(0);
+        Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+        namespaces =
+            metadataFilter.filterSchemas(
+                catalogName, Lists.newArrayList(namespaceWrapper.listSchemas(catalog)));
         break;
 
       case 2:
@@ -121,6 +130,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
             "Expected at most 2-level namespace but got: " + namespaceId);
     }
 
+    namespaces = Lists.newArrayList(namespaces);
     Collections.sort(namespaces);
     PageUtil.Page page =
         PageUtil.splitPage(namespaces, pageToken, PageUtil.normalizePageSize(limit));
@@ -465,11 +475,17 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
     String schemaName = nsId.levelAtListPos(1);
-    List<String> tables =
+    // Unauthorized entries are removed before the page is cut, so pagination stays consistent with
+    // what the caller is allowed to see.
+    LanceMetadataFilter metadataFilter = namespaceWrapper.metadataFilter();
+    List<String> tableNames =
         Arrays.stream(namespaceWrapper.asTableCatalog(catalog).listTables(Namespace.of(schemaName)))
-            .map(ident -> ident.name())
-            .sorted()
+            .map(NameIdentifier::name)
             .collect(Collectors.toList());
+
+    List<String> tables =
+        Lists.newArrayList(metadataFilter.filterTables(catalogName, schemaName, tableNames));
+    Collections.sort(tables);
 
     PageUtil.Page page = PageUtil.splitPage(tables, pageToken, PageUtil.normalizePageSize(limit));
     ListTablesResponse response = new ListTablesResponse();

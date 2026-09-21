@@ -365,6 +365,14 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident))
+              .properties()
+              .containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       Assertions.assertThrows(
           FilesetAlreadyExistsException.class,
           () ->

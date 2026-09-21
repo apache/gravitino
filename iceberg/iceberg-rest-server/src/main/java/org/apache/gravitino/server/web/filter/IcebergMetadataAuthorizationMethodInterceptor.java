@@ -24,12 +24,15 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.aopalliance.intercept.MethodInterceptor;
+import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -46,10 +49,31 @@ import org.apache.iceberg.rest.RESTUtil;
  * metadata authorization.
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
-    extends BaseMetadataAuthorizationMethodInterceptor {
+    extends BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
 
   @Override
+  public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+    return authorizeMethod(
+        methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
+  }
+
+  @Override
+  protected AuthorizationTarget resolveAuthorizationTarget(
+      Method method, AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+        extractNameIdentifierFromParameters(parameters, args);
+    return new AuthorizationTarget(
+        nameIdentifierMap, EntityType.valueOf(annotation.accessMetadataType().name()));
+  }
+
+  /**
+   * Extracts Gravitino identifiers from Iceberg REST path parameters.
+   *
+   * @param parameters invoked method parameters
+   * @param args invoked method arguments
+   * @return identifiers keyed by entity type
+   */
   protected Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
       Parameter[] parameters, Object[] args) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
@@ -107,6 +131,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     return nameIdentifierMap;
   }
 
+  @Override
+  protected Object toErrorResponse(Method method, Object[] args, Throwable throwable) {
+    return IcebergExceptionMapper.toRESTResponse(throwable);
+  }
+
   /**
    * Creates an authorization handler for Iceberg-specific operations that require custom logic
    * beyond standard annotation-based authorization.
@@ -141,8 +170,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   }
 
   @Override
-  protected boolean isExceptionPropagate(Exception e) {
-    return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  protected boolean isExceptionPropagate(Exception exception) {
+    return exception.getClass().getName().startsWith("org.apache.iceberg.exceptions");
   }
 
   /**

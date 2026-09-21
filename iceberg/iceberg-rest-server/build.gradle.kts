@@ -84,6 +84,7 @@ dependencies {
   testImplementation(project(":bundles:iceberg-azure-bundle"))
   testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(project(":server"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -97,6 +98,8 @@ dependencies {
   }
 
   testImplementation(libs.awaitility)
+  // At runtime use the SDK supplied by iceberg-aws-bundle, keeping its S3 and STS versions aligned.
+  testCompileOnly(libs.aws.s3)
   testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)

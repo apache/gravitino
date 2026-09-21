@@ -23,12 +23,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
@@ -36,8 +38,12 @@ import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TypeUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TypeUtils.class);
 
   // Flink supports time/timestamp precision from 0 to 9 (nanosecond precision).
   // @see
@@ -246,11 +252,25 @@ public class TypeUtils {
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
         String catalogString = externalType.catalogString();
-        // Parse the external catalog type string back to Flink LogicalType.
-        // This is used to restore types like MULTISET that Gravitino doesn't natively support.
-        LogicalType parsedType =
-            LogicalTypeParser.parse(catalogString, TypeUtils.class.getClassLoader());
-        return TypeConversions.fromLogicalToDataType(parsedType);
+        // MULTISET is the only Flink type carried as an external type, written here by
+        // toGravitinoType and by the Paimon catalog. Every other catalog string is a type name of
+        // some other data source, and some of those parse as a Flink type by accident, a
+        // PostgreSQL numeric parses as DECIMAL(10, 0). Only a parsed MULTISET is therefore
+        // restored, and any other type is read as a string to keep the rest of the table usable.
+        try {
+          LogicalType parsedType =
+              LogicalTypeParser.parse(catalogString, TypeUtils.class.getClassLoader());
+          if (parsedType.getTypeRoot() == LogicalTypeRoot.MULTISET) {
+            return TypeConversions.fromLogicalToDataType(parsedType);
+          }
+          LOG.warn("External type {} is not a Flink type, reading it as a string.", catalogString);
+        } catch (ValidationException e) {
+          LOG.warn(
+              "External type {} cannot be parsed as a Flink type, reading it as a string.",
+              catalogString,
+              e);
+        }
+        return DataTypes.STRING();
       default:
         throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
     }

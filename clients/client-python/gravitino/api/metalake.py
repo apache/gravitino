@@ -20,6 +20,7 @@ from typing import Optional, Dict
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.exceptions.base import UnsupportedOperationException
 
 
@@ -69,4 +70,9 @@ class Metalake(Auditable):
         """
         raise UnsupportedOperationException(
             "Metalake does not support role operations."
+        )
+
+    def support_secrets(self) -> SupportsSecrets:
+        raise UnsupportedOperationException(
+            "Metalake does not support secret property operations."
         )

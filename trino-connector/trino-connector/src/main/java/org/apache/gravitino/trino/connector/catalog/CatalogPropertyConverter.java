@@ -20,14 +20,13 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class CatalogPropertyConverter extends PropertyConverter {
-  private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
+  private static final Logger LOG = Logger.get(CatalogPropertyConverter.class);
 
   private static final String TRINO_PROPERTIES_PREFIX = "trino.bypass.";
 
@@ -59,7 +58,7 @@ public class CatalogPropertyConverter extends PropertyConverter {
       if (engineKey != null) {
         engineProperties.put(engineKey, entry.getValue());
       } else {
-        LOG.info("Property {} is not supported by engine", entry.getKey());
+        LOG.info("Property %s is not supported by engine", entry.getKey());
       }
     }
     // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
@@ -69,7 +68,7 @@ public class CatalogPropertyConverter extends PropertyConverter {
         if (!engineProperties.containsKey(key)) {
           engineProperties.put(key, entry.getValue());
         } else {
-          LOG.info("Property {} which with trino.bypass prefix is skipped", key);
+          LOG.info("Property %s which with trino.bypass prefix is skipped", key);
         }
       }
     }

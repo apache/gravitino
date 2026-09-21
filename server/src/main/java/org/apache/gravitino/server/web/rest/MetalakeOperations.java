@@ -123,7 +123,8 @@ public class MetalakeOperations {
           OperationType.CREATE, "", new IllegalArgumentException("Request body cannot be null"));
     }
 
-    LOG.info("Received create metalake request for {}", request.getName());
+    String metalakeName = request.getName();
+    LOG.info("Received create metalake request for {}", metalakeName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -139,7 +140,6 @@ public class MetalakeOperations {
           });
 
     } catch (Exception e) {
-      String metalakeName = request != null ? request.getName() : "";
       return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, metalakeName, e);
     }
   }
@@ -181,6 +181,13 @@ public class MetalakeOperations {
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       MetalakeSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.SET,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received set request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(
@@ -218,6 +225,13 @@ public class MetalakeOperations {
           String metalakeName,
       MetalakeUpdatesRequest updatesRequest) {
     LOG.info("Received alter metalake request for metalake: {}", metalakeName);
+    if (updatesRequest == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.ALTER,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

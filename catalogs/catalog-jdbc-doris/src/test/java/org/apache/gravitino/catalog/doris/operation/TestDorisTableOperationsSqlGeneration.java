@@ -22,11 +22,15 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.RE
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
@@ -50,6 +54,9 @@ import org.mockito.Mockito;
 public class TestDorisTableOperationsSqlGeneration {
 
   private static class TestableDorisTableOperations extends DorisTableOperations {
+    private JdbcTable tableForAlter =
+        JdbcTable.builder().withName("test_table").withIndexes(Indexes.EMPTY_INDEXES).build();
+
     public TestableDorisTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new DorisTypeConverter();
@@ -101,10 +108,14 @@ public class TestDorisTableOperationsSqlGeneration {
       return generateAlterTableSql("database", tableName, changes);
     }
 
+    void setTableForAlter(JdbcTable table) {
+      this.tableForAlter = table;
+    }
+
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return tableForAlter;
     }
 
     public String createTableSqlWithIndexes(
@@ -117,6 +128,11 @@ public class TestDorisTableOperationsSqlGeneration {
           Transforms.EMPTY_TRANSFORM,
           distribution,
           indexes);
+    }
+
+    List<Index> indexes(Connection connection, String databaseName, String tableName)
+        throws SQLException {
+      return getIndexes(connection, databaseName, tableName);
     }
   }
 
@@ -289,6 +305,112 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testCreateAndAlterInvertedIndexPropertiesUseDeterministicRendering() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn nameCol =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.VarCharType.of(100))
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("support_phrase", "true");
+    properties.put("parser", "english");
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.INVERTED, "idx_name", new String[][] {{"name"}}, properties)
+        };
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String expectedDefinition =
+        "INDEX `idx_name` (`name`) USING INVERTED PROPERTIES (\n"
+            + "\"parser\"=\"english\",\n"
+            + "\"support_phrase\"=\"true\"\n)";
+    String createSql =
+        mockOps.createTableSqlWithIndexes(
+            "test_inverted", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
+    Assertions.assertTrue(createSql.contains(expectedDefinition), createSql);
+
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(
+                Index.IndexType.INVERTED, "idx_name", new String[][] {{"name"}}, properties);
+    Assertions.assertEquals(
+        "ADD " + expectedDefinition, DorisTableOperations.addIndexDefinition(addIndex));
+  }
+
+  @Test
+  public void testInvertedIndexPropertiesEscapeSqlLiterals() {
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(
+                Index.IndexType.INVERTED,
+                "idx_name",
+                new String[][] {{"name"}},
+                Map.of("char_filter_pattern", "owner's \"comment\" C:\\tmp,=中文"));
+
+    Assertions.assertEquals(
+        "ADD INDEX `idx_name` (`name`) USING INVERTED PROPERTIES (\n"
+            + "\"char_filter_pattern\"=\"owner's \"\"comment\"\" C:\\\\tmp,=中文\"\n)",
+        DorisTableOperations.addIndexDefinition(addIndex));
+  }
+
+  @Test
+  public void testInvertedIndexPropertiesRejectUnsafeInput() {
+    Map<String, String> nullKey = new HashMap<>();
+    nullKey.put(null, "value");
+    Map<String, String> blankKey = new HashMap<>();
+    blankKey.put(" ", "value");
+    Map<String, String> nullValue = new HashMap<>();
+    nullValue.put("parser", null);
+
+    for (Map<String, String> properties :
+        List.of(
+            nullKey,
+            blankKey,
+            nullValue,
+            Map.of("bad\nkey", "value"),
+            Map.of("parser", "bad\tvalue"))) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              DorisTableOperations.addIndexDefinition(
+                  (TableChange.AddIndex)
+                      TableChange.addIndex(
+                          Index.IndexType.INVERTED,
+                          "idx_name",
+                          new String[][] {{"name"}},
+                          properties)));
+    }
+  }
+
+  @Test
+  public void testNonInvertedIndexPropertiesRemainUnchanged() {
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(
+                Index.IndexType.VECTOR,
+                "idx_vec",
+                new String[][] {{"embedding"}},
+                Map.of("index_type", "hnsw"));
+
+    Assertions.assertEquals(
+        "ADD INDEX `idx_vec` (`embedding`) USING ANN",
+        DorisTableOperations.addIndexDefinition(addIndex));
+  }
+
+  @Test
   public void testCreateTableWithBitmapIndex() {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
     JdbcColumn idCol =
@@ -338,6 +460,13 @@ public class TestDorisTableOperationsSqlGeneration {
         DorisTableOperations.mapDorisIndexType("BLOOMFILTER", "idx_name"));
     Assertions.assertEquals(
         Index.IndexType.VECTOR, DorisTableOperations.mapDorisIndexType("ANN", "idx_name"));
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> DorisTableOperations.mapDorisIndexType("NGRAM_BF", "idx_ngram"));
+    Assertions.assertEquals(
+        "Doris index 'idx_ngram' uses unsupported native index type 'NGRAM_BF'",
+        exception.getMessage());
     // Unknown type should fall back to INVERTED
     Assertions.assertEquals(
         Index.IndexType.INVERTED,
@@ -349,6 +478,105 @@ public class TestDorisTableOperationsSqlGeneration {
     // Non-primary index name → UNIQUE_KEY (Doris 1.2.x indexes are all BTREE-based key indexes)
     Assertions.assertEquals(
         Index.IndexType.UNIQUE_KEY, DorisTableOperations.mapDorisIndexType(null, "idx_name"));
+  }
+
+  @Test
+  public void testParseIndexProperties() {
+    Assertions.assertTrue(DorisTableOperations.parseIndexProperties(null, "idx").isEmpty());
+    Assertions.assertTrue(DorisTableOperations.parseIndexProperties("", "idx").isEmpty());
+    Assertions.assertTrue(DorisTableOperations.parseIndexProperties("( )", "idx").isEmpty());
+
+    Map<String, String> properties =
+        DorisTableOperations.parseIndexProperties(
+            "( \"support_phrase\" = \"true\", "
+                + "\"char_filter_pattern\" = \"._=:,\", "
+                + "\"path\" = \"C:\\tmp\" )",
+            "idx");
+
+    Assertions.assertEquals(
+        Map.of(
+            "support_phrase", "true",
+            "char_filter_pattern", "._=:,",
+            "path", "C:\\tmp"),
+        properties);
+  }
+
+  @Test
+  public void testParseIndexPropertiesRejectsMalformedMetadata() {
+    for (String propertiesText :
+        List.of(
+            "\"parser\" = \"english\"",
+            "(\"parser\" \"english\")",
+            "(\"parser\" = \"english\",)",
+            "(\"parser\" = \"english\" trailing)",
+            "(\"parser\" = \"english)",
+            "(\"parser\" = \"english\", \"parser\" = \"unicode\")")) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> DorisTableOperations.parseIndexProperties(propertiesText, "idx_name"));
+    }
+  }
+
+  @Test
+  public void testGetIndexesReadsOnlyInvertedProperties() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSetMetaData metaData = Mockito.mock(ResultSetMetaData.class);
+
+    Mockito.when(connection.prepareStatement("SHOW INDEX FROM `table` FROM `database`"))
+        .thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.getMetaData()).thenReturn(metaData);
+    Mockito.when(metaData.getColumnCount()).thenReturn(5);
+    Mockito.when(metaData.getColumnName(1)).thenReturn("Key_name");
+    Mockito.when(metaData.getColumnName(2)).thenReturn("Column_name");
+    Mockito.when(metaData.getColumnName(3)).thenReturn("Index_type");
+    Mockito.when(metaData.getColumnName(4)).thenReturn("Properties");
+    Mockito.when(metaData.getColumnName(5)).thenReturn("Comment");
+    Mockito.when(resultSet.next()).thenReturn(true, true, true, false);
+    Mockito.when(resultSet.getString("Key_name")).thenReturn("idx_first", "idx_ann", "idx_second");
+    Mockito.when(resultSet.getString("Column_name")).thenReturn("text_a", "text_ann", "text_b");
+    Mockito.when(resultSet.getString("Index_type")).thenReturn("INVERTED", "ANN", "INVERTED");
+    Mockito.when(resultSet.getString("Properties"))
+        .thenReturn("(\"parser\" = \"english\")", "(\"support_phrase\" = \"true\")");
+
+    List<Index> indexes = ops.indexes(connection, "database", "table");
+
+    Assertions.assertEquals(3, indexes.size());
+    Assertions.assertEquals(Map.of("parser", "english"), indexes.get(0).properties());
+    Assertions.assertTrue(indexes.get(1).properties().isEmpty());
+    Assertions.assertEquals(Map.of("support_phrase", "true"), indexes.get(2).properties());
+    Mockito.verify(resultSet, Mockito.times(2)).getString("Properties");
+  }
+
+  @Test
+  public void testGetIndexesWithoutPropertiesColumnKeepsEmptyMap() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSetMetaData metaData = Mockito.mock(ResultSetMetaData.class);
+
+    Mockito.when(connection.prepareStatement("SHOW INDEX FROM `table` FROM `database`"))
+        .thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.getMetaData()).thenReturn(metaData);
+    Mockito.when(metaData.getColumnCount()).thenReturn(3);
+    Mockito.when(metaData.getColumnName(1)).thenReturn("Key_name");
+    Mockito.when(metaData.getColumnName(2)).thenReturn("Column_name");
+    Mockito.when(metaData.getColumnName(3)).thenReturn("Index_type");
+    Mockito.when(resultSet.next()).thenReturn(true, false);
+    Mockito.when(resultSet.getString("Key_name")).thenReturn("idx_name");
+    Mockito.when(resultSet.getString("Column_name")).thenReturn("text");
+    Mockito.when(resultSet.getString("Index_type")).thenReturn("INVERTED");
+
+    List<Index> indexes = ops.indexes(connection, "database", "table");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertTrue(indexes.get(0).properties().isEmpty());
+    Mockito.verify(resultSet, Mockito.never()).getString("Properties");
   }
 
   @Test
@@ -448,6 +676,84 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testAddIndexDefinitionRejectsUnsupportedFieldShapes() {
+    assertInvalidAddIndex(
+        new String[][] {{"col1"}, {"col2"}},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got 2");
+    assertInvalidAddIndex(
+        new String[][] {{"payload", "nested"}},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path "
+            + "[payload, nested]");
+    assertInvalidAddIndex(
+        new String[0][],
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got 0");
+    assertInvalidAddIndex(
+        new String[][] {new String[0]},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path []");
+    assertInvalidAddIndex(
+        new String[][] {null},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path null");
+    assertInvalidAddIndex(
+        new String[][] {{" "}}, "Index 'idx_name' requires a non-blank top-level field in Doris");
+    assertInvalidAddIndex(
+        null, "Index 'idx_name' supports exactly one top-level field in Doris, but got null");
+  }
+
+  @Test
+  public void testCreateAndAlterIndexUseSameFieldShapeValidation() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+    JdbcColumn idColumn =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+    String[][] fields = {{"id"}, {"other"}};
+    Index[] indexes = {Indexes.of(Index.IndexType.INVERTED, "idx_name", fields)};
+
+    IllegalArgumentException createException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                mockOps.createTableSqlWithIndexes(
+                    "test_table", new JdbcColumn[] {idColumn}, distribution, indexes));
+    IllegalArgumentException alterException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                mockOps.alterTableSql(
+                    "test_table",
+                    TableChange.addIndex(Index.IndexType.INVERTED, "idx_name", fields)));
+
+    Assertions.assertEquals(createException.getMessage(), alterException.getMessage());
+  }
+
+  @Test
+  public void testInvalidAddIndexDoesNotExecuteJdbcStatement() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    ops.setDataSource(dataSource);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                "database",
+                "test_table",
+                TableChange.addIndex(
+                    Index.IndexType.INVERTED, "idx_name", new String[][] {{"col1"}, {"col2"}})));
+
+    Mockito.verify(connection, Mockito.never()).createStatement();
+  }
+
+  @Test
   public void testAddPrimaryKeyIndexDefinitionThrows() {
     // PRIMARY_KEY cannot be added via ALTER TABLE ADD INDEX in Doris
     TableChange.AddIndex primaryKeyIndex =
@@ -482,6 +788,114 @@ public class TestDorisTableOperationsSqlGeneration {
         (TableChange.DeleteIndex) TableChange.deleteIndex("idx_name", true);
     String sql = DorisTableOperations.deleteIndexDefinition(mockTable, deleteIndex);
     Assertions.assertEquals("DROP INDEX `idx_name`", sql);
+  }
+
+  @Test
+  public void testDeleteIndexDefinitionReturnsEmptyFragmentForMissingIndex() {
+    JdbcTable table = tableWithIndexes("idx_existing");
+
+    TableChange.DeleteIndex deleteIndex =
+        (TableChange.DeleteIndex) TableChange.deleteIndex("idx_missing", true);
+    Assertions.assertEquals("", DorisTableOperations.deleteIndexDefinition(table, deleteIndex));
+
+    TableChange.DeleteIndex strictDeleteIndex =
+        (TableChange.DeleteIndex) TableChange.deleteIndex("idx_missing", false);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DorisTableOperations.deleteIndexDefinition(table, strictDeleteIndex));
+    Assertions.assertEquals("Index does not exist: idx_missing", exception.getMessage());
+  }
+
+  @Test
+  public void testNoOpDeleteIsFilteredFromAlterSql() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setTableForAlter(tableWithIndexes());
+
+    Assertions.assertEquals(
+        "", ops.alterTableSql("test_table", TableChange.deleteIndex("idx_missing", true)));
+
+    TableChange[] unrelatedChanges =
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get()),
+          TableChange.updateColumnComment(new String[] {"col1"}, "updated comment"),
+          TableChange.setProperty(REPLICATION_FACTOR, "1"),
+          TableChange.addIndex(Index.IndexType.INVERTED, "idx_new", new String[][] {{"col1"}})
+        };
+    String[] unrelatedFragments =
+        new String[] {
+          "ADD COLUMN `col2`",
+          "MODIFY COLUMN `col1` COMMENT 'updated comment'",
+          "set (",
+          "ADD INDEX `idx_new`"
+        };
+    for (int i = 0; i < unrelatedChanges.length; i++) {
+      TableChange unrelatedChange = unrelatedChanges[i];
+      String noOpFirstSql =
+          ops.alterTableSql(
+              "test_table", TableChange.deleteIndex("idx_missing", true), unrelatedChange);
+      String noOpLastSql =
+          ops.alterTableSql(
+              "test_table", unrelatedChange, TableChange.deleteIndex("idx_missing", true));
+
+      Assertions.assertFalse(noOpFirstSql.contains("DROP INDEX `idx_missing`"), noOpFirstSql);
+      Assertions.assertFalse(noOpLastSql.contains("DROP INDEX `idx_missing`"), noOpLastSql);
+      Assertions.assertTrue(noOpFirstSql.contains(unrelatedFragments[i]), noOpFirstSql);
+      Assertions.assertTrue(noOpLastSql.contains(unrelatedFragments[i]), noOpLastSql);
+    }
+  }
+
+  @Test
+  public void testIndexChangeConflictsFailFastBeforeJdbc() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    ops.setDataSource(dataSource);
+
+    TableChange[][] duplicateDeleteChanges =
+        new TableChange[][] {
+          {TableChange.deleteIndex("idx", true), TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", true), TableChange.deleteIndex("idx", false)},
+          {TableChange.deleteIndex("idx", false), TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", false), TableChange.deleteIndex("idx", false)}
+        };
+    ops.setTableForAlter(tableWithIndexes("idx"));
+    for (TableChange[] changes : duplicateDeleteChanges) {
+      assertIndexChangeConflict(
+          ops,
+          connection,
+          "Index 'idx' cannot be deleted more than once in the same request",
+          changes);
+    }
+
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.INVERTED, "idx", new String[][] {{"col1"}});
+    TableChange[][] addDeleteChanges =
+        new TableChange[][] {
+          {addIndex, TableChange.deleteIndex("idx", true)},
+          {TableChange.deleteIndex("idx", true), addIndex},
+          {addIndex, TableChange.deleteIndex("idx", false)},
+          {TableChange.deleteIndex("idx", false), addIndex}
+        };
+    JdbcTable[] addDeleteTables =
+        new JdbcTable[] {
+          tableWithIndexes(), tableWithIndexes(), tableWithIndexes("idx"), tableWithIndexes("idx")
+        };
+    for (int i = 0; i < addDeleteChanges.length; i++) {
+      ops.setTableForAlter(addDeleteTables[i]);
+      assertIndexChangeConflict(
+          ops,
+          connection,
+          "Index 'idx' cannot be added and deleted in the same request",
+          addDeleteChanges[i]);
+    }
+
+    ops.setTableForAlter(tableWithIndexes());
+    ops.alterTable("database", "test_table", TableChange.deleteIndex("idx_missing", true));
+    Mockito.verify(connection, Mockito.never()).createStatement();
+    Mockito.verify(connection, Mockito.never()).prepareStatement(Mockito.anyString());
   }
 
   @Test
@@ -544,6 +958,42 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "Properties 'replication_num' and 'replication_allocation' cannot be set at the same time",
         exception.getMessage());
+  }
+
+  private static void assertIndexChangeConflict(
+      TestableDorisTableOperations ops,
+      Connection connection,
+      String expectedMessage,
+      TableChange[] changes)
+      throws Exception {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.alterTable("database", "test_table", changes));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
+    Mockito.verify(connection, Mockito.never()).createStatement();
+    Mockito.verify(connection, Mockito.never()).prepareStatement(Mockito.anyString());
+  }
+
+  private static JdbcTable tableWithIndexes(String... indexNames) {
+    Index[] indexes = new Index[indexNames.length];
+    for (int i = 0; i < indexNames.length; i++) {
+      indexes[i] = Indexes.of(Index.IndexType.INVERTED, indexNames[i], new String[][] {{"col1"}});
+    }
+    return JdbcTable.builder().withName("test_table").withIndexes(indexes).build();
+  }
+
+  private static void assertInvalidAddIndex(String[][] fields, String expectedMessage) {
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex) TableChange.addIndex(Index.IndexType.INVERTED, "idx_name", fields);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DorisTableOperations.addIndexDefinition(addIndex));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
   }
 
   private static DataSource mockBackendDataSource(int aliveBackendCount) throws Exception {

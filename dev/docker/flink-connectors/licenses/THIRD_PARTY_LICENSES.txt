@@ -1,0 +1,20 @@
+THIRD-PARTY SOFTWARE NOTICE — Apache Gravitino Flink Connector image
+
+This image packages the Apache Gravitino Flink connector as a shaded runtime
+jar. The shaded jar bundles third-party open source components, relocated
+under the org.apache.gravitino.shaded namespace and redistributed under their
+own licenses. They include, among others:
+
+  - Google Guava / Protobuf (com.google.*) ............... Apache-2.0 / BSD-3-Clause
+  - Apache HttpComponents (org.apache.hc.*) .............. Apache-2.0
+  - Jackson (com.fasterxml.jackson.*) .................... Apache-2.0
+  - Caffeine (com.github.benmanes.caffeine) .............. Apache-2.0
+  - Apache Gravitino Java client ......................... Apache-2.0
+
+The Apache Gravitino connector code itself is licensed under the Apache
+License, Version 2.0 (see the LICENSE and NOTICE files in this directory).
+
+This list is a summary for operator convenience and is not exhaustive. The
+authoritative license and notice text for every bundled component is carried
+inside the jar's META-INF directory. Nothing in this summary modifies the
+license terms that apply to any individual component.

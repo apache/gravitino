@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import io.airlift.log.Logger;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -35,8 +36,6 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This interface is used to handle different parts of catalog metadata from different catalog
@@ -44,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CatalogConnectorMetadataAdapter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorMetadataAdapter.class);
 
   /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
@@ -217,7 +216,7 @@ public class CatalogConnectorMetadataAdapter {
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
       } else {
-        LOG.warn("Property {} is not defined in Trino, we will ignore it", name);
+        LOG.warn("Property %s is not defined in Trino, we will ignore it", name);
       }
     }
     return validProperties;

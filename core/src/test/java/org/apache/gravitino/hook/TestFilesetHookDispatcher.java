@@ -40,20 +40,26 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.TestFilesetOperationDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -67,6 +73,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestFilesetHookDispatcher extends TestOperationDispatcher {
@@ -87,17 +94,12 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
         new SchemaHookDispatcher(TestFilesetOperationDispatcher.getSchemaOperationDispatcher());
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
+        GravitinoEnv.getInstance(), "internalAccessControlDispatcher", accessControlManager, true);
     catalogManager = Mockito.mock(CatalogManager.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
     Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
-    CatalogManager.CatalogWrapper catalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogWrapper.catalog()).thenReturn(catalog);
-    Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
@@ -107,12 +109,12 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     // Self-contained: use a fresh hook with a directly-mocked FilesetDispatcher and a case-
     // insensitive catalog so we can verify the helper passes a normalized ident to setOwner.
     CatalogManager savedCatalogManager = GravitinoEnv.getInstance().catalogManager();
-    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     FilesetDispatcher mockFilesetDispatcher = Mockito.mock(FilesetDispatcher.class);
@@ -122,10 +124,13 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
         .thenReturn(Mockito.mock(Fileset.class));
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
-      FilesetHookDispatcher localHook = new FilesetHookDispatcher(mockFilesetDispatcher);
+      FilesetDispatcher localHook =
+          new FilesetNormalizeDispatcher(
+              new FilesetHookDispatcher(mockFilesetDispatcher), mockCatalogManager);
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_FILESET");
       localHook.createMultipleLocationFileset(
           ident,
@@ -151,7 +156,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
       FieldUtils.writeField(
-          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     }
   }
 
@@ -159,7 +164,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
   public void testCreateFilesetThrowsWhenSetOwnerFails() throws IllegalAccessException {
     // Save the original ownerDispatcher so we can restore it in the finally block instead of
     // wiping it to null and leaking that into other tests in the suite.
-    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
 
     // Create the schema first with the existing (non-throwing) ownerDispatcher, then swap to the
     // throwing mock only for the fileset create we actually want to exercise. Otherwise the
@@ -172,7 +177,8 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
 
     try {
       NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_owner_fail");
@@ -185,7 +191,27 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       Assertions.assertEquals("Set owner failed", thrown.getMessage());
     } finally {
       FieldUtils.writeField(
-          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
+    }
+  }
+
+  @Test
+  public void testDropKeepsPrivilegesWhenDropReturnsFalse() {
+    FilesetDispatcher dispatcher = Mockito.mock(FilesetDispatcher.class);
+    FilesetHookDispatcher hook = new FilesetHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "fileset");
+    Mockito.when(dispatcher.dropFileset(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(any(), any()))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hook.dropFileset(ident));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          Mockito.never());
     }
   }
 
@@ -234,6 +260,32 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
           }
           schemaHookDispatcher.dropSchema(NameIdentifier.of(filesetNs.levels()), true);
         });
+  }
+
+  @Test
+  public void testDropFilesetShouldNotRemovePrivilegesWhenDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    FilesetDispatcher delegate = Mockito.mock(FilesetDispatcher.class);
+    FilesetHookDispatcher hookDispatcher = new FilesetHookDispatcher(delegate);
+    List<String> locations = Lists.newArrayList("/tmp/fileset");
+
+    Mockito.when(delegate.dropFileset(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> mockedAuthz =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      mockedAuthz
+          .when(
+              () -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET))
+          .thenReturn(locations);
+
+      Assertions.assertFalse(hookDispatcher.dropFileset(ident));
+
+      mockedAuthz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.FILESET, locations),
+          Mockito.never());
+    }
   }
 
   @Test

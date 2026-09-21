@@ -130,9 +130,16 @@ paths:
                     description: The message of the exception
                   stack:
                     type: array
+                    deprecated: true
+                    description: >-
+                      Deprecated diagnostic stack trace. Operators should disable it with
+                      gravitino.server.webserver.includeErrorStackTrace=false because it can
+                      expose internal implementation details. It remains enabled by default only
+                      to avoid breaking legacy clients that expect this field. See
+                      [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling)
+                      and [CWE-209](https://cwe.mitre.org/data/definitions/209.html).
                     items:
                       type: string
-                      description: The stack trace of the exception
               examples:
                 TestConnectionSuccess:
                   value: {
@@ -159,13 +166,25 @@ paths:
       summary: Test an existing catalog connection
       description: >-
         Runs the provider's smallest meaningful, read-only catalog-level operation using the
-        catalog's stored configuration and effective credentials. This fail-fast preflight
-        surfaces configuration and connectivity failures before regular catalog operations, but
-        does not guarantee that every object-level or mutating operation will succeed. Fileset
-        catalogs test all catalog-level `location` and `location-*` targets. Model and Generic
-        catalogs do not support connection testing. Expected test failures are returned as
-        application error codes in an HTTP 200 response.
+        catalog's stored configuration and effective credentials. Optional proposed catalog
+        changes are applied to a temporary effective configuration for this probe and are not
+        persisted. This fail-fast preflight surfaces configuration and connectivity failures before
+        regular catalog operations, but does not guarantee that every object-level or mutating
+        operation will succeed. Fileset catalogs test all catalog-level `location` and `location-*`
+        targets. Model and Generic catalogs do not support connection testing. Expected test
+        failures are returned as application error codes in an HTTP 200 response. When
+        authorization is enabled, testing with the stored configuration requires the same access
+        as loading the catalog, and testing with proposed changes requires owning the metalake or
+        the catalog, the same as altering it. Callers without that access receive an HTTP 403
+        response.
       operationId: testExistingCatalogConnection
+      requestBody:
+        required: false
+        description: Optional catalog changes to apply only to this connection test
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogUpdatesRequest"
       responses:
         "200":
           description: Connection test completed, including expected test failures
@@ -217,6 +236,14 @@ paths:
                     message: Catalog my_metalake.my_catalog is not in use
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: >-
+            Forbidden - The caller cannot load the catalog, or tests proposed changes without
+            owning the metalake or the catalog
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -509,6 +536,8 @@ components:
         - $ref: "#/components/schemas/UpdateCatalogCommentRequest"
         - $ref: "#/components/schemas/SetCatalogPropertyRequest"
         - $ref: "#/components/schemas/RemoveCatalogPropertyRequest"
+        - $ref: "#/components/schemas/SetCatalogSecretBindingRequest"
+        - $ref: "#/components/schemas/SetCatalogSecretReferenceRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -516,6 +545,8 @@ components:
           updateComment: "#/components/schemas/UpdateCatalogCommentRequest"
           setProperty: "#/components/schemas/SetCatalogPropertyRequest"
           removeProperty: "#/components/schemas/RemoveCatalogPropertyRequest"
+          setSecretBinding: "#/components/schemas/SetCatalogSecretBindingRequest"
+          setSecretReference: "#/components/schemas/SetCatalogSecretReferenceRequest"
 
     RenameCatalogRequest:
       type: object
@@ -592,6 +623,67 @@ components:
       example: {
         "@type": "removeProperty",
         "property": "key2"
+      }
+
+    SetCatalogSecretBindingRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+        - plaintext
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretBinding
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        plaintext:
+          type: string
+          description: Plaintext secret to write through
+          format: password
+      example: {
+        "@type": "setSecretBinding",
+        "property": "password",
+        "provider": "env",
+        "plaintext": "secret-value"
+      }
+
+    SetCatalogSecretReferenceRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretReference
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        attributes:
+          type: object
+          description: Provider-specific locator keys (empty object if none)
+          additionalProperties:
+            type: string
+          default: {}
+      example: {
+        "@type": "setSecretReference",
+        "property": "password",
+        "provider": "vault",
+        "attributes": {
+          "path": "secret/data/my-password"
+        }
       }
 
 

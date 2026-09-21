@@ -92,7 +92,7 @@ public class TestLineageOperations extends JerseyTest {
 
   @SneakyThrows
   @Test
-  public void testUpdateLineageSucc() {
+  public void testAuthorizationDisabledAcceptsGenericNamespaces() {
     RunEvent runEvent = createRunEvent();
     Mockito.when(lineageDispatcher.dispatchLineageEvent(ArgumentMatchers.any())).thenReturn(true);
     Response resp =
@@ -101,6 +101,23 @@ public class TestLineageOperations extends JerseyTest {
             .accept(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(runEvent, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.CREATED.getStatusCode(), resp.getStatus());
+  }
+
+  @SneakyThrows
+  @Test
+  void testDispatcherIllegalArgumentExceptionReturnsInternalError() {
+    RunEvent runEvent = createRunEvent();
+    Mockito.when(lineageDispatcher.dispatchLineageEvent(ArgumentMatchers.any()))
+        .thenThrow(new IllegalArgumentException("Dispatcher failure"));
+
+    Response resp =
+        target("/lineage")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(runEvent, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    Mockito.verify(lineageDispatcher).dispatchLineageEvent(ArgumentMatchers.any());
   }
 
   @SneakyThrows
@@ -114,6 +131,18 @@ public class TestLineageOperations extends JerseyTest {
             .accept(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(runEvent, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.TOO_MANY_REQUESTS.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  public void testRejectInvalidLineageEvent() {
+    Response resp =
+        target("/lineage")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity("{}", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Mockito.verifyNoInteractions(lineageDispatcher);
   }
 
   private RunEvent createRunEvent() {

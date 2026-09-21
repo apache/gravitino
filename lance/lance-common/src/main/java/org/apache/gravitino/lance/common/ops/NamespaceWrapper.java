@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 
 public abstract class NamespaceWrapper {
@@ -27,6 +28,7 @@ public abstract class NamespaceWrapper {
   private final boolean auxMode;
 
   private volatile boolean initialized = false;
+  private volatile LanceMetadataFilter metadataFilter = LanceMetadataFilter.NOOP;
   private LanceNamespaceOperations namespaceOps;
   private LanceTableOperations tableOps;
 
@@ -65,6 +67,25 @@ public abstract class NamespaceWrapper {
 
   public LanceConfig config() {
     return config;
+  }
+
+  /**
+   * Sets the filter applied to listed metadata names before pagination.
+   *
+   * @param metadataFilter the filter to apply, {@code null} restores {@link
+   *     LanceMetadataFilter#NOOP}.
+   */
+  public void setMetadataFilter(@Nullable LanceMetadataFilter metadataFilter) {
+    this.metadataFilter = metadataFilter == null ? LanceMetadataFilter.NOOP : metadataFilter;
+  }
+
+  /**
+   * Returns the filter applied to listed metadata names before pagination.
+   *
+   * @return the configured filter, never {@code null}.
+   */
+  public LanceMetadataFilter metadataFilter() {
+    return metadataFilter;
   }
 
   /**

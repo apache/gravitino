@@ -400,7 +400,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isServiceAdmin() {
     return GravitinoEnv.getInstance()
-        .accessControlDispatcher()
+        .internalAccessControlDispatcher()
         .isServiceAdmin(PrincipalUtils.getCurrentUserName());
   }
 
@@ -585,9 +585,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     MetadataObject metadataObject = MetadataObjects.parse(fullName, metadataType);
     do {
-      if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)) {
-        return hasParentUsagePermission(
-            currentPrincipal, metalake, metadataObject, metalakeObject, requestContext);
+      if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)
+          && hasParentUsagePermission(
+              currentPrincipal, metalake, metadataObject, metalakeObject, requestContext)) {
+        return true;
       }
     } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
     return false;

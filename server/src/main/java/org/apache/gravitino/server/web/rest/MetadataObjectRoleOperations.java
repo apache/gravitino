@@ -39,6 +39,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @NameBindings.AccessControlInterfaces
@@ -76,6 +77,7 @@ public class MetadataObjectRoleOperations {
           httpRequest,
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
             String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
             names =
                 MetadataAuthzHelper.filterByExpression(

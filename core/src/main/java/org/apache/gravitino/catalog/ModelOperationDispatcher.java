@@ -85,7 +85,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
     return EntityCombinedModel.of(model)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::modelPropertiesMetadata, model.properties()));
   }
 
@@ -97,9 +97,11 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         checkAndUpdateProperties(
             catalogIdent, properties, HasPropertyMetadata::modelPropertiesMetadata);
 
+    // Lock the model node, not the schema, so models in the same schema can be registered
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     Model registeredModel =
         TreeLockUtils.doWithTreeLock(
-            NameIdentifier.of(ident.namespace().levels()),
+            ident,
             LockType.WRITE,
             () ->
                 doWithCatalog(
@@ -110,7 +112,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
     return EntityCombinedModel.of(registeredModel)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,
                 registeredModel.properties()));
@@ -288,7 +290,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
     return EntityCombinedModel.of(alteredModel)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,
                 alteredModel.properties()));
@@ -329,7 +331,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
     return EntityCombinedModelVersion.of(alteredModelVersion)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::modelVersionPropertiesMetadata,
                 alteredModelVersion.properties()));
@@ -342,7 +344,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     ModelVersion modelVersion = supplier.get();
     return EntityCombinedModelVersion.of(modelVersion)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::modelVersionPropertiesMetadata,
                 modelVersion.properties()));
@@ -357,7 +359,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
             v ->
                 EntityCombinedModelVersion.of(v)
                     .withHiddenProperties(
-                        getHiddenPropertyNames(
+                        getMaskAndOmitKeys(
                             catalogIdent,
                             HasPropertyMetadata::modelVersionPropertiesMetadata,
                             v.properties())))

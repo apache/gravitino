@@ -34,6 +34,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
@@ -241,14 +242,21 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testEntityUpdateRollsBackWhenChangeLogInsertFails() throws Exception {
+  void testEntityMutationsRollBackWhenChangeLogInsertFails() throws Exception {
     createAndInsertMakeLake(METALAKE_NAME);
     CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function_rolled_back",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
     long maxIdBeforeUpdate = maxEntityChangeId();
 
-    // Take the change-log table away so that the entity row is updated first and the change-log
-    // insert then fails inside the same transaction. This is the only ordering the rollback in
-    // JDBCBackend#update protects against, and the caller owns no outer transaction here.
+    // Take the change-log table away so that each metadata mutation succeeds first and its
+    // change-log insert then fails inside the same transaction.
     renameTable("entity_change_log", "entity_change_log_bak");
     try {
       Assertions.assertThrows(
@@ -263,14 +271,22 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
                           catalog.namespace(),
                           CATALOG_NAME + "_rolled_back",
                           AUDIT_INFO)));
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              backend.delete(
+                  function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
     } finally {
       renameTable("entity_change_log_bak", "entity_change_log");
     }
 
-    // The entity mutation must not survive a failed change-log write.
+    // Neither mutation may survive a failed change-log write.
     CatalogEntity persistedCatalog =
         backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
+    FunctionEntity persistedFunction =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier());
+    Assertions.assertEquals(function.id(), persistedFunction.id());
     Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
   }
 
@@ -462,6 +478,24 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         METALAKE_NAME,
         Entity.EntityType.MODEL,
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model2").toString(),
+        OperateType.DROP);
+
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function1",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    long maxIdBeforeFunctionDrop = maxEntityChangeId();
+    Assertions.assertTrue(
+        backend.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
+    assertEntityChange(
+        maxIdBeforeFunctionDrop,
+        METALAKE_NAME,
+        Entity.EntityType.FUNCTION,
+        NameIdentifierUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "function1")
+            .toString(),
         OperateType.DROP);
   }
 

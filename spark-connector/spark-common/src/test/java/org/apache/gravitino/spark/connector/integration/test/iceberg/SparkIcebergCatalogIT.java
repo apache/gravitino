@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
+import static org.apache.spark.sql.functions.lit;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -43,14 +45,12 @@ import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.ReplaceSortOrder;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.exceptions.ValidationException;
-import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -449,8 +449,8 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .createDataset(ids, Encoders.INT())
             .withColumnRenamed("value", "id")
-            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
-            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
+            .withColumn("name", lit("a"))
+            .withColumn("age", lit(1));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(200, getSparkSession().table(tableName).count());

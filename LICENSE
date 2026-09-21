@@ -201,7 +201,8 @@
    limitations under the License.
 
    The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE for these.
+   different licenses, please see web/web/LICENSE and web-v2/web/LICENSE
+   for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0.
@@ -262,10 +263,6 @@
    Lance Namespace (https://github.com/lance-format/lance-namespace-impls)
    ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/JsonArrowSchemaConverter.java
    ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/PageUtil.java
-
-   Apache Doris
-   ./catalogs/catalog-glue/src/main/java/org/apache/gravitino/catalog/glue/GravitinoGlueCredentialsProvider.java
-   ./spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/glue/GravitinoGlueCredentialsProvider.java
 
    Apache Hive
    ./catalogs/hive-metastore-common/src/test/resources/hive-schema-3.1.0.derby.sql

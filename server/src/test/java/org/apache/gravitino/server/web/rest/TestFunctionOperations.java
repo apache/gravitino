@@ -267,6 +267,73 @@ public class TestFunctionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testGetLegacyFunctionWithUnparsedDataType() {
+    Function legacyFunction = mockFunction("legacy_func", "legacy comment", FunctionType.SCALAR);
+    FunctionParam[] params =
+        new FunctionParam[] {FunctionParams.of("input", Types.UnparsedType.of("legacy_input"))};
+    FunctionImpl[] impls =
+        new FunctionImpl[] {FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT input")};
+    when(legacyFunction.definitions())
+        .thenReturn(
+            new FunctionDefinition[] {
+              FunctionDefinitions.of(params, Types.UnparsedType.of("legacy_return"), impls)
+            });
+    NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "legacy_func");
+    when(functionDispatcher.getFunction(funcId)).thenReturn(legacyFunction);
+
+    Response response =
+        target(functionPath())
+            .path("legacy_func")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    FunctionDefinition definition =
+        response.readEntity(FunctionResponse.class).getFunction().definitions()[0];
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_input"), definition.parameters()[0].dataType());
+    Assertions.assertEquals(Types.UnparsedType.of("legacy_return"), definition.returnType());
+  }
+
+  @Test
+  public void testRegisterFunctionWithNullRequest() {
+    Response resp =
+        target(functionPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRegisterFunctionRejectsUnparsedDataType() {
+    String request =
+        """
+        {
+          "name": "invalid_func",
+          "functionType": "SCALAR",
+          "definitions": [{
+            "parameters": [{"name": "input", "dataType": "future_type"}],
+            "returnType": "integer"
+          }]
+        }
+        """;
+
+    Response response =
+        target(functionPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+    Assertions.assertTrue(error.getMessage().contains("definitions[0].parameters[0].dataType"));
+  }
+
+  @Test
   public void testRegisterScalarFunction() {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "test comment", FunctionType.SCALAR);
@@ -408,6 +475,18 @@ public class TestFunctionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterFunctionWithNullRequest() {
+    Response resp =
+        target(functionPath())
+            .path("func1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testAlterFunction() {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "new comment", FunctionType.SCALAR);
@@ -513,6 +592,34 @@ public class TestFunctionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterFunctionAddDefinitionRejectsUnparsedDataType() {
+    String request =
+        """
+        {
+          "updates": [{
+            "@type": "addDefinition",
+            "definition": {
+              "parameters": [],
+              "returnType": {"type": "unparsed", "unparsedType": "legacy_return"}
+            }
+          }]
+        }
+        """;
+
+    Response response =
+        target(functionPath())
+            .path("func1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+    Assertions.assertTrue(error.getMessage().contains("updates[0].definition.returnType"));
+  }
+
+  @Test
   public void testAlterFunctionRemoveDefinition() {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "comment", FunctionType.SCALAR);
@@ -537,6 +644,32 @@ public class TestFunctionOperations extends BaseOperationsTest {
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  public void testAlterFunctionSelectorAllowsLegacyUnparsedDataType() {
+    NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
+    Function mockFunction = mockFunction("func1", "comment", FunctionType.SCALAR);
+    when(functionDispatcher.alterFunction(eq(funcId), any(FunctionChange[].class)))
+        .thenReturn(mockFunction);
+    String request =
+        """
+        {
+          "updates": [{
+            "@type": "removeDefinition",
+            "parameters": [{"name": "input", "dataType": "legacy_type"}]
+          }]
+        }
+        """;
+
+    Response response =
+        target(functionPath())
+            .path("func1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
   }
 
   @Test

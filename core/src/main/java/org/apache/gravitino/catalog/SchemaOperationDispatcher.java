@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -50,9 +51,11 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -200,7 +203,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             if (isManagedSchema) {
               return EntityCombinedSchema.of(schema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           schema.properties()));
@@ -227,7 +230,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
               return EntityCombinedSchema.of(schema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           schema.properties()));
@@ -236,7 +239,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             // Merge both the metadata from catalog operation and the metadata from entity store.
             return EntityCombinedSchema.of(schema, schemaEntity)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::schemaPropertiesMetadata,
                         schema.properties()));
@@ -307,19 +310,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
-          validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
-          Schema alteredSchema =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
-                  NoSuchSchemaException.class);
+          Pair<Schema, SchemaChange[]> alterResult =
+              alterSchemaUnderLock(ident, catalogIdent, changes);
+          Schema alteredSchema = alterResult.getLeft();
+          SchemaChange[] effectiveChanges = alterResult.getRight();
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::schemaPropertiesMetadata,
                         alteredSchema.properties()));
@@ -333,7 +334,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             if (se == null) {
               return EntityCombinedSchema.of(alteredSchema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           alteredSchema.properties()));
@@ -361,7 +362,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
                                   .withProperties(
-                                      propertiesForSchemaEntityAlter(schemaEntity, changes))
+                                      propertiesForSchemaEntityAlter(
+                                          schemaEntity, effectiveChanges))
                                   .withAuditInfo(
                                       AuditInfo.builder()
                                           .withCreator(schemaEntity.auditInfo().creator())
@@ -376,11 +378,134 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
           return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::schemaPropertiesMetadata,
                       alteredSchema.properties()));
         });
+  }
+
+  private Pair<Schema, SchemaChange[]> alterSchemaUnderLock(
+      NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
+      throws NoSuchSchemaException {
+    if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
+        && usesManagedSchemaOperations(catalogIdent)) {
+      return alterManagedSchemaUnderLock(ident, changes);
+    }
+    return alterExternalSchemaUnderLock(ident, catalogIdent, changes);
+  }
+
+  private boolean usesManagedSchemaOperations(NameIdentifier catalogIdent) {
+    return doWithCatalog(
+        catalogIdent,
+        c -> c.doWithSchemaOps(s -> s instanceof ManagedSchemaOperations),
+        NoSuchSchemaException.class);
+  }
+
+  private Pair<Schema, SchemaChange[]> alterManagedSchemaUnderLock(
+      NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException {
+    validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
+
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    SchemaChange[][] effectiveChangesHolder = new SchemaChange[1][];
+    boolean alterCommitted = false;
+    try {
+      SchemaEntity updatedEntity =
+          store.update(
+              ident,
+              SchemaEntity.class,
+              SCHEMA,
+              existing -> {
+                Map<String, String> currentProperties =
+                    existing.properties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.properties());
+                Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareSchemaChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                effectiveChangesHolder[0] = secretResult.getLeft();
+                return SchemaEntityChanges.apply(ident, existing, secretResult.getLeft());
+              });
+      alterCommitted = true;
+      Schema alteredSchema =
+          ManagedSchemaOperations.ManagedSchema.builder()
+              .withName(ident.name())
+              .withComment(updatedEntity.comment())
+              .withProperties(updatedEntity.properties())
+              .withAuditInfo(updatedEntity.auditInfo())
+              .build();
+      return Pair.of(alteredSchema, effectiveChangesHolder[0]);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to alter schema " + ident, e);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+    }
+  }
+
+  private Pair<Schema, SchemaChange[]> alterExternalSchemaUnderLock(
+      NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
+      throws NoSuchSchemaException {
+    Schema currentSchema = null;
+    try {
+      currentSchema =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+              NoSuchSchemaException.class);
+    } catch (NoSuchSchemaException e) {
+      // Defer missing-schema handling to catalog alterSchema to preserve catalog semantics.
+    }
+    // Prefer SchemaEntity properties for secret URNs (catalog loadSchema may omit them).
+    SchemaEntity schemaEntityForSecrets = getEntity(ident, SCHEMA, SchemaEntity.class);
+    Map<String, String> currentProperties;
+    if (schemaEntityForSecrets != null
+        && schemaEntityForSecrets.properties() != null
+        && !schemaEntityForSecrets.properties().isEmpty()) {
+      currentProperties = new HashMap<>(schemaEntityForSecrets.properties());
+    } else if (currentSchema != null && currentSchema.properties() != null) {
+      currentProperties = new HashMap<>(currentSchema.properties());
+    } else {
+      currentProperties = new HashMap<>();
+    }
+
+    validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
+
+    StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+    long entityIdForSecrets;
+    if (currentStringId != null) {
+      entityIdForSecrets = currentStringId.id();
+    } else if (schemaEntityForSecrets != null) {
+      entityIdForSecrets = schemaEntityForSecrets.id();
+    } else {
+      entityIdForSecrets = 0L;
+    }
+
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    boolean alterCommitted = false;
+    try {
+      Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+          SecretAlterChanges.prepareSchemaChanges(
+              secretManager, currentProperties, entityIdForSecrets, changes);
+      writtenSecretMaterials.set(secretResult.getRight());
+      SchemaChange[] effectiveChanges = secretResult.getLeft();
+
+      Schema alteredSchema =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
+              NoSuchSchemaException.class);
+      alterCommitted = true;
+      return Pair.of(alteredSchema, effectiveChanges);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+    }
   }
 
   /**
@@ -447,13 +572,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result is ambiguous: the external schema may have been renamed or dropped out
-          // of band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
             try {
-              store.delete(ident, SCHEMA, true);
+              droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
             } catch (Exception e) {
@@ -470,10 +594,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          if (droppedFromCatalog) {
+          if (droppedFromCatalog || droppedFromStore) {
             secretManager.deleteSecretsFromProperties(schemaProperties);
           }
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 
@@ -563,7 +687,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
@@ -579,7 +703,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       if (schemaEntity == null) {
         return EntityCombinedSchema.of(schema)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdentifier,
                     HasPropertyMetadata::schemaPropertiesMetadata,
                     schema.properties()))
@@ -588,7 +712,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
       return EntityCombinedSchema.of(schema, schemaEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
@@ -607,7 +731,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     return EntityCombinedSchema.of(schema, schemaEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdentifier,
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))

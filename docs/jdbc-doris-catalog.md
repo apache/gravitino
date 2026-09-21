@@ -84,7 +84,7 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
 :::
 
 ## Schema
@@ -232,14 +232,18 @@ The Doris catalog supports the following index types. Each index applies to a si
 |----------------------|------------------------------------------------------------------------|---------------|
 | `PRIMARY_KEY`        | `` INDEX `PRIMARY` (col) `` (in the INDEX clause, no USING)            | 1.2+          |
 | `UNIQUE_KEY`         | `UNIQUE KEY(col)` (in the table model section, not INDEX clause)       | 1.2+          |
-| `INVERTED`           | `INDEX name (col) USING INVERTED`                                      | 3.0+          |
+| `INVERTED`           | `INDEX name (col) USING INVERTED [PROPERTIES(...)]`                    | 3.0+          |
 | `BITMAP`             | `INDEX name (col)` (bare, no USING clause; write-only, see note below) | 1.2+          |
 | `VECTOR`             | `INDEX name (col) USING ANN`                                           | 4.0.6+        |
 
 :::note
 - `PRIMARY_KEY` stays in the INDEX clause as a bare index (e.g. `` INDEX `PRIMARY` (`id`) ``), with no USING clause.
 - `UNIQUE_KEY` is emitted as a table model declaration (e.g. `` UNIQUE KEY(`id`) ``), outside the INDEX clause.
+- `INVERTED` properties can be supplied through `Index.properties()` for CREATE TABLE or `TableChange.AddIndex.getProperties()` for ALTER TABLE. Loaded native and Gravitino-created INVERTED indexes expose the effective Doris properties through `Index.properties()`. Supported keys, values, and server-added defaults depend on the Doris version and are validated by Doris.
+- `SHOW INDEX` does not escape embedded double quotes in property keys or values. Gravitino therefore does not guarantee their round-trip and rejects metadata that falls outside the supported flat quoted-pair format.
+- Index comments are not currently represented by the Gravitino `Index` API and are not preserved on round-trip.
 - `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+- Native Doris `NGRAM_BF` indexes are detected during table loading but are not currently representable by a Gravitino index type. Loading a table that contains one fails with `UnsupportedOperationException` instead of mapping it to an unrelated Gravitino index type. Creating or altering NGRAM_BF indexes through Gravitino and preserving their `gram_size` or `bf_size` properties are not supported.
 :::
 
 **Primary Key example:**
@@ -282,7 +286,11 @@ Index[] indexes = new Index[] {
     {
       "indexType": "inverted",
       "name": "idx_name",
-      "fieldNames": [["name"]]
+      "fieldNames": [["name"]],
+      "properties": {
+        "parser": "english",
+        "support_phrase": "true"
+      }
     }
   ]
 }
@@ -293,7 +301,11 @@ Index[] indexes = new Index[] {
 
 ```java
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.INVERTED, "idx_name", new String[][]{{"name"}}, Map.of())
+    Indexes.of(
+        IndexType.INVERTED,
+        "idx_name",
+        new String[][]{{"name"}},
+        Map.of("parser", "english", "support_phrase", "true"))
 };
 ```
 

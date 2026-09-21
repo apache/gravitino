@@ -47,7 +47,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -389,13 +388,67 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(schemaIdent, "comment", props);
 
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+          return null;
+        });
 
     Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
     Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+  }
+
+  @Test
+  void testDropSchemaRemovedFromSourceReportsMetadataCleanup() throws Exception {
+    reset(entityStore);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "externally_dropped_schema");
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    boolean droppedFromSource =
+        catalogManager.doWithCatalogWrapper(
+            NameIdentifier.of(metalake, catalog),
+            wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+    Assertions.assertTrue(droppedFromSource);
+    Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
+
+    Assertions.assertTrue(dispatcher.dropSchema(ident, true));
+    Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+    Assertions.assertFalse(dispatcher.dropSchema(ident, true));
+  }
+
+  @Test
+  void testCascadingDropOfMissingSchemaDeletesStoredSecrets() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "missing_schema_secret");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "s3cr3t")),
+          Map.of());
+      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      boolean sourceDropped =
+          catalogManager.doWithCatalogWrapper(
+              NameIdentifier.of(metalake, catalog),
+              wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+      Assertions.assertTrue(sourceDropped);
+      Assertions.assertFalse(d.dropSchema(ident, false));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      Assertions.assertTrue(d.dropSchema(ident, true));
+      Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
   }
 
   @Test
@@ -467,6 +520,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));

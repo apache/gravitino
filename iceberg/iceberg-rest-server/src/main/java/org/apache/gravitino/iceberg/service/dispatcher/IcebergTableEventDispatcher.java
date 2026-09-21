@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -53,6 +54,7 @@ import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
+import org.apache.gravitino.utils.RequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -68,6 +70,10 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
  * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationExecutor} that
  * not only delegates table operations to the underlying dispatcher but also dispatches
  * corresponding events to an {@link org.apache.gravitino.listener.EventBus}.
+ *
+ * <p>Create, update, and load attach optional extras stashed on {@link RequestContext} so an inner
+ * dispatcher can contribute {@code customInfo} to the terminal Iceberg event without publishing a
+ * sibling event that consumers would have to correlate.
  */
 public class IcebergTableEventDispatcher implements IcebergTableOperationDispatcher {
 
@@ -104,12 +110,15 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateTableFailureEvent(
-              context, nameIdentifier, transformedCreateEvent.createTableRequest(), e));
+              contextWithAuditExtras(context),
+              nameIdentifier,
+              transformedCreateEvent.createTableRequest(),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergCreateTableEvent(
-            context,
+            contextWithAuditExtras(context),
             nameIdentifier,
             transformedCreateEvent.createTableRequest(),
             loadTableResponse));
@@ -137,12 +146,15 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergUpdateTableFailureEvent(
-              context, gravitinoNameIdentifier, transformedUpdateEvent.updateTableRequest(), e));
+              contextWithAuditExtras(context),
+              gravitinoNameIdentifier,
+              transformedUpdateEvent.updateTableRequest(),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergUpdateTableEvent(
-            context,
+            contextWithAuditExtras(context),
             gravitinoNameIdentifier,
             transformedUpdateEvent.updateTableRequest(),
             loadTableResponse));
@@ -179,11 +191,14 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     try {
       loadTableResponse = icebergTableOperationDispatcher.loadTable(context, tableIdentifier);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new IcebergLoadTableFailureEvent(context, gravitinoNameIdentifier, e));
+      eventBus.dispatchEvent(
+          new IcebergLoadTableFailureEvent(
+              contextWithAuditExtras(context), gravitinoNameIdentifier, e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergLoadTableEvent(context, gravitinoNameIdentifier, loadTableResponse));
+        new IcebergLoadTableEvent(
+            contextWithAuditExtras(context), gravitinoNameIdentifier, loadTableResponse));
     return loadTableResponse;
   }
 
@@ -309,5 +324,14 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public Optional<String> getTableMetadataLocation(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return icebergTableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
+  }
+
+  /**
+   * Takes extras stashed on {@link RequestContext} and returns a context that carries them. The
+   * take is destructive so a later operation on the same thread cannot see this request's extras.
+   */
+  private static IcebergRequestContext contextWithAuditExtras(IcebergRequestContext context) {
+    Map<String, String> extras = RequestContext.takeAuditExtras();
+    return extras.isEmpty() ? context : context.withAuditExtras(extras);
   }
 }
