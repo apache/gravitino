@@ -71,6 +71,14 @@ public class TableVersionSQLProviderFactory {
     return getProvider().softDeleteTableVersionsBySchemaIds(schemaIds);
   }
 
+  public static String softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteTableVersionsByCatalogId(catalogId);
+  }
+
+  public static String softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().softDeleteTableVersionsByMetalakeId(metalakeId);
+  }
+
   public static String deleteTableVersionByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTableVersionByLegacyTimeline(legacyTimeline, limit);

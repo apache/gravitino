@@ -48,6 +48,16 @@ public interface TableVersionMapper {
       method = "softDeleteTableVersionsBySchemaIds")
   Integer softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  @UpdateProvider(
+      type = TableVersionSQLProviderFactory.class,
+      method = "softDeleteTableVersionsByCatalogId")
+  Integer softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = TableVersionSQLProviderFactory.class,
+      method = "softDeleteTableVersionsByMetalakeId")
+  Integer softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
   @DeleteProvider(
       type = TableVersionSQLProviderFactory.class,
       method = "deleteTableVersionByLegacyTimeline")

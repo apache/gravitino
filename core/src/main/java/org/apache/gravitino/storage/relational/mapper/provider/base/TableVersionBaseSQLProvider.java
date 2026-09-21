@@ -111,6 +111,38 @@ public class TableVersionBaseSQLProvider {
         + "</script>";
   }
 
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given catalog.
+   * table_version_info has no catalog_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByCatalogId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at.
+   */
+  public String softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
+  }
+
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given metalake.
+   * table_version_info has no metalake_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByMetalakeId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at.
+   */
+  public String softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
+  }
+
   public String deleteTableVersionByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
