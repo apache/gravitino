@@ -146,8 +146,11 @@ public class CatalogHive3IT extends CatalogHive2IT {
   }
 
   private void executeHiveSql(String sql) {
-    ExecResult result =
-        containerSuite.getHiveContainer().executeInContainer("hive", "-S", "-e", sql);
+    HiveContainer hiveContainer = containerSuite.getHiveContainer();
+    if (hiveContainer == null) {
+      hiveContainer = containerSuite.getHiveContainerWithS3();
+    }
+    ExecResult result = hiveContainer.executeInContainer("hive", "-S", "-e", sql);
     Assertions.assertEquals(
         0,
         result.getExitCode(),
