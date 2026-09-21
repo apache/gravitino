@@ -224,6 +224,19 @@ cancelling = client.cancel_job(job_id)
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
 
+A job carries three timestamps:
+
+- `queuedAt`: when Gravitino submitted the job to the job executor.
+- `startedAt`: when the job started executing.
+- `finishedAt`: when the job finished.
+
+Gravitino pulls job statuses from the job executor every `gravitino.job.statusPullIntervalInMs`,
+so a job's status can lag behind by up to this interval. The timestamps don't lag: the local job
+executor reports when each job actually started and finished, even for a job that starts and
+finishes between two pulls. A job executor that doesn't report these times gets the time Gravitino
+first observes the job running or finished instead. In that case, a job that finishes between two
+pulls has no `startedAt`.
+
 ### Get a Job's Output
 
 A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.

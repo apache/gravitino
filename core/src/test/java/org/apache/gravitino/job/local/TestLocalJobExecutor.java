@@ -30,6 +30,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
@@ -1234,13 +1237,108 @@ public class TestLocalJobExecutor {
     }
   }
 
+  @Test
+  public void testJobExecutionInfoOfFinishedJobs() throws IOException {
+    Instant submittedAt = Instant.now();
+    String succeededJobId =
+        jobExecutor.submitJob(newScriptJobTemplate("succeed", "sleep 1\nexit 0"));
+    String failedJobId = jobExecutor.submitJob(newScriptJobTemplate("fail", "sleep 1\nexit 1"));
+
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(
+            () ->
+                jobExecutor.getJobStatus(succeededJobId) == JobHandle.Status.SUCCEEDED
+                    && jobExecutor.getJobStatus(failedJobId) == JobHandle.Status.FAILED);
+
+    // The jobs are never polled while they run, but their snapshots still carry when they
+    // actually started and finished.
+    for (String jobId : Lists.newArrayList(succeededJobId, failedJobId)) {
+      JobExecutionInfo info = jobExecutor.getJobExecutionInfo(jobId);
+      Assertions.assertNotNull(info.startedAt(), jobId);
+      Assertions.assertNotNull(info.finishedAt(), jobId);
+      Assertions.assertFalse(info.startedAt().isBefore(submittedAt), jobId);
+      Assertions.assertTrue(
+          Duration.between(info.startedAt(), info.finishedAt()).toMillis() >= 900, info.toString());
+    }
+  }
+
+  @Test
+  public void testJobExecutionInfoOfCancelledJobs() throws IOException {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    try {
+      executor.initialize(
+          withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1")));
+      String runningJobId = executor.submitJob(newSleepJobTemplate("sleep"));
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.STARTED);
+      // The other job waits in the queue, as only one job can run at a time.
+      String queuedJobId = executor.submitJob(newScriptJobTemplate("queued", "exit 0"));
+
+      JobExecutionInfo started = executor.getJobExecutionInfo(runningJobId);
+      Assertions.assertNotNull(started.startedAt());
+      Assertions.assertNull(started.finishedAt());
+      Assertions.assertEquals(
+          JobExecutionInfo.of(JobHandle.Status.QUEUED), executor.getJobExecutionInfo(queuedJobId));
+
+      // A job cancelled from the queue never started.
+      executor.cancelJob(queuedJobId);
+      JobExecutionInfo cancelledQueued = executor.getJobExecutionInfo(queuedJobId);
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelledQueued.status());
+      Assertions.assertNull(cancelledQueued.startedAt());
+      Assertions.assertNotNull(cancelledQueued.finishedAt());
+
+      // A running job keeps its started time while it is being cancelled and after that.
+      executor.cancelJob(runningJobId);
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.CANCELLED);
+      JobExecutionInfo cancelled = executor.getJobExecutionInfo(runningJobId);
+      Assertions.assertEquals(started.startedAt(), cancelled.startedAt());
+      Assertions.assertNotNull(cancelled.finishedAt());
+      Assertions.assertFalse(cancelled.finishedAt().isBefore(cancelled.startedAt()));
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
+  public void testCleanupOnlyRemovesFinishedJobs() throws IOException {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    try {
+      executor.initialize(
+          withStagingDir(
+              ImmutableMap.of(
+                  LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS,
+                  "10",
+                  LocalJobExecutorConfigs.MAX_RUNNING_JOBS,
+                  "2")));
+      String runningJobId = executor.submitJob(newSleepJobTemplate("sleep"));
+      String finishedJobId = executor.submitJob(newScriptJobTemplate("finish", "exit 0"));
+
+      // The finished job is removed once it has been kept for the keep time, while the running job
+      // is kept however long it runs.
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> !hasJobStatus(executor, finishedJobId));
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(runningJobId));
+    } finally {
+      executor.close();
+    }
+  }
+
   private JobTemplate newSleepJobTemplate(String name) throws IOException {
+    // Exec the sleep, so that killing the job process also stops the sleep.
+    return newScriptJobTemplate(name, "exec sleep 600");
+  }
+
+  private JobTemplate newScriptJobTemplate(String name, String commands) throws IOException {
     // The job runs in the directory of its executable, so give each job its own directory.
     File jobDir = new File(workingDir, name);
     Assertions.assertTrue(jobDir.mkdirs());
-    File script = new File(jobDir, "sleep.sh");
-    // Exec the sleep, so that killing the job process also stops the sleep.
-    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep 600\n");
+    File script = new File(jobDir, "job.sh");
+    Files.writeString(script.toPath(), "#!/bin/bash\n" + commands + "\n");
     Assertions.assertTrue(script.setExecutable(true));
 
     return ShellJobTemplate.builder()
