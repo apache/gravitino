@@ -875,11 +875,10 @@ public class LanceTableOperations extends ManagedTableOperations {
         return IndexParams.builder().build();
       case VECTOR:
         // TODO make these parameters configurable
-        int numberOfDimensions = 3; // this value should be determined dynamically based on the data
-        // Add properties to Index to set this value.
+        int numberOfSubVectors = 3;
         return IndexParams.builder()
             .setVectorIndexParams(
-                VectorIndexParams.ivfPq(2, 8, numberOfDimensions, DistanceType.L2, 2))
+                VectorIndexParams.ivfPq(2, 8, numberOfSubVectors, DistanceType.L2, 2))
             .build();
       default:
         throw new IllegalArgumentException("Unsupported index type: " + indexType);

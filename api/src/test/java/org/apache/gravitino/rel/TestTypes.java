@@ -266,6 +266,29 @@ public class TestTypes {
     Assertions.assertEquals(3, unionType.types().length);
     Assertions.assertEquals("union<integer,string,boolean>", unionType.simpleString());
     Assertions.assertEquals(unionType, Types.UnionType.of(unionType.types()));
+
+    Types.VectorType vectorType = Types.VectorType.of(Types.FloatType.get(), 768);
+    Assertions.assertEquals(Type.Name.VECTOR, vectorType.name());
+    Assertions.assertEquals(Types.FloatType.get(), vectorType.elementType());
+    Assertions.assertEquals(768, vectorType.dimension());
+    Assertions.assertTrue(vectorType.hasDimensionSet());
+    Assertions.assertEquals("vector(float,768)", vectorType.simpleString());
+    Assertions.assertEquals(vectorType, Types.VectorType.of(Types.FloatType.get(), 768));
+
+    Types.VectorType unspecifiedVector = Types.VectorType.of(Types.FloatType.get());
+    Assertions.assertEquals(Types.VectorType.DIMENSION_NOT_SET, unspecifiedVector.dimension());
+    Assertions.assertFalse(unspecifiedVector.hasDimensionSet());
+    Assertions.assertEquals("vector(float)", unspecifiedVector.simpleString());
+
+    Types.VectorType matrix = Types.VectorType.of(vectorType, 32);
+    Assertions.assertEquals("vector(vector(float,768),32)", matrix.simpleString());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.VectorType.of(Types.StringType.get(), 1));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.VectorType.of(Types.FloatType.get(), 0));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.VectorType.of(Types.FloatType.get(), -2));
   }
 
   @Test

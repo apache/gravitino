@@ -257,6 +257,31 @@ public class TestLanceDataTypeConverter {
     assertEquals(10, ((ArrowType.FixedSizeList) arrowField.getFieldType().getType()).getListSize());
   }
 
+  @Test
+  public void testVectorTypeConversion() {
+    Types.VectorType vectorType = Types.VectorType.of(Types.FloatType.get(), 768);
+    Field field = CONVERTER.toArrowField("embedding", vectorType, true);
+
+    assertInstanceOf(ArrowType.FixedSizeList.class, field.getType());
+    assertEquals(768, ((ArrowType.FixedSizeList) field.getType()).getListSize());
+    Types.VectorType convertedVector = (Types.VectorType) CONVERTER.toGravitino(field);
+    assertEquals(Types.FloatType.get(), convertedVector.elementType());
+    assertEquals(768, convertedVector.dimension());
+
+    Types.VectorType matrix = Types.VectorType.of(vectorType, 32);
+    Field matrixField = CONVERTER.toArrowField("matrix", matrix, false);
+    assertInstanceOf(ArrowType.FixedSizeList.class, matrixField.getType());
+    assertEquals(matrix, CONVERTER.toGravitino(matrixField));
+  }
+
+  @Test
+  public void testUnspecifiedVectorTypeCannotConvertToArrow() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CONVERTER.toArrowField("embedding", Types.VectorType.of(Types.FloatType.get()), true));
+  }
+
   @ParameterizedTest(name = "[{index}] name={0}, type={1}, nullable={2}")
   @MethodSource("toArrowFieldArguments")
   @DisplayName("Test toArrowField for various types")

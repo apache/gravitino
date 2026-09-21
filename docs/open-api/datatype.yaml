@@ -29,6 +29,7 @@ components:
         - $ref: "#/components/schemas/PrimitiveType"
         - $ref: "#/components/schemas/StructType"
         - $ref: "#/components/schemas/ListType"
+        - $ref: "#/components/schemas/VectorType"
         - $ref: "#/components/schemas/MapType"
         - $ref: "#/components/schemas/UnionType"
         - $ref: "#/components/schemas/UnparsedType"
@@ -46,6 +47,7 @@ components:
         - $ref: "#/components/schemas/WritablePrimitiveType"
         - $ref: "#/components/schemas/WritableStructType"
         - $ref: "#/components/schemas/WritableListType"
+        - $ref: "#/components/schemas/WritableVectorType"
         - $ref: "#/components/schemas/WritableMapType"
         - $ref: "#/components/schemas/WritableUnionType"
         - $ref: "#/components/schemas/WritableExternalType"
@@ -157,6 +159,47 @@ components:
           default: true
         elementType:
           $ref: "#/components/schemas/WritableDataType"
+
+    WritableVectorType:
+      type: object
+      required:
+        - type
+        - elementType
+        - dimension
+      properties:
+        type:
+          type: string
+          enum:
+            - "vector"
+        elementType:
+          oneOf:
+            - $ref: "#/components/schemas/WritableNumericType"
+            - $ref: "#/components/schemas/WritableVectorType"
+        dimension:
+          oneOf:
+            - type: integer
+              enum:
+                - -1
+            - type: integer
+              minimum: 1
+          description: A positive fixed dimension, or -1 when unspecified
+
+    WritableNumericType:
+      oneOf:
+        - type: string
+          enum:
+            - byte
+            - byte unsigned
+            - short
+            - short unsigned
+            - integer
+            - integer unsigned
+            - long
+            - long unsigned
+            - float
+            - double
+        - type: string
+          pattern: '^decimal\(\s*[0-9]+\s*,\s*[0-9]+\s*\)$'
 
     WritableStructType:
       type: object
@@ -277,6 +320,52 @@ components:
         "elementType": "integer",
         "containsNull": false
       }
+
+    VectorType:
+      type: object
+      required:
+        - type
+        - elementType
+        - dimension
+      properties:
+        type:
+          type: string
+          enum:
+            - "vector"
+        elementType:
+          oneOf:
+            - $ref: "#/components/schemas/NumericType"
+            - $ref: "#/components/schemas/VectorType"
+        dimension:
+          oneOf:
+            - type: integer
+              enum:
+                - -1
+            - type: integer
+              minimum: 1
+          description: A positive fixed dimension, or -1 when unspecified
+      example: {
+        "type": "vector",
+        "elementType": "float",
+        "dimension": 768
+      }
+
+    NumericType:
+      oneOf:
+        - type: string
+          enum:
+            - byte
+            - byte unsigned
+            - short
+            - short unsigned
+            - integer
+            - integer unsigned
+            - long
+            - long unsigned
+            - float
+            - double
+        - type: string
+          pattern: '^decimal\(\s*[0-9]+\s*,\s*[0-9]+\s*\)$'
 
     StructType:
       type: object

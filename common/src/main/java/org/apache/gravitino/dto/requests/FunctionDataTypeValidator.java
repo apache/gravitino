@@ -99,6 +99,11 @@ final class FunctionDataTypeValidator {
       return;
     }
 
+    if (dataType instanceof Types.VectorType) {
+      validateDataType(((Types.VectorType) dataType).elementType(), fieldPath + ".elementType");
+      return;
+    }
+
     if (dataType instanceof Types.MapType) {
       Types.MapType mapType = (Types.MapType) dataType;
       validateDataType(mapType.keyType(), fieldPath + ".keyType");

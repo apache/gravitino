@@ -101,6 +101,37 @@ public class TestJsonUtils {
     String expected = "\"boolean\"";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
 
+    type = Types.VectorType.of(Types.VectorType.of(Types.FloatType.get(), 768), 32);
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n"
+            + "    \"type\": \"vector\",\n"
+            + "    \"elementType\": {\n"
+            + "        \"type\": \"vector\",\n"
+            + "        \"elementType\": \"float\",\n"
+            + "        \"dimension\": 768\n"
+            + "    },\n"
+            + "    \"dimension\": 32\n"
+            + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(type, objectMapper.readValue(jsonValue, Type.class));
+
+    Assertions.assertEquals(
+        Types.VectorType.of(Types.FloatType.get()),
+        objectMapper.readValue("\"vector(float)\"", Type.class));
+    Assertions.assertEquals(
+        Types.VectorType.of(Types.FloatType.get()),
+        objectMapper.readValue("\"vector(float,-1)\"", Type.class));
+    Assertions.assertEquals(
+        Types.VectorType.of(Types.DecimalType.of(10, 2), 128),
+        objectMapper.readValue("\"vector(decimal(10,2),128)\"", Type.class));
+    Assertions.assertEquals(
+        Types.VectorType.of(Types.VectorType.of(Types.FloatType.get(), 768), 32),
+        objectMapper.readValue("\"vector(vector(float,768),32)\"", Type.class));
+    Assertions.assertEquals(
+        Types.UnparsedType.of("vector(string,768)"),
+        objectMapper.readValue("\"vector(string,768)\"", Type.class));
+
     type = Types.TimestampType.withTimeZone();
     jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     expected = "\"timestamp_tz\"";
