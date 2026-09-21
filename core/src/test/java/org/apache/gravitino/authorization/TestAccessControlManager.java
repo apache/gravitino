@@ -350,6 +350,17 @@ public class TestAccessControlManager {
 
   @Test
   public void testListUsers() {
+    // Adding users to a nonexistent metalake must surface the documented
+    // NoSuchMetalakeException, not a raw storage error.
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addGroup("nope", "g1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeGroup("nope", "g1"));
+
     accessControlManager.addUser("metalake_list", "testList1");
     accessControlManager.addUser("metalake_list", "testList2");
 
