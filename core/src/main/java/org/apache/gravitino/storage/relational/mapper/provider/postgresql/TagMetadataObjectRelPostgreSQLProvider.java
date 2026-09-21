@@ -86,10 +86,13 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
+        // No tm.deleted_at filter: the metalake cascade tombstones the tag rows BEFORE
+        // this statement runs in the same transaction; filtering on live tags would leak
+        // the assignment rows. Matches the order-safe PolicyTagRel cascade shape.
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
-        + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
-        + " AND tm.deleted_at = 0) AND te.deleted_at = 0";
+        + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id)"
+        + " AND te.deleted_at = 0";
   }
 
   @Override

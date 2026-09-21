@@ -1218,14 +1218,16 @@ class TestRoleMetaService extends TestJDBCBackend {
     // hard delete after soft delete
     deletedCount =
         roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
-    assertEquals(3, deletedCount); // delete 1 role + 1 userRoleRel + 1 groupRoleRel
+    // delete 1 role + 1 userRoleRel + 1 groupRoleRel + 1 securable object: the metalake
+    // cascade now tombstones each role's securable objects too, so they are hard-deletable.
+    assertEquals(4, deletedCount);
     assertEquals(1, countRoles(metalake.id())); // 2 - 1
     assertEquals(1, countUserRoleRels()); // 2 - 1
     assertEquals(1, countGroupRoleRels()); // 2 - 1
 
     deletedCount =
         roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
-    assertEquals(3, deletedCount);
+    assertEquals(4, deletedCount);
     assertEquals(0, countRoles(metalake.id()));
     assertEquals(0, countUserRoleRels());
     assertEquals(0, countGroupRoleRels());
