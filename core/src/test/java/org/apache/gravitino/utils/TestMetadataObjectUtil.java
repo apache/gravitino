@@ -339,7 +339,7 @@ public class TestMetadataObjectUtil {
     verify(accessControlDispatcher).getRole("metalake", "role");
     verify(tagDispatcher).getTag("metalake", "tag");
     verify(policyDispatcher).getPolicy("metalake", "policy");
-    verify(jobDispatcher).getJob("metalake", "job");
+    verify(jobDispatcher).getJob("metalake", "job", false);
     verify(jobDispatcher).getJobTemplate("metalake", "template");
   }
 

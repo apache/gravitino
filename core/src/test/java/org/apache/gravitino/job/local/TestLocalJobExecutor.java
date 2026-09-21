@@ -18,18 +18,23 @@
  */
 package org.apache.gravitino.job.local;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
@@ -49,6 +54,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestLocalJobExecutor {
+
+  private static final int DEFAULT_TEST_MAX_BYTES = 1_000_000;
 
   private static JobExecutor jobExecutor;
 
@@ -257,6 +264,330 @@ public class TestLocalJobExecutor {
     } finally {
       exec.close();
     }
+  }
+
+  @Test
+  public void testGetJobOutputSuccessfully() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES);
+    Assertions.assertEquals(6, stdout.size());
+    Assertions.assertEquals("starting test test job", stdout.get(0));
+    Assertions.assertEquals("in common script", stdout.get(1));
+    Assertions.assertTrue(stdout.get(2).startsWith("Submitting job with name:"));
+    Assertions.assertEquals("value1", stdout.get(3));
+    Assertions.assertEquals("success", stdout.get(4));
+    Assertions.assertEquals("value3", stdout.get(5));
+
+    // The test script never writes to stderr.
+    Assertions.assertEquals(
+        Collections.emptyList(), jobExecutor.getJobStderr(jobId, 1000, DEFAULT_TEST_MAX_BYTES));
+
+    // The full output has 6 lines; only the last 3 should be returned when capped.
+    Assertions.assertEquals(
+        ImmutableList.of("value1", "success", "value3"),
+        jobExecutor.getJobStdout(jobId, 3, DEFAULT_TEST_MAX_BYTES));
+  }
+
+  @Test
+  public void testGetJobOutputForUnknownJobReturnsEmpty() {
+    // A job unknown to this executor - whether it never existed here, or its bookkeeping has
+    // expired/been lost - reports empty output rather than throwing: the job entity itself may
+    // still exist, and querying its output must not turn that into an error.
+    Assertions.assertEquals(
+        Collections.emptyList(),
+        jobExecutor.getJobStdout("no-such-job", 100, DEFAULT_TEST_MAX_BYTES));
+    Assertions.assertEquals(
+        Collections.emptyList(),
+        jobExecutor.getJobStderr("no-such-job", 100, DEFAULT_TEST_MAX_BYTES));
+  }
+
+  @Test
+  public void testGetJobOutputReturnsEmptyWhenFileDisappearsBetweenExistsCheckAndRead()
+      throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // Simulates JobManager#cleanUpStagingDirs racing with this read: the file existed moments
+    // ago (the exists() check would pass), but is no longer a readable regular file by the time
+    // the actual read is attempted - opening it as a RandomAccessFile throws
+    // FileNotFoundException, which must degrade to empty output rather than propagate as a
+    // RuntimeException/500.
+    File outputLog = new File(workingDir, "output.log");
+    Assertions.assertTrue(outputLog.delete());
+    Assertions.assertTrue(outputLog.mkdir());
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES);
+    Assertions.assertEquals(Collections.emptyList(), stdout);
+  }
+
+  @Test
+  public void testGetJobOutputForQueuedJobReturnsEmpty() throws IOException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1"));
+
+    File workingDirA = Files.createTempDirectory("gravitino-test-local-job-executor-a").toFile();
+    File workingDirB = Files.createTempDirectory("gravitino-test-local-job-executor-b").toFile();
+    try {
+      Map<String, String> jobConf =
+          ImmutableMap.of(
+              "arg1", "value1",
+              "arg2", "success",
+              "var", "value3");
+
+      // Submit two jobs to a single-threaded executor - the second one stays QUEUED until the
+      // first (which sleeps for a few seconds) finishes.
+      JobTemplate templateA =
+          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirA);
+      JobTemplate templateB =
+          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirB);
+      exec.submitJob(templateA);
+      String jobIdB = exec.submitJob(templateB);
+
+      Assertions.assertEquals(JobHandle.Status.QUEUED, exec.getJobStatus(jobIdB));
+      Assertions.assertEquals(
+          Collections.emptyList(), exec.getJobStdout(jobIdB, 100, DEFAULT_TEST_MAX_BYTES));
+      Assertions.assertEquals(
+          Collections.emptyList(), exec.getJobStderr(jobIdB, 100, DEFAULT_TEST_MAX_BYTES));
+
+      Awaitility.await()
+          .atMost(3, TimeUnit.MINUTES)
+          .until(() -> exec.getJobStatus(jobIdB) == JobHandle.Status.SUCCEEDED);
+    } finally {
+      exec.close();
+      FileUtils.deleteDirectory(workingDirA);
+      FileUtils.deleteDirectory(workingDirB);
+    }
+  }
+
+  @Test
+  public void testGetJobOutputWithOversizedSingleLineIsBoundedByMaxBytes() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // Overwrite the captured output with a single line far larger than the byte window, with no
+    // trailing newline - the pathological case a byte-bounded tail read must stay safe against
+    // (a naive line-oriented reverse reader can degrade badly on content shaped like this).
+    int maxBytes = 1024;
+    String oversizedLine = StringUtils.repeat('x', maxBytes * 4);
+    FileUtils.writeStringToFile(new File(workingDir, "output.log"), oversizedLine, "UTF-8");
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, maxBytes);
+    Assertions.assertEquals(1, stdout.size());
+    Assertions.assertTrue(stdout.get(0).length() <= maxBytes);
+    Assertions.assertTrue(oversizedLine.endsWith(stdout.get(0)));
+  }
+
+  @Test
+  public void testGetJobOutputWithOversizedSingleLineEndingInNewlineIsTruncatedNotEmpty()
+      throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // Same oversized single line as above, but terminated with a newline - the shape almost
+    // every real shell command (echo, printf '...\n') actually produces. The trailing newline is
+    // then the only '\n' in the window, and must not be mistaken for a boundary to a subsequent
+    // line - the truncated line content must still come back, not an empty list.
+    int maxBytes = 1024;
+    String oversizedLine = StringUtils.repeat('x', maxBytes * 4);
+    FileUtils.writeStringToFile(new File(workingDir, "output.log"), oversizedLine + "\n", "UTF-8");
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, maxBytes);
+    Assertions.assertEquals(1, stdout.size());
+    Assertions.assertFalse(stdout.get(0).isEmpty());
+    Assertions.assertTrue(stdout.get(0).length() <= maxBytes);
+    Assertions.assertTrue(oversizedLine.endsWith(stdout.get(0)));
+  }
+
+  @Test
+  public void testGetJobOutputWithOrdinaryLinesFollowedByOversizedFinalLine() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // A few ordinary lines followed by a newline-terminated final line that alone exceeds the
+    // byte window - the window falls entirely within that last line, so its trailing newline is
+    // again the only one visible, and the truncated tail of that line must still be returned.
+    int maxBytes = 1024;
+    String oversizedLine = StringUtils.repeat('y', maxBytes * 4);
+    String content =
+        "error: something failed\nstack frame 1\nstack frame 2\n" + oversizedLine + "\n";
+    FileUtils.writeStringToFile(new File(workingDir, "output.log"), content, "UTF-8");
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, maxBytes);
+    Assertions.assertEquals(1, stdout.size());
+    Assertions.assertFalse(stdout.get(0).isEmpty());
+    Assertions.assertTrue(stdout.get(0).length() <= maxBytes);
+    Assertions.assertTrue(oversizedLine.endsWith(stdout.get(0)));
+  }
+
+  @Test
+  public void testGetJobOutputWindowSmallerThanRequestedLines() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // Many short lines whose total size exceeds the byte window - only the lines that fit in
+    // the window should come back, even though maxLines asks for far more than that.
+    int lineCount = 2000;
+    StringBuilder content = new StringBuilder();
+    for (int i = 0; i < lineCount; i++) {
+      content.append("line").append(i).append('\n');
+    }
+    FileUtils.writeStringToFile(new File(workingDir, "output.log"), content.toString(), "UTF-8");
+
+    int maxBytes = 100;
+    List<String> stdout = jobExecutor.getJobStdout(jobId, lineCount, maxBytes);
+    Assertions.assertFalse(stdout.isEmpty());
+    Assertions.assertTrue(stdout.size() < lineCount);
+    // It's a tail read, so the very last written line must always be present.
+    Assertions.assertEquals("line" + (lineCount - 1), stdout.get(stdout.size() - 1));
+  }
+
+  @Test
+  public void testGetJobOutputStripsCrlfLineEndings() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // Windows-style line endings must not leave a trailing '\r' on the returned lines.
+    FileUtils.writeStringToFile(
+        new File(workingDir, "output.log"), "line1\r\nline2\r\nline3\r\n", "UTF-8");
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES);
+    Assertions.assertEquals(ImmutableList.of("line1", "line2", "line3"), stdout);
+  }
+
+  @Test
+  public void testGetJobOutputKeepsAllLinesWhenWindowAlignsOnLineBoundary() throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // "line1\n" is exactly 6 bytes, so a maxBytes of 12 makes the window start exactly at the
+    // beginning of "line2" - a genuine line boundary, not a partial line. Both "line2" and
+    // "line3" must be returned, not just the last one.
+    FileUtils.writeStringToFile(
+        new File(workingDir, "output.log"), "line1\nline2\nline3\n", "UTF-8");
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 100, 12);
+    Assertions.assertEquals(ImmutableList.of("line2", "line3"), stdout);
+  }
+
+  @Test
+  public void testGetJobOutputAvoidsCorruptingMultiByteUtf8CharacterAtWindowStart()
+      throws IOException {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "arg1", "value1",
+            "arg2", "success",
+            "var", "value3");
+
+    JobTemplate template =
+        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+
+    String jobId = jobExecutor.submitJob(template);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // "AAAAA" + "中" (3-byte UTF-8: 0xE4 0xB8 0xAD) + "BBBBB", with no newlines at all. With
+    // maxBytes=7 the computed window start lands on the second byte of the multi-byte character
+    // - the read must skip forward to the next character boundary rather than emitting a
+    // replacement character for the split-up bytes.
+    ByteArrayOutputStream content = new ByteArrayOutputStream();
+    content.write("AAAAA".getBytes(StandardCharsets.UTF_8));
+    content.write(new byte[] {(byte) 0xE4, (byte) 0xB8, (byte) 0xAD});
+    content.write("BBBBB".getBytes(StandardCharsets.UTF_8));
+    FileUtils.writeByteArrayToFile(new File(workingDir, "output.log"), content.toByteArray());
+
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 100, 7);
+    Assertions.assertEquals(ImmutableList.of("BBBBB"), stdout);
   }
 
   @Test
