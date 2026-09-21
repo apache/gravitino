@@ -352,15 +352,16 @@ subprojects {
     return@subprojects
   }
 
-  if (project.path == ":catalogs:hive-metastore2-libs" ||
-    project.path == ":catalogs:hive-metastore3-libs"
-  ) {
-    return@subprojects
-  }
+  val isHiveMetastoreLib = project.path in setOf(
+    ":catalogs:hive-metastore2-libs",
+    ":catalogs:hive-metastore3-libs"
+  )
 
   apply(plugin = "jacoco")
-  apply(plugin = "maven-publish")
   apply(plugin = "java")
+  if (!isHiveMetastoreLib) {
+    apply(plugin = "maven-publish")
+  }
 
   // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
   // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
@@ -596,61 +597,63 @@ subprojects {
     }
   }
 
-  apply(plugin = "signing")
-  publishing {
-    publications {
-      create<MavenPublication>("MavenJava") {
-        if (project.name == "docs" ||
-          project.name == "integration-test" ||
-          project.name == "integration-test-common" ||
-          project.name == "web"
-        ) {
-          setArtifacts(emptyList<Any>())
-        } else {
-          from(components["java"])
-          artifact(sourcesJar)
-          artifact(javadocJar)
-        }
-
-        artifactId = "${rootProject.name.lowercase()}-${project.name}"
-
-        pom {
-          name.set("Gravitino")
-          description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://gravitino.apache.org")
-          licenses {
-            license {
-              name.set("The Apache Software License, Version 2.0")
-              url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
-            }
+  if (!isHiveMetastoreLib) {
+    apply(plugin = "signing")
+    publishing {
+      publications {
+        create<MavenPublication>("MavenJava") {
+          if (project.name == "docs" ||
+            project.name == "integration-test" ||
+            project.name == "integration-test-common" ||
+            project.name == "web"
+          ) {
+            setArtifacts(emptyList<Any>())
+          } else {
+            from(components["java"])
+            artifact(sourcesJar)
+            artifact(javadocJar)
           }
-          developers {
-            developer {
-              id.set("The Gravitino community")
-              name.set("support")
-              email.set("dev@gravitino.apache.org")
+
+          artifactId = "${rootProject.name.lowercase()}-${project.name}"
+
+          pom {
+            name.set("Gravitino")
+            description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
+            url.set("https://gravitino.apache.org")
+            licenses {
+              license {
+                name.set("The Apache Software License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+              }
             }
-          }
-          scm {
-            url.set("https://github.com/apache/gravitino")
-            connection.set("scm:git:git://github.com/apache/gravitino.git")
+            developers {
+              developer {
+                id.set("The Gravitino community")
+                name.set("support")
+                email.set("dev@gravitino.apache.org")
+              }
+            }
+            scm {
+              url.set("https://github.com/apache/gravitino")
+              connection.set("scm:git:git://github.com/apache/gravitino.git")
+            }
           }
         }
       }
     }
-  }
 
-  configure<SigningExtension> {
-    val taskNames = gradle.getStartParameter().getTaskNames()
-    taskNames.forEach() {
-      if (it.contains("publishToMavenLocal")) setRequired(false)
+    configure<SigningExtension> {
+      val taskNames = gradle.getStartParameter().getTaskNames()
+      taskNames.forEach() {
+        if (it.contains("publishToMavenLocal")) setRequired(false)
+      }
+
+      val gpgId = System.getenv("GPG_ID")
+      val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
+      val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
+      useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
+      sign(publishing.publications)
     }
-
-    val gpgId = System.getenv("GPG_ID")
-    val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
-    val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
-    useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
-    sign(publishing.publications)
   }
 
   tasks.configureEach<Test> {

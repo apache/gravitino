@@ -18,26 +18,43 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
+
+import java.util.function.Supplier;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 
+/**
+ * Capabilities of the Hive catalog. Column constraint support depends on the version of the
+ * connected Hive Metastore, which is resolved and cached on first use.
+ */
 public class HiveCatalogCapability implements Capability {
+
+  private final Supplier<HiveVersion> hiveVersionSupplier;
+  private volatile HiveVersion hiveVersion;
+
+  /**
+   * Creates a capability bound to the connected Hive Metastore version.
+   *
+   * @param hiveVersionSupplier Supplies the connected Hive Metastore version.
+   */
+  public HiveCatalogCapability(Supplier<HiveVersion> hiveVersionSupplier) {
+    this.hiveVersionSupplier = hiveVersionSupplier;
+  }
+
   @Override
   public CapabilityResult columnNotNull() {
     // The NOT NULL constraint for column is supported since Hive 3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    return CapabilityResult.unsupported(
-        "The NOT NULL constraint for column is only supported since Hive 3.0, "
-            + "but the current Gravitino Hive catalog only supports Hive 2.x.");
+    return requireHive3("NOT NULL");
   }
 
   @Override
   public CapabilityResult columnDefaultValue() {
     // The DEFAULT constraint for column is supported since Hive 3.0, see
     // https://issues.apache.org/jira/browse/HIVE-18726
-    return CapabilityResult.unsupported(
-        "The DEFAULT constraint for column is only supported since Hive 3.0, "
-            + "but the current Gravitino Hive catalog only supports Hive 2.x.");
+    return requireHive3("DEFAULT");
   }
 
   @Override
@@ -52,5 +69,33 @@ public class HiveCatalogCapability implements Capability {
       default:
         return CapabilityResult.SUPPORTED;
     }
+  }
+
+  private CapabilityResult requireHive3(String constraint) {
+    HiveVersion version = hiveVersion();
+    if (version == HIVE3) {
+      return CapabilityResult.SUPPORTED;
+    }
+    return CapabilityResult.unsupported(
+        "The "
+            + constraint
+            + " constraint for column is only supported since Hive 3.0, "
+            + "but the connected Hive Metastore version is "
+            + version
+            + ".");
+  }
+
+  private HiveVersion hiveVersion() {
+    HiveVersion version = hiveVersion;
+    if (version == null) {
+      synchronized (this) {
+        version = hiveVersion;
+        if (version == null) {
+          version = hiveVersionSupplier.get();
+          hiveVersion = version;
+        }
+      }
+    }
+    return version;
   }
 }

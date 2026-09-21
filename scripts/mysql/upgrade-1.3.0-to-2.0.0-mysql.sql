@@ -17,6 +17,9 @@
 -- under the License.
 --
 
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
+
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
@@ -102,7 +105,6 @@ ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_i
 ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`;
 ALTER TABLE `policy_version_info` RENAME INDEX `idx_mid` TO `policy_version_info_idx_mid`;
-ALTER TABLE `policy_relation_meta` RENAME INDEX `idx_mid` TO `policy_relation_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `uk_sid_fn_del` TO `function_meta_uk_sid_fn_del`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_mid` TO `function_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_cid` TO `function_meta_idx_cid`;

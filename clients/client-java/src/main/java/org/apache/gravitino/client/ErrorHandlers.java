@@ -1111,6 +1111,10 @@ public class ErrorHandlers {
               .getType()
               .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
             throw new TagAlreadyAssociatedException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
           }

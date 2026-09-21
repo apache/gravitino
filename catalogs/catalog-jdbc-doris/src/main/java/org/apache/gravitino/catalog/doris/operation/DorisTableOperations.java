@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -574,14 +575,14 @@ public class DorisTableOperations extends JdbcTableOperations {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
         String dorisIndexType = hasIndexType ? resultSet.getString("Index_type") : null;
-        // Doris always names the primary key index "PRIMARY"; detect it first.
+        // Preserve the legacy PRIMARY mapping unless authoritative metadata identifies NGRAM_BF,
+        // which must fail closed.
         Index.IndexType gravitinoIndexType;
-        if ("PRIMARY".equals(indexName)) {
+        if ("PRIMARY".equals(indexName) && !"NGRAM_BF".equalsIgnoreCase(dorisIndexType)) {
           gravitinoIndexType = Index.IndexType.PRIMARY_KEY;
         } else if (hasIndexType) {
           gravitinoIndexType = mapDorisIndexType(dorisIndexType, indexName);
         } else {
-          // Doris 1.2.x: no Index_type column, infer from index name
           gravitinoIndexType = mapDorisIndexType(null, indexName);
         }
         Map<String, String> indexProperties = Collections.emptyMap();
@@ -632,6 +633,10 @@ public class DorisTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case "ANN":
         return Index.IndexType.VECTOR;
+      case "NGRAM_BF":
+        throw new UnsupportedOperationException(
+            String.format(
+                "Doris index '%s' uses unsupported native index type 'NGRAM_BF'", indexName));
       default:
         LOG.warn(
             "Unknown Doris index type '{}' for index '{}', falling back to INVERTED",
@@ -661,11 +666,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-    if (StringUtils.isNotEmpty(tableBuilder.comment())) {
+    if (StringUtils.isNotEmpty(tableBuilder.comment())
+        && !"OLAP".equalsIgnoreCase(tableBuilder.comment())) {
       return;
     }
 
-    // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
+    // Doris JDBC metadata can report the OLAP engine as REMARKS. Query the actual table comment
+    // from information_schema when REMARKS is empty or contains that engine name. Preserve the
+    // Gravitino ID suffix so JdbcCatalogOperations can extract it when loading the table.
     StringBuilder comment = new StringBuilder();
     String sql =
         "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
@@ -746,6 +754,7 @@ public class DorisTableOperations extends JdbcTableOperations {
      * */
 
     // Not all operations require the original table information, so lazy loading is used here
+    validateIndexChangeConflicts(changes);
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
@@ -819,13 +828,42 @@ public class DorisTableOperations extends JdbcTableOperations {
       alterSql.add("MODIFY COMMENT \"" + escapeSqlLiteral(newComment, '"') + "\"");
     }
 
-    if (CollectionUtils.isEmpty(alterSql)) {
+    List<String> nonEmptyAlterSql =
+        alterSql.stream().filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+    if (CollectionUtils.isEmpty(nonEmptyAlterSql)) {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    String result =
+        "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", nonEmptyAlterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
+  }
+
+  private static void validateIndexChangeConflicts(TableChange... changes) {
+    Set<String> deleteIndexNames = new HashSet<>();
+    Set<String> addIndexNames = new HashSet<>();
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.DeleteIndex) {
+        String indexName = ((TableChange.DeleteIndex) change).getName();
+        Preconditions.checkArgument(
+            deleteIndexNames.add(indexName),
+            "Index '%s' cannot be deleted more than once in the same request",
+            indexName);
+        Preconditions.checkArgument(
+            !addIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+      } else if (change instanceof TableChange.AddIndex) {
+        String indexName = ((TableChange.AddIndex) change).getName();
+        Preconditions.checkArgument(
+            !deleteIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+        addIndexNames.add(indexName);
+      }
+    }
   }
 
   private String updateColumnNullabilityDefinition(
@@ -1035,11 +1073,14 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (!deleteIndex.isIfExists()) {
-      Preconditions.checkArgument(
-          Arrays.stream(lazyLoadTable.index())
-              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
-          "Index does not exist");
+    boolean indexExists =
+        Arrays.stream(lazyLoadTable.index())
+            .anyMatch(index -> index.name().equals(deleteIndex.getName()));
+    if (!indexExists) {
+      if (deleteIndex.isIfExists()) {
+        return "";
+      }
+      throw new IllegalArgumentException("Index does not exist: " + deleteIndex.getName());
     }
     return "DROP INDEX `" + deleteIndex.getName() + "`";
   }
