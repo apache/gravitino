@@ -87,6 +87,33 @@ public class TestMetricsSystem {
             .containsKey(metricsSource.getMetricsSourceName() + "a.b"));
   }
 
+  @Test
+  void testUnregisterSeversSourceRegistryLink() {
+    MockMetricsSource source = new MockMetricsSource("lazy_src");
+    metricsSystem.register(source);
+
+    // A metric created lazily AFTER registration (first use of a counter in a
+    // catalog operation) must be visible while the source is registered.
+    source.getMetricRegistry().counter("lazy.c");
+    Assertions.assertTrue(
+        metricsSystem.getMetricRegistry().getCounters().containsKey("lazy_src.lazy.c"),
+        "a lazily created metric should surface in the shared registry");
+
+    metricsSystem.unregister(source);
+
+    // A stale source (e.g. a catalog evicted from cache) that creates a
+    // first-time metric after being unregistered must not re-inject it into
+    // the shared registry read by the reporters.
+    source.getMetricRegistry().counter("ghost.c");
+    Assertions.assertFalse(
+        metricsSystem.getMetricRegistry().getCounters().containsKey("lazy_src.ghost.c"),
+        "an unregistered source must not re-inject metrics");
+
+    // Re-registration under the same name must not throw.
+    MockMetricsSource fresh = new MockMetricsSource("lazy_src");
+    Assertions.assertDoesNotThrow(() -> metricsSystem.register(fresh));
+  }
+
   private long getCounterValue(String metricsSourceName, String name) {
     return metricsSystem.getMetricRegistry().counter(metricsSourceName + "." + name).getCount();
   }
