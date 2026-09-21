@@ -207,6 +207,7 @@ public class GravitinoEnv {
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
+  private StatisticDispatcher internalStatisticDispatcher;
 
   protected GravitinoEnv() {}
 
@@ -237,16 +238,20 @@ public class GravitinoEnv {
   }
 
   /**
-   * Initialize metadata access components without server-side integrations.
+   * Initializes components required for normalized metadata operations.
    *
-   * <p>This profile provides storage, normalized metadata dispatchers, governance, configured
-   * authorization, statistics, locking, secrets, and metrics. It excludes hooks, event and audit
-   * dispatch, auxiliary services, and the job subsystem. It is intended for processes that need
-   * direct metadata access without hosting the Gravitino server runtime.
+   * <p>This initialization profile does not initialize event listeners, audit logging, metadata
+   * hooks, auxiliary services, or job management.
+   *
+   * <p>This method must be invoked on the singleton returned by {@link #getInstance()}, because
+   * metadata components use environment-scoped dependencies.
    *
    * @param config The configuration object to initialize the environment.
    */
   public void initializeMetadataComponents(Config config) {
+    Preconditions.checkState(
+        this == getInstance(),
+        "Metadata components must be initialized on GravitinoEnv.getInstance().");
     LOG.info("Initializing Gravitino metadata environment...");
     initializeConfig(config);
     this.manageFullComponents = false;
@@ -766,6 +771,17 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  /**
+   * Get the internal StatisticDispatcher associated with the Gravitino environment.
+   *
+   * @return The internal StatisticDispatcher instance.
+   */
+  public StatisticDispatcher internalStatisticDispatcher() {
+    Preconditions.checkArgument(
+        internalStatisticDispatcher != null, "GravitinoEnv is not initialized.");
+    return internalStatisticDispatcher;
+  }
+
   public boolean cacheEnabled() {
     return config == null || config.get(Configs.CACHE_ENABLED);
   }
@@ -825,9 +841,11 @@ public class GravitinoEnv {
       }
     }
 
-    if (statisticDispatcher != null) {
+    StatisticDispatcher statisticDispatcherToClose =
+        statisticDispatcher != null ? statisticDispatcher : internalStatisticDispatcher;
+    if (statisticDispatcherToClose != null) {
       try {
-        statisticDispatcher.close();
+        statisticDispatcherToClose.close();
       } catch (Exception e) {
         LOG.warn("Failed to close StatisticDispatcher", e);
       }
@@ -887,7 +905,7 @@ public class GravitinoEnv {
     FilesetOperationDispatcher filesetOperationDispatcher = initInternalFilesetDispatcher();
     SchemaOperationDispatcher schemaOperationDispatcher = initInternalSchemaDispatcher();
     initInternalTableDispatcher();
-    PartitionOperationDispatcher partitionOperationDispatcher = initInternalPartitionDispatcher();
+    initInternalPartitionDispatcher();
     TopicOperationDispatcher topicOperationDispatcher = initInternalTopicDispatcher();
     ModelOperationDispatcher modelOperationDispatcher = initInternalModelDispatcher();
     FunctionOperationDispatcher functionOperationDispatcher =
@@ -895,7 +913,7 @@ public class GravitinoEnv {
     initInternalViewDispatcher();
     initSemanticModelDispatcher(schemaOperationDispatcher);
 
-    this.statisticDispatcher = new StatisticManager(entityStore, idGenerator, config);
+    this.internalStatisticDispatcher = new StatisticManager(entityStore, idGenerator, config);
     initInternalAuthorizationComponents();
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
@@ -904,7 +922,6 @@ public class GravitinoEnv {
     return new MetadataOperations(
         filesetOperationDispatcher,
         schemaOperationDispatcher,
-        partitionOperationDispatcher,
         topicOperationDispatcher,
         modelOperationDispatcher,
         functionOperationDispatcher);
@@ -939,12 +956,11 @@ public class GravitinoEnv {
         new TableNormalizeDispatcher(internalTableOperationDispatcher, catalogManager);
   }
 
-  private PartitionOperationDispatcher initInternalPartitionDispatcher() {
+  private void initInternalPartitionDispatcher() {
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalPartitionDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
-    return partitionOperationDispatcher;
   }
 
   private TopicOperationDispatcher initInternalTopicDispatcher() {
@@ -1085,10 +1101,7 @@ public class GravitinoEnv {
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
-    PartitionNormalizeDispatcher partitionNormalizeDispatcher =
-        new PartitionNormalizeDispatcher(
-            metadataOperations.partitionOperationDispatcher, catalogManager);
-    this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
+    this.partitionDispatcher = new PartitionEventDispatcher(eventBus, internalPartitionDispatcher);
 
     TopicHookDispatcher topicHookDispatcher =
         new TopicHookDispatcher(metadataOperations.topicOperationDispatcher);
@@ -1122,7 +1135,7 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
 
-    this.statisticDispatcher = new StatisticEventDispatcher(eventBus, statisticDispatcher);
+    this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 
     // Create and initialize access control related modules
     if (internalAccessControlDispatcher != null) {
@@ -1147,7 +1160,6 @@ public class GravitinoEnv {
   private static final class MetadataOperations {
     private final FilesetOperationDispatcher filesetOperationDispatcher;
     private final SchemaOperationDispatcher schemaOperationDispatcher;
-    private final PartitionOperationDispatcher partitionOperationDispatcher;
     private final TopicOperationDispatcher topicOperationDispatcher;
     private final ModelOperationDispatcher modelOperationDispatcher;
     private final FunctionOperationDispatcher functionOperationDispatcher;
@@ -1155,13 +1167,11 @@ public class GravitinoEnv {
     private MetadataOperations(
         FilesetOperationDispatcher filesetOperationDispatcher,
         SchemaOperationDispatcher schemaOperationDispatcher,
-        PartitionOperationDispatcher partitionOperationDispatcher,
         TopicOperationDispatcher topicOperationDispatcher,
         ModelOperationDispatcher modelOperationDispatcher,
         FunctionOperationDispatcher functionOperationDispatcher) {
       this.filesetOperationDispatcher = filesetOperationDispatcher;
       this.schemaOperationDispatcher = schemaOperationDispatcher;
-      this.partitionOperationDispatcher = partitionOperationDispatcher;
       this.topicOperationDispatcher = topicOperationDispatcher;
       this.modelOperationDispatcher = modelOperationDispatcher;
       this.functionOperationDispatcher = functionOperationDispatcher;

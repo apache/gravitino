@@ -19,11 +19,13 @@
 package org.apache.gravitino;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
@@ -31,20 +33,70 @@ import static org.mockito.Mockito.withSettings;
 
 import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
+import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.FunctionNormalizeDispatcher;
+import org.apache.gravitino.catalog.FunctionOperationDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.ModelOperationDispatcher;
+import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
+import org.apache.gravitino.catalog.PartitionOperationDispatcher;
+import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
+import org.apache.gravitino.catalog.SchemaOperationDispatcher;
+import org.apache.gravitino.catalog.TableNormalizeDispatcher;
+import org.apache.gravitino.catalog.TableOperationDispatcher;
+import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
+import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
+import org.apache.gravitino.catalog.ViewOperationDispatcher;
+import org.apache.gravitino.hook.FilesetHookDispatcher;
+import org.apache.gravitino.hook.FunctionHookDispatcher;
+import org.apache.gravitino.hook.ModelHookDispatcher;
+import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.hook.ViewHookDispatcher;
+import org.apache.gravitino.listener.FilesetEventDispatcher;
+import org.apache.gravitino.listener.FunctionEventDispatcher;
+import org.apache.gravitino.listener.ModelEventDispatcher;
+import org.apache.gravitino.listener.PartitionEventDispatcher;
+import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.StatisticEventDispatcher;
+import org.apache.gravitino.listener.TableEventDispatcher;
+import org.apache.gravitino.listener.TopicEventDispatcher;
+import org.apache.gravitino.listener.ViewEventDispatcher;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.MockedStatic;
 
+@TestMethodOrder(OrderAnnotation.class)
 class TestGravitinoEnvMetadataComponents {
 
   @Test
+  @Order(1)
+  void testMetadataProfileRejectsNonSingletonEnvironment() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () -> new TestGravitinoEnv().initializeMetadataComponents(metadataConfig(false)));
+
+    assertEquals(
+        "Metadata components must be initialized on GravitinoEnv.getInstance().",
+        exception.getMessage());
+  }
+
+  @Test
+  @Order(2)
   void testMetadataProfileProvidesCompleteMetadataAccessWithoutServerServices() throws Exception {
     Config config = metadataConfig(false);
     EntityStore entityStore = relationStore();
-    TestGravitinoEnv env = new TestGravitinoEnv();
-    Object originalLockManager = installSingletonLock(config);
+    GravitinoEnv env = GravitinoEnv.getInstance();
 
     try (MockedStatic<EntityStoreFactory> entityStoreFactory =
         mockStatic(EntityStoreFactory.class)) {
@@ -71,7 +123,7 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.secretPropertyOperationDispatcher());
       assertNotNull(env.internalTagDispatcher());
       assertNotNull(env.internalPolicyDispatcher());
-      assertInstanceOf(StatisticManager.class, env.statisticDispatcher());
+      assertInstanceOf(StatisticManager.class, env.internalStatisticDispatcher());
       assertNotNull(env.lockManager());
       assertNotNull(env.metricsSystem());
       assertNotNull(env.secretManager());
@@ -90,6 +142,7 @@ class TestGravitinoEnvMetadataComponents {
       assertNull(env.viewDispatcher());
       assertNull(env.tagDispatcher());
       assertNull(env.policyDispatcher());
+      assertNull(env.statisticDispatcher());
       assertNull(env.internalAccessControlDispatcher());
       assertNull(env.internalOwnerDispatcher());
       assertNull(env.bulkManager());
@@ -98,22 +151,25 @@ class TestGravitinoEnvMetadataComponents {
       assertThrows(IllegalArgumentException.class, env::jobOperationDispatcher);
       assertThrows(IllegalArgumentException.class, env::internalJobOperationDispatcher);
 
-      assertDoesNotThrow(env::start);
       verify(entityStore).initialize(config);
+      clearInvocations(entityStore);
+      assertEquals(0, env.internalMetalakeDispatcher().listMetalakes().length);
+      verify(entityStore).list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE);
+
+      assertDoesNotThrow(env::start);
     } finally {
       env.shutdown();
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", originalLockManager, true);
     }
 
     verify(entityStore).close();
   }
 
   @Test
+  @Order(3)
   void testMetadataProfileProvidesInternalAuthorizationWhenEnabled() throws Exception {
     Config config = metadataConfig(true);
     EntityStore entityStore = relationStore();
-    TestGravitinoEnv env = new TestGravitinoEnv();
-    Object originalLockManager = installSingletonLock(config);
+    GravitinoEnv env = GravitinoEnv.getInstance();
 
     try (MockedStatic<EntityStoreFactory> entityStoreFactory =
         mockStatic(EntityStoreFactory.class)) {
@@ -131,8 +187,86 @@ class TestGravitinoEnvMetadataComponents {
       assertNull(env.ownerDispatcher());
     } finally {
       env.shutdown();
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", originalLockManager, true);
     }
+
+    verify(entityStore).close();
+  }
+
+  @Test
+  @Order(4)
+  void testFullProfilePreservesDispatcherChains() throws Exception {
+    Config config = metadataConfig(false);
+    EntityStore entityStore = relationStore();
+    GravitinoEnv env = GravitinoEnv.getInstance();
+
+    try (MockedStatic<EntityStoreFactory> entityStoreFactory =
+        mockStatic(EntityStoreFactory.class)) {
+      entityStoreFactory
+          .when(() -> EntityStoreFactory.createEntityStore(config))
+          .thenReturn(entityStore);
+
+      env.initializeFullComponents(config);
+
+      assertDispatcherChain(
+          env.filesetDispatcher(),
+          FilesetEventDispatcher.class,
+          FilesetNormalizeDispatcher.class,
+          FilesetHookDispatcher.class,
+          FilesetOperationDispatcher.class);
+      assertDispatcherChain(
+          env.schemaDispatcher(),
+          SchemaEventDispatcher.class,
+          SchemaNormalizeDispatcher.class,
+          SchemaHookDispatcher.class,
+          SchemaOperationDispatcher.class);
+      assertDispatcherChain(
+          env.tableDispatcher(),
+          TableEventDispatcher.class,
+          TableNormalizeDispatcher.class,
+          TableHookDispatcher.class,
+          TableOperationDispatcher.class);
+      assertDispatcherChain(
+          env.topicDispatcher(),
+          TopicEventDispatcher.class,
+          TopicNormalizeDispatcher.class,
+          TopicHookDispatcher.class,
+          TopicOperationDispatcher.class);
+      assertDispatcherChain(
+          env.modelDispatcher(),
+          ModelEventDispatcher.class,
+          ModelNormalizeDispatcher.class,
+          ModelHookDispatcher.class,
+          ModelOperationDispatcher.class);
+      assertDispatcherChain(
+          env.functionDispatcher(),
+          FunctionEventDispatcher.class,
+          FunctionNormalizeDispatcher.class,
+          FunctionHookDispatcher.class,
+          FunctionOperationDispatcher.class);
+      assertDispatcherChain(
+          env.viewDispatcher(),
+          ViewEventDispatcher.class,
+          ViewNormalizeDispatcher.class,
+          ViewHookDispatcher.class,
+          ViewOperationDispatcher.class);
+      assertDispatcherChain(
+          env.partitionDispatcher(),
+          PartitionEventDispatcher.class,
+          PartitionNormalizeDispatcher.class,
+          PartitionOperationDispatcher.class);
+      assertSame(
+          env.internalPartitionDispatcher(),
+          FieldUtils.readField(env.partitionDispatcher(), "dispatcher", true));
+      assertDispatcherChain(
+          env.statisticDispatcher(), StatisticEventDispatcher.class, StatisticManager.class);
+      assertSame(
+          env.internalStatisticDispatcher(),
+          FieldUtils.readField(env.statisticDispatcher(), "dispatcher", true));
+    } finally {
+      env.shutdown();
+    }
+
+    verify(entityStore).close();
   }
 
   private static Config metadataConfig(boolean enableAuthorization) {
@@ -150,11 +284,15 @@ class TestGravitinoEnvMetadataComponents {
         EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
   }
 
-  private static Object installSingletonLock(Config config) throws IllegalAccessException {
-    Object originalLockManager =
-        FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
-    return originalLockManager;
+  private static void assertDispatcherChain(Object dispatcher, Class<?>... dispatcherClasses)
+      throws IllegalAccessException {
+    Object currentDispatcher = dispatcher;
+    for (int index = 0; index < dispatcherClasses.length; index++) {
+      assertInstanceOf(dispatcherClasses[index], currentDispatcher);
+      if (index < dispatcherClasses.length - 1) {
+        currentDispatcher = FieldUtils.readField(currentDispatcher, "dispatcher", true);
+      }
+    }
   }
 
   private static final class TestGravitinoEnv extends GravitinoEnv {}
