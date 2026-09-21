@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -44,7 +42,6 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
@@ -213,210 +210,6 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
           metalakeLoadByNormalUser.alterPolicy("policy3", PolicyChange.updateComment("222"));
         });
     metalakeLoadByNormalUser.alterPolicy("policy2", PolicyChange.updateComment("222"));
-  }
-
-  @Test
-  @Order(6)
-  public void testAssociatePolicy() {
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    SupportsPolicies supportsPolicies =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-            .supportsPolicies();
-    gravitinoMetalake.grantPrivilegesToRole(
-        role,
-        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
-        ImmutableList.of(Privileges.SelectTable.allow(), Privileges.UseSchema.allow()));
-    SupportsPolicies supportsPoliciesByNormalUser =
-        metalakeLoadByNormalUser
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-            .supportsPolicies();
-    supportsPolicies.associatePolicies(new String[] {"policy1"}, new String[] {});
-    assertThrows(
-        "Can not access metadata.",
-        ForbiddenException.class,
-        () -> {
-          supportsPoliciesByNormalUser.associatePolicies(new String[] {"policy1"}, new String[] {});
-        });
-    gravitinoMetalake.grantPrivilegesToRole(
-        role,
-        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
-        ImmutableSet.of(Privileges.CreateTable.allow()));
-    TableCatalog tableCatalog =
-        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
-    tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test", new HashMap<>());
-    tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test", new HashMap<>());
-    metalakeLoadByNormalUser
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-        .supportsPolicies()
-        .associatePolicies(new String[] {"policy2"}, new String[] {});
-
-    metalakeLoadByNormalUser
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-        .supportsPolicies()
-        .associatePolicies(new String[] {"policy2"}, new String[] {});
-  }
-
-  @Test
-  @Order(7)
-  public void testListPolicyForTable() {
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    String[] policies =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {"policy1"}, policies);
-    policies =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
-    policies =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
-    policies =
-        gravitinoMetalakeLoadByNormalUser
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {}, policies);
-    policies =
-        gravitinoMetalakeLoadByNormalUser
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
-    policies =
-        gravitinoMetalakeLoadByNormalUser
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-            .supportsPolicies()
-            .listPolicies();
-    Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
-  }
-
-  @Test
-  @Order(8)
-  public void testGetPolicyForTable() {
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    gravitinoMetalake
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-        .supportsPolicies()
-        .getPolicy("policy1");
-    gravitinoMetalake
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-        .supportsPolicies()
-        .getPolicy("policy2");
-    gravitinoMetalake
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-        .supportsPolicies()
-        .getPolicy("policy2");
-    assertThrows(
-        "Can not access metadata.",
-        ForbiddenException.class,
-        () -> {
-          gravitinoMetalakeLoadByNormalUser
-              .loadCatalog(CATALOG)
-              .asTableCatalog()
-              .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-              .supportsPolicies()
-              .getPolicy("policy1");
-        });
-
-    gravitinoMetalakeLoadByNormalUser
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-        .supportsPolicies()
-        .getPolicy("policy2");
-    gravitinoMetalakeLoadByNormalUser
-        .loadCatalog(CATALOG)
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-        .supportsPolicies()
-        .getPolicy("policy2");
-  }
-
-  @Test
-  @Order(9)
-  public void testListObjForPolicy() {
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    String[] tables =
-        Arrays.stream(
-                gravitinoMetalakeLoadByNormalUser
-                    .getPolicy("policy2")
-                    .associatedObjects()
-                    .objects())
-            .map(MetadataObject::name)
-            .toList()
-            .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table2", "table3"}, tables);
-    MetadataObject metadataObject =
-        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table2"), MetadataObject.Type.TABLE);
-    gravitinoMetalake.setOwner(metadataObject, USER, Owner.Type.USER);
-    gravitinoMetalake.grantPrivilegesToRole(
-        role, metadataObject, ImmutableSet.of(Privileges.SelectTable.deny()));
-    tables =
-        Arrays.stream(
-                gravitinoMetalakeLoadByNormalUser
-                    .getPolicy("policy2")
-                    .associatedObjects()
-                    .objects())
-            .map(MetadataObject::name)
-            .toList()
-            .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table3"}, tables);
-    assertThrows(
-        "Can not access metadata.",
-        ForbiddenException.class,
-        () -> {
-          gravitinoMetalakeLoadByNormalUser.getPolicy("policy1").associatedObjects().objects();
-        });
-    tables =
-        Arrays.stream(gravitinoMetalake.getPolicy("policy1").associatedObjects().objects())
-            .map(MetadataObject::name)
-            .toList()
-            .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
   }
 
   @Test

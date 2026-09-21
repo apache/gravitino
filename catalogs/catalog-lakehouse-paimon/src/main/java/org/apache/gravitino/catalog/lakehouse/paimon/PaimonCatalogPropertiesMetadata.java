@@ -32,11 +32,6 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
-import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
-import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -217,11 +212,6 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
-    result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(COSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(REST_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }

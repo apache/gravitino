@@ -44,7 +44,6 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
@@ -116,17 +115,13 @@ public class FunctionMetaService {
       fillFunctionPOBuilderParentEntityId(builder, functionEntity.namespace());
       FunctionPO po = initializeFunctionPO(functionEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the function cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      functionEntity.nameIdentifier(),
-                      po.schemaId(),
-                      po.catalogId(),
-                      po.metalakeId()),
-          () -> insertFunctionWithoutCommit(functionEntity, po, overwrite));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              functionEntity.nameIdentifier(),
+              po.schemaId(),
+              po.catalogId(),
+              po.metalakeId(),
+              () -> insertFunctionWithoutCommit(functionEntity, po, overwrite));
     } catch (RuntimeException re) {
       try {
         ExceptionUtils.checkSQLException(
@@ -272,29 +267,28 @@ public class FunctionMetaService {
     try {
       FunctionPO newFunctionPO =
           updateFunctionPO(oldFunctionPO, newEntity, newSchemaId, newCatalogId, newMetalakeId);
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            if (isSchemaChanged) {
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId);
-            }
-          },
-          () -> {
-            // function_current_version is the sole OCC token. The root CAS is the transaction's
-            // decision point and must run before the unguarded version-row insert below.
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    FunctionMetaMapper.class,
-                    mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
-            if (updated == 0) {
-              throw functionWriteFailure(identifier, oldFunctionPO);
-            }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              newEntity.nameIdentifier(),
+              newSchemaId,
+              newCatalogId,
+              newMetalakeId,
+              () -> {
+                // function_current_version is the sole OCC token. The root CAS is the transaction's
+                // decision point and must run before the unguarded version-row insert below.
+                int updated =
+                    SessionUtils.getWithoutCommit(
+                        FunctionMetaMapper.class,
+                        mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
+                if (updated == 0) {
+                  throw functionWriteFailure(identifier, oldFunctionPO);
+                }
+              },
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FunctionVersionMetaMapper.class,
+                      mapper ->
+                          mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
 
       return newEntity;
     } catch (RuntimeException re) {
@@ -466,11 +460,6 @@ public class FunctionMetaService {
         TagMetadataObjectRelMapper.class,
         mapper ->
             mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                functionId, MetadataObject.Type.FUNCTION.name()));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper ->
-            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                 functionId, MetadataObject.Type.FUNCTION.name()));
   }
 

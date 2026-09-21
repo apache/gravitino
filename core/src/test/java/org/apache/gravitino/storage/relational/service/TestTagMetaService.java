@@ -906,13 +906,6 @@ public class TestTagMetaService extends TestJDBCBackend {
                   "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}")
             },
             new RelationEdgeTarget[0]));
-    PolicyMetaService.getInstance()
-        .associatePoliciesWithMetadataObject(
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            new NameIdentifier[] {policy.nameIdentifier()},
-            new NameIdentifier[0]);
-
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -941,7 +934,6 @@ public class TestTagMetaService extends TestJDBCBackend {
         String.format("metadata_object_id = %d AND type = 'TAG'", tag.id());
     assertEquals(1, countActiveTagRel(tag.id()));
     assertEquals(1, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
-    assertEquals(1, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
 
@@ -949,7 +941,6 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     assertEquals(0, countActiveTagRel(tag.id()));
     assertEquals(0, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
-    assertEquals(0, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
   }

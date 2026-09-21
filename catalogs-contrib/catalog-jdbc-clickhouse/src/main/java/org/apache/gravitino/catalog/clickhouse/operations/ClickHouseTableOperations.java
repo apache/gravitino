@@ -37,6 +37,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -100,8 +101,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  private static final String INVALID_SETTINGS_METADATA_MSG =
+      "Invalid ClickHouse table SETTINGS metadata";
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
+
+  private static final BigInteger MIN_SET_MAX_VALUES = BigInteger.ZERO;
+  private static final BigInteger MAX_SET_MAX_VALUES = BigInteger.valueOf(Integer.MAX_VALUE);
+  private static final String SET_MAX_VALUES_RANGE =
+      "[%s, %s]".formatted(MIN_SET_MAX_VALUES, MAX_SET_MAX_VALUES);
+  private static final Pattern SET_MAX_VALUES_PATTERN = Pattern.compile("[+-]?[0-9]+");
 
   private static final Set<ENGINE> GENERIC_ENGINE_PARAMETER_ENGINES =
       Collections.unmodifiableSet(
@@ -110,8 +119,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
               ENGINE.SUMMINGMERGETREE,
               ENGINE.COLLAPSINGMERGETREE,
               ENGINE.VERSIONEDCOLLAPSINGMERGETREE));
-  private static final Pattern SETTINGS_PATTERN =
-      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -333,7 +340,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SortOrder[] sortOrders) {
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
+        Distributions.isNone(distribution), "ClickHouse does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
 
@@ -1612,23 +1619,84 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
-  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
-  // Keys are prefixed with "settings." to match the write path convention in
-  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
-  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
-  // so splitting by comma is safe.
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with
+  // "settings." to match the write path convention in appendTableProperties().
   private static Map<String, String> parseSettingsClause(String settingsStr) {
     Map<String, String> settings = new HashMap<>();
-    for (String pair : settingsStr.split(",")) {
-      String trimmed = pair.trim();
-      int eqIdx = trimmed.indexOf('=');
-      if (eqIdx > 0) {
-        String key = trimmed.substring(0, eqIdx).trim();
-        String value = trimmed.substring(eqIdx + 1).trim();
-        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+    int fragmentStart = 0;
+    int equalsIndex = -1;
+    for (int i = 0; i < settingsStr.length(); i++) {
+      char current = settingsStr.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(settingsStr, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(settingsStr, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (current == '=' && equalsIndex < 0) {
+        equalsIndex = i;
+      } else if (current == ',') {
+        addSetting(settings, settingsStr, fragmentStart, equalsIndex, i);
+        fragmentStart = i + 1;
+        equalsIndex = -1;
       }
     }
+
+    addSetting(settings, settingsStr, fragmentStart, equalsIndex, settingsStr.length());
     return settings;
+  }
+
+  private static void addSetting(
+      Map<String, String> settings,
+      String settingsStr,
+      int fragmentStart,
+      int equalsIndex,
+      int fragmentEnd) {
+    Preconditions.checkArgument(
+        equalsIndex >= fragmentStart && equalsIndex < fragmentEnd, INVALID_SETTINGS_METADATA_MSG);
+    String key = settingsStr.substring(fragmentStart, equalsIndex).trim();
+    String value = settingsStr.substring(equalsIndex + 1, fragmentEnd).trim();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(key) && StringUtils.isNotBlank(value),
+        INVALID_SETTINGS_METADATA_MSG);
+    settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+  }
+
+  private static int findLastTopLevelKeyword(String value, String keyword) {
+    int keywordIndex = -1;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(value, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (isKeywordAt(value, i, keyword)) {
+        keywordIndex = i;
+      }
+    }
+    return keywordIndex;
+  }
+
+  private static boolean isKeywordAt(String value, int index, String keyword) {
+    int keywordEnd = index + keyword.length();
+    return keywordEnd <= value.length()
+        && value.regionMatches(true, index, keyword, 0, keyword.length())
+        && (index == 0 || !isIdentifierCharacter(value.charAt(index - 1)))
+        && (keywordEnd == value.length() || !isIdentifierCharacter(value.charAt(keywordEnd)));
+  }
+
+  private static boolean isIdentifierCharacter(char value) {
+    return Character.isLetterOrDigit(value) || value == '_';
   }
 
   @VisibleForTesting
@@ -1637,9 +1705,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return Collections.emptyMap();
     }
 
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(engineFull);
-    if (settingsMatcher.find()) {
-      return parseSettingsClause(settingsMatcher.group(1));
+    // engine_full is formatted from ClickHouse's ASTStorage, where SETTINGS is the final storage
+    // clause. Use the last top-level match because ORDER BY may contain an unquoted identifier
+    // named "settings". Quoted values and engine parameters are skipped by the scanner.
+    int settingsStart = findLastTopLevelKeyword(engineFull, "SETTINGS");
+    if (settingsStart >= 0) {
+      return parseSettingsClause(engineFull.substring(settingsStart + "SETTINGS".length()).trim());
     }
     return Collections.emptyMap();
   }
@@ -1831,7 +1902,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
           Index.IndexType indexType;
-          String[][] fields;
           try {
             indexType = getClickHouseIndexType(type);
           } catch (IllegalArgumentException ignored) {
@@ -1843,6 +1913,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 type);
             continue;
           }
+
+          Map<String, String> parameterProperties = Collections.emptyMap();
+          String[][] fields;
           try {
             fields = parseIndexFields(expression);
           } catch (IllegalArgumentException ignored) {
@@ -1859,6 +1932,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             continue;
           }
 
+          if (indexType == Index.IndexType.DATA_SKIPPING_SET
+              || isParameterizedBloomFilterIndex(indexType)) {
+            try {
+              parameterProperties =
+                  parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException(
+                  "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
+                      .formatted(
+                          name,
+                          databaseName,
+                          tableName,
+                          parameterSourceName,
+                          parameterSource,
+                          e.getMessage()),
+                  e);
+            }
+          }
+
           // Only include granularity in properties when it differs from the default,
           // so that indexes created without explicit granularity have empty properties
           // and match the original creation state (avoids false index-change diffs).
@@ -1866,20 +1958,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           if (granularity != DEFAULT_INDEX_GRANULARITY) {
             properties.put(GRANULARITY, String.valueOf(granularity));
           }
-          Map<String, String> bloomFilterProperties;
-          try {
-            bloomFilterProperties =
-                parseBloomFilterPropertiesForQuery(
-                    indexType, parameterSource, name, !includesTypeFull);
-          } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                "Failed to load data skipping index '%s' from %s.%s with %s '%s'"
-                    .formatted(name, databaseName, tableName, parameterSourceName, parameterSource),
-                e);
-          }
           if (!includesTypeFull
               && isParameterizedBloomFilterIndex(indexType)
-              && bloomFilterProperties.isEmpty()) {
+              && parameterProperties.isEmpty()) {
             LOG.warn(
                 "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
                     + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
@@ -1888,7 +1969,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 databaseName,
                 tableName);
           }
-          properties.putAll(bloomFilterProperties);
+          if (!includesTypeFull
+              && indexType == Index.IndexType.DATA_SKIPPING_SET
+              && parameterProperties.isEmpty()
+              && !StringUtils.contains(parameterSource, "(")) {
+            LOG.warn(
+                "Legacy ClickHouse metadata does not expose SET max-values parameters for "
+                    + "SET index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                name,
+                databaseName,
+                tableName);
+          }
+          properties.putAll(parameterProperties);
           secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
         }
       }
@@ -1911,6 +2003,107 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return false;
+  }
+
+  /**
+   * Parses the single positional parameter returned by ClickHouse for a SET data skipping index.
+   *
+   * @param indexType the mapped Gravitino index type
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the SET index properties, or an empty map for non-SET index types and {@code set(0)}
+   * @throws IllegalArgumentException if a SET index has malformed or out-of-range parameters
+   */
+  @VisibleForTesting
+  static Map<String, String> parseSetProperties(
+      Index.IndexType indexType, String typeFull, String indexName) {
+    if (indexType != Index.IndexType.DATA_SKIPPING_SET) {
+      return Collections.emptyMap();
+    }
+
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
+    Preconditions.checkArgument(
+        paramsStart > 0 && paramsEnd == normalizedTypeFull.length() - 1,
+        "Invalid SET metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            DATA_SKIPPING_SET, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "SET metadata '%s' does not match SET index '%s'",
+        typeFull,
+        indexName);
+
+    String[] params = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
+    Preconditions.checkArgument(
+        params.length == 1,
+        "Invalid SET metadata '%s' for SET index '%s': expected one parameter but got %s",
+        typeFull,
+        indexName,
+        params.length);
+
+    String rawValue = params[0].trim();
+    Preconditions.checkArgument(
+        !rawValue.isEmpty(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values is required",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        SET_MAX_VALUES_PATTERN.matcher(rawValue).matches(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer",
+        typeFull,
+        indexName,
+        rawValue);
+    BigInteger value;
+    try {
+      value = new BigInteger(rawValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer"
+              .formatted(typeFull, indexName, rawValue),
+          e);
+    }
+
+    if (value.compareTo(MIN_SET_MAX_VALUES) < 0 || value.compareTo(MAX_SET_MAX_VALUES) > 0) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is outside supported range %s"
+              .formatted(typeFull, indexName, rawValue, SET_MAX_VALUES_RANGE));
+    }
+    if (value.equals(MIN_SET_MAX_VALUES)) {
+      return Collections.emptyMap();
+    }
+    return Map.of(SET_MAX_VALUES, value.toString());
+  }
+
+  private static Map<String, String> parseIndexPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    switch (indexType) {
+      case DATA_SKIPPING_SET:
+        return parseSetPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_NGRAMBFV1:
+      case DATA_SKIPPING_TOKENBFV1:
+        return parseBloomFilterPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      default:
+        return Collections.emptyMap();
+    }
+  }
+
+  private static Map<String, String> parseSetPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+      return Collections.emptyMap();
+    }
+    return parseSetProperties(indexType, parameterSource, indexName);
   }
 
   /**
@@ -2258,48 +2451,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static boolean isSingleQuotedLiteral(@Nullable String value) {
     String literal = StringUtils.trim(value);
-    if (StringUtils.length(literal) < 2 || literal.charAt(0) != '\'') {
-      return false;
-    }
-
-    for (int i = 1; i < literal.length(); i++) {
-      char current = literal.charAt(i);
-      if (current == '\\') {
-        if (i + 1 >= literal.length()) {
-          return false;
-        }
-        i++;
-      } else if (current == '\'') {
-        if (i + 1 < literal.length() && literal.charAt(i + 1) == '\'') {
-          i++;
-        } else {
-          return i == literal.length() - 1;
-        }
-      }
-    }
-    return false;
+    return StringUtils.length(literal) >= 2
+        && literal.charAt(0) == '\''
+        && findClosingQuote(literal, 0) == literal.length() - 1;
   }
 
   private static int findMatchingParenthesis(String value, int openParenthesis) {
     int depth = 1;
-    char quote = 0;
     for (int i = openParenthesis + 1; i < value.length(); i++) {
       char current = value.charAt(i);
-      if (quote != 0) {
-        if (current == '\\' && i + 1 < value.length()) {
-          i++;
-        } else if (current == quote) {
-          if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
-            i++;
-          } else {
-            quote = 0;
-          }
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        if (quoteEnd < 0) {
+          return -1;
         }
-        continue;
-      }
-
-      if (current == '\'' || current == '"' || current == '`') {
-        quote = current;
+        i = quoteEnd;
       } else if (current == '(') {
         depth++;
       } else if (current == ')') {
@@ -2310,6 +2476,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return -1;
+  }
+
+  private static int findClosingQuote(String value, int openQuote) {
+    char quote = value.charAt(openQuote);
+    for (int i = openQuote + 1; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (current == '\\' && i + 1 < value.length()) {
+        i++;
+      } else if (current == quote) {
+        if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
+          i++;
+        } else {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isQuoteDelimiter(char value) {
+    return value == '\'' || value == '"' || value == '`';
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
@@ -248,7 +250,7 @@ public class CatalogClickHouseIT extends BaseIT {
           FunctionExpression.of("now")),
       Column.of(
           CLICKHOUSE_COL_NAME3,
-          Types.VarCharType.of(255),
+          Types.StringType.get(),
           "col_3_comment",
           true,
           false,
@@ -767,6 +769,121 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testSetIndexParameterReadbackLifecycle() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("value", Types.StringType.get(), "value", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+    SortOrder[] sortOrders = getSortOrders("id");
+    Map<String, String> setProperties = Map.of(SET_MAX_VALUES, "100", GRANULARITY, "3");
+
+    String tableName = GravitinoITUtils.genRandomName("set_readback");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "SET index readback",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET,
+              "idx_set",
+              new String[][] {{"value"}},
+              setProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    assertSetIndexMetadata(loaded, "idx_set", setProperties);
+    assertSetIndexDdl(tableName, "set(100)", "GRANULARITY 3");
+    Index[] loadedIndexes = loaded.index();
+
+    String recreatedTableName = GravitinoITUtils.genRandomName("set_recreated");
+    NameIdentifier recreatedIdentifier = NameIdentifier.of(schemaName, recreatedTableName);
+    tableCatalog.createTable(
+        recreatedIdentifier,
+        columns,
+        "SET index recreated",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        loadedIndexes);
+    Table recreated = tableCatalog.loadTable(recreatedIdentifier);
+    assertSetIndexMetadata(recreated, "idx_set", setProperties);
+    assertSetIndexDdl(recreatedTableName, "set(100)", "GRANULARITY 3");
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET,
+            "idx_set_alter",
+            new String[][] {{"value"}},
+            setProperties));
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    assertSetIndexMetadata(altered, "idx_set_alter", setProperties);
+    assertSetIndexDdl(tableName, "set(100)", "GRANULARITY 3");
+
+    String defaultTableName = GravitinoITUtils.genRandomName("set_default");
+    NameIdentifier defaultIdentifier = NameIdentifier.of(schemaName, defaultTableName);
+    tableCatalog.createTable(
+        defaultIdentifier,
+        columns,
+        "SET index default",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET, "idx_set_default", new String[][] {{"value"}})
+        });
+    Table defaultLoaded = tableCatalog.loadTable(defaultIdentifier);
+    assertSetIndexMetadata(defaultLoaded, "idx_set_default", Map.of());
+    assertSetIndexDdl(defaultTableName, "set(0)");
+
+    String nativeTableName = GravitinoITUtils.genRandomName("set_native");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "  `id` UInt64,"
+                + "  `value` String,"
+                + "  INDEX `idx_native_set` `value` TYPE set(100) GRANULARITY 3"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, nativeTableName));
+    Table nativeLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, nativeTableName));
+    assertSetIndexMetadata(nativeLoaded, "idx_native_set", setProperties);
+  }
+
+  private void assertSetIndexMetadata(
+      Table table, String indexName, Map<String, String> expectedProperties) {
+    Index index =
+        Arrays.stream(table.index())
+            .filter(candidate -> Objects.equals(indexName, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + indexName));
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, index.type());
+    Assertions.assertArrayEquals(new String[][] {{"value"}}, index.fieldNames());
+    Assertions.assertEquals(expectedProperties, index.properties());
+  }
+
+  private void assertSetIndexDdl(String tableName, String... expectedFragments) {
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    for (String expectedFragment : expectedFragments) {
+      Assertions.assertTrue(
+          normalizedCreateSql.contains(expectedFragment.replaceAll("\\s+", "")),
+          "SHOW CREATE TABLE should contain " + expectedFragment + ": " + createSql);
+    }
+  }
+
+  @Test
   void testCreateAndLoadWithCustomGranularity() {
     String table = GravitinoITUtils.genRandomName("granularity_roundtrip");
     NameIdentifier ident = NameIdentifier.of(schemaName, table);
@@ -1032,7 +1149,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col3 =
         Column.of(
             CLICKHOUSE_COL_NAME3,
-            Types.VarCharType.of(255),
+            Types.StringType.get(),
             "col_3_comment",
             true,
             false,
@@ -1043,7 +1160,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col5 =
         Column.of(
             CLICKHOUSE_COL_NAME5,
-            Types.VarCharType.of(255),
+            Types.StringType.get(),
             "col_5_comment",
             true,
             false,
@@ -1092,7 +1209,7 @@ public class CatalogClickHouseIT extends BaseIT {
               Literals.doubleLiteral(123.45)),
           Column.of(
               "string_col",
-              Types.VarCharType.of(255),
+              Types.StringType.get(),
               "string",
               false,
               false,
@@ -1782,13 +1899,13 @@ public class CatalogClickHouseIT extends BaseIT {
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")));
-    // Change default value of varchar
+    // Change default value of string
     catalog
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))));
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")));
 
     // Change default value of int
     catalog
@@ -1815,7 +1932,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -1832,7 +1949,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -1849,7 +1966,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+                new String[] {columns[2].name()}, Literals.stringLiteral("hello")),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
@@ -2255,7 +2372,7 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
+    Column col4 = Column.of("status", Types.StringType.get(), "code", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
     TableCatalog tableCatalog = catalog.asTableCatalog();
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "table");
@@ -2690,8 +2807,8 @@ public class CatalogClickHouseIT extends BaseIT {
   @Test
   void testClickHouseSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column col2 = Column.of("col_2", Types.StringType.get(), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.StringType.get(), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
@@ -3011,9 +3128,18 @@ public class CatalogClickHouseIT extends BaseIT {
     String name = GravitinoITUtils.genRandomName("settings_native");
     clickhouseService.executeQuery(
         String.format(
-            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+            "CREATE TABLE `%s`.`%s` (settings Int32) ENGINE = MergeTree ORDER BY settings"
                 + " SETTINGS index_granularity = 2048",
             schemaName, name));
+
+    String engineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, name));
+    Assertions.assertNotNull(engineFull);
+    Assertions.assertTrue(
+        engineFull.contains("ORDER BY settings SETTINGS index_granularity = 2048"), engineFull);
 
     Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
     Map<String, String> props = loaded.properties();
@@ -3023,6 +3149,59 @@ public class CatalogClickHouseIT extends BaseIT {
     long settingsCount =
         props.keySet().stream().filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX)).count();
     Assertions.assertEquals(1, settingsCount);
+  }
+
+  @Test
+  void testLoadAndRecreateTableWithQuotedCommaSetting() {
+    String sourceName = GravitinoITUtils.genRandomName("settings_quoted_comma_source");
+    String recreatedName = GravitinoITUtils.genRandomName("settings_quoted_comma_recreated");
+    String settingName = "merge_workload";
+    String settingValue = "'gravitino,COMMENT,comma'";
+    String settingProperty = TableConstants.SETTINGS_PREFIX + settingName;
+
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS %s = %s",
+            schemaName, sourceName, settingName, settingValue));
+
+    String sourceEngineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, sourceName));
+    Assertions.assertNotNull(sourceEngineFull);
+    Assertions.assertTrue(
+        sourceEngineFull.contains(settingName + " = " + settingValue), sourceEngineFull);
+
+    Table loadedSource =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, sourceName));
+    Assertions.assertEquals(settingValue, loadedSource.properties().get(settingProperty));
+
+    Map<String, String> recreatedProperties = createProperties();
+    recreatedProperties.put(settingProperty, loadedSource.properties().get(settingProperty));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, recreatedName),
+            loadedSource.columns(),
+            "quoted comma setting roundtrip",
+            recreatedProperties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loadedRecreated =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, recreatedName));
+    Assertions.assertEquals(settingValue, loadedRecreated.properties().get(settingProperty));
+
+    String recreatedEngineFull =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT engine_full FROM system.tables WHERE database = '%s' AND name = '%s'",
+                schemaName, recreatedName));
+    Assertions.assertNotNull(recreatedEngineFull);
+    Assertions.assertTrue(
+        recreatedEngineFull.contains(settingName + " = " + settingValue), recreatedEngineFull);
   }
 
   @Test

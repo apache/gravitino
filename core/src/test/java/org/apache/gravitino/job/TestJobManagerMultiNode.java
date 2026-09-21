@@ -210,7 +210,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private JobEntity getJob(String jobName) {
     // Read through node B, as it works the same from any node sharing the metadata store.
-    return nodeB.getJob(METALAKE, jobName);
+    return nodeB.getJob(METALAKE, jobName, false);
   }
 
   // Simulates that the keep time has elapsed since the job was last updated, or finished.

@@ -50,6 +50,7 @@ public final class CloudStorageCredentialPropertyKeys {
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
 
   private CloudStorageCredentialPropertyKeys() {}

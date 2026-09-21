@@ -224,6 +224,58 @@ cancelling = client.cancel_job(job_id)
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
 
+### Get a Job's Output
+
+A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.
+Output is fetched live from the job executor on every call rather than stored in Gravitino, so it's
+only included when requested - a plain `getJob`/`get_job` call, or `listJobs`/`list_jobs`, never
+returns it.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+JobHandle job = client.getJob(jobId, true);
+List<String> stdout = job.stdout();
+List<String> stderr = job.stderr();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+job = client.get_job(job_id, include_output=True)
+stdout = job.stdout()
+stderr = job.stderr()
+```
+
+</TabItem>
+</Tabs>
+
+Output is only kept for as long as the job executor retains it - for the local job executor, that's
+tied to `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` below, and it's lost entirely across a
+server restart. What's returned is always the tail of the output (the most recent content), capped
+by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
+whichever limit is hit first.
+
+The REST API also accepts `outputMaxLines`/`outputMaxBytes` query parameters to request less output
+than these global caps for a single call (e.g. a quick check that doesn't need the full 1000
+lines) - a value larger than the global cap is clamped down to it, so the global configuration
+always remains a hard upper bound:
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
+```
+
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
@@ -235,6 +287,8 @@ default configurations:
 | `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output   | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output    | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 

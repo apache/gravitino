@@ -37,7 +37,6 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -77,7 +76,6 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         ModelVersionMetaMapper.class,
         OrphanedMetadataObjectRelationMapper.class,
         OwnerMetaMapper.class,
-        PolicyMetadataObjectRelMapper.class,
         PolicyTagRelMapper.class,
         PolicyMetaMapper.class,
         PolicyVersionMapper.class,

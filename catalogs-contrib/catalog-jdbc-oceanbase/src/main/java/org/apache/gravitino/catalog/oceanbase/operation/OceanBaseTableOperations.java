@@ -77,7 +77,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in oceanbase");
     }
 
-    if (!Distributions.NONE.equals(distribution)) {
+    if (!Distributions.isNone(distribution)) {
       throw new UnsupportedOperationException("OceanBase does not support distribution");
     }
 

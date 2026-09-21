@@ -87,6 +87,12 @@ Generic Catalog unknown-format loading errors or change the Generic Catalog's fo
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
 
+For Lance Spark, the default `test` task uses the explicitly verified `0.5.1`
+bundle, while `lanceSparkMatrixTest` uses the declared matrix
+(`0.2.0`, `0.4.0`, and `0.5.1`). Passing `-PlanceSparkBundleVersions=...` is a
+targeted diagnostic override; the supplied versions form the matrix and the
+first supplied version remains the primary for the normal `test` task.
+
 ```bash
 # lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
@@ -202,7 +208,7 @@ logging.basicConfig(level=logging.INFO)
 # Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
 # refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.4.0.jar "
+    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.5.1.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"
