@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -782,108 +783,187 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    List<SchemaChildUpdate> childUpdates =
+    List<SchemaChildUpdateCase> childCases =
         Arrays.asList(
-            childIdent ->
-                TableMetaService.getInstance()
-                    .updateTable(
-                        childIdent,
-                        entity -> {
-                          TableEntity table = (TableEntity) entity;
-                          return TableEntity.builder()
-                              .withId(table.id())
-                              .withName(table.name())
-                              .withNamespace(table.namespace())
-                              .withAuditInfo(table.auditInfo())
-                              .withColumns(table.columns())
-                              .withComment("updated table comment")
-                              .withProperties(table.properties())
-                              .build();
-                        }),
-            childIdent ->
-                ViewMetaService.getInstance()
-                    .updateView(
-                        childIdent,
-                        entity -> {
-                          ViewEntity view = (ViewEntity) entity;
-                          return ViewEntity.builder()
-                              .withId(view.id())
-                              .withName(view.name())
-                              .withNamespace(view.namespace())
-                              .withAuditInfo(view.auditInfo())
-                              .withColumns(view.columns())
-                              .withRepresentations(view.representations())
-                              .withComment("updated view comment")
-                              .build();
-                        }),
-            childIdent ->
-                FilesetMetaService.getInstance()
-                    .updateFileset(
-                        childIdent,
-                        entity -> {
-                          FilesetEntity fileset = (FilesetEntity) entity;
-                          return FilesetEntity.builder()
-                              .withId(fileset.id())
-                              .withName(fileset.name())
-                              .withNamespace(fileset.namespace())
-                              .withFilesetType(fileset.filesetType())
-                              .withStorageLocations(fileset.storageLocations())
-                              .withAuditInfo(fileset.auditInfo())
-                              .withComment("updated fileset comment")
-                              .withProperties(fileset.properties())
-                              .build();
-                        }),
-            childIdent ->
-                FunctionMetaService.getInstance()
-                    .updateFunction(
-                        childIdent,
-                        entity -> {
-                          FunctionEntity function = (FunctionEntity) entity;
-                          return FunctionEntity.builder()
-                              .withId(function.id())
-                              .withName(function.name())
-                              .withNamespace(function.namespace())
-                              .withAuditInfo(function.auditInfo())
-                              .withComment("updated function comment")
-                              .withFunctionType(function.functionType())
-                              .withDeterministic(function.deterministic())
-                              .withDefinitions(function.definitions())
-                              .build();
-                        }),
-            childIdent ->
-                ModelMetaService.getInstance()
-                    .updateModel(
-                        childIdent,
-                        entity -> {
-                          ModelEntity model = (ModelEntity) entity;
-                          return ModelEntity.builder()
-                              .withId(model.id())
-                              .withName(model.name())
-                              .withNamespace(model.namespace())
-                              .withAuditInfo(model.auditInfo())
-                              .withComment("updated model comment")
-                              .withLatestVersion(model.latestVersion())
-                              .withProperties(model.properties())
-                              .build();
-                        }),
-            childIdent ->
-                TopicMetaService.getInstance()
-                    .updateTopic(
-                        childIdent,
-                        entity -> {
-                          TopicEntity topic = (TopicEntity) entity;
-                          return TopicEntity.builder()
-                              .withId(topic.id())
-                              .withName(topic.name())
-                              .withNamespace(topic.namespace())
-                              .withAuditInfo(topic.auditInfo())
-                              .withComment("updated topic comment")
-                              .withProperties(topic.properties())
-                              .build();
-                        }));
+            new SchemaChildUpdateCase(
+                Entity.EntityType.TABLE,
+                "table_meta",
+                "table_id",
+                "table_version_info",
+                (namespace, name, bk) -> {
+                  TableEntity e =
+                      createTableEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    TableMetaService.getInstance()
+                        .updateTable(
+                            childIdent,
+                            entity -> {
+                              TableEntity table = (TableEntity) entity;
+                              return TableEntity.builder()
+                                  .withId(table.id())
+                                  .withName(table.name())
+                                  .withNamespace(table.namespace())
+                                  .withAuditInfo(table.auditInfo())
+                                  .withColumns(table.columns())
+                                  .withComment("updated table comment")
+                                  .withProperties(table.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.VIEW,
+                "view_meta",
+                "view_id",
+                "view_version_info",
+                (namespace, name, bk) -> {
+                  ViewEntity e =
+                      createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, name);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    ViewMetaService.getInstance()
+                        .updateView(
+                            childIdent,
+                            entity -> {
+                              ViewEntity view = (ViewEntity) entity;
+                              return ViewEntity.builder()
+                                  .withId(view.id())
+                                  .withName(view.name())
+                                  .withNamespace(view.namespace())
+                                  .withAuditInfo(view.auditInfo())
+                                  .withColumns(view.columns())
+                                  .withRepresentations(view.representations())
+                                  .withComment("updated view comment")
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.FILESET,
+                "fileset_meta",
+                "fileset_id",
+                "fileset_version_info",
+                (namespace, name, bk) -> {
+                  FilesetEntity e =
+                      createFilesetEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    FilesetMetaService.getInstance()
+                        .updateFileset(
+                            childIdent,
+                            entity -> {
+                              FilesetEntity fileset = (FilesetEntity) entity;
+                              return FilesetEntity.builder()
+                                  .withId(fileset.id())
+                                  .withName(fileset.name())
+                                  .withNamespace(fileset.namespace())
+                                  .withFilesetType(fileset.filesetType())
+                                  .withStorageLocations(fileset.storageLocations())
+                                  .withAuditInfo(fileset.auditInfo())
+                                  .withComment("updated fileset comment")
+                                  .withProperties(fileset.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.FUNCTION,
+                "function_meta",
+                "function_id",
+                "function_version_info",
+                (namespace, name, bk) -> {
+                  FunctionEntity e =
+                      createFunctionEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    FunctionMetaService.getInstance()
+                        .updateFunction(
+                            childIdent,
+                            entity -> {
+                              FunctionEntity function = (FunctionEntity) entity;
+                              return FunctionEntity.builder()
+                                  .withId(function.id())
+                                  .withName(function.name())
+                                  .withNamespace(function.namespace())
+                                  .withAuditInfo(function.auditInfo())
+                                  .withComment("updated function comment")
+                                  .withFunctionType(function.functionType())
+                                  .withDeterministic(function.deterministic())
+                                  .withDefinitions(function.definitions())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.MODEL,
+                "model_meta",
+                "model_id",
+                null,
+                (namespace, name, bk) -> {
+                  ModelEntity e =
+                      createModelEntity(
+                          RandomIdGenerator.INSTANCE.nextId(),
+                          namespace,
+                          name,
+                          "model comment",
+                          0,
+                          Collections.emptyMap(),
+                          AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    ModelMetaService.getInstance()
+                        .updateModel(
+                            childIdent,
+                            entity -> {
+                              ModelEntity model = (ModelEntity) entity;
+                              return ModelEntity.builder()
+                                  .withId(model.id())
+                                  .withName(model.name())
+                                  .withNamespace(model.namespace())
+                                  .withAuditInfo(model.auditInfo())
+                                  .withComment("updated model comment")
+                                  .withLatestVersion(model.latestVersion())
+                                  .withProperties(model.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.TOPIC,
+                "topic_meta",
+                "topic_id",
+                null,
+                (namespace, name, bk) -> {
+                  TopicEntity e =
+                      createTopicEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    TopicMetaService.getInstance()
+                        .updateTopic(
+                            childIdent,
+                            entity -> {
+                              TopicEntity topic = (TopicEntity) entity;
+                              return TopicEntity.builder()
+                                  .withId(topic.id())
+                                  .withName(topic.name())
+                                  .withNamespace(topic.namespace())
+                                  .withAuditInfo(topic.auditInfo())
+                                  .withComment("updated topic comment")
+                                  .withProperties(topic.properties())
+                                  .build();
+                            })));
 
-    for (int index = 0; index < childUpdates.size(); index++) {
-      String schemaName = "schema_for_update_lock_" + index;
+    for (int index = 0; index < childCases.size(); index++) {
+      SchemaChildUpdateCase childCase = childCases.get(index);
+      String schemaName =
+          "schema_for_update_lock_" + childCase.entityType.name().toLowerCase(Locale.ROOT);
       SchemaEntity schema =
           createSchemaEntity(
               RandomIdGenerator.INSTANCE.nextId(),
@@ -893,87 +973,66 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       backend.insert(schema, false);
 
       Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
+      String childName = "child_" + childCase.entityType.name().toLowerCase(Locale.ROOT);
+      Object[] ref = childCase.createChild.run(schemaNamespace, childName, backend);
+      NameIdentifier childIdent = (NameIdentifier) ref[0];
+      Long childId = (Long) ref[1];
 
-      if (childUpdates.get(index) == childUpdates.get(0)) {
-        TableEntity table =
-            createTableEntity(
-                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_table", AUDIT_INFO);
-        backend.insert(table, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, table.nameIdentifier(), childUpdates.get(index));
-      } else if (childUpdates.get(index) == childUpdates.get(1)) {
-        ViewEntity view =
-            createViewEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_view");
-        backend.insert(view, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, view.nameIdentifier(), childUpdates.get(index));
-      } else if (childUpdates.get(index) == childUpdates.get(2)) {
-        FilesetEntity fileset =
-            createFilesetEntity(
-                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_fileset", AUDIT_INFO);
-        backend.insert(fileset, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, fileset.nameIdentifier(), childUpdates.get(index));
-      } else if (childUpdates.get(index) == childUpdates.get(3)) {
-        FunctionEntity function =
-            createFunctionEntity(
-                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_function", AUDIT_INFO);
-        backend.insert(function, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, function.nameIdentifier(), childUpdates.get(index));
-      } else if (childUpdates.get(index) == childUpdates.get(4)) {
-        ModelEntity model =
-            createModelEntity(
-                RandomIdGenerator.INSTANCE.nextId(),
-                schemaNamespace,
-                "child_model",
-                "model comment",
-                0,
-                Collections.emptyMap(),
-                AUDIT_INFO);
-        backend.insert(model, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, model.nameIdentifier(), childUpdates.get(index));
-      } else if (childUpdates.get(index) == childUpdates.get(5)) {
-        TopicEntity topic =
-            createTopicEntity(
-                RandomIdGenerator.INSTANCE.nextId(), schemaNamespace, "child_topic", AUDIT_INFO);
-        backend.insert(topic, false);
-        assertChildUpdateWaitsForConcurrentSchemaDelete(
-            schema, topic.nameIdentifier(), childUpdates.get(index));
-      }
+      assertChildUpdateBlocksOnConcurrentSchemaDelete(
+          schema,
+          childIdent,
+          childCase.entityType,
+          childCase.update,
+          childId,
+          childCase.metaTable,
+          childCase.idColumn,
+          childCase.versionTable);
     }
   }
 
-  private void assertChildUpdateWaitsForConcurrentSchemaDelete(
-      SchemaEntity schema, NameIdentifier childIdent, SchemaChildUpdate childUpdate)
+  private void assertChildUpdateBlocksOnConcurrentSchemaDelete(
+      SchemaEntity schema,
+      NameIdentifier childIdent,
+      Entity.EntityType childType,
+      SchemaChildUpdate childUpdate,
+      Long childId,
+      String metaTable,
+      String idColumn,
+      String versionTable)
       throws Exception {
-    // Run the schema cascade delete and child update concurrently.
-    // After both finish, assert that no orphan version rows remain.
-    // Only checks the no-orphan invariant; lock timing varies across backends.
-    CountDownLatch bothStarted = new CountDownLatch(2);
+    SchemaPO observedSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch updateStarted = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
+    // Thread 1: soft-delete the schema row and hold the transaction open. The
+    // uncommitted UPDATE holds an exclusive row lock on the schema_meta row.
     Future<Throwable> deleteResult =
         executor.submit(
             () -> {
               try {
-                bothStarted.countDown();
-                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
-                SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
-                return null;
-              } catch (Throwable throwable) {
-                return throwable;
-              }
-            });
-
-    Future<Throwable> updateResult =
-        executor.submit(
-            () -> {
-              try {
-                bothStarted.countDown();
-                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
-                childUpdate.run(childIdent);
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedSchemaPO.getSchemaId(),
+                                      observedSchemaPO.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      schemaDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
                 return null;
               } catch (Throwable throwable) {
                 return throwable;
@@ -981,25 +1040,73 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             });
 
     try {
-      Throwable deleteFailure = deleteResult.get(60, TimeUnit.SECONDS);
-      Throwable updateFailure = updateResult.get(60, TimeUnit.SECONDS);
+      assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
 
-      // The cascade delete must succeed.
-      Assertions.assertNull(deleteFailure, () -> "Schema cascade delete failed: " + deleteFailure);
+      // Thread 2: attempt to update the child entity. The update's doWithSchemaWriteLock
+      // must block on the schema row held by Thread 1's uncommitted soft-delete. If the
+      // update completes within 500 ms, the schema lock was not acquired by the update path.
+      Future<Throwable> updateResult =
+          executor.submit(
+              () -> {
+                updateStarted.countDown();
+                try {
+                  childUpdate.run(childIdent);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
 
-      // The update either succeeded (then cascade cleaned up) or failed (schema gone).
-      // Both are acceptable as long as no orphan rows remain.
-      Assertions.assertTrue(
-          updateFailure == null
-              || updateFailure instanceof NoSuchEntityException
-              || updateFailure instanceof OptimisticLockException
-              || updateFailure instanceof IOException,
-          () -> "Unexpected update failure: " + updateFailure);
+      assertTrue(updateStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> updateResult.get(500, TimeUnit.MILLISECONDS));
 
-      // Schema and child entity should both be gone.
-      Assertions.assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+      // Release the delete transaction so it commits the soft-delete. The cascade
+      // cleanup of child rows happens in a separate transaction (deleteSchema(cascade=true)),
+      // so we must run the full cascade after the schema row soft-delete commits.
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(
+          deleteResult.get(30, TimeUnit.SECONDS), () -> "Schema soft-delete transaction failed");
 
+      // The update should now fail because the schema row is committed as deleted.
+      Throwable updateFailure = updateResult.get(30, TimeUnit.SECONDS);
+      Throwable root = updateFailure;
+      while (root != null && !(root instanceof NoSuchEntityException)) {
+        root = root.getCause();
+      }
+      Assertions.assertNotNull(
+          root,
+          () ->
+              "Expected NoSuchEntityException, but got "
+                  + updateFailure.getClass().getSimpleName()
+                  + ": "
+                  + updateFailure.getMessage());
+
+      // The schema row was soft-deleted by the held transaction above, but the cascade
+      // child-row cleanup was NOT performed (only the schema row was deleted). The child
+      // entity rows are still active. The orphan-row invariant is verified in the
+      // separate testCascadeDeleteLeavesNoOrphanVersionRows test, which runs a full
+      // cascade delete. Here we only verify the lock-blocking semantics.
+      assertTrue(
+          countActiveMetaRowsForEntity(childId, metaTable, idColumn) > 0,
+          () ->
+              "Child "
+                  + childType
+                  + " "
+                  + metaTable
+                  + " rows should still exist after schema-only soft-delete");
+      if (versionTable != null) {
+        assertTrue(
+            countActiveVersionRowsForEntity(childId, versionTable, idColumn) > 0,
+            () ->
+                "Child "
+                    + childType
+                    + " "
+                    + versionTable
+                    + " rows should still exist after schema-only soft-delete");
+      }
+      assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
     } finally {
+      allowDeleteCommit.countDown();
       executor.shutdownNow();
     }
   }
@@ -1009,93 +1116,243 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    String schemaName = "schema_for_orphan_test";
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            NamespaceUtil.ofSchema(metalakeName, catalogName),
-            schemaName,
-            AUDIT_INFO);
-    schemaMetaService.insertSchema(schema, false);
+    List<SchemaChildUpdateCase> childCases =
+        Arrays.asList(
+            new SchemaChildUpdateCase(
+                Entity.EntityType.TABLE,
+                "table_meta",
+                "table_id",
+                "table_version_info",
+                (namespace, name, bk) -> {
+                  TableEntity e =
+                      createTableEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    TableMetaService.getInstance()
+                        .updateTable(
+                            childIdent,
+                            entity -> {
+                              TableEntity t = (TableEntity) entity;
+                              return TableEntity.builder()
+                                  .withId(t.id())
+                                  .withName(t.name())
+                                  .withNamespace(t.namespace())
+                                  .withAuditInfo(t.auditInfo())
+                                  .withColumns(t.columns())
+                                  .withComment("updated comment")
+                                  .withProperties(t.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.VIEW,
+                "view_meta",
+                "view_id",
+                "view_version_info",
+                (namespace, name, bk) -> {
+                  ViewEntity e =
+                      createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, name);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    ViewMetaService.getInstance()
+                        .updateView(
+                            childIdent,
+                            entity -> {
+                              ViewEntity v = (ViewEntity) entity;
+                              return ViewEntity.builder()
+                                  .withId(v.id())
+                                  .withName(v.name())
+                                  .withNamespace(v.namespace())
+                                  .withAuditInfo(v.auditInfo())
+                                  .withColumns(v.columns())
+                                  .withRepresentations(v.representations())
+                                  .withComment("updated comment")
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.FILESET,
+                "fileset_meta",
+                "fileset_id",
+                "fileset_version_info",
+                (namespace, name, bk) -> {
+                  FilesetEntity e =
+                      createFilesetEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    FilesetMetaService.getInstance()
+                        .updateFileset(
+                            childIdent,
+                            entity -> {
+                              FilesetEntity f = (FilesetEntity) entity;
+                              return FilesetEntity.builder()
+                                  .withId(f.id())
+                                  .withName(f.name())
+                                  .withNamespace(f.namespace())
+                                  .withFilesetType(f.filesetType())
+                                  .withStorageLocations(f.storageLocations())
+                                  .withAuditInfo(f.auditInfo())
+                                  .withComment("updated comment")
+                                  .withProperties(f.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.FUNCTION,
+                "function_meta",
+                "function_id",
+                "function_version_info",
+                (namespace, name, bk) -> {
+                  FunctionEntity e =
+                      createFunctionEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    FunctionMetaService.getInstance()
+                        .updateFunction(
+                            childIdent,
+                            entity -> {
+                              FunctionEntity fn = (FunctionEntity) entity;
+                              return FunctionEntity.builder()
+                                  .withId(fn.id())
+                                  .withName(fn.name())
+                                  .withNamespace(fn.namespace())
+                                  .withAuditInfo(fn.auditInfo())
+                                  .withComment("updated comment")
+                                  .withFunctionType(fn.functionType())
+                                  .withDeterministic(fn.deterministic())
+                                  .withDefinitions(fn.definitions())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.MODEL,
+                "model_meta",
+                "model_id",
+                null,
+                (namespace, name, bk) -> {
+                  ModelEntity e =
+                      createModelEntity(
+                          RandomIdGenerator.INSTANCE.nextId(),
+                          namespace,
+                          name,
+                          "model comment",
+                          0,
+                          Collections.emptyMap(),
+                          AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    ModelMetaService.getInstance()
+                        .updateModel(
+                            childIdent,
+                            entity -> {
+                              ModelEntity m = (ModelEntity) entity;
+                              return ModelEntity.builder()
+                                  .withId(m.id())
+                                  .withName(m.name())
+                                  .withNamespace(m.namespace())
+                                  .withAuditInfo(m.auditInfo())
+                                  .withComment("updated comment")
+                                  .withLatestVersion(m.latestVersion())
+                                  .withProperties(m.properties())
+                                  .build();
+                            })),
+            new SchemaChildUpdateCase(
+                Entity.EntityType.TOPIC,
+                "topic_meta",
+                "topic_id",
+                null,
+                (namespace, name, bk) -> {
+                  TopicEntity e =
+                      createTopicEntity(
+                          RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+                  bk.insert(e, false);
+                  return new Object[] {e.nameIdentifier(), e.id()};
+                },
+                childIdent ->
+                    TopicMetaService.getInstance()
+                        .updateTopic(
+                            childIdent,
+                            entity -> {
+                              TopicEntity topic = (TopicEntity) entity;
+                              return TopicEntity.builder()
+                                  .withId(topic.id())
+                                  .withName(topic.name())
+                                  .withNamespace(topic.namespace())
+                                  .withAuditInfo(topic.auditInfo())
+                                  .withComment("updated comment")
+                                  .withProperties(topic.properties())
+                                  .build();
+                            })));
 
-    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
-    TableEntity table =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "orphan_table", AUDIT_INFO);
-    TableMetaService.getInstance().insertTable(table, false);
+    for (int index = 0; index < childCases.size(); index++) {
+      SchemaChildUpdateCase childCase = childCases.get(index);
+      String schemaName =
+          "schema_for_orphan_test_" + childCase.entityType.name().toLowerCase(Locale.ROOT);
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofSchema(metalakeName, catalogName),
+              schemaName,
+              AUDIT_INFO);
+      SchemaMetaService.getInstance().insertSchema(schema, false);
 
-    // Run the cascade delete and the table update concurrently. After both finish,
-    // assert that no active version row whose parent table_meta is deleted remains.
-    CountDownLatch bothStarted = new CountDownLatch(2);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
+      Namespace childNamespace = Namespace.of(metalakeName, catalogName, schemaName);
+      String childName = "child_" + childCase.entityType.name().toLowerCase(Locale.ROOT);
+      Object[] ref = childCase.createChild.run(childNamespace, childName, backend);
+      NameIdentifier childIdent = (NameIdentifier) ref[0];
+      Long childId = (Long) ref[1];
 
-    Future<Throwable> deleteResult =
-        executor.submit(
-            () -> {
-              try {
-                bothStarted.countDown();
-                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
-                schemaMetaService.deleteSchema(schema.nameIdentifier(), true);
-                return null;
-              } catch (Throwable throwable) {
-                return throwable;
-              }
-            });
+      SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
 
-    Future<Throwable> updateResult =
-        executor.submit(
-            () -> {
-              try {
-                bothStarted.countDown();
-                assertTrue(bothStarted.await(30, TimeUnit.SECONDS));
-                TableMetaService.getInstance()
-                    .updateTable(
-                        table.nameIdentifier(),
-                        entity -> {
-                          TableEntity t = (TableEntity) entity;
-                          return TableEntity.builder()
-                              .withId(t.id())
-                              .withName(t.name())
-                              .withNamespace(t.namespace())
-                              .withAuditInfo(t.auditInfo())
-                              .withColumns(t.columns())
-                              .withComment("updated comment")
-                              .withProperties(t.properties())
-                              .build();
-                        });
-                return null;
-              } catch (Throwable throwable) {
-                return throwable;
-              }
-            });
+      Throwable updateFailure =
+          assertThrows(
+              Exception.class,
+              () -> childCase.update.run(childIdent),
+              () -> "Update should have failed for " + childCase.entityType);
 
-    try {
-      Throwable deleteFailure = deleteResult.get(60, TimeUnit.SECONDS);
-      Throwable updateFailure = updateResult.get(60, TimeUnit.SECONDS);
+      Throwable root = updateFailure;
+      while (root != null && !(root instanceof NoSuchEntityException)) {
+        root = root.getCause();
+      }
+      Assertions.assertNotNull(
+          root,
+          () ->
+              "Expected NoSuchEntityException for "
+                  + childCase.entityType
+                  + ", but got "
+                  + updateFailure.getClass().getSimpleName()
+                  + ": "
+                  + updateFailure.getMessage());
 
-      // The cascade delete must succeed.
-      Assertions.assertNull(deleteFailure, () -> "Schema cascade delete failed: " + deleteFailure);
-
-      // The table update either succeeded (then cascade cleaned up its version rows)
-      // or failed (schema was already gone). Either is acceptable as long as no orphan
-      // version row remains.
-      Assertions.assertTrue(
-          updateFailure == null || updateFailure instanceof NoSuchEntityException,
-          () -> "Table update failed unexpectedly: " + updateFailure);
-
-      // The schema and table should both be gone.
       assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
-      assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
-
-      // Most important assertion: no orphan table_version_info rows. The cascade delete
-      // must soft-delete version rows alongside the parent table_meta rows.
-      int orphanTableVersions =
-          countActiveVersionRowsForEntity(table.id(), "table_version_info", "table_id");
+      assertFalse(backend.exists(childIdent, childCase.entityType));
       Assertions.assertEquals(
-          0, orphanTableVersions, "Found orphan table_version_info rows after cascade delete");
-    } finally {
-      executor.shutdownNow();
+          0,
+          countActiveMetaRowsForEntity(childId, childCase.metaTable, childCase.idColumn),
+          () ->
+              "Found orphan "
+                  + childCase.metaTable
+                  + " rows after cascade delete for "
+                  + childCase.entityType);
+      if (childCase.versionTable != null) {
+        Assertions.assertEquals(
+            0,
+            countActiveVersionRowsForEntity(childId, childCase.versionTable, childCase.idColumn),
+            () ->
+                "Found orphan "
+                    + childCase.versionTable
+                    + " rows after cascade delete for "
+                    + childCase.entityType);
+      }
     }
   }
 
@@ -1112,24 +1369,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                     versionTableName, idColumnName, entityId))) {
       if (rs.next()) {
         return rs.getInt(1);
-      }
-      return 0;
-    } catch (SQLException e) {
-      throw new RuntimeException("SQL execution failed", e);
-    }
-  }
-
-  private long getSchemaDeletedAt(Long schemaId) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT deleted_at FROM schema_meta WHERE schema_id = %d", schemaId))) {
-      if (rs.next()) {
-        return rs.getLong(1);
       }
       return 0;
     } catch (SQLException e) {
@@ -1666,5 +1905,53 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   @FunctionalInterface
   private interface SchemaChildUpdate {
     void run(NameIdentifier childIdentifier) throws Exception;
+  }
+
+  private int countActiveMetaRowsForEntity(Long entityId, String tableName, String idColumnName) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s = %d AND deleted_at = 0",
+                    tableName, idColumnName, entityId))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  @FunctionalInterface
+  private interface SchemaChildCreator {
+    Object[] run(Namespace namespace, String name, RelationalBackend backend) throws Exception;
+  }
+
+  private static class SchemaChildUpdateCase {
+    private final Entity.EntityType entityType;
+    private final String metaTable;
+    private final String idColumn;
+    private final String versionTable;
+    private final SchemaChildCreator createChild;
+    private final SchemaChildUpdate update;
+
+    private SchemaChildUpdateCase(
+        Entity.EntityType entityType,
+        String metaTable,
+        String idColumn,
+        String versionTable,
+        SchemaChildCreator createChild,
+        SchemaChildUpdate update) {
+      this.entityType = entityType;
+      this.metaTable = metaTable;
+      this.idColumn = idColumn;
+      this.versionTable = versionTable;
+      this.createChild = createChild;
+      this.update = update;
+    }
   }
 }
