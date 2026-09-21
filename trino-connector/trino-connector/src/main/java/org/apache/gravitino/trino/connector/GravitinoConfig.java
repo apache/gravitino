@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -79,6 +80,15 @@ public class GravitinoConfig {
 
   /** The Trino Iceberg REST catalog property prefix. */
   private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
+
+  /**
+   * {@code gravitino.client.authType} values that authenticate the connector's own Gravitino client
+   * but have no representation in Trino's Iceberg REST security modes ({@code NONE}/{@code
+   * OAUTH2}). A catalog routed through the Iceberg REST server under one of these types sends no
+   * credentials to it unless {@code gravitino.iceberg.rest-catalog.security} is set explicitly.
+   */
+  private static final Set<String> AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT =
+      Set.of("basic", "kerberos");
 
   private static final String OAUTH2 = "OAUTH2";
 
@@ -878,12 +888,18 @@ public class GravitinoConfig {
    * {@code gravitino.iceberg.rest-catalog.} prefix rewritten to {@code iceberg.rest-catalog.}.
    *
    * @return the Trino Iceberg REST catalog properties
+   * @throws TrinoException if the connector authenticates to Gravitino with a type that has no
+   *     Trino Iceberg REST security equivalent and {@code gravitino.iceberg.rest-catalog.security}
+   *     was not set explicitly to resolve the mismatch
    */
   public Map<String, String> getIcebergRestCatalogConfig() {
     String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
     Map<String, String> restCatalogConfig = new HashMap<>();
 
-    if (OAUTH2.equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))
+    String authType = config.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if ("simple".equalsIgnoreCase(authType)) {
+      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "NONE");
+    } else if (OAUTH2.equalsIgnoreCase(authType)
         && OAUTH2.equalsIgnoreCase(config.getOrDefault(prefix + "security", OAUTH2))) {
       restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", OAUTH2);
       putIfNotBlank(
@@ -911,7 +927,38 @@ public class GravitinoConfig {
                 restCatalogConfig.put(
                     TRINO_ICEBERG_REST_CATALOG_PREFIX + entry.getKey().substring(prefix.length()),
                     entry.getValue()));
+
+    validateRestCatalogAuthentication(restCatalogConfig);
     return restCatalogConfig;
+  }
+
+  /**
+   * Fails fast when the resolved Iceberg REST catalog config would send no credentials to the
+   * Iceberg REST server, yet the connector authenticates to Gravitino itself with {@code basic} or
+   * {@code kerberos}, which Trino's Iceberg REST client cannot carry over. Left unchecked, such a
+   * catalog registers successfully and every query against it fails at {@code fetchConfig} once the
+   * REST server requires authentication, an error far removed from its cause.
+   */
+  private void validateRestCatalogAuthentication(Map<String, String> restCatalogConfig) {
+    if (restCatalogConfig.containsKey(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security")) {
+      return;
+    }
+    String authType = config.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if (authType == null
+        || !AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT.contains(
+            authType.toLowerCase(Locale.ROOT))) {
+      return;
+    }
+    throw new TrinoException(
+        GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+        String.format(
+            "Cannot route an Iceberg catalog through the Iceberg REST server: "
+                + "gravitino.client.authType=%s has no equivalent Trino Iceberg REST security "
+                + "mode, so no credentials would be sent to it. If the REST server requires "
+                + "authentication, set 'gravitino.iceberg.rest-catalog.security' (and any "
+                + "matching oauth2.* properties) explicitly. If it does not, set "
+                + "'gravitino.iceberg.rest-catalog.security=NONE' to confirm that.",
+            authType));
   }
 
   private static void putIfNotBlank(Map<String, String> target, String key, String value) {
