@@ -33,6 +33,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -710,6 +714,63 @@ public class TestLocalJobExecutor {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> exec.initialize(Collections.emptyMap()));
     Assertions.assertTrue(e.getMessage().contains("staging directory"));
+  }
+
+  @Test
+  public void testConcurrentInitializationSharingNewStagingDir() throws Exception {
+    // Servers sharing a staging directory may start at the same time, all creating the index
+    // directory.
+    File newStagingRoot = new File(stagingRoot, "concurrent-staging");
+    int executorCount = 8;
+    CyclicBarrier barrier = new CyclicBarrier(executorCount);
+    ExecutorService pool = Executors.newFixedThreadPool(executorCount);
+    List<LocalJobExecutor> executors = Collections.synchronizedList(Lists.newArrayList());
+    try {
+      List<Future<?>> futures = Lists.newArrayList();
+      for (int i = 0; i < executorCount; i++) {
+        futures.add(
+            pool.submit(
+                () -> {
+                  LocalJobExecutor executor = new LocalJobExecutor();
+                  barrier.await();
+                  executor.initialize(
+                      ImmutableMap.of(
+                          LocalJobExecutorConfigs.STAGING_DIR, newStagingRoot.getAbsolutePath()));
+                  executors.add(executor);
+                  return null;
+                }));
+      }
+      for (Future<?> future : futures) {
+        future.get(1, TimeUnit.MINUTES);
+      }
+
+      Assertions.assertEquals(executorCount, executors.size());
+      Assertions.assertTrue(new File(newStagingRoot, OUTPUT_INDEX_DIR_NAME).isDirectory());
+    } finally {
+      pool.shutdownNow();
+      for (LocalJobExecutor executor : executors) {
+        executor.close();
+      }
+    }
+  }
+
+  @Test
+  public void testInitializeSucceedsWhenOutputIndexDirCannotBeCreated() throws IOException {
+    // A regular file where a directory is expected makes creating the index directory fail.
+    File blocker = new File(stagingRoot, "blocker");
+    FileUtils.writeStringToFile(blocker, "not a directory", StandardCharsets.UTF_8);
+    LocalJobExecutor exec = new LocalJobExecutor();
+    try {
+      Assertions.assertDoesNotThrow(
+          () ->
+              exec.initialize(
+                  ImmutableMap.of(
+                      LocalJobExecutorConfigs.STAGING_DIR,
+                      new File(blocker, "staging").getAbsolutePath())));
+    } finally {
+      exec.close();
+      FileUtils.deleteQuietly(blocker);
+    }
   }
 
   @Test

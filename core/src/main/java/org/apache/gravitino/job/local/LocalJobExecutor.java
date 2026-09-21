@@ -101,6 +101,8 @@ public class LocalJobExecutor implements JobExecutor {
 
   private static final String OUTPUT_INDEX_WORKING_DIR_FIELD = "workingDir";
 
+  // How often indexes are scanned, not how long they are kept: an index is removed only once
+  // JobManager has removed the job's staging directory, so it lives exactly as long as the output.
   private static final long OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   private static final Pattern JOB_ID_PATTERN =
@@ -159,11 +161,16 @@ public class LocalJobExecutor implements JobExecutor {
         "The job staging directory must be set for the local job executor");
     this.stagingRoot = Paths.get(stagingDir).toAbsolutePath().normalize();
     this.outputIndexDir = stagingRoot.resolve(OUTPUT_INDEX_DIR_NAME);
+    // Safe when servers sharing the staging directory start concurrently: an already existing
+    // directory counts as created. Not fatal, output retrieval must never prevent the server from
+    // starting, and writeOutputIndex() tries again for every job.
     try {
       Files.createDirectories(outputIndexDir);
     } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to create the job output index directory " + outputIndexDir, e);
+      LOG.warn(
+          "Failed to create the job output index directory {}, it's retried on job submission",
+          outputIndexDir,
+          e);
     }
     LOG.info(
         "Job output of the local job executor is located through {}. In a multi-node deployment, "
@@ -615,6 +622,9 @@ public class LocalJobExecutor implements JobExecutor {
       return null;
     }
 
+    // Resolve the '/'-separated path against this server's staging directory, then reject anything
+    // that normalizes to outside of it (e.g. "../../etc") or to the staging directory itself: the
+    // index lives on shared storage and must never make this server read an arbitrary file.
     Path workingDir = stagingRoot;
     for (String segment : Splitter.on('/').omitEmptyStrings().split(relativePath.textValue())) {
       workingDir = workingDir.resolve(segment);
