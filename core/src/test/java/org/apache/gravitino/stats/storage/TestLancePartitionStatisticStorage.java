@@ -57,6 +57,61 @@ import org.mockito.InOrder;
 public class TestLancePartitionStatisticStorage {
 
   @Test
+  public void testInFlightReaderSurvivesCacheReplaceEviction() throws Exception {
+    // A reader that borrowed the cached dataset must not have it closed underneath it when a
+    // concurrent update REPLACES the cache entry: the removal listener marks the holder closed,
+    // and the dataset only closes after the last reader leaves.
+    EntityStore entityStore = mock(EntityStore.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+    LancePartitionStatisticStorage storage =
+        new LancePartitionStatisticStorage(java.util.Collections.emptyMap());
+
+    java.util.concurrent.atomic.AtomicBoolean datasetClosed =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+    LancePartitionStatisticStorage.DatasetHolder holder =
+        new LancePartitionStatisticStorage.DatasetHolder(null) {
+          @Override
+          protected void closeDataset() {
+            datasetClosed.set(true);
+          }
+        };
+    LancePartitionStatisticStorage.DatasetHolder replacement =
+        new LancePartitionStatisticStorage.DatasetHolder(null);
+
+    java.lang.reflect.Field cacheField =
+        LancePartitionStatisticStorage.class.getDeclaredField("datasetCache");
+    cacheField.setAccessible(true);
+    com.github.benmanes.caffeine.cache.Cache<Long, LancePartitionStatisticStorage.DatasetHolder>
+        cache =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                .maximumSize(2)
+                .removalListener(
+                    (Long key,
+                        LancePartitionStatisticStorage.DatasetHolder value,
+                        com.github.benmanes.caffeine.cache.RemovalCause cause) -> {
+                      if (value != null
+                          && cause != com.github.benmanes.caffeine.cache.RemovalCause.EXPLICIT) {
+                        try {
+                          value.close();
+                        } catch (java.io.IOException e) {
+                          throw new RuntimeException(e);
+                        }
+                      }
+                    })
+                .build();
+    cacheField.set(storage, java.util.Optional.of(cache));
+
+    cache.put(1L, holder);
+    holder.readerBegins();
+    cache.put(1L, replacement); // evicts the old entry, listener calls close()
+
+    Assertions.assertFalse(
+        datasetClosed.get(), "in-flight reader must keep the dataset open after eviction");
+    holder.readerDone();
+    Assertions.assertTrue(datasetClosed.get(), "dataset closes after the last reader leaves");
+  }
+
+  @Test
   public void testLancePartitionStatisticStorage() throws Exception {
     PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
 

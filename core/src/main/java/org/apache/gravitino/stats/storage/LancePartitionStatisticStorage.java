@@ -42,6 +42,8 @@ import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -497,8 +499,11 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private List<PersistedPartitionStatistics> listStatisticsImpl(
       Long tableId, String partitionFilter) {
 
-    Dataset dataset = getDataset(tableId);
+    return withDataset(tableId, dataset -> listStatisticsWith(dataset, tableId, partitionFilter));
+  }
 
+  private List<PersistedPartitionStatistics> listStatisticsWith(
+      Dataset dataset, Long tableId, String partitionFilter) {
     String filter = "table_id = " + tableId + partitionFilter;
 
     try (LanceScanner scanner =
@@ -582,6 +587,48 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         .orElse(open(getFilePath(tableId)));
   }
 
+  /**
+   * Runs a read over the cached dataset while pinning its holder against the cache's removal
+   * listener: a concurrent REPLACE/SIZE eviction must not close the dataset underneath an in-flight
+   * scan. The dataset still handed out is the pre-eviction snapshot, which is exactly what the
+   * reader borrowed.
+   */
+  private <R> R withDataset(Long tableId, Function<Dataset, R> reader) {
+    if (!datasetCache.isPresent()) {
+      return reader.apply(open(getFilePath(tableId)));
+    }
+    // Pin atomically with the lookup: compute() holds the entry's per-key lock, so a
+    // concurrent REPLACE eviction cannot run its removal listener between the lookup and
+    // readerBegins — that window would close the dataset underneath the borrow before the
+    // pin lands. The holder stays the pre-eviction snapshot, which is what the reader reads.
+    AtomicBoolean newlyPinned = new AtomicBoolean(false);
+    DatasetHolder holder =
+        datasetCache
+            .get()
+            .asMap()
+            .compute(
+                tableId,
+                (id, existing) -> {
+                  DatasetHolder h = existing;
+                  if (h == null) {
+                    newlyPinned.set(true);
+                    h = new DatasetHolder(open(getFilePath(id)));
+                  }
+                  h.readerBegins();
+                  return h;
+                });
+    try {
+      if (!newlyPinned.get()) {
+        // Mirrors the old getDataset behavior for cached holders: the scan must see the
+        // latest committed version, not the version pinned when the holder was created.
+        holder.checkoutLatest();
+      }
+      return reader.apply(holder.getDataset());
+    } finally {
+      holder.readerDone();
+    }
+  }
+
   private Dataset open(String fileName) {
     try {
       return Dataset.open()
@@ -628,6 +675,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
     private final Dataset dataset;
 
+    private final AtomicInteger activeReaders = new AtomicInteger();
+
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     DatasetHolder(Dataset dataset) {
@@ -642,11 +691,42 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       dataset.checkoutLatest();
     }
 
+    /**
+     * Registers an in-flight reader that borrowed the dataset; pairs with {@link #readerDone()}.
+     */
+    void readerBegins() {
+      activeReaders.incrementAndGet();
+    }
+
+    /** Releases a reader; closes the dataset when the cache already evicted it and none remain. */
+    void readerDone() {
+      if (activeReaders.decrementAndGet() == 0 && closed.get()) {
+        closeDataset();
+      }
+    }
+
     @Override
     public void close() throws IOException {
       if (closed.compareAndSet(false, true)) {
-        dataset.close();
+        if (activeReaders.get() == 0) {
+          closeDataset();
+        }
+        // Readers still scanning close it in readerDone() when the last one leaves.
       }
+    }
+
+    /** Closes the underlying dataset; overridable so tests can observe without JNI. */
+    protected void closeDataset() {
+      try {
+        dataset.close();
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to close Lance dataset", e);
+      }
+    }
+
+    @VisibleForTesting
+    boolean isClosedForTest() {
+      return closed.get();
     }
   }
 }
