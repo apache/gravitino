@@ -208,8 +208,10 @@ they will be removed in a future release. Use the current names in new roles.
 | `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
 | `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
+| `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
+| `VIEW_POLICY`           | Metalake, Policy                                                        | Read policy metadata                               |
 | `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
 | `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
@@ -229,6 +231,10 @@ covers any policy in that metalake.
 Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
 Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
 `APPLY_TAG` on the tag. Ownership can satisfy either check.
+
+Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
+`APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
+List results include only tags and policies the caller can read.
 
 ### Required Privileges
 
@@ -288,8 +294,8 @@ owner-only; it does not accept a target schema.
 | User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
 | Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
 | Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Assign: `APPLY_TAG` and access to the object    |
-| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
+| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object    |
+| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
 | Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
 | Job              |                         | Owner                                  | Owner           |                                                 |
 | Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |

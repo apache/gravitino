@@ -71,6 +71,9 @@ for tag creation and value assignment examples.
   a policy with a tag requires access to both: `APPLY_POLICY` on the policy and `APPLY_TAG`
   on the tag, or the corresponding ownership. Assigning a tag also requires access to the
   target metadata object.
+- Read-only inspection requires `VIEW_TAG` or `APPLY_TAG` for tags and `VIEW_POLICY` or
+  `APPLY_POLICY` for policies. Object policy results include only policies visible to the caller;
+  use an account with the same policy visibility when comparing results before and after migration.
 - The current web UI still displays direct policy controls that call the removed
   object-policy write API. Use REST or Java for policy-to-tag associations during migration.
 - Update TMS and other policy consumers to read the resolved object policy list. Confirm the

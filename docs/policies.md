@@ -101,4 +101,5 @@ For existing direct object policy associations, see
 
 To add or remove an association, a user must own the metalake or have the required access to both
 the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy
-reads also respect the caller's access to the returned policies.
+reads also respect the caller's access to the returned policies. `VIEW_TAG` and `VIEW_POLICY`
+grant read-only access to tags and policies; `APPLY_TAG` and `APPLY_POLICY` also allow reads.
