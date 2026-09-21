@@ -407,8 +407,110 @@ public class CatalogHive2IT extends BaseIT {
         "Unsupported column type for sample value: " + column.dataType());
   }
 
-  private HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
+  protected HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
     return hiveClientPool.run(client -> client.getTable(hmsCatalog, schema, table));
+  }
+
+  /**
+   * Verifies how NOT NULL and DEFAULT columns are handled on table creation. Hive 2.x metastores do
+   * not support column constraints, so both are rejected.
+   */
+  protected void checkColumnConstraintsOnCreate(
+      NameIdentifier nameIdentifier, Map<String, String> properties) {
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"));
+
+    // test column default value
+    Column withDefault =
+        Column.of(
+            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {withDefault},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
+  }
+
+  /**
+   * Verifies how NOT NULL and DEFAULT column changes are handled on table alteration. Hive 2.x
+   * metastores do not support column constraints, so all of them are rejected.
+   */
+  protected void checkColumnConstraintsOnAlter(TableCatalog tableCatalog, NameIdentifier id) {
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
+
+    // test alter column nullability exception
+    TableChange alterColumnNullability =
+        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(id, alterColumnNullability));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0,"
+                    + " but the connected Hive Metastore version is HIVE2. Illegal column: hive_col_name1"));
+
+    // test update column default value exception
+    TableChange updateDefaultValue =
+        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
   }
 
   private HivePartition loadHivePartition(String schema, String table, String partition)
@@ -641,51 +743,7 @@ public class CatalogHive2IT extends BaseIT {
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
 
-    // test column not null
-    Column illegalColumn =
-        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        nameIdentifier,
-                        new Column[] {illegalColumn},
-                        TABLE_COMMENT,
-                        properties,
-                        Transforms.EMPTY_TRANSFORM));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
-    // test column default value
-    Column withDefault =
-        Column.of(
-            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        nameIdentifier,
-                        new Column[] {withDefault},
-                        TABLE_COMMENT,
-                        properties,
-                        Transforms.EMPTY_TRANSFORM));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
+    checkColumnConstraintsOnCreate(nameIdentifier, properties);
   }
 
   @Test
@@ -1325,48 +1383,7 @@ public class CatalogHive2IT extends BaseIT {
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
-    // test add column with default value exception
-    TableChange withDefaultValue =
-        TableChange.addColumn(
-            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
-
-    // test alter column nullability exception
-    TableChange alterColumnNullability =
-        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(id, alterColumnNullability));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0,"
-                    + " but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: hive_col_name1"));
-
-    // test update column default value exception
-    TableChange updateDefaultValue =
-        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
+    checkColumnConstraintsOnAlter(tableCatalog, id);
 
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");

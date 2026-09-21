@@ -70,6 +70,8 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -101,6 +103,8 @@ public class HiveCatalogOperations
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
   @VisibleForTesting CachedClientPool clientPool;
+
+  private volatile HiveVersion hiveVersion;
 
   @SuppressWarnings("UnusedVariable")
   private CatalogInfo info;
@@ -1092,6 +1096,33 @@ public class HiveCatalogOperations
 
   CachedClientPool getClientPool() {
     return clientPool;
+  }
+
+  /**
+   * Returns the version of the connected Hive Metastore. The version is resolved once from the
+   * client pool and cached, since it cannot change for the lifetime of the catalog.
+   *
+   * @return The connected Hive Metastore version.
+   */
+  HiveVersion hiveVersion() {
+    if (hiveVersion == null) {
+      synchronized (this) {
+        if (hiveVersion == null) {
+          Preconditions.checkState(
+              clientPool != null, "Hive catalog operations are not initialized");
+          try {
+            hiveVersion =
+                Preconditions.checkNotNull(
+                    clientPool.run(HiveClient::hiveVersion),
+                    "Hive client returned a null metastore version");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw ExceptionMessages.wrap("Failed to resolve Hive Metastore version", e);
+          }
+        }
+      }
+    }
+    return hiveVersion;
   }
 
   @VisibleForTesting

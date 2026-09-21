@@ -126,6 +126,16 @@ dependencies {
 }
 
 tasks {
+  // HiveClientClassLoader loads the version-specific client and shim jars from these modules at
+  // runtime. Build them together with the Hive catalog so every downstream integration test that
+  // depends on this jar has a complete Hive client runtime.
+  jar {
+    dependsOn(
+      ":catalogs:hive-metastore2-libs:jar",
+      ":catalogs:hive-metastore3-libs:jar"
+    )
+  }
+
   register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
@@ -172,6 +182,12 @@ tasks {
 }
 
 tasks.test {
+  // Unit tests can create Hive clients without building this project's jar first.
+  dependsOn(
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
