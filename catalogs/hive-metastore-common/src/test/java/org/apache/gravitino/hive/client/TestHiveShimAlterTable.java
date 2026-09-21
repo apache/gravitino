@@ -53,13 +53,16 @@ class TestHiveShimAlterTable {
   private static final String TABLE = "tbl";
 
   /**
-   * A {@link HiveShimV2} that uses a mocked metastore client instead of connecting to a real Hive
+   * A {@link HiveShim} that uses a mocked metastore client instead of connecting to a real Hive
    * Metastore. The mock is created inside {@link #createMetaStoreClient(Properties)} because that
    * method is invoked from the superclass constructor, before any subclass field is initialized.
+   * {@link HiveShim} itself carries the Hive 2.x-compatible {@code alterTable} behavior that every
+   * Hive version starts from, so testing it directly covers both the Hive 2.x shim (a trivial
+   * subclass with no overrides) and the baseline that the Hive 3.x shim builds on.
    */
-  private static class MockHiveShimV2 extends HiveShimV2 {
-    MockHiveShimV2() {
-      super(new Properties());
+  private static class MockHiveShim extends HiveShim {
+    MockHiveShim() {
+      super(HiveClientClassLoader.HiveVersion.HIVE2, new Properties());
     }
 
     @Override
@@ -88,7 +91,7 @@ class TestHiveShimAlterTable {
 
   @Test
   void testSkipStatsUpdateSendsDoNotUpdateStats() throws Exception {
-    MockHiveShimV2 shim = new MockHiveShimV2();
+    MockHiveShim shim = new MockHiveShim();
     IMetaStoreClient client = shim.metaStoreClient();
 
     shim.alterTable(CATALOG, DB, TABLE, testTable(), true);
@@ -104,7 +107,7 @@ class TestHiveShimAlterTable {
 
   @Test
   void testDefaultUsesPlainAlter() throws Exception {
-    MockHiveShimV2 shim = new MockHiveShimV2();
+    MockHiveShim shim = new MockHiveShim();
     IMetaStoreClient client = shim.metaStoreClient();
 
     shim.alterTable(CATALOG, DB, TABLE, testTable(), false);
