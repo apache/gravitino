@@ -27,19 +27,20 @@ import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 
 /**
  * Capabilities of the Hive catalog. Column constraint support depends on the version of the
- * connected Hive Metastore, which is resolved lazily on first use.
+ * connected Hive Metastore, which is resolved and cached on first use.
  */
 public class HiveCatalogCapability implements Capability {
 
-  private final Supplier<HiveVersion> hiveVersion;
+  private final Supplier<HiveVersion> hiveVersionSupplier;
+  private volatile HiveVersion hiveVersion;
 
   /**
    * Creates a capability bound to the connected Hive Metastore version.
    *
-   * @param hiveVersion Supplies the resolved Hive Metastore version.
+   * @param hiveVersionSupplier Supplies the connected Hive Metastore version.
    */
-  public HiveCatalogCapability(Supplier<HiveVersion> hiveVersion) {
-    this.hiveVersion = hiveVersion;
+  public HiveCatalogCapability(Supplier<HiveVersion> hiveVersionSupplier) {
+    this.hiveVersionSupplier = hiveVersionSupplier;
   }
 
   @Override
@@ -71,7 +72,7 @@ public class HiveCatalogCapability implements Capability {
   }
 
   private CapabilityResult requireHive3(String constraint) {
-    HiveVersion version = hiveVersion.get();
+    HiveVersion version = hiveVersion();
     if (version == HIVE3) {
       return CapabilityResult.SUPPORTED;
     }
@@ -82,5 +83,19 @@ public class HiveCatalogCapability implements Capability {
             + "but the connected Hive Metastore version is "
             + version
             + ".");
+  }
+
+  private HiveVersion hiveVersion() {
+    HiveVersion version = hiveVersion;
+    if (version == null) {
+      synchronized (this) {
+        version = hiveVersion;
+        if (version == null) {
+          version = hiveVersionSupplier.get();
+          hiveVersion = version;
+        }
+      }
+    }
+    return version;
   }
 }

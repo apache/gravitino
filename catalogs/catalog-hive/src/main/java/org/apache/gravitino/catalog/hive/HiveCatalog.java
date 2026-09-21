@@ -64,7 +64,8 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new HiveCatalogCapability(this::hiveVersion);
+    ClassLoader catalogClassLoader = Thread.currentThread().getContextClassLoader();
+    return new HiveCatalogCapability(() -> hiveVersion(catalogClassLoader));
   }
 
   @Override
@@ -83,20 +84,30 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   }
 
   /**
-   * Resolves the Hive Metastore version through the catalog operations. The capability may be
-   * queried before the operations are created (they are initialized on first use), so this goes
-   * through {@link #ops()} to force initialization. Custom catalog operations (ops-impl) do not
-   * expose the metastore version, so only what every supported Hive version accepts is allowed.
+   * Resolves the Hive Metastore version through the catalog operations. Custom catalog operations
+   * (ops-impl) do not expose the metastore version, so only what every supported Hive version
+   * accepts is allowed.
    */
   private HiveVersion hiveVersion() {
     CatalogOperations ops = ops();
     if (!(ops instanceof HiveCatalogOperations)) {
-      LOG.debug(
-          "Catalog operations {} do not expose a Hive Metastore version; defaulting to {}",
+      LOG.warn(
+          "Catalog operations {} do not expose a Hive Metastore version; using the conservative "
+              + "{} capability fallback",
           ops.getClass(),
           HiveVersion.HIVE2);
       return HiveVersion.HIVE2;
     }
     return ((HiveCatalogOperations) ops).hiveVersion();
+  }
+
+  private HiveVersion hiveVersion(ClassLoader catalogClassLoader) {
+    ClassLoader original = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(catalogClassLoader);
+    try {
+      return hiveVersion();
+    } finally {
+      Thread.currentThread().setContextClassLoader(original);
+    }
   }
 }

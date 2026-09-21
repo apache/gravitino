@@ -352,12 +352,6 @@ subprojects {
     return@subprojects
   }
 
-  if (project.path == ":catalogs:hive-metastore2-libs" ||
-    project.path == ":catalogs:hive-metastore3-libs"
-  ) {
-    return@subprojects
-  }
-
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")

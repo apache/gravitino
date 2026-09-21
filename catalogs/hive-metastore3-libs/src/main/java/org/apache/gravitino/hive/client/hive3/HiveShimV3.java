@@ -192,15 +192,16 @@ public class HiveShimV3 extends HiveShim {
             catalogName,
             alteredHiveTable.databaseName(),
             alteredHiveTable.name(),
-            alteredHiveTable.columns());
-    dropColumnConstraints(catalogName, databaseName, tableName, existing);
+            alteredHiveTable.columns(),
+            existing);
     try {
+      dropColumnConstraints(catalogName, databaseName, tableName, existing);
       invoke(
           ExceptionTarget.table(tableName),
           () -> client.alter_table(catalogName, databaseName, tableName, tb));
     } catch (RuntimeException e) {
-      // The table is unchanged, so the dropped constraints can be put back as they were.
-      restoreColumnConstraints(databaseName, tableName, existing, e);
+      // The table is unchanged, so any constraints dropped before the failure can be put back.
+      restoreColumnConstraints(catalogName, databaseName, tableName, existing, e);
       throw e;
     }
     try {
@@ -338,15 +339,10 @@ public class HiveShimV3 extends HiveShim {
         invoke(
             ExceptionTarget.schema(databaseName),
             () -> client.getTableObjectsByName(catalogName, databaseName, allTables));
-    return tables.stream()
-        .map(
-            tb -> {
-              ColumnConstraints constraints =
-                  loadColumnConstraints(catalogName, databaseName, tb.getTableName());
-              return HiveTableConverter.fromHiveTable(
-                  tb, notNullColumns(constraints), defaultValues(constraints));
-            })
-        .toList();
+    // This batch API is used to inspect tables while listing a schema. Loading constraints here
+    // would add two sequential metastore calls per table. Full column metadata remains available
+    // through getTable.
+    return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
   }
 
   @Override
@@ -361,11 +357,6 @@ public class HiveShimV3 extends HiveShim {
       catalog.setDescription(description);
     }
     invoke(ExceptionTarget.catalog(catalogName), () -> client.createCatalog(catalog));
-  }
-
-  @Override
-  public void close() throws Exception {
-    client.close();
   }
 
   /** NOT NULL and DEFAULT constraints of a table, as Hive metastore constraint objects. */
@@ -425,10 +416,17 @@ public class HiveShimV3 extends HiveShim {
 
   private void dropColumnConstraints(
       String catalogName, String databaseName, String tableName, ColumnConstraints constraints) {
-    for (String constraintName : constraints.names) {
+    for (SQLNotNullConstraint constraint : constraints.notNulls) {
       invoke(
           ExceptionTarget.table(tableName),
-          () -> client.dropConstraint(catalogName, databaseName, tableName, constraintName));
+          () ->
+              client.dropConstraint(catalogName, databaseName, tableName, constraint.getNn_name()));
+    }
+    for (SQLDefaultConstraint constraint : constraints.defaults) {
+      invoke(
+          ExceptionTarget.table(tableName),
+          () ->
+              client.dropConstraint(catalogName, databaseName, tableName, constraint.getDc_name()));
     }
   }
 
@@ -442,12 +440,30 @@ public class HiveShimV3 extends HiveShim {
   }
 
   private void restoreColumnConstraints(
-      String databaseName, String tableName, ColumnConstraints constraints, Exception cause) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      ColumnConstraints constraints,
+      Exception cause) {
     if (constraints.isEmpty()) {
       return;
     }
     try {
-      addColumnConstraints(constraints);
+      ColumnConstraints current = loadColumnConstraints(catalogName, databaseName, tableName);
+      ColumnConstraints missing = new ColumnConstraints();
+      for (SQLNotNullConstraint constraint : constraints.notNulls) {
+        if (!current.names.contains(constraint.getNn_name())) {
+          missing.notNulls.add(constraint);
+          missing.names.add(constraint.getNn_name());
+        }
+      }
+      for (SQLDefaultConstraint constraint : constraints.defaults) {
+        if (!current.names.contains(constraint.getDc_name())) {
+          missing.defaults.add(constraint);
+          missing.names.add(constraint.getDc_name());
+        }
+      }
+      addColumnConstraints(missing);
     } catch (RuntimeException restoreFailure) {
       cause.addSuppressed(restoreFailure);
       LOG.error(
@@ -462,10 +478,32 @@ public class HiveShimV3 extends HiveShim {
 
   private ColumnConstraints buildColumnConstraints(
       String catalogName, String databaseName, String tableName, Column[] columns) {
+    return buildColumnConstraints(
+        catalogName, databaseName, tableName, columns, new ColumnConstraints());
+  }
+
+  private ColumnConstraints buildColumnConstraints(
+      String catalogName,
+      String databaseName,
+      String tableName,
+      Column[] columns,
+      ColumnConstraints existing) {
     ColumnConstraints constraints = new ColumnConstraints();
+    Map<String, SQLNotNullConstraint> existingNotNulls = new HashMap<>();
+    for (SQLNotNullConstraint constraint : existing.notNulls) {
+      existingNotNulls.put(constraint.getColumn_name(), constraint);
+    }
+    Map<String, SQLDefaultConstraint> existingDefaults = new HashMap<>();
+    for (SQLDefaultConstraint constraint : existing.defaults) {
+      existingDefaults.put(constraint.getColumn_name(), constraint);
+    }
     for (Column column : columns) {
       if (!column.nullable()) {
-        String name = constraintName(tableName, column.name(), "nn");
+        SQLNotNullConstraint previous = existingNotNulls.get(column.name());
+        String name =
+            previous == null
+                ? constraintName(tableName, column.name(), "nn")
+                : previous.getNn_name();
         constraints.notNulls.add(
             new SQLNotNullConstraint(
                 catalogName,
@@ -473,14 +511,18 @@ public class HiveShimV3 extends HiveShim {
                 tableName,
                 column.name(),
                 name,
-                CONSTRAINT_ENABLE,
-                CONSTRAINT_VALIDATE,
-                CONSTRAINT_RELY));
+                previous == null ? CONSTRAINT_ENABLE : previous.isEnable_cstr(),
+                previous == null ? CONSTRAINT_VALIDATE : previous.isValidate_cstr(),
+                previous == null ? CONSTRAINT_RELY : previous.isRely_cstr()));
         constraints.names.add(name);
       }
       String defaultValue = HiveColumnDefaultValueConverter.fromGravitino(column.defaultValue());
       if (defaultValue != null) {
-        String name = constraintName(tableName, column.name(), "dv");
+        SQLDefaultConstraint previous = existingDefaults.get(column.name());
+        String name =
+            previous == null
+                ? constraintName(tableName, column.name(), "dv")
+                : previous.getDc_name();
         constraints.defaults.add(
             new SQLDefaultConstraint(
                 catalogName,
@@ -489,9 +531,9 @@ public class HiveShimV3 extends HiveShim {
                 column.name(),
                 defaultValue,
                 name,
-                CONSTRAINT_ENABLE,
-                CONSTRAINT_VALIDATE,
-                CONSTRAINT_RELY));
+                previous == null ? CONSTRAINT_ENABLE : previous.isEnable_cstr(),
+                previous == null ? CONSTRAINT_VALIDATE : previous.isValidate_cstr(),
+                previous == null ? CONSTRAINT_RELY : previous.isRely_cstr()));
         constraints.names.add(name);
       }
     }

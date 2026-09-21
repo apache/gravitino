@@ -120,6 +120,9 @@ public class TestHiveColumnDefaultValueConverter {
         Literals.stringLiteral("it's"),
         HiveColumnDefaultValueConverter.toGravitino(Types.StringType.get(), "'it\\'s'"));
     assertEquals(
+        Literals.stringLiteral("it's"),
+        HiveColumnDefaultValueConverter.toGravitino(Types.StringType.get(), "'it''s'"));
+    assertEquals(
         Literals.varcharLiteral(10, "abc"),
         HiveColumnDefaultValueConverter.toGravitino(Types.VarCharType.of(10), "'abc'"));
     assertEquals(

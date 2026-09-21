@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,16 +50,17 @@ public class TestHiveCatalogCapability {
   }
 
   @Test
-  public void testVersionIsResolvedLazily() {
-    boolean[] resolved = {false};
+  public void testVersionIsResolvedLazilyAndCached() {
+    int[] resolutions = {0};
     HiveCatalogCapability capability =
         new HiveCatalogCapability(
             () -> {
-              resolved[0] = true;
+              resolutions[0]++;
               return HiveVersion.HIVE3;
             });
-    assertFalse(resolved[0]);
+    assertEquals(0, resolutions[0]);
     assertTrue(capability.columnNotNull().supported());
-    assertTrue(resolved[0]);
+    assertTrue(capability.columnDefaultValue().supported());
+    assertEquals(1, resolutions[0]);
   }
 }

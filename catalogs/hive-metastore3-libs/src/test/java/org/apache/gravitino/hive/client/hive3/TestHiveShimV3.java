@@ -27,9 +27,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +55,7 @@ import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 /**
  * Unit tests for {@link HiveShimV3}, using a mocked {@link IMetaStoreClient} to verify NOT NULL /
@@ -162,26 +163,48 @@ class TestHiveShimV3 {
   }
 
   @Test
-  void testAlterTableDropsAndRecreatesConstraints() throws Exception {
+  void testAlterTablePreservesExistingConstraintMetadata() throws Exception {
     MockHiveShimV3 shim = new MockHiveShimV3();
     IMetaStoreClient client = shim.metaStoreClient();
 
     SQLNotNullConstraint existingNotNull =
-        new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "tbl_id_nn_old", true, false, false);
+        new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "external_not_null", false, true, true);
+    SQLDefaultConstraint existingDefault =
+        new SQLDefaultConstraint(
+            CATALOG, DB, TABLE, "name", "'abc'", "external_default", false, true, true);
     when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
         .thenReturn(List.of(existingNotNull));
     when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of());
+        .thenReturn(List.of(existingDefault));
 
-    Column notNullColumn = Column.of("id", Types.IntegerType.get(), null, false, false, null);
-    HiveTable alteredTable = testTable(notNullColumn);
+    Column notNullColumn =
+        Column.of("id", Types.IntegerType.get(), "updated comment", false, false, null);
+    Column defaultValueColumn =
+        Column.of("name", Types.StringType.get(), null, true, false, Literals.stringLiteral("abc"));
+    HiveTable alteredTable = testTable(notNullColumn, defaultValueColumn);
 
     shim.alterTable(CATALOG, DB, TABLE, alteredTable, false);
 
-    verify(client).dropConstraint(CATALOG, DB, TABLE, "tbl_id_nn_old");
-    verify(client).alter_table(eq(CATALOG), eq(DB), eq(TABLE), any(Table.class));
-    verify(client).addNotNullConstraint(any());
-    verify(client, never()).addDefaultConstraint(any());
+    ArgumentCaptor<List<SQLNotNullConstraint>> notNullCaptor = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<List<SQLDefaultConstraint>> defaultCaptor = ArgumentCaptor.forClass(List.class);
+    InOrder calls = inOrder(client);
+    calls.verify(client).dropConstraint(CATALOG, DB, TABLE, "external_not_null");
+    calls.verify(client).dropConstraint(CATALOG, DB, TABLE, "external_default");
+    calls.verify(client).alter_table(eq(CATALOG), eq(DB), eq(TABLE), any(Table.class));
+    calls.verify(client).addNotNullConstraint(notNullCaptor.capture());
+    calls.verify(client).addDefaultConstraint(defaultCaptor.capture());
+
+    SQLNotNullConstraint recreatedNotNull = notNullCaptor.getValue().get(0);
+    assertEquals("external_not_null", recreatedNotNull.getNn_name());
+    assertFalse(recreatedNotNull.isEnable_cstr());
+    assertTrue(recreatedNotNull.isValidate_cstr());
+    assertTrue(recreatedNotNull.isRely_cstr());
+
+    SQLDefaultConstraint recreatedDefault = defaultCaptor.getValue().get(0);
+    assertEquals("external_default", recreatedDefault.getDc_name());
+    assertFalse(recreatedDefault.isEnable_cstr());
+    assertTrue(recreatedDefault.isValidate_cstr());
+    assertTrue(recreatedDefault.isRely_cstr());
   }
 
   @Test
@@ -192,9 +215,9 @@ class TestHiveShimV3 {
     SQLNotNullConstraint existingNotNull =
         new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "tbl_id_nn_old", true, false, false);
     when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of(existingNotNull));
+        .thenReturn(List.of(existingNotNull), List.of());
     when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of());
+        .thenReturn(List.of(), List.of());
     doThrow(new MetaException("boom"))
         .when(client)
         .alter_table(anyString(), anyString(), anyString(), any(Table.class));
@@ -217,9 +240,9 @@ class TestHiveShimV3 {
     SQLNotNullConstraint existingNotNull =
         new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "tbl_id_nn_old", true, false, false);
     when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of(existingNotNull));
+        .thenReturn(List.of(existingNotNull), List.of());
     when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of());
+        .thenReturn(List.of(), List.of());
     doThrow(new MetaException("boom"))
         .when(client)
         .alter_table(anyString(), anyString(), anyString(), any(Table.class));
@@ -234,6 +257,39 @@ class TestHiveShimV3 {
         assertThrows(
             RuntimeException.class, () -> shim.alterTable(CATALOG, DB, TABLE, alteredTable, false));
     assertTrue(thrown.getMessage() == null || !thrown.getMessage().contains("restore"));
+  }
+
+  @Test
+  void testAlterTableRestoresEarlierConstraintWhenLaterDropFails() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+
+    SQLNotNullConstraint existingNotNull =
+        new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "existing_not_null", true, false, false);
+    SQLDefaultConstraint existingDefault =
+        new SQLDefaultConstraint(
+            CATALOG, DB, TABLE, "name", "'abc'", "existing_default", true, false, false);
+    when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
+        .thenReturn(List.of(existingNotNull), List.of());
+    when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
+        .thenReturn(List.of(existingDefault), List.of(existingDefault));
+    doThrow(new MetaException("second drop failed"))
+        .when(client)
+        .dropConstraint(CATALOG, DB, TABLE, "existing_default");
+
+    Column notNullColumn = Column.of("id", Types.IntegerType.get(), null, false, false, null);
+    Column defaultValueColumn =
+        Column.of("name", Types.StringType.get(), null, true, false, Literals.stringLiteral("abc"));
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            shim.alterTable(
+                CATALOG, DB, TABLE, testTable(notNullColumn, defaultValueColumn), false));
+
+    verify(client).addNotNullConstraint(List.of(existingNotNull));
+    verify(client, never()).addDefaultConstraint(any());
+    verify(client, never()).alter_table(anyString(), anyString(), anyString(), any(Table.class));
   }
 
   @Test
@@ -262,7 +318,7 @@ class TestHiveShimV3 {
   }
 
   @Test
-  void testGetTableObjectsByNameLoadsConstraints() throws Exception {
+  void testGetTableObjectsByNameDoesNotLoadConstraints() throws Exception {
     MockHiveShimV3 shim = new MockHiveShimV3();
     IMetaStoreClient client = shim.metaStoreClient();
 
@@ -271,18 +327,9 @@ class TestHiveShimV3 {
     hiveTable.setCatName(CATALOG);
     when(client.getTableObjectsByName(CATALOG, DB, List.of(TABLE))).thenReturn(List.of(hiveTable));
 
-    SQLNotNullConstraint notNull =
-        new SQLNotNullConstraint(CATALOG, DB, TABLE, "id", "tbl_id_nn", true, false, false);
-    when(client.getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of(notNull));
-    when(client.getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE)))
-        .thenReturn(List.of());
-
     shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE));
 
-    verify(client, times(1))
-        .getNotNullConstraints(new NotNullConstraintsRequest(CATALOG, DB, TABLE));
-    verify(client, times(1))
-        .getDefaultConstraints(new DefaultConstraintsRequest(CATALOG, DB, TABLE));
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
   }
 }

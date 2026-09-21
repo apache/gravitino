@@ -204,6 +204,10 @@ public class HiveColumnDefaultValueConverter {
   }
 
   private static String unquote(String quoted) {
-    return quoted.substring(1, quoted.length() - 1).replace("\\'", "'").replace("\\\\", "\\");
+    return quoted
+        .substring(1, quoted.length() - 1)
+        .replace("''", "'")
+        .replace("\\'", "'")
+        .replace("\\\\", "\\");
   }
 }
