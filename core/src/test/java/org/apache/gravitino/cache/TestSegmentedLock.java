@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -379,5 +380,59 @@ public class TestSegmentedLock {
                 lock.withGlobalLock(() -> {});
               });
         });
+  }
+
+  @Test
+  @Timeout(30)
+  void testGlobalClearingWaitsForInFlightOperations() throws InterruptedException {
+    SegmentedLock lock = new SegmentedLock(4);
+    CountDownLatch insideSegmentOp = new CountDownLatch(1);
+    CountDownLatch releaseSegmentOp = new CountDownLatch(1);
+    CountDownLatch globalActionDone = new CountDownLatch(1);
+    AtomicBoolean overlapped = new AtomicBoolean(false);
+
+    Thread segmentOpThread =
+        new Thread(
+            () ->
+                lock.withLock(
+                    "key1",
+                    () -> {
+                      insideSegmentOp.countDown();
+                      try {
+                        releaseSegmentOp.await();
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                      }
+                    }));
+    segmentOpThread.start();
+    assertTrue(insideSegmentOp.await(5, TimeUnit.SECONDS), "segment operation never started");
+
+    Thread globalThread =
+        new Thread(
+            () ->
+                lock.withGlobalLock(
+                    () -> {
+                      // The global action must never observe the in-flight segment
+                      // operation still holding its critical section.
+                      if (releaseSegmentOp.getCount() > 0) {
+                        overlapped.set(true);
+                      }
+                      globalActionDone.countDown();
+                    }));
+    globalThread.start();
+
+    // While the segment operation is in flight, the global action must not complete:
+    // withGlobalLock promises exclusive access to all segments, so it must block
+    // until the in-flight operation releases its critical section. A completion
+    // here means the global action ran concurrently with it.
+    assertFalse(
+        globalActionDone.await(1, TimeUnit.SECONDS),
+        "global action ran concurrently with an in-flight segment operation");
+    releaseSegmentOp.countDown();
+    assertTrue(globalActionDone.await(5, TimeUnit.SECONDS), "global action never completed");
+    assertFalse(overlapped.get(), "global action overlapped with the in-flight segment operation");
+
+    segmentOpThread.join(5000);
+    globalThread.join(5000);
   }
 }
