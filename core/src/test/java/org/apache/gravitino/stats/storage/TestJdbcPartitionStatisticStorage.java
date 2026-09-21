@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -99,6 +100,21 @@ public class TestJdbcPartitionStatisticStorage {
 
     // Create storage with mocked DataSource
     storage = new JdbcPartitionStatisticStorage(mockDataSource);
+  }
+
+  @Test
+  public void testCloseClosesOwnedDataSource() throws Exception {
+    // The storage is the only reachable owner of the pooled DataSource (the
+    // factory is discarded by the manager), so close() must release it.
+    BasicDataSource dataSource = new BasicDataSource();
+    dataSource.setDriverClassName("org.h2.Driver");
+    dataSource.setUrl("jdbc:h2:mem:stats_close_test;DB_CLOSE_DELAY=-1");
+
+    try (JdbcPartitionStatisticStorage owned = new JdbcPartitionStatisticStorage(dataSource)) {
+      // no-op: never open a connection
+    }
+
+    assertTrue(dataSource.isClosed());
   }
 
   @AfterEach

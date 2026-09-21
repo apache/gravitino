@@ -356,8 +356,18 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
 
   @Override
   public void close() throws IOException {
-    // DataSource lifecycle is managed externally by the factory
     LOG.debug("Closing JdbcPartitionStatisticStorage");
+    // This storage is the only reachable owner of the pooled DataSource: the
+    // factory that created it is discarded by the manager, so close must
+    // release the pool. DataSources that do not implement AutoCloseable keep
+    // their externally-managed lifecycle.
+    if (dataSource instanceof AutoCloseable) {
+      try {
+        ((AutoCloseable) dataSource).close();
+      } catch (Exception e) {
+        throw new IOException("Failed to close JDBC DataSource", e);
+      }
+    }
   }
 
   /**
