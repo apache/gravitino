@@ -284,17 +284,6 @@ public final class RegisteredPropertyKeys {
   }
 
   /**
-   * Returns whether {@code key} is an official Gravitino property for connector metadata checks —
-   * either a shared cloud/credential key or any {@linkplain #isRegistered(String) registered} key.
-   *
-   * @param key property key
-   * @return true when the key is known to Gravitino
-   */
-  public static boolean isOfficialPropertyKey(@Nullable String key) {
-    return isSharedCloudOrCredentialKey(key) || isRegistered(key);
-  }
-
-  /**
    * Returns whether a registered property is hidden when the catalog metadata does not declare it.
    *
    * @param key property key

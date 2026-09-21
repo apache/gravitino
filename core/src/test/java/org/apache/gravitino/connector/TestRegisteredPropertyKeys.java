@@ -77,21 +77,8 @@ public class TestRegisteredPropertyKeys {
   }
 
   @Test
-  void testOfficialPropertyKeyWrapsSharedAndRegistered() {
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("s3-access-key-id"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("credential-providers"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("aws-access-key-id"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("location-"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("lance.storage."));
-    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("location-warehouse"));
-    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("lance.storage.password"));
-    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("typo-access-key"));
-    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey(null));
-  }
-
-  @Test
   void testConnectorSpecificPropertyMustBeRegistered() {
-    BasePropertiesMetadata missingOfficial =
+    BasePropertiesMetadata missingRegistered =
         new BasePropertiesMetadata() {
           @Override
           protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
@@ -103,7 +90,7 @@ public class TestRegisteredPropertyKeys {
         };
 
     IllegalArgumentException exception =
-        Assertions.assertThrows(IllegalArgumentException.class, missingOfficial::propertyEntries);
+        Assertions.assertThrows(IllegalArgumentException.class, missingRegistered::propertyEntries);
     Assertions.assertTrue(exception.getMessage().contains("connector-only-unregistered-key"));
     Assertions.assertTrue(exception.getMessage().contains("RegisteredPropertyKeys"));
   }
