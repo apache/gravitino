@@ -34,6 +34,9 @@ public class LocalJobExecutorConfigs {
       Math.max(1, Math.min(Runtime.getRuntime().availableProcessors() / 2, 10));
 
   public static final String JOB_STATUS_KEEP_TIME_MS = "jobStatusKeepTimeInMs";
+
+  public static final String CANCEL_FORCE_KILL_DELAY_MS = "cancelForceKillDelayInMs";
+  public static final long DEFAULT_CANCEL_FORCE_KILL_DELAY_MS = 30 * 1000L; // 30 seconds
   public static final long DEFAULT_JOB_STATUS_KEEP_TIME_MS = 60 * 60 * 1000; // 1 hour
 
   public static final String SPARK_HOME = "sparkHome";

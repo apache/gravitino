@@ -640,6 +640,48 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testCancelJobEscalatesToForcibleKill() throws Exception {
+    // A process that ignores SIGTERM must still terminate (and free its worker
+    // thread) after the cancel grace period.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(ImmutableMap.of("cancelForceKillDelayInMs", "1000"));
+    try {
+      JobTemplateEntity.TemplateContent trapContent =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(Lists.newArrayList("-c", "trap '' TERM; sleep 300"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity trapTemplate =
+          JobTemplateEntity.builder()
+              .withId(2L)
+              .withName("trap-term-job-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(trapContent)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template =
+          JobManager.createRuntimeJobTemplate(trapTemplate, ImmutableMap.of(), workingDir);
+
+      String jobId = executor.submitJob(template);
+      Thread.sleep(1000);
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
   public void testCancelSucceededJob() {
     // Cancelling a job that is already succeeded.
     Map<String, String> successJobConf =
