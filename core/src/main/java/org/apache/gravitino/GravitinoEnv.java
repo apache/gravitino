@@ -243,8 +243,8 @@ public class GravitinoEnv {
    * <p>This initialization profile does not initialize event listeners, audit logging, metadata
    * hooks, auxiliary services, or job management.
    *
-   * <p>This method must be invoked on the singleton returned by {@link #getInstance()}, because
-   * metadata components use environment-scoped dependencies.
+   * <p>This method must be called on {@link #getInstance()}. Some metadata components read their
+   * dependencies directly from that singleton instead of from the object being initialized.
    *
    * @param config The configuration object to initialize the environment.
    */
@@ -456,6 +456,8 @@ public class GravitinoEnv {
    * @return The internal PartitionDispatcher instance.
    */
   public PartitionDispatcher internalPartitionDispatcher() {
+    Preconditions.checkArgument(
+        internalPartitionDispatcher != null, "GravitinoEnv is not initialized.");
     return internalPartitionDispatcher;
   }
 

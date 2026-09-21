@@ -31,7 +31,11 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.withSettings;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
@@ -69,17 +73,28 @@ import org.apache.gravitino.listener.ViewEventDispatcher;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.MockedStatic;
 
-@TestMethodOrder(OrderAnnotation.class)
 class TestGravitinoEnvMetadataComponents {
 
+  private Map<Field, Object> singletonState;
+
+  @BeforeEach
+  void isolateSingletonState() throws IllegalAccessException {
+    GravitinoEnv singleton = GravitinoEnv.getInstance();
+    singletonState = snapshotState(singleton);
+    restoreState(singleton, snapshotState(new TestGravitinoEnv()));
+  }
+
+  @AfterEach
+  void restoreSingletonState() throws IllegalAccessException {
+    restoreState(GravitinoEnv.getInstance(), singletonState);
+  }
+
   @Test
-  @Order(1)
   void testMetadataProfileRejectsNonSingletonEnvironment() {
     IllegalStateException exception =
         assertThrows(
@@ -92,7 +107,14 @@ class TestGravitinoEnvMetadataComponents {
   }
 
   @Test
-  @Order(2)
+  void testInternalPartitionAndStatisticDispatchersRequireInitialization() {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+
+    assertThrows(IllegalArgumentException.class, env::internalPartitionDispatcher);
+    assertThrows(IllegalArgumentException.class, env::internalStatisticDispatcher);
+  }
+
+  @Test
   void testMetadataProfileProvidesCompleteMetadataAccessWithoutServerServices() throws Exception {
     Config config = metadataConfig(false);
     EntityStore entityStore = relationStore();
@@ -165,7 +187,6 @@ class TestGravitinoEnvMetadataComponents {
   }
 
   @Test
-  @Order(3)
   void testMetadataProfileProvidesInternalAuthorizationWhenEnabled() throws Exception {
     Config config = metadataConfig(true);
     EntityStore entityStore = relationStore();
@@ -193,7 +214,6 @@ class TestGravitinoEnvMetadataComponents {
   }
 
   @Test
-  @Order(4)
   void testFullProfilePreservesDispatcherChains() throws Exception {
     Config config = metadataConfig(false);
     EntityStore entityStore = relationStore();
@@ -282,6 +302,23 @@ class TestGravitinoEnvMetadataComponents {
   private static EntityStore relationStore() {
     return mock(
         EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
+  }
+
+  private static Map<Field, Object> snapshotState(GravitinoEnv env) throws IllegalAccessException {
+    Map<Field, Object> state = new LinkedHashMap<>();
+    for (Field field : FieldUtils.getAllFieldsList(GravitinoEnv.class)) {
+      if (!Modifier.isStatic(field.getModifiers())) {
+        state.put(field, FieldUtils.readField(field, env, true));
+      }
+    }
+    return state;
+  }
+
+  private static void restoreState(GravitinoEnv env, Map<Field, Object> state)
+      throws IllegalAccessException {
+    for (Map.Entry<Field, Object> entry : state.entrySet()) {
+      FieldUtils.writeField(entry.getKey(), env, entry.getValue(), true);
+    }
   }
 
   private static void assertDispatcherChain(Object dispatcher, Class<?>... dispatcherClasses)
