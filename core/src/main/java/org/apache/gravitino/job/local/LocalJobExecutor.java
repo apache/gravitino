@@ -24,9 +24,14 @@ import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_MAX
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_WAITING_QUEUE_SIZE;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.MAX_RUNNING_JOBS;
+import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.STAGING_DIR;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.WAITING_QUEUE_SIZE;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -36,6 +41,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,16 +58,29 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A {@link JobExecutor} that runs jobs as processes on the Gravitino server itself.
+ *
+ * <p>Each job runs in its staging directory under {@code gravitino.job.stagingDir}, and its stdout
+ * and stderr are captured in files there. To find those files by job id alone, the executor writes
+ * a small, write-once index file per job under {@code <stagingDir>/.job-output-index}. In a
+ * multi-node deployment the staging directory must be shared by all Gravitino servers, otherwise a
+ * job's output can only be retrieved from the server that ran it.
+ */
 public class LocalJobExecutor implements JobExecutor {
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalJobExecutor.class);
@@ -64,6 +88,27 @@ public class LocalJobExecutor implements JobExecutor {
   private static final String LOCAL_JOB_PREFIX = "local-job-";
 
   private static final long UNEXPIRED_TIME_IN_MS = -1L;
+
+  // Contains '.' and '-', which a metalake name can't, so it never collides with a metalake's
+  // staging directory.
+  private static final String OUTPUT_INDEX_DIR_NAME = ".job-output-index";
+
+  private static final String OUTPUT_INDEX_FILE_SUFFIX = ".json";
+
+  private static final int OUTPUT_INDEX_VERSION = 1;
+
+  private static final String OUTPUT_INDEX_VERSION_FIELD = "version";
+
+  private static final String OUTPUT_INDEX_WORKING_DIR_FIELD = "workingDir";
+
+  private static final long OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS = TimeUnit.HOURS.toMillis(1);
+
+  private static final Pattern JOB_ID_PATTERN =
+      Pattern.compile(
+          LOCAL_JOB_PREFIX
+              + "[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
+  private static final ObjectMapper MAPPER = JsonUtils.anyFieldMapper();
 
   // A random id of this executor instance, it is embedded in every job id submitted by this
   // instance, so that each Gravitino server only tracks the jobs it runs itself.
@@ -92,9 +137,13 @@ public class LocalJobExecutor implements JobExecutor {
 
   private Map<String, Process> runningProcesses;
 
-  // The working directory of each job, used to locate its captured stdout/stderr files. Cleaned
-  // up together with jobStatus so the two maps stay in sync.
-  private Map<String, File> jobWorkingDirs;
+  // Not resolved with toRealPath(): every path is derived from the same configured string, so
+  // leaving symlinks unresolved keeps them comparable across servers.
+  private Path stagingRoot;
+
+  private Path outputIndexDir;
+
+  private final AtomicBoolean missingOutputIndexWarned = new AtomicBoolean(false);
 
   @Override
   public void initialize(Map<String, String> configs) {
@@ -102,6 +151,26 @@ public class LocalJobExecutor implements JobExecutor {
     this.executorId = String.format("%08x", ThreadLocalRandom.current().nextInt());
     this.ownedJobIdPrefix = LOCAL_JOB_PREFIX + executorId + "-";
     LOG.info("Initializing local job executor with executor id {}", executorId);
+
+    // Validated before any thread is started, so a failed initialization leaks nothing.
+    String stagingDir = configs.get(STAGING_DIR);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(stagingDir),
+        "The job staging directory must be set for the local job executor");
+    this.stagingRoot = Paths.get(stagingDir).toAbsolutePath().normalize();
+    this.outputIndexDir = stagingRoot.resolve(OUTPUT_INDEX_DIR_NAME);
+    try {
+      Files.createDirectories(outputIndexDir);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to create the job output index directory " + outputIndexDir, e);
+    }
+    LOG.info(
+        "Job output of the local job executor is located through {}. In a multi-node deployment, "
+            + "gravitino.job.stagingDir ({}) must be shared by all Gravitino servers, otherwise "
+            + "a job's output can only be retrieved from the server that ran it.",
+        outputIndexDir,
+        stagingRoot);
 
     int waitingQueueSize =
         configs.containsKey(WAITING_QUEUE_SIZE)
@@ -175,9 +244,13 @@ public class LocalJobExecutor implements JobExecutor {
         jobStatusCleanupIntervalInMs,
         jobStatusCleanupIntervalInMs,
         TimeUnit.MILLISECONDS);
+    jobStatusCleanupExecutor.scheduleWithFixedDelay(
+        this::cleanupOutputIndexes,
+        OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS,
+        OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS,
+        TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
-    this.jobWorkingDirs = Maps.newConcurrentMap();
 
     // Spark is optional for the local job executor, so a missing Spark installation must not fail
     // the server startup. Warn early instead; Spark jobs will be rejected at submission.
@@ -208,11 +281,10 @@ public class LocalJobExecutor implements JobExecutor {
       }
 
       jobStatus.put(newJobId, Pair.of(JobHandle.Status.QUEUED, UNEXPIRED_TIME_IN_MS));
-      // Retain the working directory so output.log/error.log can be located later without
-      // needing to keep the running Process object around after the job finishes.
-      jobWorkingDirs.put(newJobId, LocalProcessBuilder.resolveWorkingDirectory(jobTemplate));
     }
 
+    // Written only once the job is accepted, so a rejected submission leaves no index behind.
+    writeOutputIndex(newJobId, jobTemplate);
     return newJobId;
   }
 
@@ -317,7 +389,6 @@ public class LocalJobExecutor implements JobExecutor {
     // Stop the job status cleanup executor
     jobStatusCleanupExecutor.shutdownNow();
     jobStatus.clear();
-    jobWorkingDirs.clear();
   }
 
   public void runJob(Pair<String, JobTemplate> jobPair) {
@@ -404,29 +475,174 @@ public class LocalJobExecutor implements JobExecutor {
       jobStatus
           .entrySet()
           .removeIf(
-              entry -> {
-                boolean expired =
-                    entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
-                        && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs;
-                if (expired) {
-                  jobWorkingDirs.remove(entry.getKey());
-                }
-                return expired;
-              });
+              entry ->
+                  entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
+                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs);
+    }
+  }
+
+  /**
+   * Removes the output index files whose job staging directory no longer exists. The staging
+   * directories themselves are removed by JobManager, so this never deletes any job output.
+   */
+  @VisibleForTesting
+  void cleanupOutputIndexes() {
+    // An exception escaping a scheduled task would cancel all its later runs.
+    try (DirectoryStream<Path> indexFiles =
+        Files.newDirectoryStream(
+            outputIndexDir, LOCAL_JOB_PREFIX + "*" + OUTPUT_INDEX_FILE_SUFFIX)) {
+      for (Path indexFile : indexFiles) {
+        try {
+          Path workingDir = parseOutputIndex(Files.readAllBytes(indexFile));
+          // An index this server can't interpret may come from a newer server, so keep it. Only
+          // a confirmed missing directory counts: notExists() is false on I/O errors too, so a
+          // storage hiccup never removes an index.
+          if (workingDir != null && Files.notExists(workingDir)) {
+            Files.deleteIfExists(indexFile);
+            LOG.debug("Removed output index {} of a deleted job staging directory", indexFile);
+          }
+        } catch (NoSuchFileException e) {
+          // Removed concurrently, e.g. by another server sharing the staging directory.
+        } catch (IOException | RuntimeException e) {
+          LOG.warn("Failed to clean up job output index {}", indexFile, e);
+        }
+      }
+    } catch (IOException | RuntimeException e) {
+      LOG.warn("Failed to clean up job output indexes under {}", outputIndexDir, e);
     }
   }
 
   private List<String> getJobOutput(String jobId, String fileName, int maxLines, int maxBytes) {
-    File workingDir = getWorkingDir(jobId);
+    Path workingDir = locateWorkingDir(jobId);
     if (workingDir == null) {
       return ImmutableList.of();
     }
-    return readLastLines(new File(workingDir, fileName), maxLines, maxBytes);
+    return readLastLines(workingDir.resolve(fileName).toFile(), maxLines, maxBytes);
+  }
+
+  private void writeOutputIndex(String jobId, JobTemplate jobTemplate) {
+    // The job is already queued, so any failure here must not fail the submission: the caller
+    // would then clean up the staging directory of a job that still runs.
+    try {
+      Path workingDir =
+          LocalProcessBuilder.resolveWorkingDirectory(jobTemplate)
+              .toPath()
+              .toAbsolutePath()
+              .normalize();
+      if (!workingDir.startsWith(stagingRoot) || workingDir.equals(stagingRoot)) {
+        LOG.warn(
+            "The working directory {} of job {} is not under the job staging directory {}, so "
+                + "its output can't be retrieved",
+            workingDir,
+            jobId,
+            stagingRoot);
+        return;
+      }
+
+      // Relative to the staging directory, so servers mounting shared storage at different paths
+      // can all resolve it. '/'-separated regardless of the platform's separator.
+      ObjectNode index = MAPPER.createObjectNode();
+      index.put(OUTPUT_INDEX_VERSION_FIELD, OUTPUT_INDEX_VERSION);
+      index.put(
+          OUTPUT_INDEX_WORKING_DIR_FIELD, Joiner.on('/').join(stagingRoot.relativize(workingDir)));
+      // Recreated in case it was removed while the server is running, e.g. by a manual cleanup.
+      Files.createDirectories(outputIndexDir);
+      // No temp file and rename: the job id is only handed out after this returns, so nobody can
+      // read a partially written index, and atomic rename isn't available on every shared storage.
+      Files.write(
+          outputIndexFile(jobId),
+          MAPPER.writeValueAsBytes(index),
+          StandardOpenOption.CREATE_NEW,
+          StandardOpenOption.WRITE);
+    } catch (IOException | RuntimeException e) {
+      LOG.warn(
+          "Failed to write the output index of job {}, its output can't be retrieved", jobId, e);
+    }
   }
 
   @Nullable
-  private File getWorkingDir(String jobId) {
-    return jobWorkingDirs.get(jobId);
+  private Path locateWorkingDir(String jobId) {
+    // The job id becomes a file name, so it must not be able to carry any path elements.
+    if (jobId == null || !JOB_ID_PATTERN.matcher(jobId).matches()) {
+      LOG.debug("Job {} is not a job of the local job executor, it has no output index", jobId);
+      return null;
+    }
+
+    Path indexFile = outputIndexFile(jobId);
+    byte[] content;
+    try {
+      content = Files.readAllBytes(indexFile);
+    } catch (NoSuchFileException e) {
+      warnMissingOutputIndex(jobId);
+      return null;
+    } catch (IOException e) {
+      // Same as reading the output itself: an unexpected I/O failure must not be reported as
+      // "no output".
+      throw new RuntimeException("Failed to read the output index of job " + jobId, e);
+    }
+
+    Path workingDir = parseOutputIndex(content);
+    if (workingDir == null) {
+      LOG.warn("The output index {} of job {} is invalid or unsupported", indexFile, jobId);
+    }
+    return workingDir;
+  }
+
+  // Returns null if the index can't be interpreted, including when it points outside the staging
+  // directory.
+  @Nullable
+  private Path parseOutputIndex(byte[] content) {
+    JsonNode index;
+    try {
+      index = MAPPER.readTree(content);
+    } catch (IOException e) {
+      return null;
+    }
+    if (index == null || !index.isObject()) {
+      return null;
+    }
+
+    JsonNode version = index.get(OUTPUT_INDEX_VERSION_FIELD);
+    if (version == null || !version.isInt() || version.intValue() != OUTPUT_INDEX_VERSION) {
+      return null;
+    }
+
+    JsonNode relativePath = index.get(OUTPUT_INDEX_WORKING_DIR_FIELD);
+    if (relativePath == null
+        || !relativePath.isTextual()
+        || StringUtils.isBlank(relativePath.textValue())
+        || relativePath.textValue().startsWith("/")) {
+      return null;
+    }
+
+    Path workingDir = stagingRoot;
+    for (String segment : Splitter.on('/').omitEmptyStrings().split(relativePath.textValue())) {
+      workingDir = workingDir.resolve(segment);
+    }
+    workingDir = workingDir.normalize();
+    return workingDir.startsWith(stagingRoot) && !workingDir.equals(stagingRoot)
+        ? workingDir
+        : null;
+  }
+
+  private Path outputIndexFile(String jobId) {
+    return outputIndexDir.resolve(jobId + OUTPUT_INDEX_FILE_SUFFIX);
+  }
+
+  private void warnMissingOutputIndex(String jobId) {
+    // Warn once per executor instance, a client polling the output would otherwise flood the log.
+    if (missingOutputIndexWarned.compareAndSet(false, true)) {
+      LOG.warn(
+          "No output index found for job {} under {}, so its output can't be retrieved. The job "
+              + "may have been submitted before this Gravitino version, or run on another "
+              + "Gravitino server that doesn't share gravitino.job.stagingDir with this one. In a "
+              + "multi-node deployment, gravitino.job.stagingDir must be shared by all servers. "
+              + "Later occurrences are logged at DEBUG level.",
+          jobId,
+          outputIndexDir);
+    } else {
+      LOG.debug("No output index found for job {} under {}", jobId, outputIndexDir);
+    }
   }
 
   private List<String> readLastLines(File file, int maxLines, int maxBytes) {

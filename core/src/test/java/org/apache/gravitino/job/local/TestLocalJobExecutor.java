@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.job.local;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -42,6 +43,7 @@ import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -57,16 +59,21 @@ public class TestLocalJobExecutor {
 
   private static final int DEFAULT_TEST_MAX_BYTES = 1_000_000;
 
+  private static final String OUTPUT_INDEX_DIR_NAME = ".job-output-index";
+
   private static JobExecutor jobExecutor;
 
   private static JobTemplateEntity jobTemplateEntity;
+
+  private static File stagingRoot;
 
   private static File workingDir;
 
   @BeforeAll
   public static void setUpClass() throws IOException {
+    stagingRoot = Files.createTempDirectory("gravitino-test-local-job-staging").toFile();
     jobExecutor = new LocalJobExecutor();
-    jobExecutor.initialize(Collections.emptyMap());
+    jobExecutor.initialize(withStagingDir(Collections.emptyMap()));
 
     URL testJobScriptUrl = TestLocalJobExecutor.class.getResource("/test-job.sh");
     Assertions.assertNotNull(testJobScriptUrl);
@@ -102,11 +109,15 @@ public class TestLocalJobExecutor {
       jobExecutor.close();
       jobExecutor = null;
     }
+    if (stagingRoot != null) {
+      FileUtils.deleteDirectory(stagingRoot);
+    }
   }
 
   @BeforeEach
   public void setUp() throws IOException {
-    workingDir = Files.createTempDirectory("gravitino-test-local-job-executor").toFile();
+    // Jobs are staged under the staging directory, like JobManager does.
+    workingDir = Files.createTempDirectory(stagingRoot.toPath(), "job").toFile();
   }
 
   @AfterEach
@@ -165,7 +176,7 @@ public class TestLocalJobExecutor {
 
     LocalJobExecutor anotherExecutor = new LocalJobExecutor();
     try {
-      anotherExecutor.initialize(Collections.emptyMap());
+      anotherExecutor.initialize(withStagingDir(Collections.emptyMap()));
       Assertions.assertNotEquals(executor.executorId(), anotherExecutor.executorId());
       Assertions.assertFalse(anotherExecutor.ownsJob(jobId));
       Assertions.assertThrows(NoSuchJobException.class, () -> anotherExecutor.getJobStatus(jobId));
@@ -182,7 +193,8 @@ public class TestLocalJobExecutor {
   public void testRunJobsConcurrentlyUpToMaxRunningJobs() throws IOException {
     LocalJobExecutor executor = new LocalJobExecutor();
     try {
-      executor.initialize(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "2"));
+      executor.initialize(
+          withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "2")));
       String jobId1 = executor.submitJob(newSleepJobTemplate("sleep-1"));
       String jobId2 = executor.submitJob(newSleepJobTemplate("sleep-2"));
       String jobId3 = executor.submitJob(newSleepJobTemplate("sleep-3"));
@@ -236,7 +248,8 @@ public class TestLocalJobExecutor {
     File sparkHome = new File(workingDir, "spark");
     LocalJobExecutor exec = new LocalJobExecutor();
     exec.initialize(
-        ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, sparkHome.getAbsolutePath()));
+        withStagingDir(
+            ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, sparkHome.getAbsolutePath())));
 
     try {
       SparkJobTemplate template =
@@ -247,9 +260,12 @@ public class TestLocalJobExecutor {
               .build();
 
       // spark-submit does not exist, the job is rejected at submission instead of being queued.
+      int indexCountBeforeRejection = outputIndexFileCount();
       IllegalArgumentException e =
           Assertions.assertThrows(IllegalArgumentException.class, () -> exec.submitJob(template));
       Assertions.assertTrue(e.getMessage().contains("spark-submit is not found or not executable"));
+      // A rejected submission leaves no output index behind.
+      Assertions.assertEquals(indexCountBeforeRejection, outputIndexFileCount());
 
       // Once spark-submit is available, the same job is accepted.
       File sparkSubmit = new File(sparkHome, "bin/spark-submit");
@@ -347,10 +363,10 @@ public class TestLocalJobExecutor {
   @Test
   public void testGetJobOutputForQueuedJobReturnsEmpty() throws IOException {
     LocalJobExecutor exec = new LocalJobExecutor();
-    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1"));
+    exec.initialize(withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1")));
 
-    File workingDirA = Files.createTempDirectory("gravitino-test-local-job-executor-a").toFile();
-    File workingDirB = Files.createTempDirectory("gravitino-test-local-job-executor-b").toFile();
+    File workingDirA = Files.createTempDirectory(stagingRoot.toPath(), "job-a").toFile();
+    File workingDirB = Files.createTempDirectory(stagingRoot.toPath(), "job-b").toFile();
     try {
       Map<String, String> jobConf =
           ImmutableMap.of(
@@ -664,7 +680,8 @@ public class TestLocalJobExecutor {
       throws NoSuchFieldException, IllegalAccessException {
     LocalJobExecutor exec = new LocalJobExecutor();
 
-    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "1"));
+    exec.initialize(
+        withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "1")));
 
     Field field = LocalJobExecutor.class.getDeclaredField("jobStatusKeepTimeInMs");
     field.setAccessible(true);
@@ -677,12 +694,226 @@ public class TestLocalJobExecutor {
       throws NoSuchFieldException, IllegalAccessException {
     LocalJobExecutor exec = new LocalJobExecutor();
 
-    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "11"));
+    exec.initialize(
+        withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "11")));
 
     Field field = LocalJobExecutor.class.getDeclaredField("jobStatusKeepTimeInMs");
     field.setAccessible(true);
     long actualValue = (long) field.get(exec);
     Assertions.assertEquals(11L, actualValue);
+  }
+
+  @Test
+  public void testInitializeWithoutStagingDirFails() {
+    LocalJobExecutor exec = new LocalJobExecutor();
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> exec.initialize(Collections.emptyMap()));
+    Assertions.assertTrue(e.getMessage().contains("staging directory"));
+  }
+
+  @Test
+  public void testSubmitJobWritesOutputIndexRelativeToStagingDir() throws IOException {
+    // Laid out like the {metalake}/{template}/gravitino-job-{id} staging directory of JobManager.
+    File jobDir = new File(workingDir, "metalake/template/gravitino-job-1");
+    Assertions.assertTrue(jobDir.mkdirs());
+    String jobId = runSucceededJob(jobDir);
+
+    JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
+    Assertions.assertEquals(1, index.get("version").intValue());
+    Assertions.assertEquals(
+        workingDir.getName() + "/metalake/template/gravitino-job-1",
+        index.get("workingDir").textValue());
+  }
+
+  @Test
+  public void testGetJobOutputFromAnotherExecutorInstance() throws IOException {
+    String jobId = runSucceededJob(workingDir);
+    List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES);
+    Assertions.assertEquals(6, stdout.size());
+
+    // Another server sharing the staging directory, or this server after a restart.
+    LocalJobExecutor anotherExecutor = new LocalJobExecutor();
+    try {
+      anotherExecutor.initialize(withStagingDir(Collections.emptyMap()));
+      Assertions.assertFalse(anotherExecutor.ownsJob(jobId));
+      Assertions.assertEquals(
+          stdout, anotherExecutor.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES));
+      Assertions.assertEquals(
+          Collections.emptyList(),
+          anotherExecutor.getJobStderr(jobId, 1000, DEFAULT_TEST_MAX_BYTES));
+    } finally {
+      anotherExecutor.close();
+    }
+  }
+
+  @Test
+  public void testGetJobOutputAfterJobStatusExpired() throws IOException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+    try {
+      // The status of a finished job is dropped from memory almost right away.
+      exec.initialize(
+          withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "10")));
+      String jobId = exec.submitJob(newRuntimeJobTemplate(workingDir));
+      // A queued or running job's status never expires, so a missing status means it finished.
+      Awaitility.await().atMost(3, TimeUnit.MINUTES).until(() -> !hasJobStatus(exec, jobId));
+
+      Assertions.assertEquals(6, exec.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES).size());
+    } finally {
+      exec.close();
+    }
+  }
+
+  @Test
+  public void testGetJobOutputWhenWorkingDirIsOutsideStagingDir() throws IOException {
+    File outsideDir = Files.createTempDirectory("gravitino-test-local-job-outside").toFile();
+    try {
+      String jobId = runSucceededJob(outsideDir);
+      Assertions.assertTrue(new File(outsideDir, "output.log").length() > 0);
+
+      Assertions.assertFalse(outputIndexFile(jobId).exists());
+      Assertions.assertEquals(
+          Collections.emptyList(), jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES));
+    } finally {
+      FileUtils.deleteDirectory(outsideDir);
+    }
+  }
+
+  @Test
+  public void testGetJobOutputWithInvalidOutputIndexReturnsEmpty() throws IOException {
+    String jobId = runSucceededJob(workingDir);
+    String validIndex = FileUtils.readFileToString(outputIndexFile(jobId), StandardCharsets.UTF_8);
+
+    // A readable output outside the staging directory, next to it.
+    File outsideDir = Files.createTempDirectory("gravitino-test-local-job-outside").toFile();
+    try {
+      FileUtils.writeStringToFile(
+          new File(outsideDir, "output.log"), "outside\n", StandardCharsets.UTF_8);
+
+      List<String> invalidIndexes =
+          ImmutableList.of(
+              "{\"version\":1,\"workingDir\":\"../" + outsideDir.getName() + "\"}",
+              "{\"version\":1,\"workingDir\":\"" + outsideDir.getAbsolutePath() + "\"}",
+              "{\"version\":1,\"workingDir\":\".\"}",
+              "{\"version\":1,\"workingDir\":\"\"}",
+              "{\"version\":2,\"workingDir\":\"" + workingDir.getName() + "\"}",
+              "{\"workingDir\":\"" + workingDir.getName() + "\"}",
+              // Truncated by a crash while being written.
+              "{\"version\":1,\"workingDir\":\"",
+              "");
+      for (String invalidIndex : invalidIndexes) {
+        FileUtils.writeStringToFile(outputIndexFile(jobId), invalidIndex, StandardCharsets.UTF_8);
+        Assertions.assertEquals(
+            Collections.emptyList(),
+            jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES),
+            invalidIndex);
+      }
+
+      FileUtils.writeStringToFile(outputIndexFile(jobId), validIndex, StandardCharsets.UTF_8);
+      Assertions.assertEquals(
+          6, jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES).size());
+    } finally {
+      FileUtils.deleteDirectory(outsideDir);
+    }
+  }
+
+  @Test
+  public void testGetJobOutputWithInvalidJobIdReturnsEmpty() {
+    // The job id is used as a file name, so it must never be able to carry path elements.
+    List<String> jobIds =
+        ImmutableList.of(
+            "local-job-../../etc/passwd",
+            "../local-job-00000000-" + UUID.randomUUID(),
+            // A job id from before the executor id was introduced.
+            "local-job-" + UUID.randomUUID(),
+            // A well-formed job id without an output index.
+            "local-job-00000000-" + UUID.randomUUID(),
+            "");
+    for (String jobId : jobIds) {
+      Assertions.assertEquals(
+          Collections.emptyList(),
+          jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES),
+          jobId);
+    }
+  }
+
+  @Test
+  public void testCleanupOutputIndexes() throws IOException {
+    File keptDir = Files.createTempDirectory(stagingRoot.toPath(), "kept").toFile();
+    File removedDir = Files.createTempDirectory(stagingRoot.toPath(), "removed").toFile();
+    String keptJobId = runSucceededJob(keptDir);
+    String removedJobId = runSucceededJob(removedDir);
+    // Like JobManager removing the staging directory of an expired job.
+    FileUtils.deleteDirectory(removedDir);
+
+    // An index this server can't interpret, e.g. written by a newer server, and an unrelated file.
+    File unsupportedIndex = outputIndexFile("local-job-00000000-" + UUID.randomUUID());
+    FileUtils.writeStringToFile(unsupportedIndex, "{\"version\":2}", StandardCharsets.UTF_8);
+    File unrelatedFile = new File(stagingRoot, OUTPUT_INDEX_DIR_NAME + File.separator + "README");
+    FileUtils.writeStringToFile(unrelatedFile, "keep me", StandardCharsets.UTF_8);
+    try {
+      ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes();
+
+      Assertions.assertFalse(outputIndexFile(removedJobId).exists());
+      Assertions.assertTrue(outputIndexFile(keptJobId).exists());
+      Assertions.assertTrue(unsupportedIndex.exists());
+      Assertions.assertTrue(unrelatedFile.exists());
+      Assertions.assertEquals(
+          6, jobExecutor.getJobStdout(keptJobId, 100, DEFAULT_TEST_MAX_BYTES).size());
+    } finally {
+      FileUtils.deleteQuietly(unsupportedIndex);
+      FileUtils.deleteQuietly(unrelatedFile);
+      FileUtils.deleteDirectory(keptDir);
+    }
+  }
+
+  @Test
+  public void testOutputIndexDirIsRecreatedWhenRemoved() throws IOException {
+    FileUtils.deleteDirectory(new File(stagingRoot, OUTPUT_INDEX_DIR_NAME));
+
+    String jobId = runSucceededJob(workingDir);
+    Assertions.assertTrue(outputIndexFile(jobId).exists());
+    Assertions.assertEquals(6, jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES).size());
+  }
+
+  private static Map<String, String> withStagingDir(Map<String, String> configs) {
+    return ImmutableMap.<String, String>builder()
+        .putAll(configs)
+        .put(LocalJobExecutorConfigs.STAGING_DIR, stagingRoot.getAbsolutePath())
+        .build();
+  }
+
+  private static JobTemplate newRuntimeJobTemplate(File jobDir) {
+    return JobManager.createRuntimeJobTemplate(
+        jobTemplateEntity,
+        ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
+        jobDir);
+  }
+
+  private static String runSucceededJob(File jobDir) {
+    String jobId = jobExecutor.submitJob(newRuntimeJobTemplate(jobDir));
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+    return jobId;
+  }
+
+  private static boolean hasJobStatus(JobExecutor executor, String jobId) {
+    try {
+      executor.getJobStatus(jobId);
+      return true;
+    } catch (NoSuchJobException e) {
+      return false;
+    }
+  }
+
+  private static File outputIndexFile(String jobId) {
+    return new File(stagingRoot, OUTPUT_INDEX_DIR_NAME + File.separator + jobId + ".json");
+  }
+
+  private static int outputIndexFileCount() {
+    File[] indexFiles = new File(stagingRoot, OUTPUT_INDEX_DIR_NAME).listFiles();
+    return indexFiles == null ? 0 : indexFiles.length;
   }
 
   private JobTemplate newSleepJobTemplate(String name) throws IOException {

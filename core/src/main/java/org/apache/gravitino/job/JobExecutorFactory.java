@@ -20,6 +20,7 @@ package org.apache.gravitino.job;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -60,7 +61,13 @@ public class JobExecutorFactory {
         jobExecutorName);
 
     Map<String, String> configs =
-        config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + ".");
+        Maps.newHashMap(
+            config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + "."));
+    if (LocalJobExecutor.class.getCanonicalName().equals(clzName)) {
+      // The local job executor keeps its output index under the job staging directory, so it must
+      // resolve paths against exactly the directory JobManager stages jobs in.
+      configs.put(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR));
+    }
     try {
       JobExecutor jobExecutor =
           (JobExecutor) Class.forName(clzName).getDeclaredConstructor().newInstance();

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.job;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -37,6 +38,7 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
+import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
@@ -63,6 +65,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private static final String TEMPLATE = "sleep_job";
 
+  private static final String ECHO_TEMPLATE = "echo_job";
+
   // Active jobs not updated for this long are expired, and finished jobs are cleaned up after it.
   // The tests move the job timestamps back instead of waiting for it to elapse.
   private static final long JOB_KEEP_TIME_IN_MS = TimeUnit.HOURS.toMillis(1);
@@ -83,9 +87,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   public void setUpNodes() throws Exception {
     testDir = Files.createTempDirectory("gravitino-test-job-multi-node").toFile();
 
-    Config config = new Config(false) {};
-    config.set(Configs.JOB_STAGING_DIR, new File(testDir, "staging").getAbsolutePath());
-    config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, JOB_KEEP_TIME_IN_MS);
+    // Both nodes share the same staging directory, like a deployment on shared storage.
+    Config config = newConfig(new File(testDir, "staging"));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     // Both nodes share the same metadata store, backed by the relational backend under test.
@@ -96,11 +99,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
     createAndInsertMakeLake(METALAKE);
     backend.insert(newSleepJobTemplateEntity(), false);
+    backend.insert(newEchoJobTemplateEntity(), false);
 
-    executorA = new LocalJobExecutor();
-    executorA.initialize(Collections.emptyMap());
-    executorB = new LocalJobExecutor();
-    executorB.initialize(Collections.emptyMap());
+    executorA = newLocalJobExecutor(config);
+    executorB = newLocalJobExecutor(config);
     nodeA = newJobManager(config, entityStore, executorA);
     nodeB = newJobManager(config, entityStore, executorB);
   }
@@ -198,6 +200,60 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Assertions.assertFalse(jobExists(cancellingJob.name()));
   }
 
+  @TestTemplate
+  public void testGetJobOutputFromAnotherNode() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("a");
+
+    // Node B didn't run the job, it reads the output from the shared staging directory.
+    JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+    Assertions.assertEquals(ImmutableList.of("hello a"), jobWithOutput.stdout());
+    Assertions.assertEquals(ImmutableList.of("oops a"), jobWithOutput.stderr());
+
+    // The output doesn't depend on the node that ran the job being alive.
+    nodeA.close();
+    nodeA = null;
+    Assertions.assertEquals(
+        ImmutableList.of("hello a"), nodeB.getJob(METALAKE, job.name(), true).stdout());
+  }
+
+  @TestTemplate
+  public void testGetJobOutputAfterTemplateRenamed() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("b");
+
+    String newName = ECHO_TEMPLATE + "_renamed";
+    nodeA.alterJobTemplate(METALAKE, ECHO_TEMPLATE, JobTemplateChange.rename(newName));
+
+    // The job reports the new template name, while its staging directory keeps the old one.
+    JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+    Assertions.assertEquals(newName, jobWithOutput.jobTemplateName());
+    Assertions.assertEquals(ImmutableList.of("hello b"), jobWithOutput.stdout());
+  }
+
+  @TestTemplate
+  public void testGetJobOutputFromNodeNotSharingStagingDir() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("c");
+
+    // A node with a staging directory of its own can't reach the output, and reports none
+    // instead of failing.
+    Config otherConfig = newConfig(new File(testDir, "other-staging"));
+    JobManager nodeC = newJobManager(otherConfig, entityStore, newLocalJobExecutor(otherConfig));
+    try {
+      JobEntity jobWithOutput = nodeC.getJob(METALAKE, job.name(), true);
+      Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stdout());
+      Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stderr());
+    } finally {
+      nodeC.close();
+    }
+  }
+
+  private JobEntity runEchoJobOnNodeA(String name) throws IOException {
+    JobEntity job = nodeA.runJob(METALAKE, ECHO_TEMPLATE, ImmutableMap.of("name", name));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+    return job;
+  }
+
   private JobEntity runLongJobOnNodeA() throws IOException {
     JobEntity job = nodeA.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600"));
     Awaitility.await()
@@ -253,20 +309,30 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   private JobTemplateEntity newSleepJobTemplateEntity() throws IOException {
-    File script = new File(testDir, "sleep-job.sh");
     // Exec the sleep, so that killing the job process also stops the sleep.
-    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep \"$1\"\n");
+    return newScriptJobTemplateEntity(TEMPLATE, "exec sleep \"$1\"\n", "{{seconds}}");
+  }
+
+  private JobTemplateEntity newEchoJobTemplateEntity() throws IOException {
+    return newScriptJobTemplateEntity(
+        ECHO_TEMPLATE, "echo \"hello $1\"\necho \"oops $1\" >&2\n", "{{name}}");
+  }
+
+  private JobTemplateEntity newScriptJobTemplateEntity(
+      String name, String scriptBody, String argument) throws IOException {
+    File script = new File(testDir, name + ".sh");
+    Files.writeString(script.toPath(), "#!/bin/bash\n" + scriptBody);
     Assertions.assertTrue(script.setExecutable(true));
 
     return JobTemplateEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName(TEMPLATE)
+        .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate(METALAKE))
         .withTemplateContent(
             JobTemplateEntity.TemplateContent.builder()
                 .withJobType(JobTemplate.JobType.SHELL)
                 .withExecutable(script.getAbsolutePath())
-                .withArguments(Lists.newArrayList("{{seconds}}"))
+                .withArguments(Lists.newArrayList(argument))
                 .withEnvironments(Collections.emptyMap())
                 .withCustomFields(Collections.emptyMap())
                 .withScripts(Collections.emptyList())
@@ -274,6 +340,21 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private static Config newConfig(File stagingDir) {
+    Config config = new Config(false) {};
+    config.set(Configs.JOB_STAGING_DIR, stagingDir.getAbsolutePath());
+    config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, JOB_KEEP_TIME_IN_MS);
+    return config;
+  }
+
+  // Configured the way JobExecutorFactory configures it for a server with this configuration.
+  private static LocalJobExecutor newLocalJobExecutor(Config config) {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(
+        ImmutableMap.of(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR)));
+    return executor;
   }
 
   private static JobManager newJobManager(
