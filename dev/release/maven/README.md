@@ -35,6 +35,15 @@ regenerated after exclusions. A ZIP intermediate preserves case-sensitive paths.
 selected by `group:artifact:version`, then `group:artifact`, then `group:*`.
 Comma-separated filenames precede an optional `|` license label. Rules apply only
 to bundled dependencies with content; declarations in a POM do not trigger them.
+A label-only rule requires legal documents in the dependency JAR. Components with
+version-specific rules require an audited version entry or an explicit artifact-level
+fallback; a group rule cannot silently replace version-specific supplements.
+An empty version entry records that no supplement is needed for that audited version.
+
+The document inventory is not a complete dependency or license audit. An Apache-2.0
+dependency may be covered by the base LICENSE without supplying its own legal files;
+the absence of files alone cannot establish its licensing or exclude embedded code
+under other terms.
 
 When changing dependencies or copied sources, inspect the actual included code and
 upstream legal documents. Update the relevant templates, mappings and root source
@@ -42,6 +51,11 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 
 ## Sources for supplements
 
+- Aliyun OSS 3.10.2/3.13.0: the exact Maven Central source JARs contain the same
+  BSD-2-Clause header in `com/aliyun/oss/common/utils/IniEditor.java`.
+- Google API Client 1.24.1: its exact Maven Central source JAR contains a separate
+  BSD-3-Clause header in `com/google/api/client/googleapis/auth/oauth2/CloudShellCredential.java`.
+- Google Auth credentials and OAuth2 HTTP 1.28.0: [BSD-3-Clause LICENSE](https://github.com/googleapis/google-auth-library-java/blob/v1.28.0/LICENSE).
 - gRPC 1.66.0: [NOTICE](https://github.com/grpc/grpc-java/blob/v1.66.0/NOTICE.txt).
   Only the gRPC attribution applies to `grpc-api`; the okhttp/xds portions are
   not bundled. `grpc-context` is an empty compatibility JAR.
@@ -70,6 +84,8 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   and [1.0.90 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v1.0.90/LICENSE)
   respectively. Jackson 2.18.3 also needs the Boost text identified by its parser
   NOTICE. Existing fast_float and bigint texts are preserved.
+  Versions 2.9.2/2.13.5 contain neither parser; 2.21.3 already includes their full
+  license texts. These audited versions require no supplements.
 - Reactive Streams 1.0.4: [MIT-0 LICENSE](https://github.com/reactive-streams/reactive-streams-jvm/blob/v1.0.4/LICENSE).
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
   embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD
@@ -103,9 +119,14 @@ The root `check` task includes `testMavenLegalFiles`, which checks template and 
 mapping consistency and exercises the generator with synthetic JARs. Client-runtime
 tests check the actual shaded JAR's canonical entries, dependency documents,
 supplements and references.
+`testMavenArtifactLegalFiles` checks the CLI, an Aliyun bundle and a WAR packaging
+fixture in each web module for canonical documents and preservation of their generated
+or module-specific legal files. The WAR fixtures use separate output directories and
+do not build the JavaScript application.
 
 ```shell
 ./gradlew testMavenLegalFiles :clients:client-java-runtime:test --tests '*TestRuntimeJarLegalFiles' -PskipITs
+./gradlew testMavenArtifactLegalFiles -PskipITs
 ```
 
 Before a release, inspect the final Maven artifacts and review metadata for changed

@@ -161,10 +161,17 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
     fun supplement(id: String): String {
       val parts = id.split('/')
       val coordinate = "${parts[0]}:${parts[1]}"
-      return overrides["$coordinate:${parts[2]}"] ?: overrides[coordinate] ?: overrides["${parts[0]}:*"] ?: ""
+      val selected = overrides["$coordinate:${parts[2]}"] ?: overrides[coordinate]
+      require(selected != null || overrides.keys.none { it.startsWith("$coordinate:") }) {
+        "Unaudited Maven legal supplement version: $coordinate:${parts[2]}. Review dependencies.txt and upstream legal documents."
+      }
+      return selected ?: overrides["${parts[0]}:*"] ?: ""
     }
-    dependencyJars.files.sortedBy { ids.getValue(it.name) }.forEach { jar ->
-      val id = ids.getValue(jar.name)
+    val dependencies = dependencyJars.files.map { jar ->
+      val id = requireNotNull(ids[jar.name]) { "Missing Maven coordinate for bundled artifact: $jar" }
+      id to jar
+    }
+    dependencies.sortedBy { it.first }.forEach { (id, jar) ->
       val coordinate = id.split('/').take(2).joinToString(":")
       val group = id.substringBefore('/')
       if (group in excluded) return@forEach
@@ -206,6 +213,10 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
           require(supplement.isFile) { "Missing Maven legal supplement for $coordinate: $name" }
           add(prefix + name, supplement.readBytes())
         }
+        require(selected.isEmpty() || documents.keys.any { it.startsWith(prefix) }) {
+          "No legal documents for mapped bundled component $coordinate:${id.split('/')[2]}. " +
+            "Supply the required upstream texts in dependencies.txt; a license label alone is insufficient."
+        }
       }
     }
     var license = directory.resolve("LICENSE").readText()
@@ -220,7 +231,7 @@ abstract class GenerateJarLegalFiles : DefaultTask() {
         val coordinate = "${parts[2]}:${parts[3]}"
         val selected = supplement(parts.drop(2).joinToString("/"))
         val label = selected.substringAfter('|', "").trim()
-        license += "\n$coordinate:${parts[4]}" + if (label.isEmpty()) "\n" else " — $label\n"
+        license += "\n$coordinate:${parts[4]}" + if (label.isEmpty()) "\n" else " - $label\n"
         license += "Licensing and attribution documents:\n" + paths.joinToString("\n") { "  $it" } + "\n"
       }
     }
@@ -812,7 +823,7 @@ subprojects {
   }
   val javadocLegalFiles = tasks.register<GenerateJarLegalFiles>("generateJavadocLegalFiles") {
     templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
-    // The copied Spark transform implementation is private and absent from Javadoc.
+    // SparkTransformConverter's Iceberg-derived findWidth method is private and absent from Javadoc.
     sourceNotices.set(
       when (project.path) {
         ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }

@@ -17,6 +17,11 @@
 #
 # Supplement only dependencies actually included in the artifact.
 # Sources and audited versions are documented in README.md.
+com.aliyun.oss:aliyun-sdk-oss:3.10.2=LICENSE.aliyun-inieditor | Aliyun OSS (Apache-2.0), including IniEditor (BSD-2-Clause)
+com.aliyun.oss:aliyun-sdk-oss:3.13.0=LICENSE.aliyun-inieditor | Aliyun OSS (Apache-2.0), including IniEditor (BSD-2-Clause)
+com.google.api-client:google-api-client:1.24.1=LICENSE.google-cloudshell | Google API Client (Apache-2.0), including CloudShellCredential (BSD-3-Clause)
+com.google.auth:google-auth-library-credentials:1.28.0=LICENSE.google-auth | Google Auth Library (BSD-3-Clause)
+com.google.auth:google-auth-library-oauth2-http:1.28.0=LICENSE.google-auth | Google Auth Library (BSD-3-Clause)
 com.azure:*=LICENSE.azure | Microsoft Azure SDK (MIT)
 com.microsoft.azure:msal4j=LICENSE.msal | Microsoft Authentication Library (MIT)
 com.microsoft.azure:msal4j-persistence-extension=LICENSE.msal | Microsoft Authentication persistence extension (MIT)
@@ -45,5 +50,11 @@ org.checkerframework:checker-qual= | Checker Framework qualifiers (MIT)
 org.codehaus.woodstox:stax2-api= | StAX2 API (BSD-2-Clause)
 org.slf4j:*= | SLF4J (MIT)
 net.java.dev.jna:*= | Java Native Access (Apache-2.0 selected from dual license)
+# Version-specific rules require an explicit entry for every audited version.
+# These older versions do not contain FastDoubleParser or Schubfach.
+com.fasterxml.jackson.core:jackson-core:2.9.2=
+com.fasterxml.jackson.core:jackson-core:2.13.5=
 com.fasterxml.jackson.core:jackson-core:2.15.2=LICENSE.fastdoubleparser-0.9.0,LICENSE.schubfach | Jackson Core (Apache-2.0), including FastDoubleParser 0.9.0 and Schubfach (MIT), bigint (BSD-2-Clause)
 com.fasterxml.jackson.core:jackson-core:2.18.3=LICENSE.fastdoubleparser-1.0.90,LICENSE.schubfach,LICENSE.fastdoubleparser-boost | Jackson Core (Apache-2.0), including FastDoubleParser 1.0.90 and Schubfach (MIT), fast_double_parser (BSL-1.0), fast_float (MIT), bigint (BSD-2-Clause)
+# This version already includes the complete parser license texts.
+com.fasterxml.jackson.core:jackson-core:2.21.3=
