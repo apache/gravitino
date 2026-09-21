@@ -56,6 +56,18 @@ public class TestBaseCatalogPropertiesMetadata {
   }
 
   @Test
+  void testConnectorCredentialKeysAreDeclaredForAllCatalogs() {
+    assertTrue(metadata.containsProperty("aws-access-key-id"));
+    assertFalse(metadata.isHiddenProperty("aws-access-key-id"));
+    assertTrue(metadata.isHiddenProperty("aws-secret-access-key"));
+    assertTrue(metadata.isHiddenProperty("jdbc-password"));
+    assertTrue(metadata.isHiddenProperty("token"));
+    assertFalse(metadata.isHiddenProperty("dlf-access-key-id"));
+    assertTrue(metadata.isHiddenProperty("dlf-access-key-secret"));
+    assertTrue(metadata.isHiddenProperty("dlf-security-token"));
+  }
+
+  @Test
   void testRuntimeCopiedS3AccessKeyUsesSharedCloudMetadata() {
     PropertiesMetadata glueLikeMetadata =
         new BaseCatalogPropertiesMetadata() {

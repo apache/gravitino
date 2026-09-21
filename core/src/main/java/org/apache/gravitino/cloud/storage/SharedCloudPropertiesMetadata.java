@@ -18,14 +18,86 @@
  */
 package org.apache.gravitino.cloud.storage;
 
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.PropertyEntry;
 
-/** Shared cloud-storage credential {@link PropertyEntry} definitions for catalog metadata. */
+/**
+ * Shared credential {@link PropertyEntry} definitions merged into every catalog's properties
+ * metadata.
+ *
+ * <p>Includes cloud-storage keys plus connector-specific credential keys (Glue AWS static keys,
+ * JDBC password, Paimon REST token and DLF keys). Hidden flags match the connector that owns the
+ * key. A connector that already declares the same key keeps its own entry.
+ */
 public final class SharedCloudPropertiesMetadata {
 
-  /** Cloud credential and endpoint keys merged into every catalog's properties metadata. */
+  /**
+   * Connector-owned credential keys that are not part of the shared cloud-storage metadata maps.
+   */
+  private static final Map<String, PropertyEntry<?>> CONNECTOR_CREDENTIAL_PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
+              "aws-access-key-id",
+              stringOptionalPropertyEntry(
+                  "aws-access-key-id",
+                  "AWS access key ID for static credential authentication",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "aws-secret-access-key",
+              stringOptionalPropertyEntry(
+                  "aws-secret-access-key",
+                  "AWS secret access key paired with aws-access-key-id",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              "jdbc-password",
+              stringOptionalPropertyEntry(
+                  "jdbc-password",
+                  "JDBC password",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              "token",
+              stringOptionalPropertyEntry(
+                  "token",
+                  "Bearer token for REST catalog authentication",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              "dlf-access-key-id",
+              stringOptionalPropertyEntry(
+                  "dlf-access-key-id",
+                  "Access key ID for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "dlf-access-key-secret",
+              stringOptionalPropertyEntry(
+                  "dlf-access-key-secret",
+                  "Access key secret for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              "dlf-security-token",
+              stringOptionalPropertyEntry(
+                  "dlf-security-token",
+                  "Security token for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .build();
+
+  /** Cloud and connector credential keys merged into every catalog's properties metadata. */
   public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
@@ -33,6 +105,7 @@ public final class SharedCloudPropertiesMetadata {
           .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(CONNECTOR_CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 
   private SharedCloudPropertiesMetadata() {}
