@@ -165,8 +165,11 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    boolean existsInCache = cache.contains(ident, entityType);
-    return existsInCache || backend.exists(ident, entityType);
+    // Deliberately not answered from the cache. A per-node cache can hold an entity that another
+    // node dropped until the change log is replayed, and callers use this check to reject creates
+    // with AlreadyExists, so a stale positive here surfaces as a wrong error. The cache saves a
+    // single indexed query, which is not worth that.
+    return backend.exists(ident, entityType);
   }
 
   @Override

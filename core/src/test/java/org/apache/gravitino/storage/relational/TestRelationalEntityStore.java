@@ -364,6 +364,21 @@ public class TestRelationalEntityStore {
     Mockito.verify(poller, Mockito.never()).registerListener(Mockito.any());
   }
 
+  @Test
+  void testExistsConsultsBackendEvenOnCacheHit() throws IOException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    // A per-node cache can still hold an entity that another node has already dropped; the
+    // change log removes it only after the next poll. exists() must not turn that stale entry
+    // into a positive answer, since callers use it to reject creates with AlreadyExists.
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(cache.contains(ident, Entity.EntityType.CATALOG)).thenReturn(true);
+    FieldUtils.writeField(store, "cache", cache, true);
+    Mockito.when(backend.exists(ident, Entity.EntityType.CATALOG)).thenReturn(false);
+
+    Assertions.assertFalse(store.exists(ident, Entity.EntityType.CATALOG));
+    Mockito.verify(backend).exists(ident, Entity.EntityType.CATALOG);
+  }
+
   /**
    * Installs a cache reporting the given coherence mode plus a mock poller, and returns the poller
    * so the caller can assert on listener registration.
