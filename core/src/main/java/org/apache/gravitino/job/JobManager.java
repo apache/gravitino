@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,15 +84,6 @@ public class JobManager implements JobOperationDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(JobManager.class);
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
-
-  private static final String JOB_STAGING_DIR =
-      File.separator
-          + "%s"
-          + File.separator
-          + "%s"
-          + File.separator
-          + JobHandle.JOB_ID_PREFIX
-          + "%s";
 
   private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
 
@@ -315,13 +307,10 @@ public class JobManager implements JobOperationDispatcher {
     // recreated after the metadata transaction commits, so its parent directory is not ours to
     // delete.
     for (JobEntity job : jobs) {
-      String jobStagingPath =
-          stagingDir.getAbsolutePath()
-              + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
       try {
-        FileUtils.deleteDirectory(new File(jobStagingPath));
-      } catch (IOException e) {
-        LOG.error("Failed to delete job staging directory: {}", jobStagingPath, e);
+        FileUtils.deleteDirectory(jobStagingDir(metalake, job.jobTemplateName(), job.id()));
+      } catch (IOException | IllegalArgumentException e) {
+        LOG.error("Failed to delete job staging directory for job {}", job.name(), e);
       }
     }
 
@@ -486,6 +475,22 @@ public class JobManager implements JobOperationDispatcher {
     return requested == null ? globalMax : Math.min(requested, globalMax);
   }
 
+  private File jobStagingDir(String metalake, String jobTemplateName, long jobId) {
+    Path stagingPath = stagingDir.toPath().toAbsolutePath().normalize();
+    Path metalakeStagingPath = stagingPath.resolve(metalake).normalize();
+    Path templateStagingPath = metalakeStagingPath.resolve(jobTemplateName).normalize();
+
+    if (!metalakeStagingPath.startsWith(stagingPath)
+        || !templateStagingPath.startsWith(metalakeStagingPath)
+        || templateStagingPath.equals(metalakeStagingPath)) {
+      throw new IllegalArgumentException(
+          "Job template name '%s' resolves outside the metalake staging directory"
+              .formatted(jobTemplateName));
+    }
+
+    return templateStagingPath.resolve(JobHandle.JOB_ID_PREFIX + jobId).toFile();
+  }
+
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
@@ -496,10 +501,7 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create staging directory.
     long jobId = idGenerator.nextId();
-    String jobStagingPath =
-        stagingDir.getAbsolutePath()
-            + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
-    File jobStagingDir = new File(jobStagingPath);
+    File jobStagingDir = jobStagingDir(metalake, jobTemplateName, jobId);
     try {
       Files.createDirectories(jobStagingDir.toPath());
     } catch (IOException e) {
@@ -822,13 +824,10 @@ public class JobManager implements JobOperationDispatcher {
               entityStore.delete(
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
 
-              String jobStagingPath =
-                  stagingDir.getAbsolutePath()
-                      + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
-              File jobStagingDir = new File(jobStagingPath);
+              File jobStagingDir = jobStagingDir(metalake, job.jobTemplateName(), job.id());
               if (jobStagingDir.exists()) {
                 FileUtils.deleteDirectory(jobStagingDir);
-                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
+                LOG.info("Deleted job staging directory {} for job {}", jobStagingDir, job.name());
               }
             } catch (OptimisticLockException e) {
               // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
@@ -837,7 +836,7 @@ public class JobManager implements JobOperationDispatcher {
                   "Job {} under metalake {} changed concurrently; deferring cleanup",
                   job.name(),
                   metalake);
-            } catch (IOException e) {
+            } catch (IOException | IllegalArgumentException e) {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }
           });

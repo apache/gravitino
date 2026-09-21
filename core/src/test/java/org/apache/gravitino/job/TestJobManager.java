@@ -796,6 +796,28 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobRejectsStagingPathTraversal() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity unsafeTemplate =
+        newShellJobTemplateEntity("..", "A job template that escapes its staging directory");
+    when(jobManager.getJobTemplate(metalake, unsafeTemplate.name())).thenReturn(unsafeTemplate);
+    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.runJob(metalake, unsafeTemplate.name(), Collections.emptyMap()));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("outside the metalake staging directory"));
+    verify(jobExecutor, never()).submitJob(any());
+  }
+
+  @Test
   public void testRunJobPropagatesJobExecutorRejection() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
