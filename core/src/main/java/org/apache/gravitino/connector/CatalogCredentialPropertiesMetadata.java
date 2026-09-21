@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector;
 
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -30,8 +31,9 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
  *
  * <p>Hidden is defined only here. Glue and Paimon metadata reference these entries instead of
  * setting hidden again. {@link org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata}
- * merges this map into catalogs that do not already declare the key. JDBC user and password stay on
- * the JDBC, Iceberg, and Paimon catalogs, because they are not cloud credentials.
+ * merges {@link #PROPERTY_ENTRIES} into catalogs that do not already declare the key.
+ * {@code aws-region} is defined here for Glue to reference, but it is not in {@link
+ * #PROPERTY_ENTRIES}: it is required, so merging it would reject catalogs that are not Glue.
  */
 public final class CatalogCredentialPropertiesMetadata {
 
@@ -54,6 +56,16 @@ public final class CatalogCredentialPropertiesMetadata {
           false /* immutable */,
           null /* defaultValue */,
           true /* hidden */);
+
+  /**
+   * AWS region for the Glue Data Catalog. Required and immutable. Not merged into every catalog.
+   */
+  public static final PropertyEntry<String> AWS_REGION =
+      stringRequiredPropertyEntry(
+          GlueConstants.AWS_REGION,
+          "AWS region for the Glue Data Catalog (e.g. us-east-1)",
+          true /* immutable */,
+          false /* hidden */);
 
   /** Paimon REST and DLF credential keys, including non-secret companions. */
   public static final Map<String, PropertyEntry<?>> PAIMON_REST_PROPERTY_ENTRIES =

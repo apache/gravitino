@@ -35,7 +35,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata;
-import org.apache.gravitino.connector.GlueCatalogPropertyEntries;
 import org.apache.gravitino.connector.PropertyEntry;
 
 /** Properties metadata for the AWS Glue Data Catalog connector catalog-level configuration. */
@@ -43,11 +42,27 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       ImmutableMap.<String, PropertyEntry<?>>builder()
-          .put(AWS_REGION, GlueCatalogPropertyEntries.AWS_REGION)
-          .put(AWS_GLUE_CATALOG_ID, GlueCatalogPropertyEntries.AWS_GLUE_CATALOG_ID)
+          .put(AWS_REGION, CatalogCredentialPropertiesMetadata.AWS_REGION)
+          .put(
+              AWS_GLUE_CATALOG_ID,
+              stringOptionalPropertyEntry(
+                  AWS_GLUE_CATALOG_ID,
+                  "The 12-digit AWS account ID that owns the Glue catalog."
+                      + " When omitted, defaults to the caller's AWS account ID.",
+                  true /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(AWS_ACCESS_KEY_ID, CatalogCredentialPropertiesMetadata.AWS_ACCESS_KEY_ID)
           .put(AWS_SECRET_ACCESS_KEY, CatalogCredentialPropertiesMetadata.AWS_SECRET_ACCESS_KEY)
-          .put(AWS_GLUE_ENDPOINT, GlueCatalogPropertyEntries.AWS_GLUE_ENDPOINT)
+          .put(
+              AWS_GLUE_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  AWS_GLUE_ENDPOINT,
+                  "Custom Glue endpoint URL for VPC endpoints or LocalStack testing"
+                      + " (e.g. http://localhost:4566)",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               DEFAULT_TABLE_FORMAT,
               stringOptionalPropertyEntry(
