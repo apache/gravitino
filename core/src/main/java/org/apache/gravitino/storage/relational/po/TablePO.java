@@ -96,7 +96,14 @@ public class TablePO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
+        && Objects.equal(getFormat(), tablePO.getFormat())
+        && Objects.equal(getProperties(), tablePO.getProperties())
+        && Objects.equal(getPartitions(), tablePO.getPartitions())
+        && Objects.equal(getSortOrders(), tablePO.getSortOrders())
+        && Objects.equal(getDistribution(), tablePO.getDistribution())
+        && Objects.equal(getIndexes(), tablePO.getIndexes())
+        && Objects.equal(getComment(), tablePO.getComment());
   }
 
   @Override
@@ -110,7 +117,14 @@ public class TablePO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt());
+        getDeletedAt(),
+        getFormat(),
+        getProperties(),
+        getPartitions(),
+        getSortOrders(),
+        getDistribution(),
+        getIndexes(),
+        getComment());
   }
 
   public static class Builder {
