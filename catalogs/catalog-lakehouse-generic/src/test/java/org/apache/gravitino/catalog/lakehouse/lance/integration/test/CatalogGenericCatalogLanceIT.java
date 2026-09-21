@@ -423,6 +423,82 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  public void testAddNullableColumnBackfillsNull() throws Exception {
+    String addColumnTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, addColumnTableName);
+    String tableLocation = String.format("%s/%s/%s", tempDirectory, schemaName, addColumnTableName);
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            createColumns(),
+            TABLE_COMMENT,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      SourcedTransaction transaction =
+          dataset
+              .newTransactionBuilder()
+              .operation(
+                  Append.builder()
+                      .fragments(
+                          createFragmentMetadata(
+                              tableLocation,
+                              List.of(
+                                  new LanceDataValue(1, 100L, "first"),
+                                  new LanceDataValue(2, 200L, "second")),
+                              dataset.getSchema()))
+                      .build())
+              .transactionProperties(Map.of())
+              .build();
+      try (Dataset ignored = transaction.commit()) {
+        // The committed dataset is closed after the historical rows have been written.
+      }
+    }
+
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"new_nullable_col"}, Types.StringType.get(), "nullable column"));
+
+    Assertions.assertEquals(4, alteredTable.columns().length);
+    Assertions.assertEquals("new_nullable_col", alteredTable.columns()[3].name());
+    Assertions.assertEquals("nullable column", alteredTable.columns()[3].comment());
+
+    int rowCount = 0;
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build();
+        LanceScanner scanner =
+            dataset.newScan(
+                new ScanOptions.Builder().columns(List.of("new_nullable_col")).build());
+        ArrowReader reader = scanner.scanBatches()) {
+      Field addedStringField = dataset.getSchema().findField("new_nullable_col");
+      Assertions.assertNotNull(addedStringField);
+      Assertions.assertTrue(addedStringField.isNullable());
+      Assertions.assertEquals(new ArrowType.Utf8(), addedStringField.getType());
+
+      while (reader.loadNextBatch()) {
+        VectorSchemaRoot root = reader.getVectorSchemaRoot();
+        VarCharVector stringVector = (VarCharVector) root.getVector("new_nullable_col");
+        for (int i = 0; i < root.getRowCount(); i++) {
+          Assertions.assertTrue(stringVector.isNull(i));
+          rowCount++;
+        }
+      }
+    }
+    Assertions.assertEquals(2, rowCount);
+  }
+
+  @Test
   void testVersionCheckRefreshKeepsColumnTagsAndComments() {
     String refreshCatalogName = GravitinoITUtils.genRandomName("lance_version_check_catalog");
     Catalog refreshCatalog =
