@@ -204,16 +204,6 @@ if [[ "$1" == "package" ]]; then
   echo "Packaging release source tarballs"
   cp -r gravitino gravitino-$GRAVITINO_VERSION-src
 
-  # Keep Web WAR legal documents as inputs for builds from the source archive.
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.iceberg
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.iceberg
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.lance
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.lance
-
   rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src
   echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour --output gravitino-$GRAVITINO_VERSION-src.tar.gz.asc \
