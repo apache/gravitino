@@ -28,9 +28,10 @@ import org.apache.gravitino.connector.PropertyEntry;
  * Shared credential {@link PropertyEntry} definitions merged into every catalog's properties
  * metadata.
  *
- * <p>Includes cloud-storage keys plus connector-specific credential keys (Glue AWS static keys,
- * JDBC password, Paimon REST token and DLF keys). Hidden flags match the connector that owns the
- * key. A connector that already declares the same key keeps its own entry.
+ * <p>Includes cloud-storage keys plus connector-specific credential keys and their non-secret
+ * companions (Glue AWS static keys, JDBC user/password, Paimon REST token provider/token, and DLF
+ * keys). Hidden flags match the connector that owns the key. A connector that already declares the
+ * same key keeps its own entry.
  */
 public final class SharedCloudPropertiesMetadata {
 
@@ -56,6 +57,14 @@ public final class SharedCloudPropertiesMetadata {
                   null /* defaultValue */,
                   true /* hidden */))
           .put(
+              "jdbc-user",
+              stringOptionalPropertyEntry(
+                  "jdbc-user",
+                  "JDBC user",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
               "jdbc-password",
               stringOptionalPropertyEntry(
                   "jdbc-password",
@@ -63,6 +72,14 @@ public final class SharedCloudPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              "token-provider",
+              stringOptionalPropertyEntry(
+                  "token-provider",
+                  "Token provider type for REST catalog authentication",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               "token",
               stringOptionalPropertyEntry(
@@ -95,6 +112,22 @@ public final class SharedCloudPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              "dlf-token-path",
+              stringOptionalPropertyEntry(
+                  "dlf-token-path",
+                  "Token path for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              "dlf-token-loader",
+              stringOptionalPropertyEntry(
+                  "dlf-token-loader",
+                  "Token loader for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   /** Cloud and connector credential keys merged into every catalog's properties metadata. */

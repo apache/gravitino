@@ -60,11 +60,19 @@ public class TestBaseCatalogPropertiesMetadata {
     assertTrue(metadata.containsProperty("aws-access-key-id"));
     assertFalse(metadata.isHiddenProperty("aws-access-key-id"));
     assertTrue(metadata.isHiddenProperty("aws-secret-access-key"));
+    assertTrue(metadata.containsProperty("jdbc-user"));
+    assertFalse(metadata.isHiddenProperty("jdbc-user"));
     assertTrue(metadata.isHiddenProperty("jdbc-password"));
+    assertTrue(metadata.containsProperty("token-provider"));
+    assertFalse(metadata.isHiddenProperty("token-provider"));
     assertTrue(metadata.isHiddenProperty("token"));
     assertFalse(metadata.isHiddenProperty("dlf-access-key-id"));
     assertTrue(metadata.isHiddenProperty("dlf-access-key-secret"));
     assertTrue(metadata.isHiddenProperty("dlf-security-token"));
+    assertTrue(metadata.containsProperty("dlf-token-path"));
+    assertFalse(metadata.isHiddenProperty("dlf-token-path"));
+    assertTrue(metadata.containsProperty("dlf-token-loader"));
+    assertFalse(metadata.isHiddenProperty("dlf-token-loader"));
   }
 
   @Test
