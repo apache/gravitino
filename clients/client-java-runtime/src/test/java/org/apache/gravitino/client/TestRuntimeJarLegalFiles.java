@@ -89,13 +89,14 @@ class TestRuntimeJarLegalFiles {
   @Test
   void testMissingBundledLicensesAreSupplemented() throws IOException {
     try (JarFile jar = artifact()) {
-      assertTrue(
-          readSuffix(jar, "/LICENSE.jsr305-concurrent").contains("Copyright (c) 2005 Brian Goetz"));
-      assertTrue(
-          readSuffix(jar, "/LICENSE.fastdoubleparser-0.9.0").contains("Copyright (c) 2023 Werner"));
-      assertTrue(
-          readSuffix(jar, "/LICENSE.schubfach")
-              .contains("Copyright 2018-2020 Raffaello Giulietti"));
+      for (String name :
+          Arrays.asList(
+              "LICENSE.jsr305-concurrent", "LICENSE.fastdoubleparser-0.9.0", "LICENSE.schubfach")) {
+        assertArrayEquals(
+            Files.readAllBytes(Paths.get(System.getProperty("legalTemplates"), name)),
+            readBytesBySuffix(jar, "/" + name),
+            name);
+      }
       assertTrue(readEntry(jar, "META-INF/LICENSE").contains("CC-BY-2.5"));
     }
   }
@@ -128,14 +129,14 @@ class TestRuntimeJarLegalFiles {
     return new JarFile(System.getProperty("artifactPath"));
   }
 
-  private static String readSuffix(JarFile jar, String suffix) throws IOException {
+  private static byte[] readBytesBySuffix(JarFile jar, String suffix) throws IOException {
     String path =
         jar.stream()
             .map(JarEntry::getName)
             .filter(name -> name.endsWith(suffix))
             .findFirst()
             .orElseThrow(() -> new AssertionError("Missing legal document ending in " + suffix));
-    return readEntry(jar, path);
+    return readBytes(jar, path);
   }
 
   private static String readEntry(JarFile jar, String path) throws IOException {

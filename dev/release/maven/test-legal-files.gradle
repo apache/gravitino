@@ -121,18 +121,8 @@ def legalTests = tasks.register('testMavenLegalFiles') {
       }
     }
     // The Javadoc exclusion relies on the copied findWidth implementation remaining private.
-    def requirePrivateFindWidth = { String source ->
-      if (!(source =~ /(?m)^\s*private\s+static\s+int\s+findWidth\s*\(/).find()) {
-        throw new IllegalArgumentException('Review the Spark Javadoc Iceberg notice: findWidth is no longer private or its declaration changed')
-      }
-    }
     def sparkTransforms = file('spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/SparkTransformConverter.java').text
-    requirePrivateFindWidth(sparkTransforms)
-    ['public', 'protected', ''].each { visibility ->
-      expectFailure('Review the Spark Javadoc Iceberg notice') {
-        requirePrivateFindWidth(sparkTransforms.replace('private static int findWidth', "${visibility} static int findWidth"))
-      }
-    }
+    assert (sparkTransforms =~ /(?m)^\s*private\s+static\s+int\s+findWidth\s*\(/).find(): 'Review the Spark Javadoc Iceberg notice: findWidth is no longer private or its declaration changed'
     def selector = generatorType.getField('Companion').get(null)
     ['META-INF/LICENSE', 'META-INF/NOTICE.markdown', 'META-INF/FastDoubleParser-LICENSE',
      'THIRD-PARTY-NOTICES', 'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
