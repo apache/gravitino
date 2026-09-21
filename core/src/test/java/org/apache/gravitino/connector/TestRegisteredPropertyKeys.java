@@ -32,7 +32,11 @@ public class TestRegisteredPropertyKeys {
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("dlf-access-key-id"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("credential-providers"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-unknown"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-warehouse"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("location-"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("placeholder-"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("location-warehouse"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("location-password"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("placeholder-token"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("bootstrap.servers"));
     Assertions.assertTrue(RegisteredPropertyKeys.isRegistered("metastore.uris"));
     Assertions.assertFalse(RegisteredPropertyKeys.isRegistered("typo-access-key"));
@@ -56,6 +60,8 @@ public class TestRegisteredPropertyKeys {
     Assertions.assertTrue(RegisteredPropertyKeys.isReserved("in-use"));
     Assertions.assertTrue(RegisteredPropertyKeys.isReserved("PartitionName"));
     Assertions.assertTrue(RegisteredPropertyKeys.isReserved("presto_view"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isReserved("write.distribution-mode"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isHidden("write.distribution-mode"));
     Assertions.assertFalse(RegisteredPropertyKeys.isReserved("s3-access-key-id"));
   }
 
@@ -75,7 +81,10 @@ public class TestRegisteredPropertyKeys {
     Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("s3-access-key-id"));
     Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("credential-providers"));
     Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("aws-access-key-id"));
-    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("location-warehouse"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("location-"));
+    Assertions.assertTrue(RegisteredPropertyKeys.isOfficialPropertyKey("lance.storage."));
+    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("location-warehouse"));
+    Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("lance.storage.password"));
     Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey("typo-access-key"));
     Assertions.assertFalse(RegisteredPropertyKeys.isOfficialPropertyKey(null));
   }
@@ -128,7 +137,15 @@ public class TestRegisteredPropertyKeys {
       "rest-client-socket-timeout-ms",
       "authentication.kerberos.check-interval-sec",
       "authentication.kerberos.keytab-fetch-timeout-sec",
-      "s3-credential-list-location-prefix"
+      "s3-credential-list-location-prefix",
+      "jdbc-url",
+      "jdbc-database",
+      "jdbc.pool.min-size",
+      "jdbc.pool.max-size",
+      "jdbc.pool.test-on-borrow",
+      "jdbc.pool.max-wait-ms",
+      "lance.storage.",
+      "write.distribution-mode"
     };
     for (String key : keys) {
       Assertions.assertTrue(RegisteredPropertyKeys.isRegistered(key), () -> "missing: " + key);

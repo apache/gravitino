@@ -32,10 +32,8 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREF
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
@@ -51,9 +49,11 @@ import org.apache.gravitino.credential.config.CredentialConfig;
  *
  * <p>Like {@link CredentialConfig#CREDENTIAL_PROPERTY_ENTRIES}, this class exposes a {@link
  * #PROPERTY_ENTRIES} map. Name-based (fuzzy) masking and secret recovery treat only keys that are
- * <em>not</em> in this map (and do not match a registered property prefix) as unknown. For
- * registered keys omitted from the current catalog {@link PropertiesMetadata}, the {@link
- * PropertyEntry} hidden / reserved flags from this map still apply.
+ * <em>not</em> an exact entry in this map as unknown. Prefix rules such as {@code location-} stay
+ * in the owning {@link PropertiesMetadata} and are not expanded here, so an undeclared sensitive
+ * name like {@code location-password} is still masked on catalogs that do not declare that prefix.
+ * For registered keys omitted from the current catalog metadata, the {@link PropertyEntry} hidden /
+ * reserved flags from this map still apply.
  *
  * <p>Shared credential and cloud-storage entries are reused from existing metadata modules.
  * Connector-specific keys that may appear outside their owning catalog metadata (for example Glue
@@ -103,8 +103,8 @@ public final class RegisteredPropertyKeys {
               reserved(PROPERTY_IN_USE),
               reservedHidden(PROPERTY_METALAKE_IN_USE),
               reservedHidden(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN),
-              prefix(PROPERTY_MULTIPLE_LOCATIONS_PREFIX),
-              prefix(PROPERTY_LOCATION_PLACEHOLDER_PREFIX),
+              optional(PROPERTY_MULTIPLE_LOCATIONS_PREFIX),
+              optional(PROPERTY_LOCATION_PLACEHOLDER_PREFIX),
               // Hive / Kafka catalog connection
               optional("metastore.uris"),
               optional("bootstrap.servers"),
@@ -165,9 +165,15 @@ public final class RegisteredPropertyKeys {
               optional("io-impl"),
               optional("data-access"),
               optional("table-metadata-cache-impl"),
+              optional("jdbc-url"),
+              optional("jdbc-database"),
               optional("jdbc-user"),
               optionalHidden("jdbc-password"),
               optional("jdbc-driver"),
+              optional("jdbc.pool.min-size"),
+              optional("jdbc.pool.max-size"),
+              optionalHidden("jdbc.pool.test-on-borrow"),
+              optional("jdbc.pool.max-wait-ms"),
               optional("uri"),
               optionalHidden("token"),
               optional("token-provider"),
@@ -191,6 +197,7 @@ public final class RegisteredPropertyKeys {
               optional("lance.declared"),
               optional("lance.register"),
               optional("lance.schema-refresh-mode"),
+              optional("lance.storage."),
               optional("lance.version"),
               // Doris
               optional("bloom_filter_columns"),
@@ -222,6 +229,7 @@ public final class RegisteredPropertyKeys {
               optional("catalog-backend"),
               optional("table-type"),
               optional("format-version"),
+              reserved("write.distribution-mode"),
               optional("replication_num"),
               optional("engine"),
               optional("partition-count"),
@@ -252,34 +260,17 @@ public final class RegisteredPropertyKeys {
           .putAll(CONNECTOR_PROPERTY_ENTRIES)
           .build();
 
-  private static final Set<String> REGISTERED_PREFIXES =
-      PROPERTY_ENTRIES.values().stream()
-          .filter(PropertyEntry::isPrefix)
-          .map(PropertyEntry::getName)
-          .collect(ImmutableSet.toImmutableSet());
-
   private RegisteredPropertyKeys() {}
 
   /**
-   * Returns whether {@code key} is a registered Gravitino property name (exact match or a
-   * registered property prefix).
+   * Returns whether {@code key} is an exact registered Gravitino property name. Prefix expansion
+   * belongs to the owning {@link PropertiesMetadata}, not this registry.
    *
    * @param key property key
    * @return true when the key is registered
    */
   public static boolean isRegistered(@Nullable String key) {
-    if (StringUtils.isEmpty(key)) {
-      return false;
-    }
-    if (PROPERTY_ENTRIES.containsKey(key)) {
-      return true;
-    }
-    for (String prefix : REGISTERED_PREFIXES) {
-      if (key.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
+    return StringUtils.isNotEmpty(key) && PROPERTY_ENTRIES.containsKey(key);
   }
 
   /**
@@ -294,8 +285,7 @@ public final class RegisteredPropertyKeys {
 
   /**
    * Returns whether {@code key} is an official Gravitino property for connector metadata checks —
-   * either a shared cloud/credential key or any {@linkplain #isRegistered(String) registered} key
-   * (exact or prefix).
+   * either a shared cloud/credential key or any {@linkplain #isRegistered(String) registered} key.
    *
    * @param key property key
    * @return true when the key is known to Gravitino
@@ -333,7 +323,7 @@ public final class RegisteredPropertyKeys {
     return entry != null && entry.isReserved();
   }
 
-  /** Returns the immutable map of exact registered property entries (excludes prefix matches). */
+  /** Returns the immutable map of registered property entries. */
   public static Map<String, PropertyEntry<?>> propertyEntries() {
     return PROPERTY_ENTRIES;
   }
@@ -359,10 +349,5 @@ public final class RegisteredPropertyKeys {
   /** Reserved hidden string property for registry membership / masking flags. */
   private static PropertyEntry<String> reservedHidden(String name) {
     return PropertyEntry.stringReservedPropertyEntry(name, name, true);
-  }
-
-  /** Immutable property-prefix entry for registry membership / prefix matching. */
-  private static PropertyEntry<String> prefix(String name) {
-    return PropertyEntry.stringImmutablePropertyPrefixEntry(name, name, false, null, false, false);
   }
 }
