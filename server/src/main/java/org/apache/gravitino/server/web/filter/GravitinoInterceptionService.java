@@ -43,6 +43,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
@@ -51,6 +52,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression.MissingMetalakeResponse;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
@@ -305,11 +307,20 @@ public class GravitinoInterceptionService implements InterceptionService {
                       "job.namespace must identify an existing metalake: %s", metalakeIdent.name()),
                   e));
         }
+        if (allowMissingMetalakeResponse(expressionAnnotation)) {
+          return Optional.of(buildMissingMetalakeResponse(expressionAnnotation, e));
+        }
         // Not a real authz denial — metalake is absent, not forbidden. Skip event dispatch;
         // HttpAuditFilter will emit a generic HttpRequestFailureEvent for this 403.
         return Optional.of(
             buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression));
       } catch (ForbiddenException ex) {
+        if (allowMissingMetalakeResponse(expressionAnnotation)
+            && !GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(metalakeIdent)) {
+          NoSuchMetalakeException missingMetalake =
+              new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent.name());
+          return Optional.of(buildMissingMetalakeResponse(expressionAnnotation, missingMetalake));
+        }
         LOG.warn(
             "User validation failed - User: {}, Metalake: {}, Reason: {}",
             currentUser,
@@ -327,6 +338,21 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
 
       return Optional.empty();
+    }
+
+    private boolean allowMissingMetalakeResponse(AuthorizationExpression expressionAnnotation) {
+      return expressionAnnotation.missingMetalakeResponseForServiceAdmin()
+              != MissingMetalakeResponse.FORBIDDEN
+          && GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer().isServiceAdmin();
+    }
+
+    private Response buildMissingMetalakeResponse(
+        AuthorizationExpression expressionAnnotation, NoSuchMetalakeException exception) {
+      if (expressionAnnotation.missingMetalakeResponseForServiceAdmin()
+          == MissingMetalakeResponse.NOT_FOUND) {
+        return Utils.notFound(exception.getMessage(), exception);
+      }
+      return Utils.ok(new DropResponse(false));
     }
 
     private Response buildNoAuthResponse(

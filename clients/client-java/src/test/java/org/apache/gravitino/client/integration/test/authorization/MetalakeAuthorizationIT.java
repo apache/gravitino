@@ -28,6 +28,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -167,6 +168,17 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
           normalUserClient.dropMetalake(testMetalake3, true);
         });
     serviceAdminClient.dropMetalake(testMetalake3, true);
+  }
+
+  @Test
+  @Order(6)
+  public void testMissingMetalakeForServiceAdmin() {
+    assertThrows(
+        NoSuchMetalakeException.class, () -> serviceAdminClient.loadMetalake(testMetalake3));
+    Assertions.assertFalse(serviceAdminClient.dropMetalake(testMetalake3, true));
+    assertThrows(ForbiddenException.class, () -> normalUserClient.loadMetalake(testMetalake3));
+    assertThrows(
+        ForbiddenException.class, () -> normalUserClient.dropMetalake(testMetalake3, true));
   }
 
   private void assertMetalakeEquals(

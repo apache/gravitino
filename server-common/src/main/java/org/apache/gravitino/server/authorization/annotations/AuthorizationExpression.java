@@ -31,6 +31,16 @@ import org.apache.gravitino.MetadataObject;
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AuthorizationExpression {
+  /** Response to return when a service admin accesses a missing metalake. */
+  enum MissingMetalakeResponse {
+    /** Keep the default authorization denial. */
+    FORBIDDEN,
+    /** Report the missing metalake. */
+    NOT_FOUND,
+    /** Return a successful drop response with {@code dropped=false}. */
+    DROP_FALSE
+  }
+
   /**
    * The expression to evaluate for authorization, which represents multiple privileges.
    *
@@ -76,4 +86,12 @@ public @interface AuthorizationExpression {
    * @return expression that permits existence checks when primary denies
    */
   String allowCheckExistence() default "";
+
+  /**
+   * Response to return for a missing metalake when the caller is a service admin.
+   *
+   * @return the response for a missing metalake
+   */
+  MissingMetalakeResponse missingMetalakeResponseForServiceAdmin() default
+      MissingMetalakeResponse.FORBIDDEN;
 }

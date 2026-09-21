@@ -56,6 +56,7 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression.MissingMetalakeResponse;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
@@ -150,7 +151,8 @@ public class MetalakeOperations {
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION)
+      expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION,
+      missingMetalakeResponseForServiceAdmin = MissingMetalakeResponse.NOT_FOUND)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
@@ -259,7 +261,9 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-metalake", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER",
+      missingMetalakeResponseForServiceAdmin = MissingMetalakeResponse.DROP_FALSE)
   public Response dropMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
