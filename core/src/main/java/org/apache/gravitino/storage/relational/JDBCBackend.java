@@ -1092,14 +1092,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
 
   private static void insertEntityChange(
       NameIdentifier ident, Entity.EntityType entityType, OperateType operateType) {
+    String metalake = NameIdentifierUtil.getMetalake(ident);
+    String fullName = EntityChangeLogNameIdentifierCodec.encode(ident);
     SessionUtils.doWithoutCommit(
         EntityChangeLogMapper.class,
-        mapper ->
-            mapper.insertEntityChange(
-                NameIdentifierUtil.getMetalake(ident),
-                entityType.name(),
-                EntityChangeLogNameIdentifierCodec.encode(ident),
-                operateType));
+        mapper -> mapper.insertEntityChange(metalake, entityType.name(), fullName, operateType));
+    EntityChangeLogDiagnostics.logAppended(metalake, entityType.name(), operateType, fullName);
   }
 
   private static boolean shouldRecordEntityDrop(Entity.EntityType entityType) {

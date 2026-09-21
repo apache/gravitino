@@ -21,9 +21,12 @@ package org.apache.gravitino.storage.relational;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +65,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheChangeLogListener.class);
 
   private final EntityCache cache;
+  @Nullable private final EntityChangeLogMetricsSource metrics;
 
   /**
    * Creates a listener that invalidates the given entity store cache.
@@ -69,49 +73,99 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
    * @param cache the per-node entity store cache to keep coherent
    */
   public EntityCacheChangeLogListener(EntityCache cache) {
+    this(cache, null);
+  }
+
+  /**
+   * Creates a listener with metrics shared with the poller.
+   *
+   * @param cache the per-node entity store cache
+   * @param metrics process-local change log metrics, or null when metrics are unavailable
+   */
+  public EntityCacheChangeLogListener(
+      EntityCache cache, @Nullable EntityChangeLogMetricsSource metrics) {
     Preconditions.checkArgument(cache != null, "cache cannot be null");
     this.cache = cache;
+    this.metrics = metrics;
   }
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
+    long startNanos = System.nanoTime();
+    int applied = 0;
+    int skipped = 0;
     for (EntityChangeRecord change : changes) {
       EntityType type = entityType(change);
       NameIdentifier ident = identifier(change);
       if (type == null || ident == null) {
         // Already logged by the parsing helpers. A row that names no entity cannot invalidate
         // anything, so skipping it leaves no stale entry behind.
+        skipped++;
         continue;
       }
 
       try {
-        LOG.debug("Invalidating entity cache due to entity change log: {} ({})", ident, type);
+        LOG.debug(
+            "entityChangeLog invalidate changeId={} entityType={} operateType={} ident={} fullName={}",
+            change.getId(),
+            type,
+            change.getOperateType(),
+            ident,
+            change.getFullName());
         cache.invalidate(ident, type);
+        applied++;
+        if (metrics != null) {
+          metrics.recordsApplied(1);
+        }
       } catch (RuntimeException e) {
+        if (metrics != null) {
+          metrics.invalidationFailed();
+        }
         // Dropping a single invalidation would leave this node serving that entity stale until it
         // expires. Clearing the whole cache is the safe superset, and it also covers the rest of
         // this batch, so there is nothing left to replay.
         LOG.error(
-            "Failed to invalidate {} ({}) from the entity change log, clearing the local entity "
-                + "cache to stay coherent",
-            ident,
+            "entityChangeLog targeted invalidation failed changeId={} entityType={} "
+                + "operateType={} ident={} fullName={}; clearing full local entity cache",
+            change.getId(),
             type,
+            change.getOperateType(),
+            ident,
+            change.getFullName(),
             e);
         cache.clear();
+        if (metrics != null) {
+          metrics.fallbackCleared();
+        }
+        LOG.debug(
+            "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=true durationMs={}",
+            changes.size(),
+            applied,
+            skipped,
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
         return;
       }
     }
+    LOG.debug(
+        "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=false durationMs={}",
+        changes.size(),
+        applied,
+        skipped,
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
   }
 
   private EntityType entityType(EntityChangeRecord change) {
     if (change.getEntityType() == null) {
-      LOG.warn("Invalid entity type in entity change log: null");
+      LOG.warn("entityChangeLog malformed changeId={} field=entityType value=null", change.getId());
       return null;
     }
     try {
       return EntityType.valueOf(change.getEntityType().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
-      LOG.warn("Unknown entity type in entity change log: {}", change.getEntityType());
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=entityType value={}",
+          change.getId(),
+          change.getEntityType());
       return null;
     }
   }
@@ -119,13 +173,20 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
   private NameIdentifier identifier(EntityChangeRecord change) {
     String fullName = change.getFullName();
     if (fullName == null || fullName.isEmpty()) {
-      LOG.warn("Invalid full name in entity change log: {}", fullName);
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=fullName value={}",
+          change.getId(),
+          fullName);
       return null;
     }
     try {
       return EntityChangeLogNameIdentifierCodec.decode(fullName);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Undecodable full name in entity change log: {}", fullName, e);
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=fullName value={}",
+          change.getId(),
+          fullName,
+          e);
       return null;
     }
   }

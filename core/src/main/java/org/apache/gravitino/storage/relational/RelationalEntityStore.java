@@ -38,6 +38,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -53,6 +54,8 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -74,6 +77,7 @@ public class RelationalEntityStore
   private EntityChangeLogPoller entityChangeLogPoller;
   private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
+  private EntityChangeLogMetricsSource changeLogMetrics;
 
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
   // caches have no per-node copy to invalidate, so no listener is registered.
@@ -101,8 +105,14 @@ public class RelationalEntityStore
 
     // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
     // to local listeners, while cleanup independently removes records beyond the retention period.
+    this.changeLogMetrics = new EntityChangeLogMetricsSource();
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.register(changeLogMetrics);
+    }
     this.entityChangeLogPoller =
-        new EntityChangeLogPoller(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
+        new EntityChangeLogPoller(
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS), changeLogMetrics);
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
@@ -127,7 +137,7 @@ public class RelationalEntityStore
       return;
     }
 
-    this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
+    this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache, changeLogMetrics);
     this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
   }
 
@@ -283,6 +293,10 @@ public class RelationalEntityStore
     failure = closeComponent(failure, "entity change log cleaner", entityChangeLogCleaner);
     failure = closeComponent(failure, "relational garbage collector", garbageCollector);
     failure = closeComponent(failure, "relational backend", backend);
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null && changeLogMetrics != null) {
+      metricsSystem.unregister(changeLogMetrics);
+    }
 
     if (failure != null) {
       throw failure;

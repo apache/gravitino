@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -201,10 +202,72 @@ public class TestEntityChangeLogPoller {
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
 
-      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, metrics);
 
       Assertions.assertDoesNotThrow(poller::pollChanges);
+      Assertions.assertEquals(
+          1, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+      Assertions.assertEquals(
+          0, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
     }
+  }
+
+  @Test
+  void testSuccessfulEmptyPollSamplesTailAndUpdatesMetrics() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, MAX_ROWS)).thenReturn(List.of());
+    when(mapper.selectMaxChangeId()).thenReturn(4L);
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      new EntityChangeLogPoller(1, metrics).pollChanges();
+    }
+
+    Assertions.assertEquals(
+        4L, metrics.getMetricRegistry().getGauges().get("db-tail-id").getValue());
+    Assertions.assertEquals(
+        4L, metrics.getMetricRegistry().getGauges().get("record-lag").getValue());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().histogram("batch-size-records").getCount());
+    Assertions.assertEquals(
+        0, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
+    Assertions.assertTrue(
+        ((Number)
+                    metrics
+                        .getMetricRegistry()
+                        .getGauges()
+                        .get("seconds-since-last-successful-poll")
+                        .getValue())
+                .longValue()
+            >= 0);
+  }
+
+  @Test
+  void testListenerFailureIsAttributedAndCursorStillAdvances() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, MAX_ROWS))
+        .thenReturn(List.of(change(1L, "TABLE", "ml1.cat1.schema1.table1")));
+    when(mapper.selectMaxChangeId()).thenReturn(1L);
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, metrics);
+      poller.registerListener(
+          changes -> {
+            throw new IllegalStateException("failure");
+          });
+      poller.pollChanges();
+    }
+
+    Assertions.assertEquals(
+        1L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("listener-failures-total").getCount());
+    Assertions.assertEquals(
+        0, metrics.getMetricRegistry().counter("records-applied-total").getCount());
   }
 
   @Test

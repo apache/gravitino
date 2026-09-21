@@ -141,10 +141,13 @@ it recognizes.
 ### Running More Than One Server
 
 Servers behind a load balancer share the entity store but keep local caches. Each server polls the
-entity change log and invalidates entries that another server has modified. The defaults are safe:
-a three second poll, and a server that cannot keep its caches current exits rather than serving
-metadata it knows to be stale. Point the load balancer's health check at `GET /health/ready` so a
-server that has lost its database stops receiving traffic.
+entity change log and invalidates entries that another server has modified. The default poll
+interval is three seconds. The poller delivers each batch to every registered listener once and
+then advances its cursor; a listener that cannot invalidate a key must clear its local cache. The
+poller logs query and listener failures and continues polling. Monitor the
+[entity change log metrics](metrics.md#entity-change-log-metrics), especially record lag, time
+since the last successful poll, listener failures, and fallback clears. Point the load balancer's
+health check at `GET /health/ready` so a server that has lost its database stops receiving traffic.
 
 ## Server Configuration
 

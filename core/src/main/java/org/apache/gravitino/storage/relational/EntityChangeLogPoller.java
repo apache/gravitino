@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational;
 
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -75,6 +77,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private final List<EntityChangeLogListener> listeners = new CopyOnWriteArrayList<>();
   private final long pollIntervalSecs;
+  private final EntityChangeLogMetricsSource metrics;
 
   private ScheduledExecutorService scheduler;
   private volatile long entityPollHighWaterId = 0;
@@ -85,7 +88,18 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * @param pollIntervalSecs interval between successive polling cycles
    */
   public EntityChangeLogPoller(long pollIntervalSecs) {
+    this(pollIntervalSecs, new EntityChangeLogMetricsSource());
+  }
+
+  /**
+   * Creates a poller using the metrics source registered by the entity store.
+   *
+   * @param pollIntervalSecs interval between successive polling cycles
+   * @param metrics process-local change log metrics
+   */
+  public EntityChangeLogPoller(long pollIntervalSecs, EntityChangeLogMetricsSource metrics) {
     Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
+    this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
     this.pollIntervalSecs = pollIntervalSecs;
   }
 
@@ -134,6 +148,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
         getOrDefault(
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+    metrics.setDbTailId(entityPollHighWaterId);
+    metrics.setCursorId(entityPollHighWaterId);
     LOG.info(
         "Starting entity change log poller at high-water id {} with a {} second interval, "
             + "{} listener(s) registered",
@@ -174,9 +190,10 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   @VisibleForTesting
   void pollChanges() {
-    try {
+    try (Timer.Context ignored = metrics.timePoll()) {
       doPollChanges();
     } catch (Throwable e) {
+      metrics.pollFailed();
       // Catch Throwable, not Exception: this method is the task handed to
       // scheduleWithFixedDelay(), and anything that escapes it cancels all future runs for good,
       // silently. A listener or its recovery path can throw an Error as well as an Exception.
@@ -198,8 +215,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   @Nullable
   private BatchDelivery fetchNextDelivery() {
+    long fetchStartNanos = System.nanoTime();
     List<EntityChangeRecord> changes = fetchEntityChanges();
+    long dbTailId =
+        getOrDefault(
+            SessionUtils.getWithoutCommit(
+                EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+    metrics.setDbTailId(dbTailId);
+    metrics.pollSucceeded(changes.size());
+    long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - fetchStartNanos);
     if (changes.isEmpty()) {
+      LOG.debug(
+          "entityChangeLog poll cursor={} fetched=0 tailId={} durationMs={}",
+          entityPollHighWaterId,
+          dbTailId,
+          durationMs);
       return null;
     }
 
@@ -208,11 +238,13 @@ public class EntityChangeLogPoller implements AutoCloseable {
     BatchDelivery delivery =
         new BatchDelivery(immutableChanges, lastChangeId, List.copyOf(listeners));
     LOG.debug(
-        "Fetched {} entity change log record(s) after cursor {}, id range [{}, {}]: {}",
-        immutableChanges.size(),
+        "entityChangeLog poll cursor={} fetched={} firstId={} lastId={} tailId={} durationMs={} records={}",
         entityPollHighWaterId,
+        immutableChanges.size(),
         delivery.firstChangeId(),
         delivery.lastChangeId,
+        dbTailId,
+        durationMs,
         summarize(immutableChanges));
     return delivery;
   }
@@ -280,6 +312,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private void advanceCursor(BatchDelivery delivery) {
     long previousHighWaterId = entityPollHighWaterId;
     entityPollHighWaterId = delivery.lastChangeId;
+    metrics.setCursorId(entityPollHighWaterId);
     LOG.info(
         "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to {}; "
             + "newest record is ~{} ms old",
@@ -308,13 +341,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
       }
 
       try {
+        LOG.debug(
+            "entityChangeLog delivery listener={} firstId={} lastId={} count={} attempt=1",
+            listener.getClass().getName(),
+            delivery.firstChangeId(),
+            delivery.lastChangeId,
+            delivery.changes.size());
         listener.onEntityChange(delivery.changes);
+        metrics.recordsDelivered(delivery.changes.size());
         LOG.debug(
             "Entity change log listener {} consumed batch id range [{}, {}]",
             listener.getClass().getName(),
             delivery.firstChangeId(),
             delivery.lastChangeId);
       } catch (Throwable e) {
+        metrics.listenerFailed(listener.getClass().getName());
         // Throwable, not Exception: one faulty listener must not take down the whole poller, even
         // if it fails with an Error rather than an Exception.
         LOG.error(
