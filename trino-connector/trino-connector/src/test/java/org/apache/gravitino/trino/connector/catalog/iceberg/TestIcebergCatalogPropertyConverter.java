@@ -553,9 +553,8 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-driver", "org.postgresql.Driver")
             .build();
 
-    // With authType=simple no iceberg.rest-catalog.security is emitted, so the REST catalog has no
-    // token endpoint to exchange Trino's subject JWT at and the per-user session mode must stay
-    // off.
+    // authType=simple maps to iceberg.rest-catalog.security=NONE, so the REST catalog has no token
+    // endpoint to exchange Trino's subject JWT at and the per-user session mode must stay off.
     Map<String, String> config =
         buildConnectorConfig(
             "catalog1",
@@ -564,6 +563,7 @@ public class TestIcebergCatalogPropertyConverter {
                 ImmutableMap.of(
                     "gravitino.client.session.forwardUser", "true",
                     "gravitino.client.authType", "simple")));
+    Assertions.assertEquals("NONE", config.get("iceberg.rest-catalog.security"));
     Assertions.assertNull(config.get("iceberg.rest-catalog.session"));
   }
 
