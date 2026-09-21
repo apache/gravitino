@@ -407,7 +407,14 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 newPosition,
                 newNullable,
                 newAutoIncrement);
-        newColumns.add(newColumn.position(), newColumn);
+        if (newPosition.isPresent()) {
+          newColumns.add(newColumn.position(), newColumn);
+        } else {
+          // Stored positions go stale as sibling changes in the same alter add or
+          // remove columns, so without an explicit position change the column goes
+          // back to the list index it was removed from.
+          newColumns.add(i, newColumn);
+        }
 
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
         boolean removed =
