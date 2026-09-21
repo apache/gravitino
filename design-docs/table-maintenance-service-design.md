@@ -554,12 +554,12 @@ HTTP `tableMaintenance.uri` / Kafka produce-consume keys are **not** in scope (N
 
 TMS recognizes four maintenance **task types** (aligned with product Compact policy surface):
 
-| Task type          | Typical job / policy                             | Code default `minIntervalMs` |
-| ------------------ | ------------------------------------------------ | ---------------------------- |
-| `compaction`       | rewrite data files / `system_iceberg_compaction` | `3600000` (1 hour)           |
-| `snapshot-expiry`  | expire snapshots                                 | `86400000` (1 day)           |
-| `manifest-rewrite` | rewrite manifests                                | `86400000` (1 day)           |
-| `orphan-cleanup`   | orphan file cleanup                              | `604800000` (7 days)         |
+| Task type          | Typical job / policy | Code default `minIntervalMs` |
+| ------------------ | -------------------- | ---------------------------- |
+| `compaction`       | rewrite data files   | `3600000` (1 hour)           |
+| `snapshot-expiry`  | expire snapshots     | `86400000` (1 day)           |
+| `manifest-rewrite` | rewrite manifests    | `86400000` (1 day)           |
+| `orphan-cleanup`   | orphan file cleanup  | `604800000` (7 days)         |
 
 **Resolution order** (first hit wins), same idea as Amoro table props + AMS defaults:
 
