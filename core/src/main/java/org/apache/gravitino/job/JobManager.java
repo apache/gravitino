@@ -957,7 +957,7 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
         matcher.appendReplacement(result, matcher.group(0));
