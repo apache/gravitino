@@ -260,9 +260,10 @@ stderr = job.stderr()
 </TabItem>
 </Tabs>
 
-Output is only kept for as long as the job executor retains it - for the local job executor, that's
-tied to `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` below, and it's lost entirely across a
-server restart. What's returned is always the tail of the output (the most recent content), capped
+Output is only kept for as long as the job executor retains it. The local job executor keeps it in
+the job's staging directory, so it's available until the staging directory is cleaned up
+(`gravitino.job.stagingDirKeepTimeInMs` after the job finishes), also across server restarts.
+What's returned is always the tail of the output (the most recent content), capped
 by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
 whichever limit is hit first.
 
@@ -276,19 +277,35 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
 ```
 
+:::caution
+When multiple Gravitino servers share the same metadata store, `gravitino.job.stagingDir` must be on
+storage shared by all servers (for example an NFS mount) for the local job executor to return a
+job's output from any server. The servers may mount it at different paths. Otherwise, only the
+server that ran a job can return its output, and the other servers return empty output rather than
+an error.
+:::
+
+The local job executor finds a job's output through a small index file it writes to
+`<gravitino.job.stagingDir>/.job-output-index` when the job is submitted:
+
+- Jobs submitted before Gravitino 2.0.0, or during a rolling upgrade by a server that isn't upgraded
+  yet, have no index file and return empty output.
+- Deleting this directory makes the output of existing jobs unavailable. After downgrading to an
+  earlier version, it isn't used anymore and can be removed.
+
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
-| Property name                          | Description                                                                       | Default value                 | Required |
-|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|
-| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       |
-| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
-| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
-| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
-| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output   | `1000`                        | No       |
-| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output    | `262144` (256KB)              | No       |
+| Property name                          | Description                                                                                                                                                          | Default value                 | Required |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs. Must be shared by all servers in a multi-server deployment, see [Get a Job's Output](#get-a-jobs-output) | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs                                                                                                                             | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                    | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                            | `300000` (5 minutes)          | No       |
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                      | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output                                                                                       | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 
@@ -315,6 +332,8 @@ only tracks the jobs it runs itself:
 - Cancelling a job on a server that doesn't run it marks the job as `CANCELLING`, and the server
   running the job cancels it the next time it pulls job statuses. This can take up to
   `gravitino.job.statusPullIntervalInMs`.
+- A job's output can be read from any server only if `gravitino.job.stagingDir` is shared by all
+  servers, see [Get a Job's Output](#get-a-jobs-output).
 - If a server exits while running jobs, nobody can track these jobs anymore. When such a job has
   not been updated for `gravitino.job.stagingDirKeepTimeInMs`, it is marked as `FAILED`, or as
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
