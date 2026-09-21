@@ -52,18 +52,14 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
-import org.apache.gravitino.dto.requests.MetalakeSetRequest;
-import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
-import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
-import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -73,7 +69,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
-import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
@@ -423,177 +418,40 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-  public void testMetalakeNotExist() throws Throwable {
+  public void testMissingAndInaccessibleMetalakeHaveSameResponse() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
-            mockStatic(GravitinoAuthorizerProvider.class);
         MockedStatic<AuthorizationUtils> authorizationUtilsMocked =
             mockStatic(AuthorizationUtils.class)) {
-
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("tester"));
       principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
-
-      MethodInvocation methodInvocation = mock(MethodInvocation.class);
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-
-      // Mock AuthorizationUtils.checkCurrentUser to throw NoSuchMetalakeException
       authorizationUtilsMocked
           .when(
               () ->
                   AuthorizationUtils.checkCurrentUser(
                       ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
-          .thenThrow(new NoSuchMetalakeException("Metalake nonExistentMetalake does not exist"));
+          .thenThrow(new NoSuchMetalakeException("Metalake target does not exist"))
+          .thenThrow(new ForbiddenException("User is not a member of target"));
 
-      GravitinoInterceptionService gravitinoInterceptionService =
-          new GravitinoInterceptionService();
-      Class<TestOperations> testOperationsClass = TestOperations.class;
-      Method[] methods = testOperationsClass.getMethods();
-      Method testMethod = methods[0];
-      List<MethodInterceptor> methodInterceptors =
-          gravitinoInterceptionService.getMethodInterceptors(testMethod);
-      MethodInterceptor methodInterceptor = methodInterceptors.get(0);
-
-      // Test with non-existent metalake
-      when(methodInvocation.getMethod()).thenReturn(testMethod);
-      when(methodInvocation.getArguments()).thenReturn(new Object[] {"nonExistentMetalake"});
-      Response response = (Response) methodInterceptor.invoke(methodInvocation);
-
-      // Verify that a 403 Forbidden response is returned
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-      assertEquals(
-          "User 'tester' is not authorized to perform operation 'testMethod' on "
-              + "metadata 'nonExistentMetalake'",
-          errorResponse.getMessage());
-    }
-  }
-
-  @Test
-  public void testServiceAdminProceedsOnMissingMetalake() throws Throwable {
-    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> authorizerProvider =
-            mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<AuthorizationUtils> authorizationUtils =
-            mockStatic(AuthorizationUtils.class)) {
-      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("admin");
-      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
-      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-      authorizerProvider.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
-      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
-      // PassThroughAuthorizer path: the membership check itself reports the missing metalake.
-      authorizationUtils
-          .when(
-              () ->
-                  AuthorizationUtils.checkCurrentUser(
-                      ArgumentMatchers.eq("gone"),
-                      ArgumentMatchers.eq("admin"),
-                      any(AuthorizationRequestContext.class)))
-          .thenThrow(new NoSuchMetalakeException("Metalake gone does not exist"));
-
-      GravitinoInterceptionService service = new GravitinoInterceptionService();
-      Response resourceResult = Utils.ok(new DropResponse(false));
-
-      for (boolean serviceAdmin : new boolean[] {false, true}) {
-        when(authorizer.isServiceAdmin()).thenReturn(serviceAdmin);
-        for (Method method : missingMetalakeAwareMethods()) {
-          MethodInvocation invocation = mock(MethodInvocation.class);
-          when(invocation.getMethod()).thenReturn(method);
-          when(invocation.getArguments()).thenReturn(missingMetalakeArguments(method, "gone"));
-          when(invocation.proceed()).thenReturn(resourceResult);
-          MethodInterceptor interceptor = service.getMethodInterceptors(method).get(0);
-
-          Object result = interceptor.invoke(invocation);
-
-          if (serviceAdmin) {
-            // The resource method reports the missing metalake itself (404 or dropped=false).
-            Assertions.assertSame(resourceResult, result, method.getName());
-            verify(invocation).proceed();
-          } else {
-            assertEquals(
-                Response.Status.FORBIDDEN.getStatusCode(),
-                ((Response) result).getStatus(),
-                method.getName());
-            verify(invocation, never()).proceed();
-          }
-        }
-      }
-    }
-  }
-
-  @Test
-  public void testServiceAdminDistinguishesMissingMetalakeFromNonMembership() throws Throwable {
-    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> authorizerProvider =
-            mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<AuthorizationUtils> authorizationUtils = mockStatic(AuthorizationUtils.class);
-        MockedStatic<GravitinoEnv> envMock = mockStatic(GravitinoEnv.class)) {
-      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("admin");
-      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
-      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-      authorizerProvider.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
-      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
-      when(authorizer.isServiceAdmin()).thenReturn(true);
-      // JCasbin path: non-membership is reported for missing and inaccessible metalakes alike.
-      authorizationUtils
-          .when(
-              () ->
-                  AuthorizationUtils.checkCurrentUser(
-                      ArgumentMatchers.eq("metalake"),
-                      ArgumentMatchers.eq("admin"),
-                      any(AuthorizationRequestContext.class)))
-          .thenThrow(new ForbiddenException("User is not a member"));
-
-      GravitinoEnv env = mock(GravitinoEnv.class);
-      MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
-      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
-      when(env.metalakeDispatcher()).thenReturn(metalakeDispatcher);
-      when(env.eventBus()).thenReturn(mock(EventBus.class));
-
-      Method method = MetalakeOperations.class.getMethod("loadMetalake", String.class);
+      Method method = TestOperations.class.getMethods()[0];
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);
-      when(invocation.getArguments()).thenReturn(new Object[] {"metalake"});
-      Response resourceResult = Utils.ok(new DropResponse(false));
-      when(invocation.proceed()).thenReturn(resourceResult);
+      when(invocation.getArguments()).thenReturn(new Object[] {"target"});
       MethodInterceptor interceptor =
           new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
 
-      when(metalakeDispatcher.metalakeExists(ArgumentMatchers.any())).thenReturn(false);
-      Assertions.assertSame(resourceResult, interceptor.invoke(invocation));
-      verify(invocation).proceed();
+      Response missingResponse = (Response) interceptor.invoke(invocation);
+      Response inaccessibleResponse = (Response) interceptor.invoke(invocation);
 
-      when(metalakeDispatcher.metalakeExists(ArgumentMatchers.any())).thenReturn(true);
-      Response existingResponse = (Response) interceptor.invoke(invocation);
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), existingResponse.getStatus());
-      // Still exactly one proceed(): an existing metalake the admin cannot access stays denied.
-      verify(invocation).proceed();
-    }
-  }
-
-  private static Method[] missingMetalakeAwareMethods() throws NoSuchMethodException {
-    return new Method[] {
-      MetalakeOperations.class.getMethod("loadMetalake", String.class),
-      MetalakeOperations.class.getMethod("setMetalake", String.class, MetalakeSetRequest.class),
-      MetalakeOperations.class.getMethod(
-          "alterMetalake", String.class, MetalakeUpdatesRequest.class),
-      MetalakeOperations.class.getMethod("dropMetalake", String.class, boolean.class)
-    };
-  }
-
-  private static Object[] missingMetalakeArguments(Method method, String metalake) {
-    switch (method.getName()) {
-      case "setMetalake":
-        return new Object[] {metalake, new MetalakeSetRequest(true)};
-      case "alterMetalake":
-        return new Object[] {metalake, new MetalakeUpdatesRequest()};
-      case "dropMetalake":
-        return new Object[] {metalake, false};
-      default:
-        return new Object[] {metalake};
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), missingResponse.getStatus());
+      assertEquals(missingResponse.getStatus(), inaccessibleResponse.getStatus());
+      ErrorResponse missingError = (ErrorResponse) missingResponse.getEntity();
+      ErrorResponse inaccessibleError = (ErrorResponse) inaccessibleResponse.getEntity();
+      assertEquals(missingError.getCode(), inaccessibleError.getCode());
+      assertEquals(missingError.getType(), inaccessibleError.getType());
+      assertEquals(
+          "Current user tester is not a member of metalake target, or the metalake does not exist",
+          missingError.getMessage());
+      assertEquals(missingError.getMessage(), inaccessibleError.getMessage());
+      verify(invocation, never()).proceed();
     }
   }
 

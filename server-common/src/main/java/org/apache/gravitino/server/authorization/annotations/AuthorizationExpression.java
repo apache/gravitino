@@ -76,16 +76,4 @@ public @interface AuthorizationExpression {
    * @return expression that permits existence checks when primary denies
    */
   String allowCheckExistence() default "";
-
-  /**
-   * Whether a service admin may reach the resource method when the target metalake does not exist.
-   * The interceptor normally answers 403 so that callers cannot probe for metalake existence. When
-   * this is {@code true} and the caller is a service admin, the interceptor proceeds instead, so
-   * the resource method reports the missing metalake exactly as it would without authorization: a
-   * 404 for load/alter, or {@code dropped=false} for drop, including the events those operations
-   * emit. An existing metalake the service admin cannot access still gets 403.
-   *
-   * @return whether service admins bypass the denial for a missing metalake
-   */
-  boolean allowServiceAdminOnMissingMetalake() default false;
 }
