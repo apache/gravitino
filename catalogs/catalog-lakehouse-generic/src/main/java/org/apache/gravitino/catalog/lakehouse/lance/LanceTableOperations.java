@@ -24,9 +24,11 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -172,8 +174,14 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @param catalogProperties the catalog properties
    */
   public void setCatalogProperties(Map<String, String> catalogProperties) {
+    // A copy that tolerates a null value, not ImmutableMap.copyOf, which throws on one. Nothing
+    // upstream rejects a catalog property whose value is null, and the generic catalog hands this
+    // map on unchanged, so copying it strictly here would fail every table operation on such a
+    // catalog rather than the one property that is null.
     this.catalogProperties =
-        catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+        catalogProperties == null
+            ? Map.of()
+            : Collections.unmodifiableMap(Maps.newHashMap(catalogProperties));
   }
 
   @Override
