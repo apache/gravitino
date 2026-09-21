@@ -788,6 +788,34 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testOutputIndexKeepsSpecialCharactersInWorkingDir() throws IOException {
+    // Job template names are not restricted, so the staging directory may contain any character a
+    // file name can. They must survive the JSON encoding and the '/'-joining unchanged.
+    String specialName =
+        "a b \"quoted\" back\\slash 中文 \t tab \n newline %20 #!$&'()*+,;=@[]{}~`^|<>?";
+    File jobDir =
+        new File(
+            workingDir,
+            "metalake" + File.separator + specialName + File.separator + "gravitino-job-1");
+    Assertions.assertTrue(jobDir.mkdirs());
+    String jobId = runSucceededJob(jobDir);
+
+    JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
+    Assertions.assertEquals(
+        workingDir.getName() + "/metalake/" + specialName + "/gravitino-job-1",
+        index.get("workingDir").textValue());
+
+    LocalJobExecutor anotherExecutor = new LocalJobExecutor();
+    try {
+      anotherExecutor.initialize(withStagingDir(Collections.emptyMap()));
+      Assertions.assertEquals(
+          6, anotherExecutor.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES).size());
+    } finally {
+      anotherExecutor.close();
+    }
+  }
+
+  @Test
   public void testGetJobOutputFromAnotherExecutorInstance() throws IOException {
     String jobId = runSucceededJob(workingDir);
     List<String> stdout = jobExecutor.getJobStdout(jobId, 1000, DEFAULT_TEST_MAX_BYTES);

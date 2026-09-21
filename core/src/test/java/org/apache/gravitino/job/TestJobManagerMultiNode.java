@@ -230,6 +230,26 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetJobOutputOfTemplateNamedWithSpecialCharacters() throws IOException {
+    // Template names are not restricted, and name a directory level of the job staging directory.
+    for (String templateName : ImmutableList.of("etl job \"v2\" 中文 #1", "team/etl")) {
+      backend.insert(
+          newScriptJobTemplateEntity(
+              templateName, "echo \"hello $1\"\necho \"oops $1\" >&2\n", "{{name}}"),
+          false);
+
+      JobEntity job = nodeA.runJob(METALAKE, templateName, ImmutableMap.of("name", "d"));
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+
+      JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+      Assertions.assertEquals(ImmutableList.of("hello d"), jobWithOutput.stdout(), templateName);
+      Assertions.assertEquals(ImmutableList.of("oops d"), jobWithOutput.stderr(), templateName);
+    }
+  }
+
+  @TestTemplate
   public void testGetJobOutputFromNodeNotSharingStagingDir() throws IOException {
     JobEntity job = runEchoJobOnNodeA("c");
 
@@ -320,7 +340,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private JobTemplateEntity newScriptJobTemplateEntity(
       String name, String scriptBody, String argument) throws IOException {
-    File script = new File(testDir, name + ".sh");
+    // Not named after the template, whose name may contain any character.
+    File script = Files.createTempFile(testDir.toPath(), "job", ".sh").toFile();
     Files.writeString(script.toPath(), "#!/bin/bash\n" + scriptBody);
     Assertions.assertTrue(script.setExecutable(true));
 
