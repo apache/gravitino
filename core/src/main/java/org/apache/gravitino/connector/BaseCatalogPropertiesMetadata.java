@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
@@ -107,11 +108,18 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
     if (propertyEntries == null) {
       synchronized (this) {
         if (propertyEntries == null) {
-          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add
-          // catalog-only entries.
+          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add shared
+          // cloud credential keys and catalog-only entries.
           Map<String, PropertyEntry<?>> base = buildBasePropertyEntries();
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
           builder.putAll(base);
+
+          SharedCloudPropertiesMetadata.PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                if (!base.containsKey(name)) {
+                  builder.put(name, entry);
+                }
+              });
 
           BASIC_CATALOG_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
