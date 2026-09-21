@@ -56,7 +56,6 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression.MissingMetalakeResponse;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
@@ -152,7 +151,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "load-metalake", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION,
-      missingMetalakeResponseForServiceAdmin = MissingMetalakeResponse.NOT_FOUND)
+      allowServiceAdminOnMissingMetalake = true)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
@@ -178,7 +177,9 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-metalake", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER",
+      allowServiceAdminOnMissingMetalake = true)
   public Response setMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
@@ -221,7 +222,9 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-metalake", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER",
+      allowServiceAdminOnMissingMetalake = true)
   public Response alterMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
@@ -263,7 +266,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "drop-metalake", absolute = true)
   @AuthorizationExpression(
       expression = "METALAKE::OWNER",
-      missingMetalakeResponseForServiceAdmin = MissingMetalakeResponse.DROP_FALSE)
+      allowServiceAdminOnMissingMetalake = true)
   public Response dropMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
