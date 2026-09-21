@@ -125,10 +125,21 @@ public class AuthorizationUtils {
       String metalake, String user, AuthorizationRequestContext requestContext) {
     GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (authorizer != null && !authorizer.isMetalakeUser(metalake, requestContext)) {
-      throw new ForbiddenException(
-          "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
-          user, metalake);
+      throw new ForbiddenException("%s", metalakeMembershipFailureMessage(metalake, user));
     }
+  }
+
+  /**
+   * Returns a membership error that does not disclose whether the metalake exists.
+   *
+   * @param metalake The metalake name.
+   * @param user The current user name.
+   * @return A neutral membership error message.
+   */
+  public static String metalakeMembershipFailureMessage(String metalake, String user) {
+    return String.format(
+        "Current user %s is not a member of metalake %s, or the metalake does not exist",
+        user, metalake);
   }
 
   public static NameIdentifier ofRole(String metalake, String role) {

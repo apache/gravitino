@@ -418,52 +418,43 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-  public void testMetalakeNotExist() throws Throwable {
+  public void testMissingAndInaccessibleMetalakeHaveSameResponse() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
-            mockStatic(GravitinoAuthorizerProvider.class);
         MockedStatic<AuthorizationUtils> authorizationUtilsMocked =
             mockStatic(AuthorizationUtils.class)) {
-
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("tester"));
       principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
-
-      MethodInvocation methodInvocation = mock(MethodInvocation.class);
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-
-      // Mock AuthorizationUtils.checkCurrentUser to throw NoSuchMetalakeException
       authorizationUtilsMocked
           .when(
               () ->
                   AuthorizationUtils.checkCurrentUser(
                       ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
-          .thenThrow(new NoSuchMetalakeException("Metalake nonExistentMetalake does not exist"));
+          .thenThrow(new NoSuchMetalakeException("Metalake target does not exist"))
+          .thenThrow(new ForbiddenException("User is not a member of target"));
+      authorizationUtilsMocked
+          .when(() -> AuthorizationUtils.metalakeMembershipFailureMessage("target", "tester"))
+          .thenCallRealMethod();
 
-      GravitinoInterceptionService gravitinoInterceptionService =
-          new GravitinoInterceptionService();
-      Class<TestOperations> testOperationsClass = TestOperations.class;
-      Method[] methods = testOperationsClass.getMethods();
-      Method testMethod = methods[0];
-      List<MethodInterceptor> methodInterceptors =
-          gravitinoInterceptionService.getMethodInterceptors(testMethod);
-      MethodInterceptor methodInterceptor = methodInterceptors.get(0);
+      Method method = TestOperations.class.getMethods()[0];
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"target"});
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
 
-      // Test with non-existent metalake
-      when(methodInvocation.getMethod()).thenReturn(testMethod);
-      when(methodInvocation.getArguments()).thenReturn(new Object[] {"nonExistentMetalake"});
-      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+      Response missingResponse = (Response) interceptor.invoke(invocation);
+      Response inaccessibleResponse = (Response) interceptor.invoke(invocation);
 
-      // Verify that a 403 Forbidden response is returned
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), missingResponse.getStatus());
+      assertEquals(missingResponse.getStatus(), inaccessibleResponse.getStatus());
+      ErrorResponse missingError = (ErrorResponse) missingResponse.getEntity();
+      ErrorResponse inaccessibleError = (ErrorResponse) inaccessibleResponse.getEntity();
+      assertEquals(missingError.getCode(), inaccessibleError.getCode());
+      assertEquals(missingError.getType(), inaccessibleError.getType());
       assertEquals(
-          "User 'tester' is not authorized to perform operation 'testMethod' on "
-              + "metadata 'nonExistentMetalake'",
-          errorResponse.getMessage());
+          "Current user tester is not a member of metalake target, or the metalake does not exist",
+          missingError.getMessage());
+      assertEquals(missingError.getMessage(), inaccessibleError.getMessage());
+      verify(invocation, never()).proceed();
     }
   }
 
