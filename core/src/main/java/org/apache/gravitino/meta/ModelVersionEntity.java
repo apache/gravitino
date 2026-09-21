@@ -170,11 +170,18 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(modelIdent, version, comment, aliases, uris, properties, auditInfo);
+    // aliases are compared as an unordered collection in equals, so their hash
+    // contribution must not depend on element order either.
+    int hash = Objects.hash(modelIdent, version, comment, uris, properties, auditInfo);
+    return 31 * hash + unorderedHashCode(aliases);
   }
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static int unorderedHashCode(List<?> list) {
+    return list == null ? 0 : list.stream().mapToInt(Object::hashCode).sum();
   }
 
   public static class Builder {
