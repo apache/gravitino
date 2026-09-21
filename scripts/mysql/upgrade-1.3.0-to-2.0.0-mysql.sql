@@ -195,5 +195,6 @@ UPDATE `owner_meta` o
     SET o.`deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
         o.`updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
     WHERE o.`deleted_at` = 0 AND o.`id` <> d.keep_id;
+ALTER TABLE `owner_meta` ADD COLUMN `active_owner` TINYINT GENERATED ALWAYS AS (CASE WHEN `deleted_at` = 0 THEN 1 ELSE NULL END) STORED;
+ALTER TABLE `owner_meta` ADD UNIQUE KEY `uk_mi_mo_active` (`metadata_object_id`, `metadata_object_type`, `active_owner`);
 ALTER TABLE `owner_meta` DROP INDEX `uk_ow_me_del`;
-ALTER TABLE `owner_meta` ADD UNIQUE KEY `uk_mi_mo_del` (`metadata_object_id`, `metadata_object_type`, `deleted_at`);

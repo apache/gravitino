@@ -333,8 +333,9 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
+    `active_owner` TINYINT GENERATED ALWAYS AS (CASE WHEN `deleted_at` = 0 THEN 1 ELSE NULL END),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mi_mo_del` (`metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    UNIQUE KEY `uk_mi_mo_active` (`metadata_object_id`, `metadata_object_type`, `active_owner`),
     KEY `idx_oid` (`owner_id`),
     KEY `idx_meid` (`metadata_object_id`),
     KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)

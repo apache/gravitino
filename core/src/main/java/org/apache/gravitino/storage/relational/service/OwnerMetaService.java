@@ -279,7 +279,7 @@ public class OwnerMetaService {
    * leaving a live row that points nowhere.
    *
    * <p>The previous owner rows are retired by a soft-delete keyed on the object, and {@code
-   * uk_mi_mo_del} allows one live row per object. Two assignments that both start when the object
+   * uk_mi_mo_active} allows one live row per object. Two assignments that both start when the object
    * has no live row cannot see each other's insert: the second one fails the unique key once the
    * first commits, and is then replayed once so that it retires the row it could not see. That
    * makes the outcome "last assignment wins" without a lock on the object itself.

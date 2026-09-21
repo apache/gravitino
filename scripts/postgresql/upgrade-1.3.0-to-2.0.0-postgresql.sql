@@ -160,5 +160,6 @@ UPDATE owner_meta
           AND d.metadata_object_id = owner_meta.metadata_object_id
           AND d.metadata_object_type = owner_meta.metadata_object_type
       );
+CREATE UNIQUE INDEX IF NOT EXISTS uk_mi_mo_active
+    ON owner_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
 ALTER TABLE owner_meta DROP CONSTRAINT IF EXISTS owner_meta_owner_id_metadata_object_id_metadata_object_type_key;
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mi_mo_del ON owner_meta (metadata_object_id, metadata_object_type, deleted_at);

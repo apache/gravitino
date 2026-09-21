@@ -111,5 +111,6 @@ UPDATE `owner_meta`
           AND d.`metadata_object_id` = `owner_meta`.`metadata_object_id`
           AND d.`metadata_object_type` = `owner_meta`.`metadata_object_type`
       );
+ALTER TABLE `owner_meta` ADD COLUMN `active_owner` TINYINT GENERATED ALWAYS AS (CASE WHEN `deleted_at` = 0 THEN 1 ELSE NULL END);
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_mi_mo_active` ON `owner_meta` (`metadata_object_id`, `metadata_object_type`, `active_owner`);
 ALTER TABLE `owner_meta` DROP INDEX `uk_ow_me_del`;
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_mi_mo_del` ON `owner_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`);

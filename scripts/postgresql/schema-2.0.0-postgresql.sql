@@ -562,10 +562,11 @@ CREATE TABLE IF NOT EXISTS owner_meta (
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    UNIQUE (metadata_object_id, metadata_object_type, deleted_at)
+    PRIMARY KEY (id)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uk_mi_mo_active
+    ON owner_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
 CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
 CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
 CREATE INDEX IF NOT EXISTS idx_user_meta_name_del_upd
