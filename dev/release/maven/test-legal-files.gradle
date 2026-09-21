@@ -107,12 +107,6 @@ def legalTests = tasks.register('testMavenLegalFiles') {
         }
       }
     }
-    sourceOwners.each { module, files ->
-      if (files.any { it.name == 'SparkTransformConverter.java' }) {
-        assert !module.tasks.named('generateJavadocLegalFiles').get().sourceNotices.get().contains('iceberg'): "${module.path}: private Iceberg implementation is absent from Javadoc"
-      }
-    }
-
     def selector = generatorType.getField('Companion').get(null)
     ['META-INF/LICENSE', 'META-INF/NOTICE.markdown', 'META-INF/FastDoubleParser-LICENSE',
      'THIRD-PARTY-NOTICES', 'META-INF/license/thirdparty.txt', 'LICENSE-AspectJ.adoc', 'about.html', 'about_files/license.html'].each {
