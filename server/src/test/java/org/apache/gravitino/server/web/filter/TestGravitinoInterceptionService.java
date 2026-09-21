@@ -326,7 +326,7 @@ public class TestGravitinoInterceptionService {
           .thenAnswer(invocation -> null);
 
       GravitinoInterceptionService service = new GravitinoInterceptionService();
-      Method testMethod = TestOperations.class.getMethods()[0];
+      Method testMethod = TestOperations.class.getMethod("testMethod", String.class);
       MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
       when(methodInvocation.getMethod()).thenReturn(testMethod);
       when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
@@ -503,6 +503,9 @@ public class TestGravitinoInterceptionService {
                       ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
           .thenThrow(new NoSuchMetalakeException("Metalake target does not exist"))
           .thenThrow(new ForbiddenException("User is not a member of target"));
+      authorizationUtilsMocked
+          .when(() -> AuthorizationUtils.metalakeMembershipFailureMessage("target", "tester"))
+          .thenCallRealMethod();
 
       Method method = TestOperations.class.getMethods()[0];
       MethodInvocation invocation = mock(MethodInvocation.class);
