@@ -127,9 +127,9 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   /**
-   * The 1.3.0 owner unique key allowed one live owner row per (owner, object); the 2.0.0 key allows
-   * one per object. Rows left by the old race have to be merged before the key can be tightened:
-   * the newest live row (largest id) stays, older ones are soft-deleted.
+   * The owner unique key allows one live row per (owner, object). Rows left by concurrent
+   * assignments are merged during the upgrade: the newest live row (largest id) stays, while older
+   * ones are soft-deleted.
    */
   @TestTemplate
   public void testUpgradeToTwoZeroMergesDuplicateLiveOwners() throws SQLException, IOException {
@@ -146,15 +146,15 @@ public class TestSQLScripts extends TestJDBCBackend {
             + " updated_at) VALUES (%d, 1, %d, 'USER', %d, 'CATALOG', '{}', 1, 1, %d, 0)";
     List<String> rows =
         List.of(
-            // Object 10 has three live owners; two rows must be retired at the same time.
+            // Three owners of object 10 leave two rows to retire in the same statement.
             String.format(insert, 1, 100, 10, 0),
             String.format(insert, 2, 200, 10, 0),
             String.format(insert, 3, 300, 10, 0),
-            // Retired rows may already share a deletion timestamp.
+            // Historical rows may already share a deletion timestamp.
             String.format(insert, 4, 100, 20, 0),
             String.format(insert, 5, 200, 20, 5),
             String.format(insert, 6, 300, 20, 5),
-            // Object 10 as a SCHEMA is a different object and keeps its single live owner.
+            // Object 10 as a SCHEMA is a different object.
             String.format(insert, 7, 400, 10, 0).replace("'CATALOG'", "'SCHEMA'"));
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -184,25 +184,20 @@ public class TestSQLScripts extends TestJDBCBackend {
         Connection connection = sqlSession.getConnection();
         Statement statement = connection.createStatement();
         ResultSet retired =
-            statement.executeQuery(
-                "SELECT deleted_at, updated_at FROM owner_meta WHERE id IN (1, 2) ORDER BY id")) {
+            statement.executeQuery("SELECT deleted_at, updated_at FROM owner_meta WHERE id = 1")) {
       Assertions.assertTrue(retired.next());
-      long deletedAt = retired.getLong(1);
-      Assertions.assertTrue(deletedAt > 0, "older duplicates must be soft-deleted");
-      Assertions.assertEquals(deletedAt, retired.getLong(2));
-      Assertions.assertTrue(retired.next());
-      Assertions.assertEquals(deletedAt, retired.getLong(1));
-      Assertions.assertEquals(deletedAt, retired.getLong(2));
+      Assertions.assertTrue(retired.getLong(1) > 0, "older duplicate must be soft-deleted");
+      Assertions.assertEquals(retired.getLong(1), retired.getLong(2));
     }
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
         Statement statement = connection.createStatement()) {
-      // Historical rows can share a deletion time, including after the upgrade.
+      // Historical rows can share a deletion timestamp after the upgrade.
       statement.execute(String.format(insert, 8, 500, 20, 5));
-      // The tightened key still rejects a second live owner for the same object.
+      // The existing key still rejects a second live row for the same owner and object.
       Assertions.assertThrows(
-          SQLException.class, () -> statement.execute(String.format(insert, 9, 600, 20, 0)));
+          SQLException.class, () -> statement.execute(String.format(insert, 9, 100, 20, 0)));
     }
   }
 

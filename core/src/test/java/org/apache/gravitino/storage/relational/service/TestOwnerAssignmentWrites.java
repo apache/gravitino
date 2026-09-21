@@ -58,10 +58,10 @@ import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
 
 /**
- * Races between owner assignment and the deletion or replacement of the owner principal, and
- * between two assignments on the same object. Every scenario is driven by a real transaction held
- * open on one thread while the contender runs on another, so the assertions describe what two
- * Gravitino servers sharing one database would observe.
+ * Races between owner assignment and deletion of the owned object or owner principal, and between
+ * two assignments on the same object. Every scenario is driven by a real transaction held open on
+ * one thread while the contender runs on another, so the assertions describe what two Gravitino
+ * servers sharing one database would observe.
  */
 class TestOwnerAssignmentWrites extends TestJDBCBackend {
   private static final String METALAKE = "owner_write_metalake";
@@ -81,6 +81,21 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
       assertFalse(owner(owned).isPresent());
       assertEquals(0, liveOwnerRows(id));
     }
+  }
+
+  @TestTemplate
+  void testAssignmentWaitsForUncommittedOwnedObjectDeleteAndFails() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    CatalogEntity owned = createAndInsertCatalog(METALAKE, "owned");
+    NameIdentifier principal = insertPrincipal(false, "owner");
+    Throwable failure =
+        whileTransactionHeld(
+            () ->
+                assertTrue(
+                    CatalogMetaService.getInstance().deleteCatalog(owned.nameIdentifier(), false)),
+            () -> setOwner(owned, principal, Entity.EntityType.USER));
+    assertInstanceOf(NoSuchEntityException.class, failure);
+    assertEquals(0, liveOwnerRowsForObject(owned));
   }
 
   @TestTemplate
@@ -137,6 +152,37 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
             true));
     assertEquals(1, liveOwnerRowsForObject(owned));
     assertEquals("second", ownerName(owned));
+  }
+
+  @TestTemplate
+  void testConcurrentMetalakeAssignmentsSerializeOnTheMetalakeRow() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    NameIdentifier owned = NameIdentifier.of(METALAKE);
+    NameIdentifier first = insertPrincipal(false, "first");
+    NameIdentifier second = insertPrincipal(true, "second");
+    assertNull(
+        whileTransactionHeld(
+            () ->
+                OwnerMetaService.getInstance()
+                    .setOwner(owned, Entity.EntityType.METALAKE, first, Entity.EntityType.USER),
+            () ->
+                OwnerMetaService.getInstance()
+                    .setOwner(owned, Entity.EntityType.METALAKE, second, Entity.EntityType.GROUP)));
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE);
+    assertEquals(
+        1,
+        queryLong(
+            "SELECT COUNT(*) FROM owner_meta WHERE metadata_object_id = "
+                + metalakeId
+                + " AND metadata_object_type = 'METALAKE' AND deleted_at = 0"));
+    assertEquals(
+        "second",
+        assertInstanceOf(
+                GroupEntity.class,
+                OwnerMetaService.getInstance()
+                    .getOwner(owned, Entity.EntityType.METALAKE)
+                    .orElseThrow())
+            .name());
   }
 
   @TestTemplate

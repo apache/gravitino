@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,7 +32,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -51,17 +49,12 @@ import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
-import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** This class is an utilization class to retrieve owner relation. */
 public class OwnerMetaService {
-
-  private static final Logger LOG = LoggerFactory.getLogger(OwnerMetaService.class);
 
   private static final OwnerMetaService INSTANCE = new OwnerMetaService();
 
@@ -201,6 +194,8 @@ public class OwnerMetaService {
         owner,
         ownerType,
         ownerId,
+        List.of(entityId),
+        entityType,
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
@@ -259,6 +254,8 @@ public class OwnerMetaService {
         ownerIdent,
         ownerType,
         ownerId,
+        entityIds,
+        ownedObjectType,
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
@@ -269,25 +266,9 @@ public class OwnerMetaService {
   }
 
   /**
-   * Runs one owner assignment as a single transaction: fence the metalake and the owner principal
-   * on the identity the caller observed, retire the previous owner rows, then insert the new ones.
-   *
-   * <p>The metalake is held first because its cascade retires owner rows; the principal is held
-   * next because its deletion does the same. Both are shared locks, so concurrent assignments only
-   * wait for an in-flight deletion, not for each other. A principal that turns out deleted,
-   * replaced under the same name, or moved to another metalake fails as not found instead of
-   * leaving a live row that points nowhere.
-   *
-   * <p>The previous owner rows are retired by a soft-delete keyed on the object, and {@code
-   * uk_mi_mo_active} allows one live row per object. Two assignments that both start when the object
-   * has no live row cannot see each other's insert: the second one fails the unique key once the
-   * first commits, and is then replayed once so that it retires the row it could not see. That
-   * makes the outcome "last assignment wins" without a lock on the object itself.
-   *
-   * <p>The replay needs a fresh transaction: PostgreSQL aborts the whole transaction on the
-   * unique-key failure, so nothing can be retried on the same connection. The assignment therefore
-   * replays only when it owns the transaction, which is the case for every caller today. A caller
-   * that already holds a transaction gets the failure as is.
+   * Serializes assignments on the owned object's row, including the first assignment when no owner
+   * relation exists. The metalake is locked first to fence cascade deletion; object rows are locked
+   * in stable ID order; the principal is then fenced before owner relations change.
    */
   private void assignOwner(
       String metalake,
@@ -295,36 +276,52 @@ public class OwnerMetaService {
       NameIdentifier owner,
       Entity.EntityType ownerType,
       long ownerId,
+      List<Long> entityIds,
+      Entity.EntityType ownedObjectType,
       Runnable retirePreviousOwners,
       Runnable insertOwners) {
-    boolean ownsTransaction = !SessionUtils.isInTransaction();
-    for (int attempt = 0; ; attempt++) {
-      try {
-        SessionUtils.doMultipleWithCommit(
-            () -> lockMetalakeForOwnerWrite(metalake, metalakeId),
-            () -> lockPrincipalForOwnerWrite(owner, ownerType, ownerId, metalakeId),
-            retirePreviousOwners,
-            insertOwners);
-        return;
-      } catch (RuntimeException e) {
-        if (!ownsTransaction || attempt > 0 || !isDuplicateOwnerRow(e)) {
-          throw e;
-        }
-        LOG.debug("Owner assignment lost a race on {} and is replayed once", owner, e);
-      }
-    }
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            lockMetalakeForOwnerWrite(
+                metalake, metalakeId, ownedObjectType == Entity.EntityType.METALAKE),
+        () -> lockOwnedObjectsForOwnerWrite(entityIds, ownedObjectType, metalakeId),
+        () -> lockPrincipalForOwnerWrite(owner, ownerType, ownerId, metalakeId),
+        retirePreviousOwners,
+        insertOwners);
   }
 
-  private void lockMetalakeForOwnerWrite(String metalake, long metalakeId) {
+  private void lockMetalakeForOwnerWrite(String metalake, long metalakeId, boolean exclusive) {
     OccWriteSupport.lockParentForChildWrite(
         metalake,
         Entity.EntityType.METALAKE,
         () ->
             SessionUtils.getWithoutCommit(
                 MetalakeMetaMapper.class,
-                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+                mapper ->
+                    exclusive
+                        ? mapper.selectMetalakeMetaByIdForUpdate(metalakeId)
+                        : mapper.selectMetalakeMetaByIdForShare(metalakeId)),
         null,
         current -> Objects.equals(current.getMetalakeName(), metalake));
+  }
+
+  private void lockOwnedObjectsForOwnerWrite(
+      List<Long> entityIds, Entity.EntityType entityType, long metalakeId) {
+    if (entityType == Entity.EntityType.METALAKE) {
+      return;
+    }
+    for (Long entityId : entityIds) {
+      OccWriteSupport.lockParentForChildWrite(
+          String.valueOf(entityId),
+          entityType,
+          () ->
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.selectMetadataObjectIdForUpdate(entityId, metalakeId, entityType)),
+          null,
+          current -> Objects.equals(current, entityId));
+    }
   }
 
   private void lockPrincipalForOwnerWrite(
@@ -356,18 +353,6 @@ public class OwnerMetaService {
         return;
       default:
         throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
-    }
-  }
-
-  /** Whether the failure is the unique-key violation raised by a second live owner row. */
-  private static boolean isDuplicateOwnerRow(RuntimeException e) {
-    try {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.USER, "owner");
-      return false;
-    } catch (EntityAlreadyExistsException duplicate) {
-      return true;
-    } catch (IOException other) {
-      return false;
     }
   }
 }

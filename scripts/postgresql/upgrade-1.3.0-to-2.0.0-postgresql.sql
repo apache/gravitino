@@ -148,8 +148,8 @@ COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model prop
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
 
--- One live owner per object. Merge duplicates left by concurrent assignments before tightening the
--- unique key: the newest live row (largest id) wins, older ones are soft-deleted.
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
 UPDATE owner_meta
     SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
         updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
@@ -160,6 +160,3 @@ UPDATE owner_meta
           AND d.metadata_object_id = owner_meta.metadata_object_id
           AND d.metadata_object_type = owner_meta.metadata_object_type
       );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mi_mo_active
-    ON owner_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
-ALTER TABLE owner_meta DROP CONSTRAINT IF EXISTS owner_meta_owner_id_metadata_object_id_metadata_object_type_key;
