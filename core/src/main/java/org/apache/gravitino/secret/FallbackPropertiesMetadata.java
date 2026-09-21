@@ -18,8 +18,14 @@
  */
 package org.apache.gravitino.secret;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -36,10 +42,20 @@ final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
   static final FallbackPropertiesMetadata INSTANCE = new FallbackPropertiesMetadata();
 
+  private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(AWSPropertiesMetadata.PROPERTY_ENTRIES)
+          .build();
+
   private FallbackPropertiesMetadata() {}
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return SharedCloudPropertiesMetadata.PROPERTY_ENTRIES;
+    return CLOUD_PROPERTY_ENTRIES;
   }
 }

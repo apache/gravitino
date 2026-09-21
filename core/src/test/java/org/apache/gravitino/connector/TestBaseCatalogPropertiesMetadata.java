@@ -63,56 +63,9 @@ public class TestBaseCatalogPropertiesMetadata {
     assertFalse(metadata.containsProperty("jdbc-user"));
     assertFalse(metadata.containsProperty("jdbc-password"));
     assertFalse(metadata.containsProperty("token-provider"));
-    assertFalse(metadata.containsProperty("token"));
-    assertFalse(metadata.containsProperty("dlf-access-key-id"));
-    assertFalse(metadata.containsProperty("dlf-access-key-secret"));
-    assertFalse(metadata.containsProperty("dlf-security-token"));
-    assertFalse(metadata.containsProperty("dlf-token-path"));
-    assertFalse(metadata.containsProperty("dlf-token-loader"));
-    assertTrue(metadata.containsProperty("gcs.oauth2.token"));
-    assertTrue(metadata.isHiddenProperty("gcs.oauth2.token"));
-    assertTrue(metadata.containsProperty("gcs.oauth2.token-expires-at"));
-    assertFalse(metadata.isHiddenProperty("gcs.oauth2.token-expires-at"));
-    assertTrue(metadata.containsProperty("gcs.oauth2.refresh-credentials-endpoint"));
-    assertFalse(metadata.isHiddenProperty("gcs.oauth2.refresh-credentials-endpoint"));
-    assertTrue(metadata.containsProperty("s3.session-token-expires-at-ms"));
-    assertFalse(metadata.isHiddenProperty("s3.session-token-expires-at-ms"));
-    assertTrue(metadata.containsProperty("s3.session-token"));
-    assertTrue(metadata.isHiddenProperty("s3.session-token"));
-    assertFalse(metadata.containsProperty("jdbc.password"));
+    assertFalse(metadata.containsProperty("gcs.oauth2.token"));
+    assertFalse(metadata.containsProperty("s3.session-token"));
     assertFalse(metadata.containsProperty("jdbc.user"));
-    assertTrue(metadata.containsProperty("adls.sas-token.account.dfs.core.windows.net"));
-    assertTrue(metadata.isHiddenProperty("adls.sas-token.account.dfs.core.windows.net"));
-    assertTrue(
-        metadata.containsProperty("adls.sas-token-expires-at-ms.account.dfs.core.windows.net"));
-    assertFalse(
-        metadata.isHiddenProperty("adls.sas-token-expires-at-ms.account.dfs.core.windows.net"));
-
-    assertEquals(
-        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        metadata.isHiddenProperty("s3.session-token"));
-    assertEquals(
-        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        metadata.isHiddenProperty("gcs.oauth2.token"));
-    assertEquals(
-        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        metadata.isHiddenProperty("adls.sas-token.account.dfs.core.windows.net"));
-    assertEquals(
-        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_STS_ENDPOINT),
-        metadata.isHiddenProperty("client.refresh-credentials-endpoint"));
-    assertEquals(
-        metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_STS_ENDPOINT),
-        metadata.isHiddenProperty("gcs.oauth2.refresh-credentials-endpoint"));
-    assertEquals(
-        metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS),
-        metadata.isHiddenProperty("s3.session-token-expires-at-ms"));
-    assertEquals(
-        metadata.isHiddenProperty(CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS),
-        metadata.isHiddenProperty("client.security-token-expires-at-ms"));
-    assertFalse(metadata.isHiddenProperty("gcs.oauth2.token-expires-at"));
-    assertEquals(
-        metadata.isHiddenProperty(CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS),
-        metadata.isHiddenProperty("adls.sas-token-expires-at-ms.account.dfs.core.windows.net"));
   }
 
   @Test

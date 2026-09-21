@@ -32,7 +32,12 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
@@ -103,6 +108,19 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   true /* hidden */)),
           PropertyEntry::getName);
 
+  /**
+   * Cloud credential keys merged into every catalog. A catalog that already declares a key wins.
+   */
+  private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(AWSPropertiesMetadata.PROPERTY_ENTRIES)
+          .build();
+
   @Override
   public Map<String, PropertyEntry<?>> propertyEntries() {
     if (propertyEntries == null) {
@@ -114,7 +132,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
           builder.putAll(base);
 
-          SharedCloudPropertiesMetadata.PROPERTY_ENTRIES.forEach(
+          CLOUD_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 if (!base.containsKey(name)) {
                   builder.put(name, entry);

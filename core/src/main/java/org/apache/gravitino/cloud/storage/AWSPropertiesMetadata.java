@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector;
+package org.apache.gravitino.cloud.storage;
 
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
@@ -24,18 +24,16 @@ import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropert
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 
 /**
- * Glue AWS credential {@link PropertyEntry} definitions.
+ * Shared AWS credential {@link PropertyEntry} definitions for catalog properties metadata.
  *
- * <p>Hidden is defined only here. Glue metadata references these entries instead of setting hidden
- * again. {@link org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata} merges {@link
- * #PROPERTY_ENTRIES} into catalogs that do not already declare the key. {@code aws-region} is
- * defined here for Glue to reference, but it is not in {@link #PROPERTY_ENTRIES}: it is required,
- * so merging it would reject catalogs that are not Glue.
+ * <p>{@link #AWS_REGION} is required by Glue and is not part of {@link #PROPERTY_ENTRIES}. Merging
+ * it into every catalog would reject catalogs that are not Glue.
  */
-public final class CatalogCredentialPropertiesMetadata {
+public final class AWSPropertiesMetadata {
 
   /** AWS access key ID. Not hidden. */
   public static final PropertyEntry<String> AWS_ACCESS_KEY_ID =
@@ -67,12 +65,12 @@ public final class CatalogCredentialPropertiesMetadata {
           true /* immutable */,
           false /* hidden */);
 
-  /** Glue AWS credential keys merged into every catalog's properties metadata. */
+  /** AWS credential keys merged into every catalog's properties metadata. */
   public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(AWS_ACCESS_KEY_ID.getName(), AWS_ACCESS_KEY_ID)
           .put(AWS_SECRET_ACCESS_KEY.getName(), AWS_SECRET_ACCESS_KEY)
           .build();
 
-  private CatalogCredentialPropertiesMetadata() {}
+  private AWSPropertiesMetadata() {}
 }
