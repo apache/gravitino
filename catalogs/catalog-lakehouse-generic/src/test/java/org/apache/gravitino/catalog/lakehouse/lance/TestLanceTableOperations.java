@@ -56,6 +56,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -799,6 +800,34 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testAddColumnRejectsUnsupportedOptions() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    List<TableChange> unsupportedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"parent", "nested"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.addColumn(
+                new String[] {"first"}, Types.StringType.get(), TableChange.ColumnPosition.first()),
+            TableChange.addColumn(
+                new String[] {"sequence"}, Types.LongType.get(), null, null, true, true),
+            TableChange.addColumn(
+                new String[] {"with_default"},
+                Types.IntegerType.get(),
+                Literals.integerLiteral(1)));
+
+    for (TableChange change : unsupportedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> lanceTableOps.handleLanceTableChange(table, new TableChange[] {change}));
+    }
+    verify(dataset, never()).addColumns(anyList());
+  }
+
+  @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
@@ -811,6 +840,7 @@ public class TestLanceTableOperations {
 
     TableChange[] changes =
         new TableChange[] {
+          TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
           TableChange.renameColumn(new String[] {"old"}, "renamed"),
           TableChange.addIndex(Index.IndexType.SCALAR, "idx_renamed", new String[][] {{"renamed"}}),
           TableChange.deleteColumn(new String[] {"renamed"}, false)
@@ -820,6 +850,7 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(7L, returnedVersion);
 
     InOrder inOrder = Mockito.inOrder(dataset);
+    inOrder.verify(dataset).addColumns(List.of(Field.nullable("added", new ArrowType.Utf8())));
     inOrder.verify(dataset).alterColumns(anyList());
     inOrder.verify(dataset).createIndex(any(IndexOptions.class));
     inOrder.verify(dataset).dropColumns(anyList());
