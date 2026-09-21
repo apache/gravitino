@@ -42,7 +42,13 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       ImmutableMap.<String, PropertyEntry<?>>builder()
-          .put(AWS_REGION, AWSPropertiesMetadata.AWS_REGION)
+          .put(
+              AWS_REGION,
+              stringRequiredPropertyEntry(
+                  AWS_REGION,
+                  "AWS region for the Glue Data Catalog (e.g. us-east-1)",
+                  true /* immutable */,
+                  false /* hidden */))
           .put(
               AWS_GLUE_CATALOG_ID,
               stringOptionalPropertyEntry(
