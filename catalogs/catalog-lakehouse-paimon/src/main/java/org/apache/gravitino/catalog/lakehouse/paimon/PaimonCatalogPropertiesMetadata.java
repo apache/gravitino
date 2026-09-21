@@ -139,8 +139,18 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            CatalogCredentialPropertiesMetadata.JDBC_USER,
-            CatalogCredentialPropertiesMetadata.JDBC_PASSWORD,
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_USER,
+                "Gravitino Paimon catalog jdbc user",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_PASSWORD,
+                "Gravitino Paimon catalog jdbc password",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_DRIVER,
                 "The driver of the Jdbc connection",

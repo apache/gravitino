@@ -23,16 +23,15 @@ import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropert
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 
 /**
  * Connector credential {@link PropertyEntry} definitions.
  *
- * <p>Hidden is defined only here. Glue, JDBC, Iceberg, and Paimon metadata reference these entries
- * (or {@link PropertyEntry#isHidden()}) instead of setting hidden again. {@link
- * org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata} merges this map into catalogs
- * that do not already declare the key.
+ * <p>Hidden is defined only here. Glue and Paimon metadata reference these entries instead of
+ * setting hidden again. {@link org.apache.gravitino.cloud.storage.SharedCloudPropertiesMetadata}
+ * merges this map into catalogs that do not already declare the key. JDBC user and password stay on
+ * the JDBC, Iceberg, and Paimon catalogs, because they are not cloud credentials.
  */
 public final class CatalogCredentialPropertiesMetadata {
 
@@ -55,31 +54,6 @@ public final class CatalogCredentialPropertiesMetadata {
           false /* immutable */,
           null /* defaultValue */,
           true /* hidden */);
-
-  /** JDBC user. Not hidden. Optional here; JDBC catalogs use {@link #JDBC_USER_REQUIRED}. */
-  public static final PropertyEntry<String> JDBC_USER =
-      stringOptionalPropertyEntry(
-          IcebergConstants.GRAVITINO_JDBC_USER,
-          "JDBC user",
-          false /* immutable */,
-          null /* defaultValue */,
-          false /* hidden */);
-
-  /** JDBC user required by JDBC catalogs. Hidden matches {@link #JDBC_USER}. */
-  public static final PropertyEntry<String> JDBC_USER_REQUIRED = JDBC_USER.withRequired(true);
-
-  /** JDBC password. Hidden. Optional here; JDBC catalogs use {@link #JDBC_PASSWORD_REQUIRED}. */
-  public static final PropertyEntry<String> JDBC_PASSWORD =
-      stringOptionalPropertyEntry(
-          IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-          "JDBC password",
-          false /* immutable */,
-          null /* defaultValue */,
-          true /* hidden */);
-
-  /** JDBC password required by JDBC catalogs. Hidden matches {@link #JDBC_PASSWORD}. */
-  public static final PropertyEntry<String> JDBC_PASSWORD_REQUIRED =
-      JDBC_PASSWORD.withRequired(true);
 
   /** Paimon REST and DLF credential keys, including non-secret companions. */
   public static final Map<String, PropertyEntry<?>> PAIMON_REST_PROPERTY_ENTRIES =
@@ -142,13 +116,11 @@ public final class CatalogCredentialPropertiesMetadata {
                   false /* hidden */))
           .build();
 
-  /** Glue, JDBC, and Paimon credential keys. */
+  /** Glue and Paimon credential keys. */
   public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(AWS_ACCESS_KEY_ID.getName(), AWS_ACCESS_KEY_ID)
           .put(AWS_SECRET_ACCESS_KEY.getName(), AWS_SECRET_ACCESS_KEY)
-          .put(JDBC_USER.getName(), JDBC_USER)
-          .put(JDBC_PASSWORD.getName(), JDBC_PASSWORD)
           .putAll(PAIMON_REST_PROPERTY_ENTRIES)
           .build();
 

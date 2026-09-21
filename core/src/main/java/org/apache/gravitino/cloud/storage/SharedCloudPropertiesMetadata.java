@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.cloud.storage;
 
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_ADLS_ACCOUNT_KEY;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_ADLS_ACCOUNT_NAME;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT;
@@ -27,8 +29,6 @@ import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_CL
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_GCS_TOKEN;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_GCS_TOKEN_EXPIRES_AT;
-import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_JDBC_PASSWORD;
-import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_JDBC_USER;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_ID;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET;
 import static org.apache.gravitino.credential.CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN;
@@ -60,7 +60,7 @@ import org.apache.gravitino.storage.S3Properties;
  *
  * <p>Cloud entries and {@link org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata}
  * are the definitions those properties already have. Engine keys from {@link
- * org.apache.gravitino.credential.CredentialPropertyUtils} copy hidden from the catalog property
+ * org.apache.gravitino.credential.CredentialPropertyUtils} take hidden from the catalog property
  * that stores the same value: an access key from that cloud's access key, a session or SAS token
  * from that cloud's secret or from {@code token}, an expiry from that cloud's {@code
  * *-token-expire-in-secs}, and a refresh endpoint from {@code s3-token-service-endpoint}. A
@@ -111,63 +111,69 @@ public final class SharedCloudPropertiesMetadata {
 
   /**
    * Engine property names from {@link org.apache.gravitino.credential.CredentialPropertyUtils}.
-   * Hidden is copied from the catalog credential entry each key corresponds to.
+   * Hidden is taken from the catalog credential entry each key corresponds to.
    */
   private static final Map<String, PropertyEntry<?>> ENGINE_CREDENTIAL_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
-          .put(ICEBERG_S3_ACCESS_KEY_ID, S3_ACCESS_KEY_ID.withName(ICEBERG_S3_ACCESS_KEY_ID))
+          .put(ICEBERG_S3_ACCESS_KEY_ID, renamed(S3_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID))
           .put(
               ICEBERG_S3_SECRET_ACCESS_KEY,
-              S3_SECRET_ACCESS_KEY.withName(ICEBERG_S3_SECRET_ACCESS_KEY))
+              renamed(S3_SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY))
           .put(
               ICEBERG_S3_TOKEN,
-              S3_SECRET_ACCESS_KEY.asOptionalString(ICEBERG_S3_TOKEN, "Iceberg S3 session token"))
+              optionalString(S3_SECRET_ACCESS_KEY, ICEBERG_S3_TOKEN, "Iceberg S3 session token"))
           .put(
               ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
-              S3_TOKEN_EXPIRE.asOptionalString(
+              optionalString(
+                  S3_TOKEN_EXPIRE,
                   ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
                   "Epoch millis when the Iceberg S3 session token expires"))
           .put(
               ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT,
-              S3_TOKEN_SERVICE_ENDPOINT.asOptionalString(
+              optionalString(
+                  S3_TOKEN_SERVICE_ENDPOINT,
                   ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT,
                   "Iceberg client endpoint for refreshing S3 credentials"))
-          .put(ICEBERG_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_ID.withName(ICEBERG_OSS_ACCESS_KEY_ID))
+          .put(ICEBERG_OSS_ACCESS_KEY_ID, renamed(OSS_ACCESS_KEY_ID, ICEBERG_OSS_ACCESS_KEY_ID))
           .put(
               ICEBERG_OSS_ACCESS_KEY_SECRET,
-              OSS_ACCESS_KEY_SECRET.withName(ICEBERG_OSS_ACCESS_KEY_SECRET))
+              renamed(OSS_ACCESS_KEY_SECRET, ICEBERG_OSS_ACCESS_KEY_SECRET))
           .put(
               ICEBERG_OSS_SECURITY_TOKEN,
-              OSS_ACCESS_KEY_SECRET.asOptionalString(
-                  ICEBERG_OSS_SECURITY_TOKEN, "Iceberg OSS security token"))
+              optionalString(
+                  OSS_ACCESS_KEY_SECRET, ICEBERG_OSS_SECURITY_TOKEN, "Iceberg OSS security token"))
           .put(
               ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
-              OSS_TOKEN_EXPIRE.asOptionalString(
+              optionalString(
+                  OSS_TOKEN_EXPIRE,
                   ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
                   "Epoch millis when the Iceberg OSS security token expires"))
           .put(
               ICEBERG_ADLS_SAS_TOKEN_PREFIX,
-              TOKEN.asOptionalStringPrefix(
-                  ICEBERG_ADLS_SAS_TOKEN_PREFIX, "Iceberg ADLS SAS token for an account host"))
-          .put(ICEBERG_ADLS_ACCOUNT_NAME, AZURE_ACCOUNT_NAME.withName(ICEBERG_ADLS_ACCOUNT_NAME))
-          .put(ICEBERG_ADLS_ACCOUNT_KEY, AZURE_ACCOUNT_KEY.withName(ICEBERG_ADLS_ACCOUNT_KEY))
+              optionalStringPrefix(
+                  TOKEN,
+                  ICEBERG_ADLS_SAS_TOKEN_PREFIX,
+                  "Iceberg ADLS SAS token for an account host"))
+          .put(ICEBERG_ADLS_ACCOUNT_NAME, renamed(AZURE_ACCOUNT_NAME, ICEBERG_ADLS_ACCOUNT_NAME))
+          .put(ICEBERG_ADLS_ACCOUNT_KEY, renamed(AZURE_ACCOUNT_KEY, ICEBERG_ADLS_ACCOUNT_KEY))
           .put(
               ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX,
-              ADLS_TOKEN_EXPIRE.asOptionalStringPrefix(
+              optionalStringPrefix(
+                  ADLS_TOKEN_EXPIRE,
                   ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX,
                   "Epoch millis when an Iceberg ADLS SAS token expires"))
           .put(
               ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT,
-              S3_TOKEN_SERVICE_ENDPOINT.asOptionalString(
+              optionalString(
+                  S3_TOKEN_SERVICE_ENDPOINT,
                   ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT,
                   "Iceberg endpoint for refreshing ADLS credentials"))
           .put(
               ICEBERG_GCS_TOKEN,
-              TOKEN.asOptionalString(
-                  ICEBERG_GCS_TOKEN, "OAuth2 access token for Iceberg GCSFileIO"))
+              optionalString(TOKEN, ICEBERG_GCS_TOKEN, "OAuth2 access token for Iceberg GCSFileIO"))
           .put(
               ICEBERG_GCS_TOKEN_EXPIRES_AT,
-              PropertyEntry.stringOptionalPropertyEntry(
+              stringOptionalPropertyEntry(
                   ICEBERG_GCS_TOKEN_EXPIRES_AT,
                   "Epoch millis when the Iceberg GCS OAuth2 token expires",
                   false /* immutable */,
@@ -175,21 +181,16 @@ public final class SharedCloudPropertiesMetadata {
                   tokenExpireHidden()))
           .put(
               ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT,
-              S3_TOKEN_SERVICE_ENDPOINT.asOptionalString(
+              optionalString(
+                  S3_TOKEN_SERVICE_ENDPOINT,
                   ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT,
                   "Iceberg endpoint for refreshing GCS OAuth2 credentials"))
-          .put(
-              ICEBERG_JDBC_USER,
-              CatalogCredentialPropertiesMetadata.JDBC_USER.withName(ICEBERG_JDBC_USER))
-          .put(
-              ICEBERG_JDBC_PASSWORD,
-              CatalogCredentialPropertiesMetadata.JDBC_PASSWORD.withName(ICEBERG_JDBC_PASSWORD))
-          .put(PAIMON_S3_ACCESS_KEY, S3_ACCESS_KEY_ID.withName(PAIMON_S3_ACCESS_KEY))
-          .put(PAIMON_S3_SECRET_KEY, S3_SECRET_ACCESS_KEY.withName(PAIMON_S3_SECRET_KEY))
-          .put(PAIMON_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_ID.withName(PAIMON_OSS_ACCESS_KEY_ID))
+          .put(PAIMON_S3_ACCESS_KEY, renamed(S3_ACCESS_KEY_ID, PAIMON_S3_ACCESS_KEY))
+          .put(PAIMON_S3_SECRET_KEY, renamed(S3_SECRET_ACCESS_KEY, PAIMON_S3_SECRET_KEY))
+          .put(PAIMON_OSS_ACCESS_KEY_ID, renamed(OSS_ACCESS_KEY_ID, PAIMON_OSS_ACCESS_KEY_ID))
           .put(
               PAIMON_OSS_ACCESS_KEY_SECRET,
-              OSS_ACCESS_KEY_SECRET.withName(PAIMON_OSS_ACCESS_KEY_SECRET))
+              renamed(OSS_ACCESS_KEY_SECRET, PAIMON_OSS_ACCESS_KEY_SECRET))
           .build();
 
   /** Cloud and connector credential keys merged into every catalog's properties metadata. */
@@ -210,6 +211,25 @@ public final class SharedCloudPropertiesMetadata {
     PropertyEntry<?> propertyEntry = entries.get(name);
     Preconditions.checkNotNull(propertyEntry, "Property entry is not defined: %s", name);
     return propertyEntry;
+  }
+
+  /** Same description and hidden flag as {@code source}, under a different name. */
+  private static PropertyEntry<String> renamed(PropertyEntry<?> source, String name) {
+    return stringOptionalPropertyEntry(
+        name, source.getDescription(), source.isImmutable(), null, source.isHidden());
+  }
+
+  /** Optional string whose hidden flag comes from {@code hiddenSource}. */
+  private static PropertyEntry<String> optionalString(
+      PropertyEntry<?> hiddenSource, String name, String description) {
+    return stringOptionalPropertyEntry(name, description, false, null, hiddenSource.isHidden());
+  }
+
+  /** Optional string prefix whose hidden flag comes from {@code hiddenSource}. */
+  private static PropertyEntry<String> optionalStringPrefix(
+      PropertyEntry<?> hiddenSource, String name, String description) {
+    return stringOptionalPropertyPrefixEntry(
+        name, description, false, null, hiddenSource.isHidden(), false);
   }
 
   /**

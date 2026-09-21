@@ -60,9 +60,8 @@ public class TestBaseCatalogPropertiesMetadata {
     assertTrue(metadata.containsProperty("aws-access-key-id"));
     assertFalse(metadata.isHiddenProperty("aws-access-key-id"));
     assertTrue(metadata.isHiddenProperty("aws-secret-access-key"));
-    assertTrue(metadata.containsProperty("jdbc-user"));
-    assertFalse(metadata.isHiddenProperty("jdbc-user"));
-    assertTrue(metadata.isHiddenProperty("jdbc-password"));
+    assertFalse(metadata.containsProperty("jdbc-user"));
+    assertFalse(metadata.containsProperty("jdbc-password"));
     assertTrue(metadata.containsProperty("token-provider"));
     assertFalse(metadata.isHiddenProperty("token-provider"));
     assertTrue(metadata.isHiddenProperty("token"));
@@ -84,10 +83,8 @@ public class TestBaseCatalogPropertiesMetadata {
     assertFalse(metadata.isHiddenProperty("s3.session-token-expires-at-ms"));
     assertTrue(metadata.containsProperty("s3.session-token"));
     assertTrue(metadata.isHiddenProperty("s3.session-token"));
-    assertTrue(metadata.containsProperty("jdbc.password"));
-    assertTrue(metadata.isHiddenProperty("jdbc.password"));
-    assertTrue(metadata.containsProperty("jdbc.user"));
-    assertFalse(metadata.isHiddenProperty("jdbc.user"));
+    assertFalse(metadata.containsProperty("jdbc.password"));
+    assertFalse(metadata.containsProperty("jdbc.user"));
     assertTrue(metadata.containsProperty("adls.sas-token.account.dfs.core.windows.net"));
     assertTrue(metadata.isHiddenProperty("adls.sas-token.account.dfs.core.windows.net"));
     assertTrue(

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
-import org.apache.gravitino.connector.CatalogCredentialPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
@@ -73,8 +72,22 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 null /* defaultValue */,
                 false /* hidden */,
                 false /* reserved */),
-            CatalogCredentialPropertiesMetadata.JDBC_USER_REQUIRED,
-            CatalogCredentialPropertiesMetadata.JDBC_PASSWORD_REQUIRED,
+            stringPropertyEntry(
+                JdbcConfig.USERNAME.getKey(),
+                JdbcConfig.USERNAME.getDoc(),
+                true /* required */,
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
+            stringPropertyEntry(
+                JdbcConfig.PASSWORD.getKey(),
+                JdbcConfig.PASSWORD.getDoc(),
+                true /* required */,
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */,
+                false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
