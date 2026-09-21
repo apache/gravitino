@@ -172,8 +172,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           if (metalakeIdent != null) {
             authorizationMetalake = Optional.of(metalakeIdent.name());
             Optional<Response> validationFailure =
-                validateCurrentUser(
-                    metalakeIdent, authorizationRequestContext, method, expression, false);
+                validateCurrentUser(metalakeIdent, authorizationRequestContext, method, expression);
             if (validationFailure.isPresent()) {
               return validationFailure.get();
             }
@@ -219,8 +218,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                       NameIdentifier.of(dynamicMetalake.get()),
                       authorizationRequestContext,
                       method,
-                      expression,
-                      true);
+                      expression);
               if (validationFailure.isPresent()) {
                 return validationFailure.get();
               }
@@ -280,21 +278,15 @@ public class GravitinoInterceptionService implements InterceptionService {
         NameIdentifier metalakeIdent,
         AuthorizationRequestContext authorizationRequestContext,
         Method method,
-        String expression,
-        boolean dynamicMetalake) {
+        String expression) {
       String currentUser = PrincipalUtils.getCurrentUserName();
       try {
         AuthorizationUtils.checkCurrentUser(
             metalakeIdent.name(), currentUser, authorizationRequestContext);
       } catch (NoSuchMetalakeException e) {
+        // A custom authorizer may report a missing metalake directly; JCasbin reports it as
+        // non-membership instead.
         LOG.warn("Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
-        if (dynamicMetalake) {
-          return Optional.of(
-              Utils.illegalArguments(
-                  String.format(
-                      "job.namespace must identify an existing metalake: %s", metalakeIdent.name()),
-                  e));
-        }
         // A missing metalake is not an authorization denial, so skip the denial event. Return the
         // same client-visible response as a failed membership check to avoid exposing existence.
         return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
@@ -320,10 +312,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
     private Response metalakeMembershipFailure(String user, String metalake) {
       return Utils.forbidden(
-          String.format(
-              "Current user %s is not a member of metalake %s, or the metalake does not exist",
-              user, metalake),
-          null);
+          AuthorizationUtils.metalakeMembershipFailureMessage(metalake, user), null);
     }
 
     private Response buildNoAuthResponse(
