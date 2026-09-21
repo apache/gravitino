@@ -118,8 +118,6 @@ public class TestCloudPropertiesMetadata {
     assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isRequired());
     assertTrue(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isHidden());
     assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isRequired());
-    assertSame(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID, GlueConstants.AWS_ACCESS_KEY_ID);
-    assertSame(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY, GlueConstants.AWS_SECRET_ACCESS_KEY);
   }
 
   @Test

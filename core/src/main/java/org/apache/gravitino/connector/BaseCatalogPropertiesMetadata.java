@@ -29,7 +29,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.cloud.storage.CloudPropertiesMetadata;
@@ -119,10 +121,13 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
           Map<String, PropertyEntry<?>> base = buildBasePropertyEntries();
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
           builder.putAll(base);
+          // Track keys already placed so a later collision reports "Property metadata already
+          // exists" instead of Guava's "Multiple entries with same key" from builder.build().
+          Set<String> placed = new HashSet<>(base.keySet());
 
           CLOUD_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
-                if (!base.containsKey(name)) {
+                if (placed.add(name)) {
                   builder.put(name, entry);
                 }
               });
@@ -130,7 +135,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
           BASIC_CATALOG_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
-                    !base.containsKey(name), "Property metadata already exists: " + name);
+                    placed.add(name), "Property metadata already exists: " + name);
                 builder.put(name, entry);
               });
           propertyEntries = builder.build();

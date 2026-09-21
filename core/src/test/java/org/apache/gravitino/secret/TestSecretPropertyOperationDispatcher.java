@@ -197,5 +197,13 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
+    // AWS access-key pair is catalog-only (BaseCatalogPropertiesMetadata), not in this entity
+    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES.
+    Assertions.assertFalse(metadata.containsProperty("aws-access-key-id"));
+    Assertions.assertFalse(metadata.containsProperty("aws-secret-access-key"));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-access-key-id", metadata));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-secret-access-key", metadata));
   }
 }
