@@ -200,19 +200,25 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(
-        id,
-        name,
-        auditInfo,
-        columns,
-        namespace,
-        properties,
-        Arrays.hashCode(partitioning),
-        Arrays.hashCode(sortOrders),
-        distribution,
-        distribution,
-        Arrays.hashCode(indexes),
-        comment);
+    // columns are compared as an unordered collection in equals, so their hash
+    // contribution must not depend on element order either.
+    int hash =
+        Objects.hashCode(
+            id,
+            name,
+            auditInfo,
+            namespace,
+            properties,
+            Arrays.hashCode(partitioning),
+            Arrays.hashCode(sortOrders),
+            distribution,
+            Arrays.hashCode(indexes),
+            comment);
+    return 31 * hash + unorderedHashCode(columns);
+  }
+
+  private static int unorderedHashCode(List<?> list) {
+    return list == null ? 0 : list.stream().mapToInt(Object::hashCode).sum();
   }
 
   public static class Builder {
