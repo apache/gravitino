@@ -57,13 +57,14 @@ Leaving either unset takes the broker's own default, from `num.partition` and
 
 ### What Gravitino Stores and What It Does Not
 
-Gravitino stores the topic's place in the hierarchy and anything attached to it, including tags,
-policies, and ownership. Message content, offsets, consumer groups, and lag stay entirely in the
+Gravitino stores the topic's place in the hierarchy, its tag assignments, derived policies,
+and ownership. Message content, offsets, consumer groups, and lag stay entirely in the
 cluster.
 
 Message schemas are also outside the catalog. Gravitino does not integrate with a schema registry,
 so the structure of the messages in a topic is not described here and cannot be classified per field
-the way table columns can. Tags and policies attach to the topic as a whole.
+the way table columns can. Tags are assigned to the topic as a whole, and matching policies
+are derived from those tags.
 
 ## Working With Topics in the UI
 

@@ -125,7 +125,7 @@ spark.hadoop.fs.defaultFS=file:///
 Four things are worth confirming before assuming a configuration problem is a code problem.
 
 - `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the job template list.
-- The policy is attached to the target table, not merely created.
+- The policy is associated with a tag assigned to the target table or one of its ancestors.
 - `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing.
 - The rewrite log shows `Rewritten data files: N` with `N` greater than zero for a non-empty table.
 

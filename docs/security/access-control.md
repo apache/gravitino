@@ -210,7 +210,7 @@ they will be removed in a future release. Use the current names in new roles.
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
 | `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
@@ -222,12 +222,13 @@ object and its descendants.
 
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
 this page. The object they bind to is the instrument the holder may use, not the object the operation
-acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder attach that one policy
-and no other, while granting it on the metalake lets them attach any policy in the metalake.
+acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder associate that
+policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it on the metalake
+covers any policy in that metalake.
 
-Attaching a tag or a policy is checked twice: the holder needs `APPLY_TAG` or `APPLY_POLICY` for the
-tag or policy in question, and separately needs access to the metadata object being tagged. A user
-cannot tag an object they could not otherwise reach.
+Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
+`APPLY_TAG` on the tag. Ownership can satisfy either check.
 
 ### Required Privileges
 
@@ -287,8 +288,8 @@ owner-only; it does not accept a target schema.
 | User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
 | Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
 | Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
-| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
+| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Assign: `APPLY_TAG` and access to the object    |
+| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
 | Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
 | Job              |                         | Owner                                  | Owner           |                                                 |
 | Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
