@@ -49,10 +49,11 @@ def _missing_ray_iceberg_dependencies() -> Optional[str]:
 
 
 _MISSING_RAY_ICEBERG_DEPS = _missing_ray_iceberg_dependencies()
+_RAY_ICEBERG_IT_REQUIRED = os.environ.get("RAY_ICEBERG_IT_REQUIRED") == "true"
 
 
 @unittest.skipIf(
-    _MISSING_RAY_ICEBERG_DEPS is not None,
+    _MISSING_RAY_ICEBERG_DEPS is not None and not _RAY_ICEBERG_IT_REQUIRED,
     f"Ray Iceberg test deps not installed: {_MISSING_RAY_ICEBERG_DEPS}. "
     "Install with: pip install -r clients/client-python/requirements-ray-iceberg.txt",
 )

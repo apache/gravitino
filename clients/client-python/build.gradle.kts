@@ -280,6 +280,7 @@ tasks {
         environment("PROJECT_VERSION", project.version)
         environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
         environment("START_EXTERNAL_GRAVITINO", "true")
+        environment("RAY_ICEBERG_IT_REQUIRED", "true")
         environment("PYTHONPATH", "${project.rootDir.path}/clients/client-python")
         args = listOf("-m", "unittest", "-v", "test_ray_iceberg")
       }
