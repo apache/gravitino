@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.jar.JarEntry;
@@ -64,9 +65,10 @@ class TestRuntimeJarDependencies {
       JarEntry factoryServiceEntry = jarFile.getJarEntry(FACTORY_SERVICE_ENTRY);
       assertNotNull(factoryServiceEntry, "Factory service descriptor should exist in runtime jar");
 
-      String factoryServices =
-          new String(
-              jarFile.getInputStream(factoryServiceEntry).readAllBytes(), StandardCharsets.UTF_8);
+      String factoryServices;
+      try (InputStream in = jarFile.getInputStream(factoryServiceEntry)) {
+        factoryServices = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+      }
       assertTrue(
           factoryServices.contains(
               "org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory"),

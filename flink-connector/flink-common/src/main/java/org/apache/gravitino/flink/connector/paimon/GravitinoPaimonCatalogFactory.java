@@ -35,7 +35,7 @@ import org.apache.gravitino.flink.connector.utils.FactoryUtils;
  * Factory for creating instances of {@link GravitinoPaimonCatalog}. It will be created by SPI
  * discovery in Flink.
  */
-public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public Catalog createCatalog(Context context) {
@@ -52,8 +52,10 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    return new GravitinoPaimonCatalog(
-        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+    // GravitinoPaimonCatalog is abstract (its inner-catalog construction differs per Flink
+    // version); every concrete, version-specific factory overrides this hook.
+    throw new UnsupportedOperationException(
+        "newCatalog() must be overridden by a Flink version-specific catalog factory");
   }
 
   @Override

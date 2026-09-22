@@ -82,7 +82,6 @@ if (!skipTrinoConnector) {
 } else {
   println("Skipping trino-connector modules since skipTrinoConnector is set to true")
 }
-include("spark-connector:spark-common")
 // flink-common's sources are also compiled directly into each flink-connector:flink-*
 // module's own sourceSet (not consumed as a jar dependency), so it is not gated by scalaVersion.
 include("flink-connector:flink-common")
