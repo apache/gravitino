@@ -222,40 +222,36 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @ParameterizedTest
-  @CsvSource({
-    "false, false, false", "false, true, false",
-    "true, false, false", "true, true, false",
-    "false, false, true", "false, true, true",
-    "true, false, true", "true, true, true"
-  })
-  void testMembershipUpdateRejectsChangedExistingRole(boolean group, boolean grant, boolean deleted)
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testMembershipUpdateCarriesObservedRolesForward(boolean group, boolean grant)
       throws IOException {
     try (EntityStore store = new TestMemoryEntityStore.InMemoryEntityStore()) {
       store.initialize(config);
       RoleEntity retained = membershipRole(10L, "retained");
       RoleEntity target = membershipRole(20L, "target");
-      RoleEntity another = membershipRole(30L, "another");
       putMembershipPrincipal(store, group, List.of(retained, target));
-      Entity observed = membershipPrincipal(store, group);
       RoleManager roles = Mockito.mock(RoleManager.class);
       Mockito.when(roles.getRole(METALAKE, target.name())).thenReturn(target);
-      Mockito.when(roles.getRole(METALAKE, another.name())).thenReturn(another);
-      // The updater sees the old membership, but the name lookup sees a completed delete/recreate.
-      if (deleted) {
-        Mockito.when(roles.getRole(METALAKE, retained.name()))
-            .thenThrow(new NoSuchRoleException("Role was deleted"));
-      } else {
-        Mockito.when(roles.getRole(METALAKE, retained.name()))
-            .thenReturn(membershipRole(11L, retained.name()));
-      }
+      // "retained" has been deleted and recreated under the same name. The updater must never
+      // resolve an existing membership by name, so the replacement cannot inherit the grant and
+      // the update costs no lookup per existing role.
+      Mockito.when(roles.getRole(METALAKE, retained.name()))
+          .thenReturn(membershipRole(11L, retained.name()));
       PermissionManager manager = new PermissionManager(store, roles);
       reset(authorizationPlugin);
-      Assertions.assertThrows(
-          IllegalRoleException.class,
-          () -> changeMembership(manager, group, grant, List.of(target.name(), another.name())));
-      // The whole batch must fail before writing a new principal or notifying the plugin.
-      Assertions.assertSame(observed, membershipPrincipal(store, group));
-      Mockito.verifyNoInteractions(authorizationPlugin);
+
+      changeMembership(manager, group, grant, List.of(target.name()));
+
+      Entity updated = membershipPrincipal(store, group);
+      List<String> names =
+          group ? ((GroupEntity) updated).roleNames() : ((UserEntity) updated).roleNames();
+      List<Long> ids = group ? ((GroupEntity) updated).roleIds() : ((UserEntity) updated).roleIds();
+      // Granting an already-held role is a no-op, revoking it drops only that pair.
+      Assertions.assertEquals(
+          grant ? List.of(retained.name(), target.name()) : List.of(retained.name()), names);
+      Assertions.assertEquals(
+          grant ? List.of(retained.id(), target.id()) : List.of(retained.id()), ids);
+      Mockito.verify(roles, Mockito.never()).getRole(METALAKE, retained.name());
     }
   }
 
@@ -300,7 +296,7 @@ public class TestAccessControlManagerForPermissions {
       RoleManager roles = Mockito.mock(RoleManager.class);
       // The request resolves the old ID, then a concurrent operation grants the replacement
       // before the principal snapshot is read. Revoking the old ID must preserve the new pair.
-      Mockito.when(roles.getRole(METALAKE, old.name())).thenReturn(old, replacement);
+      Mockito.when(roles.getRole(METALAKE, old.name())).thenReturn(old);
       Mockito.when(roles.getRole(METALAKE, removed.name())).thenReturn(removed);
       PermissionManager manager = new PermissionManager(store, roles);
       changeMembership(manager, group, false, List.of(old.name(), removed.name(), removed.name()));

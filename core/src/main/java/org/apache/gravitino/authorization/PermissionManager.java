@@ -85,10 +85,9 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities =
-                    getExistingRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+                checkObservedRoles(userEntity.roleNames(), userEntity.roleIds());
+                List<String> roleNames = mutableCopy(userEntity.roleNames());
+                List<Long> roleIds = mutableCopy(userEntity.roleIds());
 
                 for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
                   if (roleIds.contains(roleEntityToGrant.id())) {
@@ -170,10 +169,9 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities =
-                    getExistingRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+                checkObservedRoles(groupEntity.roleNames(), groupEntity.roleIds());
+                List<String> roleNames = mutableCopy(groupEntity.roleNames());
+                List<Long> roleIds = mutableCopy(groupEntity.roleIds());
 
                 for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
                   if (roleIds.contains(roleEntityToGrant.id())) {
@@ -255,10 +253,9 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities =
-                    getExistingRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+                checkObservedRoles(groupEntity.roleNames(), groupEntity.roleIds());
+                List<String> roleNames = mutableCopy(groupEntity.roleNames());
+                List<Long> roleIds = mutableCopy(groupEntity.roleIds());
 
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
                   int index = roleIds.indexOf(roleEntityToRevoke.id());
@@ -342,11 +339,9 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities =
-                    getExistingRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
-
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+                checkObservedRoles(userEntity.roleNames(), userEntity.roleIds());
+                List<String> roleNames = mutableCopy(userEntity.roleNames());
+                List<Long> roleIds = mutableCopy(userEntity.roleIds());
 
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
                   int index = roleIds.indexOf(roleEntityToRevoke.id());
@@ -859,35 +854,25 @@ class PermissionManager {
     }
   }
 
-  private List<RoleEntity> getExistingRoles(
-      String metalake, @Nullable List<String> roleNames, @Nullable List<Long> roleIds) {
-    List<RoleEntity> roles = Lists.newArrayList();
+  // The principal handed to the updater already carries its memberships as a (name, ID) pair per
+  // role, read from the membership join that UserMetaService#updateUser and
+  // GroupMetaService#updateGroup run inside the update transaction. Resolving those names again
+  // here would cost one query per existing role inside that transaction, and it would resolve them
+  // by name, which is what lets a deleted-and-recreated role take an observed membership over. The
+  // observed IDs are carried forward untouched instead, so a replacement never inherits a grant and
+  // the transaction issues no extra reads. Only the pairing itself still needs checking, because
+  // role IDs are an optional entity field and a name alone cannot prove membership identity.
+  private static void checkObservedRoles(
+      @Nullable List<String> roleNames, @Nullable List<Long> roleIds) {
     if (roleNames == null || roleNames.isEmpty()) {
-      return roles;
+      return;
     }
     if (roleIds == null || roleNames.size() != roleIds.size()) {
       throw new IllegalRoleException("Existing role names and IDs must be paired");
     }
-    for (int i = 0; i < roleNames.size(); i++) {
-      RoleEntity role = roleManager.getRole(metalake, roleNames.get(i));
-      // Names can be reused after deletion. Never turn an observed membership into a grant of
-      // the replacement, even when that replacement is active and would pass the storage fence.
-      if (!role.id().equals(roleIds.get(i))) {
-        throw new IllegalRoleException(
-            "Role %s in metalake %s was deleted and recreated concurrently (observed ID %s, "
-                + "current ID %s); retry the operation",
-            role.name(), metalake, roleIds.get(i), role.id());
-      }
-      roles.add(role);
-    }
-    return roles;
   }
 
-  private List<Long> toRoleIds(List<RoleEntity> roleEntities) {
-    return roleEntities.stream().map(RoleEntity::id).collect(Collectors.toList());
-  }
-
-  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
-    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
+  private static <T> List<T> mutableCopy(@Nullable List<T> values) {
+    return values == null ? Lists.newArrayList() : Lists.newArrayList(values);
   }
 }
