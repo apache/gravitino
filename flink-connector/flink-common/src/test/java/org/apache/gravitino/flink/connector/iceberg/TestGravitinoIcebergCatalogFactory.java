@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 
 class TestGravitinoIcebergCatalogFactory {
 
-  private final GravitinoIcebergCatalogFactory factory = new GravitinoIcebergCatalogFactory();
+  private final GravitinoIcebergCatalogFactory factory = new GravitinoIcebergCatalogFactory() {};
 
   @Test
   void testJdbcBackendTranslatedToCatalogImpl() {

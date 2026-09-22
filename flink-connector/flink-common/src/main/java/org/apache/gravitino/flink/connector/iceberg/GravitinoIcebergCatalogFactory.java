@@ -36,7 +36,7 @@ import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 import org.apache.iceberg.rest.auth.AuthProperties;
 
-public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public Catalog createCatalog(Context context) {

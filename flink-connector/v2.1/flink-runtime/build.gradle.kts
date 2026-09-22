@@ -46,6 +46,11 @@ configurations.all {
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":flink-connector:flink-2.1"))
+  // flink-2.1's own openlineageSqlJava21 constraint only applies to that module's compileOnly and
+  // testImplementation configurations, so it never reaches this module's runtimeClasspath (which
+  // shadowJar packages). Depend on it directly here so the shaded runtime jar ships the patched
+  // 1.52.0 release instead of the vulnerable 1.32.0 pulled transitively by flink-connector-jdbc.
+  implementation(libs.openlineageSqlJava21)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
