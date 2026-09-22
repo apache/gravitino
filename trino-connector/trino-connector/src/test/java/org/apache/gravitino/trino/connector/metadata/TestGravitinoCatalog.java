@@ -106,6 +106,23 @@ public class TestGravitinoCatalog {
     assertTrue(catalog.isSameRegion("c2"));
   }
 
+  @Test
+  public void testCatalogWithResolvedSecretsProperties() {
+    String catalogName = "mock";
+    String provider = "hive";
+    HashMap<String, String> properties = new HashMap<>();
+    properties.put("metastore.uris", "thrift://localhost:9083");
+    Catalog mockCatalog =
+        mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
+
+    HashMap<String, String> resolved = new HashMap<>(properties);
+    resolved.put("jdbc-password", "from-secrets");
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog, resolved);
+
+    assertEquals("from-secrets", catalog.getProperty("jdbc-password", ""));
+    assertEquals("thrift://localhost:9083", catalog.getProperty("metastore.uris", ""));
+  }
+
   public static Catalog mockCatalog(
       String name,
       String provider,

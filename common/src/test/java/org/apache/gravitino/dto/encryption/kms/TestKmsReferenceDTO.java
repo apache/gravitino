@@ -30,9 +30,8 @@ public class TestKmsReferenceDTO {
   private final ObjectMapper objectMapper = JsonUtils.objectMapper();
 
   @Test
-  void testRoundTripPreservesExactApi() throws JsonProcessingException {
-    KmsReference reference =
-        new KmsReference("google-cloud-kms", "analytics-prod", "projects/p/keys/k");
+  void testRoundTripPreservesProviderAndKeyId() throws JsonProcessingException {
+    KmsReference reference = new KmsReference("analytics-prod", "projects/p/keys/k");
 
     KmsReferenceDTO dto = KmsReferenceDTO.fromKmsReference(reference);
     String json = objectMapper.writeValueAsString(dto);
@@ -40,52 +39,23 @@ public class TestKmsReferenceDTO {
 
     Assertions.assertEquals(reference, restored);
     Assertions.assertEquals(
-        objectMapper.readTree(
-            "{\"api\":\"google-cloud-kms\",\"source\":\"analytics-prod\","
-                + "\"keyId\":\"projects/p/keys/k\"}"),
+        objectMapper.readTree("{\"provider\":\"analytics-prod\",\"keyId\":\"projects/p/keys/k\"}"),
         objectMapper.readTree(json));
   }
 
   @Test
-  void testAcceptsCustomApiIdentifier() throws JsonProcessingException {
-    KmsReference reference = new KmsReference("acme-kms-v2", "team-a", "keys/primary");
-    KmsReferenceDTO dto = KmsReferenceDTO.fromKmsReference(reference);
-
-    String json = objectMapper.writeValueAsString(dto);
-    KmsReference restored = objectMapper.readValue(json, KmsReferenceDTO.class).toKmsReference();
-
-    Assertions.assertEquals("acme-kms-v2", restored.api());
-    Assertions.assertEquals(reference, restored);
-  }
-
-  @Test
-  void testToKmsReferenceRejectsPaddedApi() {
+  void testToKmsReferenceRejectsBlankProvider() {
     KmsReferenceDTO dto =
-        KmsReferenceDTO.builder()
-            .withApi(" google-cloud-kms ")
-            .withSource("analytics-prod")
-            .withKeyId("projects/p/keys/k")
-            .build();
+        KmsReferenceDTO.builder().withProvider(" ").withKeyId("projects/p/keys/k").build();
 
     Assertions.assertThrows(IllegalArgumentException.class, dto::toKmsReference);
   }
 
   @Test
-  void testToKmsReferenceRejectsInvalidApiFormat() {
-    KmsReferenceDTO uppercase =
-        KmsReferenceDTO.builder()
-            .withApi("AWS-KMS")
-            .withSource("production")
-            .withKeyId("key")
-            .build();
-    KmsReferenceDTO snakeCase =
-        KmsReferenceDTO.builder()
-            .withApi("aws_kms")
-            .withSource("production")
-            .withKeyId("key")
-            .build();
+  void testToKmsReferenceRejectsBlankKeyId() {
+    KmsReferenceDTO dto =
+        KmsReferenceDTO.builder().withProvider("analytics-prod").withKeyId(" ").build();
 
-    Assertions.assertThrows(IllegalArgumentException.class, uppercase::toKmsReference);
-    Assertions.assertThrows(IllegalArgumentException.class, snakeCase::toKmsReference);
+    Assertions.assertThrows(IllegalArgumentException.class, dto::toKmsReference);
   }
 }

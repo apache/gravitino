@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.utils.ExceptionMessages;
 
 /**
  * Utility class to convert Hive exceptions to Gravitino exceptions. This class handles various
@@ -190,7 +191,10 @@ public class HiveExceptionConverter {
 
     if (isConnectionKeyword(lowerMessage) || exceptionClassName.contains("TransportException")) {
       return new ConnectionFailedException(
-          cause, "Failed to connect to Hive Metastore: %s", target.name());
+          cause,
+          "%s",
+          ExceptionMessages.withCause(
+              "Failed to connect to Hive Metastore: " + target.name(), cause));
     }
 
     if (cause instanceof RuntimeException) {

@@ -156,6 +156,31 @@ class TestSecurableObject(unittest.TestCase):
         self.assertEqual(MetadataObject.Type.TABLE, table_object.type())
         self.assertEqual(table_object, another_table_object)
 
+    def test_view_object(self) -> None:
+        catalog_object = SecurableObjects.of_catalog(
+            "catalog",
+            [MockPrivilege(Privilege.Name.USE_CATALOG, Privilege.Condition.ALLOW)],
+        )
+        schema_object = SecurableObjects.of_schema(
+            catalog_object,
+            "schema",
+            [MockPrivilege(Privilege.Name.USE_SCHEMA, Privilege.Condition.ALLOW)],
+        )
+        view_privilege = MockPrivilege(
+            Privilege.Name.SELECT_VIEW, Privilege.Condition.ALLOW
+        )
+
+        view_object = SecurableObjects.of_view(schema_object, "view", [view_privilege])
+        another_view_object = SecurableObjects.of(
+            MetadataObject.Type.VIEW,
+            ["catalog", "schema", "view"],
+            [view_privilege],
+        )
+
+        self.assertEqual("catalog.schema.view", view_object.full_name())
+        self.assertEqual(MetadataObject.Type.VIEW, view_object.type())
+        self.assertEqual(view_object, another_view_object)
+
     def test_fileset_object(self) -> None:
         catalog_object = SecurableObjects.of_catalog(
             "catalog",
@@ -197,6 +222,33 @@ class TestSecurableObject(unittest.TestCase):
         self.assertEqual("catalog.schema.fileset", fileset_object.full_name())
         self.assertEqual(MetadataObject.Type.FILESET, fileset_object.type())
         self.assertEqual(fileset_object, another_fileset_object)
+
+    def test_function_object(self) -> None:
+        catalog_object = SecurableObjects.of_catalog(
+            "catalog",
+            [MockPrivilege(Privilege.Name.USE_CATALOG, Privilege.Condition.ALLOW)],
+        )
+        schema_object = SecurableObjects.of_schema(
+            catalog_object,
+            "schema",
+            [MockPrivilege(Privilege.Name.USE_SCHEMA, Privilege.Condition.ALLOW)],
+        )
+        function_privilege = MockPrivilege(
+            Privilege.Name.EXECUTE_FUNCTION, Privilege.Condition.ALLOW
+        )
+
+        function_object = SecurableObjects.of_function(
+            schema_object, "function", [function_privilege]
+        )
+        another_function_object = SecurableObjects.of(
+            MetadataObject.Type.FUNCTION,
+            ["catalog", "schema", "function"],
+            [function_privilege],
+        )
+
+        self.assertEqual("catalog.schema.function", function_object.full_name())
+        self.assertEqual(MetadataObject.Type.FUNCTION, function_object.type())
+        self.assertEqual(function_object, another_function_object)
 
     def test_topic_object(self) -> None:
         catalog_object = SecurableObjects.of_catalog(

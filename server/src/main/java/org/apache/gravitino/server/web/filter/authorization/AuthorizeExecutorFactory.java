@@ -36,16 +36,16 @@ public class AuthorizeExecutorFactory {
       Parameter[] parameters,
       Object[] args,
       String secondaryExpression,
-      ExpressionCondition secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      String allowCheckExistenceExpression) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
-      case ASSOCIATE_POLICY -> new AssociatePolicyAuthorizationExecutor(
-          expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);
       case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
           parameters,
           args,
@@ -54,9 +54,19 @@ public class AuthorizeExecutorFactory {
           pathParams,
           entityType,
           secondaryExpression,
-          secondaryExpressionCondition);
+          secondaryExpressionCondition,
+          allowCheckExistenceExpression);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
     };
   }
 }

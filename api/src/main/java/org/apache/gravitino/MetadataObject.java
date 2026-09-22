@@ -54,6 +54,8 @@ public interface MetadataObject {
     TABLE,
     /** A view is mapped to the view of relational data sources like Apache Hive, MySQL, etc. */
     VIEW,
+    /** A Semantic Model represents a governed analytical semantic definition. */
+    SEMANTIC_MODEL,
     /**
      * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
      */
@@ -64,6 +66,8 @@ public interface MetadataObject {
     ROLE,
     /** A model is mapped to the model artifact in ML. */
     MODEL,
+    /** A model version is a checkpoint / snapshot linked to a registered model. */
+    MODEL_VERSION,
     /** A tag is used to help manage other metadata object. */
     TAG,
     /**

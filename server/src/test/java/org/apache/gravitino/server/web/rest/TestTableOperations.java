@@ -226,6 +226,17 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTableWithNullRequest() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTable() {
     Column[] columns =
         new Column[] {
@@ -565,6 +576,17 @@ public class TestTableOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testAlterTableWithNullRequest() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

@@ -16,7 +16,11 @@
 # under the License.
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from enum import Enum
+from typing import List, Optional
+
+from gravitino.api.job.job_template import JobTemplate
 
 
 class JobHandle(ABC):
@@ -52,3 +56,42 @@ class JobHandle(ABC):
     @abstractmethod
     def job_status(self) -> Status:
         pass
+
+    def queued_at(self) -> Optional[datetime]:
+        """Returns the time the job was queued for execution."""
+        raise NotImplementedError("queued_at is not implemented")
+
+    def started_at(self) -> Optional[datetime]:
+        """Returns the time the job started execution, or ``None`` if the job has not started
+        execution yet.
+        """
+        raise NotImplementedError("started_at is not implemented")
+
+    def finished_at(self) -> Optional[datetime]:
+        """Returns the time the job finished execution, or ``None`` if the job has not finished
+        execution yet.
+        """
+        raise NotImplementedError("finished_at is not implemented")
+
+    def runtime_job_template(self) -> Optional[JobTemplate]:
+        """Returns the resolved job template that was actually submitted for execution, with
+        placeholders replaced and referenced files downloaded, or ``None`` for jobs run before
+        this field was introduced.
+        """
+        raise NotImplementedError("runtime_job_template is not implemented")
+
+    def stdout(self) -> List[str]:
+        """Returns the captured standard output of the job, as a list of lines. This is only
+        populated when the handle was obtained via ``SupportsJobs.get_job`` with
+        ``include_output=True``; handles obtained via the plain ``get_job``, ``list_jobs``, or
+        ``run_job`` always return an empty list here.
+        """
+        return []
+
+    def stderr(self) -> List[str]:
+        """Returns the captured standard error output of the job, as a list of lines. This is only
+        populated when the handle was obtained via ``SupportsJobs.get_job`` with
+        ``include_output=True``; handles obtained via the plain ``get_job``, ``list_jobs``, or
+        ``run_job`` always return an empty list here.
+        """
+        return []

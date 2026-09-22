@@ -62,10 +62,21 @@ public class GravitinoCatalog {
    * @param catalog the catalog
    */
   public GravitinoCatalog(String metalake, Catalog catalog) {
+    this(metalake, catalog, catalog.properties());
+  }
+
+  /**
+   * Constructs a new GravitinoCatalog with resolved plaintext properties.
+   *
+   * @param metalake the name of the metalake
+   * @param catalog the catalog
+   * @param properties resolved catalog properties (secret URNs replaced with plaintext)
+   */
+  public GravitinoCatalog(String metalake, Catalog catalog, Map<String, String> properties) {
     this.metalake = metalake;
     this.provider = catalog.provider();
     this.name = catalog.name();
-    this.properties = catalog.properties();
+    this.properties = properties;
     Instant time =
         catalog.auditInfo().lastModifiedTime() == null
             ? catalog.auditInfo().createTime()

@@ -157,6 +157,28 @@ public class TestMySQLDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(varbinaryType), VarbinaryType.VARBINARY);
 
+    // catalogString may carry type parameters, e.g. "varbinary(100)", "enum('a','b','c')",
+    // "binary(16)" or "bit(8)" -- these must resolve the same as their bare form.
+    Type varbinaryWithLengthType = Types.ExternalType.of("varbinary(100)");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(varbinaryWithLengthType), VarbinaryType.VARBINARY);
+
+    Type enumWithValuesType = Types.ExternalType.of("enum('a','b','c')");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(enumWithValuesType), VarcharType.VARCHAR);
+
+    Type setWithValuesType = Types.ExternalType.of("set('x','y','z')");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(setWithValuesType), VarcharType.VARCHAR);
+
+    Type binaryWithLengthType = Types.ExternalType.of("binary(16)");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(binaryWithLengthType), VarbinaryType.VARBINARY);
+
+    Type bitWithLengthType = Types.ExternalType.of("bit(8)");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(bitWithLengthType), VarbinaryType.VARBINARY);
+
     Type tinyblobType = Types.ExternalType.of("tinyblob");
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(tinyblobType), VarbinaryType.VARBINARY);

@@ -175,13 +175,14 @@ The Gravitino Iceberg aliyun bundle jar already includes the Iceberg aliyun nece
 
 Supports using google credential file to access GCS data.
 
-| Configuration item | Description                                                                                                                  | Default value                           | Required |
-|--------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| Configuration item         | Description                                                                                                                  | Default value                           | Required |
+|----------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`                  | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `gcs-service-account-file` | Path of the GCS service account JSON file. Used for server-side FileIO and for `gcs-token` credential vending.               | GCS Application default credential.     | No       |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
 
-Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
+When `gcs-service-account-file` is set, Gravitino loads it at catalog initialization and injects Iceberg `gcs.oauth2.token` for FileIO (Iceberg's `GCSFileIO` has no service-account-file property). If that property is unset, fall back to Application Default Credentials, for example `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`.
 
 :::info
 Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
@@ -257,7 +258,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-password` and cloud credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
 :::
 
 ## Schema

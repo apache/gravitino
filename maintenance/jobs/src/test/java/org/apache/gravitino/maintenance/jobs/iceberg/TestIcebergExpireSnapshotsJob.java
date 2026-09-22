@@ -471,7 +471,7 @@ public class TestIcebergExpireSnapshotsJob {
       IcebergJobUtils.parseCustomSparkConfigs("{invalid json}");
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
+      assertTrue(e.getMessage().contains("--spark-conf"));
     }
   }
 }

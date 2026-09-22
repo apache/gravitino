@@ -217,7 +217,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     }
 
     if (gravitinoTable.getDistribution() != null
-        && !Distributions.NONE.equals(gravitinoTable.getDistribution())) {
+        && !Distributions.isNone(gravitinoTable.getDistribution())) {
       properties.put(
           HivePropertyMeta.HIVE_BUCKET_KEY,
           Arrays.stream(gravitinoTable.getDistribution().expressions())

@@ -20,16 +20,24 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.MetalakeMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
 
 public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider {
+
+  @Override
+  public String selectMetalakeMetaByIdForShare(Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " FOR SHARE";
+  }
+
   @Override
   public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }

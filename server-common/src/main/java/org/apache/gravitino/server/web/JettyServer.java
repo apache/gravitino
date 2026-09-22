@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -71,6 +72,16 @@ public class JettyServer {
   private static final String HTTPS = "https";
   private static final String HTTP_PROTOCOL = "http/1.1";
 
+  /**
+   * The pathSpecs {@link #initialize} registers directly on the shared servlet context when a
+   * {@link MetricsSystem} is available, outside of whatever pathspec the caller itself filters.
+   * Callers that need request-context tracking or audit coverage on these paths (see GH-12760) must
+   * apply their own filters to them explicitly, using this constant rather than re-declaring the
+   * literal path strings, so the two can never drift apart.
+   */
+  public static final ImmutableList<String> METRICS_PATH_SPECS =
+      ImmutableList.of("/metrics", "/prometheus/metrics");
+
   private Server server;
 
   private ServletContextHandler servletContextHandler;
@@ -105,7 +116,7 @@ public class JettyServer {
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
-    errorHandler.setShowStacks(true);
+    errorHandler.setShowStacks(serverConfig.isIncludeErrorStackTrace());
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
@@ -168,16 +179,19 @@ public class JettyServer {
       webUiEnabled = false;
     }
 
+    // Install before authentication, custom filters, and servlet mappings on every service.
+    addFilter(new OutOfMemoryErrorFilter(), "/*");
+
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
       MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
       servletContextHandler.setAttribute(
           "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
+      servletContextHandler.addServlet(MetricsServlet.class, METRICS_PATH_SPECS.get(0));
 
       servletContextHandler.addServlet(
-          new ServletHolder(metricsSystem.getPrometheusServlet()), "/prometheus/metrics");
+          new ServletHolder(metricsSystem.getPrometheusServlet()), METRICS_PATH_SPECS.get(1));
     }
 
     HandlerCollection handlers = new HandlerCollection();
@@ -473,6 +487,7 @@ public class JettyServer {
                     thread.setName(getName() + "-" + thread.getId());
                     thread.setUncaughtExceptionHandler(
                         (t, throwable) -> {
+                          ServerHealth.getInstance().recordFailure(throwable);
                           LOG.error("{} uncaught exception:", t.getName(), throwable);
                         });
                     // JettyServer maybe used by Gravitino server and Iceberg REST server with
@@ -493,7 +508,14 @@ public class JettyServer {
     return server.getThreadPool();
   }
 
-  public void addCustomFilters(String pathSpec) {
+  /**
+   * Registers every configured custom filter, binding each one's single {@link FilterHolder} to all
+   * of {@code pathSpecs} in one pass — so a filter whose {@code init()} isn't safe to run more than
+   * once per JVM only runs it once, regardless of how many paths it's bound to.
+   *
+   * @param pathSpecs the pathSpecs to bind each configured custom filter to
+   */
+  public void addCustomFilters(String... pathSpecs) {
     for (String filterName : serverConfig.getCustomFilters()) {
       if (StringUtils.isBlank(filterName)) {
         continue;
@@ -504,7 +526,10 @@ public class JettyServer {
           serverConfig.getAllWithPrefix(String.format("%s.param.", filterName)).entrySet()) {
         filterHolder.setInitParameter(entry.getKey(), entry.getValue());
       }
-      servletContextHandler.addFilter(filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      for (String pathSpec : pathSpecs) {
+        servletContextHandler.addFilter(
+            filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      }
     }
   }
 
@@ -513,14 +538,18 @@ public class JettyServer {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(createAuthenticationFilter(), pathSpec);
+    addFilter(createAuthenticationFilter(serverConfig.isIncludeErrorStackTrace()), pathSpec);
   }
 
   /**
    * Creates the authentication filter for this server. Subclasses can override this to provide a
    * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
+   *
+   * @param includeErrorStackTrace whether the filter's error responses may include server-side
+   *     stack traces; implementations must not include them when this is {@code false}
+   * @return the authentication filter
    */
-  protected Filter createAuthenticationFilter() {
-    return new AuthenticationFilter();
+  protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
+    return new AuthenticationFilter(includeErrorStackTrace);
   }
 }

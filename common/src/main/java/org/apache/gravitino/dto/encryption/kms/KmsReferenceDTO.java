@@ -35,11 +35,8 @@ import org.apache.gravitino.encryption.kms.KmsReference;
 @Builder(setterPrefix = "with")
 public class KmsReferenceDTO {
 
-  @JsonProperty("api")
-  private String api;
-
-  @JsonProperty("source")
-  private String source;
+  @JsonProperty("provider")
+  private String provider;
 
   @JsonProperty("keyId")
   private String keyId;
@@ -47,13 +44,10 @@ public class KmsReferenceDTO {
   /**
    * Converts this DTO to a {@link KmsReference}.
    *
-   * <p>{@code api} is validated by {@link KmsReference}: it must already be lowercase kebab-case
-   * with no surrounding whitespace and is matched exactly.
-   *
    * @return the KMS key reference
    */
   public KmsReference toKmsReference() {
-    return new KmsReference(api, source, keyId);
+    return new KmsReference(provider, keyId);
   }
 
   /**
@@ -63,6 +57,6 @@ public class KmsReferenceDTO {
    * @return the KMS key reference DTO
    */
   public static KmsReferenceDTO fromKmsReference(KmsReference reference) {
-    return new KmsReferenceDTO(reference.api(), reference.source(), reference.keyId());
+    return new KmsReferenceDTO(reference.provider(), reference.keyId());
   }
 }

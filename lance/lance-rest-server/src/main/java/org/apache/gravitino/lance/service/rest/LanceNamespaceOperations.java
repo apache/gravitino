@@ -19,6 +19,11 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.LIST_TABLES_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -36,7 +41,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.DescribeNamespaceResponse;
@@ -63,6 +70,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/list")
   @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response listNamespaces(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -75,6 +83,8 @@ public class LanceNamespaceOperations {
   @Path("/list")
   @Timed(name = "list-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces-root", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
+  @LanceRootNamespace
   public Response listNamespacesOnRoot(
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
@@ -99,6 +109,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/describe")
   @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-namespaces", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response describeNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
@@ -115,6 +126,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/create")
   @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespaces", absolute = true)
+  @AuthorizationExpression(expression = CREATE_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response createNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -138,6 +150,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/drop")
   @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-namespaces", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response dropNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -161,6 +174,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/exists")
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
+  @AuthorizationExpression(expression = PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response namespaceExists(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
@@ -176,6 +190,7 @@ public class LanceNamespaceOperations {
   @Path("{id}/table/list")
   @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-tables", absolute = true)
+  @AuthorizationExpression(expression = LIST_TABLES_AUTHORIZATION_EXPRESSION)
   public Response listTables(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,

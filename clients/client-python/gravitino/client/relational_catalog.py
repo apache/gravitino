@@ -19,6 +19,7 @@ from typing import Final, Optional, overload
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
@@ -64,7 +65,7 @@ from gravitino.utils import HTTPClient
 
 
 class RelationalCatalog(
-    BaseSchemaCatalog, TableCatalog, ViewCatalog
+    BaseSchemaCatalog, TableCatalog, ViewCatalog, SupportsSecrets
 ):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
@@ -96,6 +97,9 @@ class RelationalCatalog(
             audit,
             rest_client,
         )
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
 
     def as_table_catalog(self) -> TableCatalog:
         """Return this relational catalog as a :class:`TableCatalog`.

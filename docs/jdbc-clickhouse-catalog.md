@@ -172,10 +172,10 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, and `DATA_SKIPPING_SET` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, and `DATA_SKIPPING_TOKENBFV1` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
 
 ### Table Column Types
 
@@ -192,7 +192,7 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | `Float`             | `Float32`                              |
 | `Double`            | `Float64`                              |
 | `Decimal(p,s)`      | `Decimal(p,s)`                         |
-| `String`/`VarChar`  | `String`                               |
+| `String`            | `String`                               |
 | `FixedChar(n)`      | `FixedString(n)`                       |
 | `Date`              | `Date`                                 |
 | `Timestamp[(p)]`    | `DateTime` (precision defaults to `0`) |
@@ -200,11 +200,18 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | `UUID`              | `UUID`                                 |
 
 Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
+`VarChar(n)` is rejected when creating or adding a column because ClickHouse cannot enforce its length limit.
+Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
 
 ### Table Properties
 
 :::note
-- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.
+- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause during CREATE TABLE. Their
+  values use ClickHouse scalar literal text: numbers and booleans are unquoted, while strings must
+  be valid single-quoted literals.
+- ALTER TABLE supports setting or resetting table-level `settings.*` properties. A request may
+  contain multiple setting operations of the same form, but cannot mix set and remove operations
+  or combine settings with schema, comment, or index changes.
 - The `engine` value is immutable after creation.
 :::
 
@@ -223,18 +230,24 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 **Memory engine data volatility**: Tables created with `engine=Memory` store data in RAM only. After a ClickHouse server restart the table definition persists (Gravitino's `loadTable` succeeds), but all data is permanently lost. Gravitino metadata and ClickHouse remain consistent at the schema level, but users are responsible for repopulating data after restarts. Consider using `TinyLog`, `StripeLog`, or a MergeTree-family engine if data durability is required.
 :::
 
-| Property Name             | Description                                                                                              | Default Value | Required | Reserved | Immutable |
-|---------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
-| `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       |
-| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        |
-| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        |
-| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        |
-| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        |
-| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        |
-| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        |
+| Property Name             | Description                                                                                                                                                   | Default Value | Required | Reserved | Immutable |
+|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)                                                                   | `MergeTree`   | No       | No       | Yes       |
+| `graphite.config`         | Name of the `<graphite_rollup>` configuration element used by `GraphiteMergeTree`                                                                             | (none)        | No\*\*\* | No       | No        |
+| `engine_parameters`       | Parameters for supported parameterized MergeTree engines                                                                                                      | (none)        | No       | No       | No        |
+| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                                                                                    | (none)        | No\*     | No       | No        |
+| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                                                                      | (none)        | No       | No       | No        |
+| `cluster-remote-database` | Remote database for `Distributed` engine                                                                                                                      | (none)        | No\*\*   | No       | No        |
+| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                                                                         | (none)        | No\*\*   | No       | No        |
+| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral)                                                      | (none)        | No\*\*   | No       | No        |
+| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<scalar-literal>`; supports settings-only set or remove requests after creation                       | (none)        | No       | No       | No        |
+| `partition-key`           | ClickHouse's canonical native partition expression (from `system.tables.partition_key`). Read-only; always present on load, empty string means unpartitioned. | `""`          | No       | Yes      | Yes       |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
+\*\*\* Required when `engine=GraphiteMergeTree`.
+
+The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeTree`, `CollapsingMergeTree`, and `VersionedCollapsingMergeTree`. Values are restored when loading these tables and must be provided without outer parentheses. For `GraphiteMergeTree`, use `graphite.config` instead.
 
 ### Table Indexes
 
@@ -243,8 +256,14 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
   - `DATA_SKIPPING_MINMAX` (default `GRANULARITY 1`)
   - `DATA_SKIPPING_BLOOM_FILTER` (default `GRANULARITY 1`)
   - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
+  - `DATA_SKIPPING_NGRAMBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `ngram_size`, `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
+  - `DATA_SKIPPING_TOKENBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
+
+  On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  ClickHouse data-skipping indexes whose field expressions cannot be represented as Gravitino field names, such as `lower(name)` or `name + 1`, are skipped with a warning when the table is loaded and are not recreated. Direct column references and tuples containing only column references remain supported.
 
 ### Partitioning, Sorting, and Distribution
 
@@ -257,6 +276,8 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
    - Identity: `PARTITION BY column_name`
    - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
+
+   The patterns above apply when creating a table. When loading a table, Gravitino preserves ClickHouse's canonical native partition expression (as returned by `system.tables.partition_key`) in the read-only `partition-key` property. An arbitrary native expression is therefore retained on load even when it cannot be mapped to one of the supported `Transform`s; in that case `Table.partitioning()` is empty and the full expression is exposed through `partition-key`.
 
 - Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
 
@@ -350,12 +371,15 @@ Supported:
 - Rename column.
 - Update column type/comment/default/position/nullability.
 - Delete columns (with `IF EXISTS` support).
-- Add data-skipping indexes with custom `GRANULARITY` and `set(N)` via `Index.properties()`; drop data-skipping indexes. Adding/dropping primary key is not supported.
+- Add and drop data-skipping indexes; configure custom `GRANULARITY`, `set(N)`, and `ngrambf_v1`/`tokenbf_v1` Bloom-filter parameters via `Index.properties()`. Adding/dropping primary key is not supported.
 - Update table comment.
+- Modify table-level `settings.*` properties with `MODIFY SETTING` and reset them with `RESET SETTING`. Each request must contain only set operations or only remove operations.
 
 Unsupported:
 - Changing engine after creation.
-- Removing table properties or arbitrary `ALTER TABLE ... SETTINGS`.
+- Altering non-`settings.*` table properties.
+- Mixing settings with schema/comment/index changes, or mixing setting modifications and resets in one request.
+- Column-level SETTINGS and quoted-comma SETTINGS load/recreate round-trip.
 - Auto-increment columns.
 
 See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for common JDBC semantics.

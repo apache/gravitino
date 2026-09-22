@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -31,13 +32,14 @@ import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -79,11 +81,27 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    Catalog catalog =
+        dispatcher.createCatalog(
+            ident, type, provider, comment, properties, secretBindings, secretReferences);
 
     try {
       // Set the creator as the owner of the catalog.
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
       if (ownerDispatcher != null) {
         ownerDispatcher.setOwner(
             ident.namespace().level(0),
@@ -94,9 +112,16 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
       // Apply the metalake securable object privileges to authorization plugin
       FutureGrantManager futureGrantManager = GravitinoEnv.getInstance().futureGrantManager();
-      if (futureGrantManager != null && catalog instanceof BaseCatalog) {
-        futureGrantManager.grantNewlyCreatedCatalog(
-            ident.namespace().level(0), (BaseCatalog) catalog);
+      if (futureGrantManager != null) {
+        GravitinoEnv.getInstance()
+            .catalogManager()
+            .doWithCatalog(
+                ident,
+                leasedCatalog -> {
+                  futureGrantManager.grantNewlyCreatedCatalog(
+                      ident.namespace().level(0), leasedCatalog);
+                  return null;
+                });
       }
     } catch (Exception postHookException) {
       LOG.warn(
@@ -143,16 +168,13 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       return false;
     }
 
-    Catalog catalog = dispatcher.loadCatalog(ident);
-
-    if (catalog != null) {
-      List<String> locations =
-          AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
-      AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
-    }
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
+    AuthorizationUtils.removeCatalogPrivileges(ident, locations);
 
     // We should call the authorization plugin before dropping the catalog, because the dropping
-    // catalog will close the authorization plugin.
+    // catalog will close the authorization plugin. Child schema/fileset write-through secrets are
+    // cleaned in CatalogManager.dropCatalog / FilesetCatalogOperations.dropSchema.
     return dispatcher.dropCatalog(ident, force);
   }
 
@@ -165,6 +187,16 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       Map<String, String> properties)
       throws Exception {
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier ident) throws Exception {
+    dispatcher.testConnection(ident);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
+    dispatcher.testConnection(ident, changes);
   }
 
   @Override

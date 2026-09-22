@@ -39,6 +39,7 @@ import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -62,6 +63,8 @@ public class RangerITEnv {
   public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String METALAKE_ID = "1000";
+  public static final String CATALOG_ID = "1001";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   public static RangerClient rangerClient;
   public static final String HADOOP_USER_NAME = "gravitino";
@@ -118,7 +121,11 @@ public class RangerITEnv {
                 RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME,
                 RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
-                "true"));
+                "true",
+                BaseAuthorization.METALAKE_ID,
+                METALAKE_ID,
+                BaseAuthorization.CATALOG_ID,
+                CATALOG_ID));
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
         Mockito.spy(
@@ -141,7 +148,11 @@ public class RangerITEnv {
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME,
                     RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
-                    "true")));
+                    "true",
+                    BaseAuthorization.METALAKE_ID,
+                    METALAKE_ID,
+                    BaseAuthorization.CATALOG_ID,
+                    CATALOG_ID)));
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =

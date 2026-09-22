@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,9 +65,13 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
+import org.apache.gravitino.policy.PolicyTagAssociation;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -82,10 +87,14 @@ import org.apache.gravitino.tag.TagValueConstraint;
 public class GravitinoClient extends GravitinoClientBase
     implements SupportsCatalogs, TagOperations, SupportsJobs, PolicyOperations {
 
-  private final GravitinoMetalake metalake;
+  private final String metalakeName;
+
+  private volatile GravitinoMetalake metalake;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   *
+   * <p>The metalake is loaded lazily on first use, not in the constructor.
    *
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
@@ -94,7 +103,6 @@ public class GravitinoClient extends GravitinoClientBase
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
-   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
       String uri,
@@ -104,17 +112,27 @@ public class GravitinoClient extends GravitinoClientBase
       Map<String, String> headers,
       Map<String, String> properties) {
     super(uri, authDataProvider, checkVersion, headers, properties);
-    this.metalake = loadMetalake(metalakeName);
+    this.metalakeName = metalakeName;
   }
 
   /**
-   * Get the current metalake object
+   * Returns the metalake, loading it on first access.
    *
    * @return the {@link GravitinoMetalake} object
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  private GravitinoMetalake getMetalake() {
-    return metalake;
+  private GravitinoMetalake getMetalake() throws NoSuchMetalakeException {
+    GravitinoMetalake result = metalake;
+    if (result == null) {
+      synchronized (this) {
+        result = metalake;
+        if (result == null) {
+          result = loadMetalake(metalakeName);
+          metalake = result;
+        }
+      }
+    }
+    return result;
   }
 
   @Override
@@ -140,7 +158,29 @@ public class GravitinoClient extends GravitinoClientBase
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetalake().createCatalog(catalogName, type, provider, comment, properties);
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return getMetalake()
+        .createCatalog(
+            catalogName, type, provider, comment, properties, secretBindings, secretReferences);
   }
 
   @Override
@@ -176,22 +216,6 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public User addUser(String user) throws UserAlreadyExistsException, NoSuchMetalakeException {
     return getMetalake().addUser(user);
-  }
-
-  /**
-   * Adds a new User with an external identifier.
-   *
-   * @param user The name of the User.
-   * @param externalId The external identifier of the User.
-   * @param enabled Whether the User is enabled.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String user, String externalId, boolean enabled)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return getMetalake().addUser(user, externalId, enabled);
   }
 
   /**
@@ -251,22 +275,6 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return getMetalake().addGroup(group);
-  }
-
-  /**
-   * Adds a new Group with an external identifier.
-   *
-   * @param group The name of the Group.
-   * @param externalId The external identifier of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
-   *     exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String group, String externalId)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return getMetalake().addGroup(group, externalId);
   }
 
   /**
@@ -576,6 +584,23 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public void testConnection(String catalogName) throws Exception {
+    getMetalake().testConnection(catalogName);
+  }
+
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    getMetalake().testConnection(catalogName, changes);
+  }
+
+  @Override
   public String[] listTags() throws NoSuchMetalakeException {
     return getMetalake().listTags();
   }
@@ -615,6 +640,22 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public boolean deleteTag(String name) {
     return getMetalake().deleteTag(name);
+  }
+
+  @Override
+  public PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
+    return getMetalake().listPolicyAssociationsForTag(tagName);
+  }
+
+  @Override
+  public PolicyTagAssociation addPolicyForTag(
+      String tagName, String policyName, PolicyAssociationSelector selector) {
+    return getMetalake().addPolicyForTag(tagName, policyName, selector);
+  }
+
+  @Override
+  public void removePolicyFromTag(String tagName, String policyName) {
+    getMetalake().removePolicyFromTag(tagName, policyName);
   }
 
   @Override
@@ -666,6 +707,11 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
+    return getMetalake().getJob(jobId, includeOutput);
+  }
+
+  @Override
   public JobHandle cancelJob(String jobId) throws NoSuchJobException {
     return getMetalake().cancelJob(jobId);
   }
@@ -713,6 +759,11 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().deletePolicy(name);
   }
 
+  @Override
+  public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
+    return getMetalake().listTagAssociationsForPolicy(policyName);
+  }
+
   /** Builder class for constructing a GravitinoClient. */
   public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 
@@ -742,9 +793,11 @@ public class GravitinoClient extends GravitinoClientBase
     /**
      * Builds a new GravitinoClient instance.
      *
+     * <p>The metalake is loaded lazily on first use; {@link NoSuchMetalakeException} is thrown at
+     * that point, not here.
+     *
      * @return A new instance of GravitinoClient with the specified base URI.
      * @throws IllegalArgumentException If the base URI is null or empty.
-     * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
      */
     @Override
     public GravitinoClient build() {

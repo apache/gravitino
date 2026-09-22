@@ -35,6 +35,9 @@ class TagCreateRequest(RESTRequest):
     _properties: Optional[dict[str, str]] = field(
         default_factory=dict, metadata=config(field_name="properties")
     )
+    _allowed_values: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="allowedValues")
+    )
 
     def validate(self) -> None:
         """
@@ -43,4 +46,19 @@ class TagCreateRequest(RESTRequest):
 
         Precondition.check_string_not_empty(
             self._name, "name is required and cannot be empty"
+        )
+
+        if self._allowed_values is None:
+            return
+
+        Precondition.check_argument(
+            all(
+                value is not None and value.strip() != ""
+                for value in self._allowed_values
+            ),
+            "allowedValues must not contain null or empty values",
+        )
+        Precondition.check_argument(
+            all(len(value) <= 256 for value in self._allowed_values),
+            "allowedValues must not contain values longer than 256 characters",
         )

@@ -29,6 +29,7 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   // ---- writable properties ----
   public static final String REPLICATION_FACTOR = "replication_num";
+  public static final String REPLICATION_ALLOCATION = "replication_allocation";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
   public static final String COMPRESSION = "compression";
@@ -48,6 +49,12 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                     + " of backend server less than 3, the default value will be used",
                 false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                REPLICATION_ALLOCATION,
+                "The replication allocation policy for the table.",
+                false /* immutable */,
+                null /* default value */,
                 false /* hidden */),
             PropertyEntry.stringOptionalPropertyEntry(
                 COMPRESSION,

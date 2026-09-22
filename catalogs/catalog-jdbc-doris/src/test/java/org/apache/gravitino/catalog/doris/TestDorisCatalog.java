@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BL
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.ENABLE_UNIQUE_KEY_MERGE_ON_WRITE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.LIGHT_SCHEMA_CHANGE;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.STORAGE_POLICY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -45,9 +46,9 @@ public class TestDorisCatalog {
         dorisTablePropertiesMetadata.specificPropertyEntries();
 
     // Verify the total number of registered properties.
-    // 6 = 1 existing (replication_num) + 5 new (compression, bloom_filter_columns,
-    // storage_policy, light_schema_change, enable_unique_key_merge_on_write).
-    Assertions.assertEquals(6, propertyEntryMap.size());
+    // 7 = replication_num, replication_allocation, compression, bloom_filter_columns,
+    // storage_policy, light_schema_change, and enable_unique_key_merge_on_write.
+    Assertions.assertEquals(7, propertyEntryMap.size());
 
     // ---- replication_num (integerOptional) ----
     Assertions.assertTrue(propertyEntryMap.containsKey(REPLICATION_FACTOR));
@@ -60,6 +61,17 @@ public class TestDorisCatalog {
     Assertions.assertEquals(Integer.class, replication.getJavaType());
     Assertions.assertEquals(
         DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR, replication.getDefaultValue());
+
+    // ---- replication_allocation (stringOptional) ----
+    Assertions.assertTrue(propertyEntryMap.containsKey(REPLICATION_ALLOCATION));
+    PropertyEntry<?> replicationAllocation = propertyEntryMap.get(REPLICATION_ALLOCATION);
+    Assertions.assertEquals(REPLICATION_ALLOCATION, replicationAllocation.getName());
+    Assertions.assertFalse(replicationAllocation.isRequired());
+    Assertions.assertFalse(replicationAllocation.isImmutable());
+    Assertions.assertFalse(replicationAllocation.isReserved());
+    Assertions.assertFalse(replicationAllocation.isHidden());
+    Assertions.assertEquals(String.class, replicationAllocation.getJavaType());
+    Assertions.assertNull(replicationAllocation.getDefaultValue());
 
     // ---- compression (stringOptional) ----
     Assertions.assertTrue(propertyEntryMap.containsKey(COMPRESSION));

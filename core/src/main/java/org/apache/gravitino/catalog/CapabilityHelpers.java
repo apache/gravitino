@@ -27,7 +27,9 @@ import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -52,10 +54,11 @@ public class CapabilityHelpers {
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
     try {
-      return c.capabilities();
-    } catch (Exception e) {
+      return catalogManager.doWithCatalog(catalogIdent, catalog -> catalog.capability());
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
   }
@@ -94,6 +97,18 @@ public class CapabilityHelpers {
         .toArray(FilesetChange[]::new);
   }
 
+  public static ModelChange[] applyCapabilities(Capability capabilities, ModelChange... changes) {
+    return Arrays.stream(changes)
+        .map(
+            change -> {
+              if (change instanceof ModelChange.RenameModel) {
+                return applyCapabilities((ModelChange.RenameModel) change, capabilities);
+              }
+              return change;
+            })
+        .toArray(ModelChange[]::new);
+  }
+
   public static ViewChange[] applyCapabilities(Capability capabilities, ViewChange... changes) {
     return Arrays.stream(changes)
         .map(
@@ -122,17 +137,6 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
-  /**
-   * Convenience overload that loads the catalog capability for {@code ident} and applies it to the
-   * identifier. Use this from call sites (e.g. HookDispatchers) that need a normalized identifier
-   * but do not already hold a {@link Capability} instance.
-   */
-  public static NameIdentifier applyCapabilities(
-      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, scope, capability);
-  }
-
   public static NameIdentifier[] applyCaseSensitive(
       NameIdentifier[] idents, Capability.Scope scope, Capability capabilities) {
     return Arrays.stream(idents)
@@ -148,16 +152,25 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
+  /**
+   * Loads the catalog capability for {@code ident} and applies its case-sensitivity rules.
+   *
+   * @param ident the identifier to normalize
+   * @param scope the identifier's capability scope
+   * @param catalogManager the catalog manager used to load the capability
+   * @return the case-normalized identifier
+   */
+  public static NameIdentifier applyCaseSensitive(
+      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
+    Capability capability = getCapability(ident, catalogManager);
+    return applyCaseSensitive(ident, scope, capability);
+  }
+
   public static Namespace applyCaseSensitive(
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.MODEL
-        || identScope == Capability.Scope.FUNCTION) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -223,16 +236,27 @@ public class CapabilityHelpers {
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.FUNCTION) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
     }
     return namespace;
+  }
+
+  private static boolean hasSchemaParent(Capability.Scope resourceScope) {
+    switch (resourceScope) {
+      case TABLE:
+      case VIEW:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+      case SEMANTIC_MODEL:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private static Index applyCapabilities(Index index, Capability capabilities) {
@@ -347,6 +371,14 @@ public class CapabilityHelpers {
         applyCaseSensitiveOnName(
             Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
     return FilesetChange.rename(newName);
+  }
+
+  private static ModelChange applyCapabilities(
+      ModelChange.RenameModel renameModel, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    String newName =
+        applyCaseSensitiveOnName(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    return ModelChange.rename(newName);
   }
 
   private static ViewChange applyCapabilities(
@@ -499,7 +531,7 @@ public class CapabilityHelpers {
         column.defaultValue());
   }
 
-  private static String applyCapabilitiesOnName(
+  static String applyCapabilitiesOnName(
       Capability.Scope scope, String name, Capability capabilities) {
     applyNameSpecification(scope, name, capabilities);
     return applyCaseSensitiveOnName(scope, name, capabilities);

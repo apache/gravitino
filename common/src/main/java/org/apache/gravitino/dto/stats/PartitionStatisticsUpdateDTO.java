@@ -73,6 +73,13 @@ public class PartitionStatisticsUpdateDTO implements PartitionStatisticsUpdate {
         StringUtils.isNotBlank(partitionName), "\"partitionName\" must not be null or empty");
     Preconditions.checkArgument(
         statistics != null && !statistics.isEmpty(), "\"statistics\" must not be null or empty");
+    statistics.forEach(
+        (name, value) -> {
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(name), "statistic \"name\" must not be null or empty");
+          Preconditions.checkArgument(
+              value != null, "statistic \"value\" for '%s' must not be null", name);
+        });
   }
 
   /**

@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -62,6 +63,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -285,6 +287,9 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
             () ->
@@ -322,7 +327,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ViewMetaMapper.class,
-                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ViewVersionInfoMapper.class,
+                    mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
@@ -376,6 +385,9 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,
                     mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
             () ->
@@ -396,33 +408,38 @@ public class MetalakeMetaService {
   }
 
   void deleteMetalakeWithVersion(NameIdentifier identifier, Long metalakeId, Long currentVersion) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion));
-    if (deleted == 0) {
-      throw metalakeWriteFailure(identifier, metalakeId, identifier.name());
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion)),
+        () -> metalakeWriteFailure(identifier, metalakeId, identifier.name()));
+  }
+
+  /** Locks and validates a metalake while inserting a child in the current transaction. */
+  void lockMetalakeForChildWrite(String name, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), name));
   }
 
   private RuntimeException metalakeWriteFailure(
       NameIdentifier identifier, Long metalakeId, String observedName) {
-    // Use a locking read to see the latest committed row. Under MySQL REPEATABLE READ, a plain
-    // SELECT can return an old snapshot that still contains a row another writer already deleted
-    // or renamed. We would then report a version conflict instead of a missing metalake. The CAS
-    // UPDATE above already waits for the same row lock, so the other writer has finished before
-    // this read runs.
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId));
-    if (currentMetalakePO == null
-        || !Objects.equals(currentMetalakePO.getMetalakeName(), observedName)) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.METALAKE, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedName));
   }
 
   private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
@@ -434,19 +451,15 @@ public class MetalakeMetaService {
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
             mapper -> mapper.listCatalogPOsByMetalakeIdForUpdate(metalakeId));
-    if (catalogPOs.isEmpty()) {
-      return;
-    }
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.softDeleteCatalogMetasWithVersion(catalogPOs));
-    // Never commit a partial cascade. A smaller count means that a catalog no longer matches the
-    // ID and version read above, so the outer transaction must roll back all deletes.
-    if (deleted != catalogPOs.size()) {
-      throw ExceptionUtils.concurrentChildModification(
-          Entity.EntityType.CATALOG, Entity.EntityType.METALAKE, metalakeIdentifier);
-    }
+    OccWriteSupport.deleteChildrenWithVersions(
+        metalakeIdentifier,
+        Entity.EntityType.CATALOG,
+        Entity.EntityType.METALAKE,
+        catalogPOs,
+        children ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper -> mapper.softDeleteCatalogMetasWithVersion(children)));
   }
 
   List<SchemaPO> listSchemaPOsForCascade(Long metalakeId) {
@@ -456,18 +469,15 @@ public class MetalakeMetaService {
 
   private void deleteSchemasWithVersions(
       NameIdentifier metalakeIdentifier, List<SchemaPO> schemaPOs) {
-    if (schemaPOs.isEmpty()) {
-      return;
-    }
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
-    // The version check protects this snapshot from a schema alter that does not use the parent
-    // catalog lock. Roll back the whole cascade instead of silently losing that schema change.
-    if (deleted != schemaPOs.size()) {
-      throw ExceptionUtils.concurrentChildModification(
-          Entity.EntityType.SCHEMA, Entity.EntityType.METALAKE, metalakeIdentifier);
-    }
+    OccWriteSupport.deleteChildrenWithVersions(
+        metalakeIdentifier,
+        Entity.EntityType.SCHEMA,
+        Entity.EntityType.METALAKE,
+        schemaPOs,
+        children ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.softDeleteSchemaMetasWithVersion(children)));
   }
 
   @Monitored(

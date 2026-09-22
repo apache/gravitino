@@ -69,8 +69,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ### Register a Spark Template
 
 A Spark template submits an application. Running one with the local executor needs either
-`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, or the job
-fails to launch.
+`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, pointing to a
+Spark installation with an executable `bin/spark-submit`. Otherwise, the run request is rejected with
+an error that names the missing setting, and no job is created.
 
 ```json
 {
@@ -223,6 +224,58 @@ cancelling = client.cancel_job(job_id)
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
 
+### Get a Job's Output
+
+A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.
+Output is fetched live from the job executor on every call rather than stored in Gravitino, so it's
+only included when requested - a plain `getJob`/`get_job` call, or `listJobs`/`list_jobs`, never
+returns it.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+JobHandle job = client.getJob(jobId, true);
+List<String> stdout = job.stdout();
+List<String> stderr = job.stderr();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+job = client.get_job(job_id, include_output=True)
+stdout = job.stdout()
+stderr = job.stderr()
+```
+
+</TabItem>
+</Tabs>
+
+Output is only kept for as long as the job executor retains it - for the local job executor, that's
+tied to `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` below, and it's lost entirely across a
+server restart. What's returned is always the tail of the output (the most recent content), capped
+by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
+whichever limit is hit first.
+
+The REST API also accepts `outputMaxLines`/`outputMaxBytes` query parameters to request less output
+than these global caps for a single call (e.g. a quick check that doesn't need the full 1000
+lines) - a value larger than the global cap is clamped down to it, so the global configuration
+always remains a hard upper bound:
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
+```
+
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
@@ -234,7 +287,8 @@ default configurations:
 | `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
-
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output   | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output    | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 
@@ -247,6 +301,43 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+
+The local job executor runs up to `gravitino.jobExecutor.local.maxRunningJobs` jobs at the same
+time, each in its own process on the Gravitino server host, and queues the others. Make sure the
+host has enough resources for that many jobs, or lower this value, especially when running Spark
+jobs.
+
+When multiple Gravitino servers share the same metadata store, each server's local job executor
+only tracks the jobs it runs itself:
+
+- A job can only be run and tracked by the server that received the run request. Other servers
+  skip it when pulling job statuses.
+- Cancelling a job on a server that doesn't run it marks the job as `CANCELLING`, and the server
+  running the job cancels it the next time it pulls job statuses. This can take up to
+  `gravitino.job.statusPullIntervalInMs`.
+- If a server exits while running jobs, nobody can track these jobs anymore. When such a job has
+  not been updated for `gravitino.job.stagingDirKeepTimeInMs`, it is marked as `FAILED`, or as
+  `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
+  `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
+  directory.
+
+:::caution
+The local job executor can't tell a job left behind by an exited server from a job that is still
+running without changing its status. A job of the local job executor that is still queued, started
+or cancelling after `gravitino.job.stagingDirKeepTimeInMs` is marked as `FAILED` (or `CANCELLED`),
+even if the job is still running, and keeps this status even if it later finishes. Set this time
+longer than any job can run, or stay queued, without changing its status.
+:::
+
+:::caution
+The local job executor gets a new identity every time the Gravitino server starts, so a restarted
+server doesn't recognize the jobs it ran before the restart. This also applies to a single-server
+deployment. The processes of these jobs are usually gone with the previous server process, but the
+jobs are only marked as `FAILED` once they expire as described above, which can take up to about
+1.1 times `gravitino.job.stagingDirKeepTimeInMs` (about 7.7 days by default), as the cleanup runs
+every tenth of that time. Until then, they are still reported as queued, started or cancelling.
+Cancelling such a job only marks it as `CANCELLING`, which also restarts the expiration.
+:::
 
 ## Future Work
 

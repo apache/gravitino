@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +98,12 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
-      BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
+      BaseCatalogFactory catalogFactory = catalogFactoryForProvider(catalog.provider());
       CatalogPropertiesConverter catalogPropertiesConverter =
           catalogFactory.catalogPropertiesConverter();
+      Map<String, String> catalogProperties = propsWithSecrets(catalog);
       Map<String, String> flinkCatalogProperties =
-          catalogPropertiesConverter.toFlinkCatalogProperties(catalog.properties());
+          catalogPropertiesConverter.toFlinkCatalogProperties(catalogProperties);
       CatalogDescriptor descriptor =
           newCatalogDescriptor(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
@@ -150,7 +152,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
             catalogType));
   }
 
-  private BaseCatalogFactory getCatalogFactory(String provider) {
+  /**
+   * Resolve the Flink catalog factory for a Gravitino provider. Package-visible for unit tests.
+   *
+   * @param provider Gravitino catalog provider name
+   * @return matching {@link BaseCatalogFactory}
+   */
+  BaseCatalogFactory catalogFactoryForProvider(String provider) {
     return discoverFactories(
         catalogFactory ->
             ((BaseCatalogFactory) catalogFactory)
@@ -209,5 +217,9 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       throw new RuntimeException(errorMessage);
     }
     return (BaseCatalogFactory) factories.get(0);
+  }
+
+  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+    return PropertyUtils.propertiesWithSecrets(catalog.properties(), catalog::supportsSecrets);
   }
 }

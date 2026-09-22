@@ -23,9 +23,14 @@ import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -35,7 +40,77 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class SecretPropertyUtils {
 
+  /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
+  private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
+      new PropertiesMetadata() {
+        @Override
+        public Map<String, PropertyEntry<?>> propertyEntries() {
+          return Map.of();
+        }
+      };
+
   private SecretPropertyUtils() {}
+
+  /**
+   * Replaces the sensitive property key keywords from server configuration.
+   *
+   * @param config server configuration
+   */
+  public static void configureSensitiveKeyKeywords(Config config) {
+    SensitivePropertyKeyMatcher.configure(config);
+  }
+
+  /**
+   * Returns whether a property key name looks sensitive (credential-like).
+   *
+   * <p>A key matches when, after lower-casing, it contains one of the active keywords as a literal
+   * substring. The default keywords are {@code secret}, {@code password}, {@code token}, {@code
+   * credential}, {@code access}, and {@code account} (covers Azure storage account key/name and GCS
+   * service-account file paths). {@link Configs#SENSITIVE_KEY_KEYWORDS} replaces that set, so a
+   * deployment can drop a default keyword or add another. Underscores and hyphens are not
+   * normalized; they are irrelevant because the default keywords contain neither.
+   *
+   * @param key the property key
+   * @return true when the key name matches an active keyword
+   */
+  public static boolean isSensitivePropertyKey(@Nullable String key) {
+    if (key == null || key.isEmpty()) {
+      return false;
+    }
+    return SensitivePropertyKeyMatcher.matches(key.toLowerCase(Locale.ROOT));
+  }
+
+  /**
+   * Returns whether a sensitive-named inline property should be recovered via {@code getSecrets}.
+   *
+   * <p>Secret-manager URNs are always recovered separately. For inline plaintext:
+   *
+   * <ul>
+   *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
+   *       catalog does not expose properties metadata for the entity type.
+   *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
+   *       non-hidden configuration (for example {@code credential-providers}, {@code
+   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   * </ul>
+   *
+   * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty
+   * {@link PropertiesMetadata} (every key is undeclared) — see the two-argument {@link
+   * #buildSecrets(SecretManager, Map)}.
+   *
+   * @param key the property key
+   * @param metadata entity properties metadata, or null when unavailable
+   * @return true when the inline plaintext should be included in {@code getSecrets}
+   */
+  public static boolean shouldRecoverSensitiveNamedSecret(
+      String key, @Nullable PropertiesMetadata metadata) {
+    if (!isSensitivePropertyKey(key)) {
+      return false;
+    }
+    if (metadata == null) {
+      return false;
+    }
+    return !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
+  }
 
   /**
    * Returns whether a property value is a Gravitino secret URN for the given key.
@@ -49,6 +124,108 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Builds a map of plaintext secret properties for {@code getSecrets} with historical fuzzy
+   * recovery for sensitive-named keys.
+   *
+   * <p>Delegates to {@link #buildSecrets(SecretManager, Map, PropertiesMetadata)} with an empty
+   * properties metadata so every key is treated as undeclared. Prefer the three-argument overload
+   * when real entity metadata is available.
+   *
+   * @param secretManager secret manager used to resolve URNs
+   * @param rawProperties raw entity properties (may be null)
+   * @return a new secret plaintext property map; never null
+   */
+  public static Map<String, String> buildSecrets(
+      SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
+    return buildSecrets(secretManager, rawProperties, EMPTY_PROPERTIES_METADATA);
+  }
+
+  /**
+   * Builds a map of plaintext secret properties for {@code getSecrets}.
+   *
+   * <p>Starting from raw entity properties:
+   *
+   * <ol>
+   *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
+   *       {@link SecretManager#readSecret}.
+   *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
+   *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (undeclared or
+   *       declared hidden). Declared non-hidden keys are excluded even when the name looks
+   *       sensitive. When {@code metadata} is {@code null}, sensitive-named plaintext is not
+   *       recovered (URN-only).
+   * </ol>
+   *
+   * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
+   * hidden. A hidden key is recovered only when it is a secret URN or its name matches {@link
+   * #isSensitivePropertyKey} (for example {@code jdbc-password}). A hidden key whose name does not
+   * look sensitive (for example a path-like {@code auth-file}) stays masked as {@code ******} on
+   * list/get and is absent from this map.
+   *
+   * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
+   * properties()} so undeclared credential keys remain usable without leaking on list/get.
+   *
+   * @param secretManager secret manager used to resolve URNs
+   * @param rawProperties raw entity properties (may be null)
+   * @param metadata entity properties metadata, or null when unavailable (URN-only recovery)
+   * @return a new secret plaintext property map; never null
+   */
+  public static Map<String, String> buildSecrets(
+      SecretManager secretManager,
+      @Nullable Map<String, String> rawProperties,
+      @Nullable PropertiesMetadata metadata) {
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    if (rawProperties == null || rawProperties.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, String> secrets = new HashMap<>();
+    for (Map.Entry<String, String> entry : rawProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null) {
+        continue;
+      }
+      if (isSecretProperty(key, value)) {
+        secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
+      } else if (shouldRecoverSensitiveNamedSecret(key, metadata)) {
+        secrets.put(key, value);
+      }
+    }
+    return secrets;
+  }
+
+  /**
+   * Merges base properties with secret plaintext properties.
+   *
+   * <p>Returns a new mutable map containing all entries from {@code base}, then overlays {@code
+   * secrets}. Null maps are treated as empty.
+   *
+   * @param base non-secret / default-load properties (may be null)
+   * @param secrets secret plaintext properties from {@link #buildSecrets} (may be null)
+   * @return a new mutable merged property map; never null
+   */
+  public static Map<String, String> mergeProperties(
+      @Nullable Map<String, String> base, @Nullable Map<String, String> secrets) {
+    Map<String, String> merged = copyEntityProperties(base);
+    if (secrets != null && !secrets.isEmpty()) {
+      merged.putAll(secrets);
+    }
+    return merged;
+  }
+
+  /**
+   * Returns whether either secret map has at least one entry.
+   *
+   * @param secretBindings write-through bindings (may be null)
+   * @param secretReferences secret locators (may be null)
+   * @return true when at least one secret map is non-empty
+   */
+  public static boolean hasSecretMaps(
+      @Nullable Map<?, ?> secretBindings, @Nullable Map<?, ?> secretReferences) {
+    return (secretBindings != null && !secretBindings.isEmpty())
+        || (secretReferences != null && !secretReferences.isEmpty());
+  }
+
+  /**
    * Returns a mutable copy of a property map for create-time assembly.
    *
    * <p>{@code null} becomes an empty {@link HashMap}; otherwise returns a new {@link HashMap} copy.
@@ -58,6 +235,88 @@ public final class SecretPropertyUtils {
    * @return a mutable property map, never null
    */
   public static Map<String, String> copyEntityProperties(@Nullable Map<String, String> properties) {
+    return properties == null ? new HashMap<>() : new HashMap<>(properties);
+  }
+
+  /**
+   * Returns whether {@code value} is a write-through secret URN owned by this entity property.
+   *
+   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}.
+   *
+   * @param propertyKey the property key
+   * @param value the property value
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId the entity id
+   * @return true when the value is a write-through URN for this entity and property
+   */
+  public static boolean isWriteThroughForEntity(
+      @Nullable String propertyKey, @Nullable String value, String entityType, long entityId) {
+    if (!isSecretProperty(propertyKey, value)) {
+      return false;
+    }
+    try {
+      SecretUrn urn = SecretUrn.parse(value);
+      List<String> segments = urn.identifierSegments();
+      return segments.size() == 3
+          && entityType.equals(segments.get(0))
+          && String.valueOf(entityId).equals(segments.get(1))
+          && propertyKey.equals(segments.get(2));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Validates alter {@code setProperty} plaintext: rejects blank, masked placeholder, and raw URN
+   * strings.
+   *
+   * @param property the property key
+   * @param value the plaintext value
+   */
+  public static void validateAlterSetPropertyValue(String property, String value) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(value), "value must not be blank");
+    Preconditions.checkArgument(
+        !"******".equals(value), "setProperty value must not be the masked placeholder ******");
+    Preconditions.checkArgument(
+        !value.startsWith(URN_PREFIX),
+        "setProperty value must not be a secret URN; use setSecretBinding or setSecretReference");
+  }
+
+  /**
+   * Validates alter {@code setSecretBinding} plaintext.
+   *
+   * @param plaintext the plaintext from the binding
+   */
+  public static void validateAlterSecretBindingPlaintext(String plaintext) {
+    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
+    Preconditions.checkArgument(
+        !"******".equals(plaintext),
+        "setSecretBinding plaintext must not be the masked placeholder ******");
+  }
+
+  /**
+   * Returns a mutable property map for create-time assembly, or {@code null} when the caller
+   * supplied no properties and no secrets.
+   *
+   * <p>When {@code properties} is {@code null} and both secret maps are null or empty, returns
+   * {@code null} so {@code validatePropertyForCreate} can skip required-key checks (historical
+   * behavior). When secrets are present but {@code properties} is null, returns an empty {@link
+   * HashMap} for URN assembly. Otherwise returns a new {@link HashMap} copy of {@code properties}.
+   *
+   * @param properties property map to copy (may be null)
+   * @param secretBindings write-through bindings (may be null)
+   * @param secretReferences secret locators (may be null)
+   * @return a mutable property map, or null when there are no properties and no secrets
+   */
+  @Nullable
+  public static Map<String, String> copyEntityProperties(
+      @Nullable Map<String, String> properties,
+      @Nullable Map<?, ?> secretBindings,
+      @Nullable Map<?, ?> secretReferences) {
+    if (properties == null && !hasSecretMaps(secretBindings, secretReferences)) {
+      return null;
+    }
     return properties == null ? new HashMap<>() : new HashMap<>(properties);
   }
 

@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,9 +28,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
+import java.lang.reflect.Field;
+import java.util.function.Supplier;
 import org.apache.gravitino.metrics.MetricNames;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ThreadPool;
@@ -201,6 +206,32 @@ public class TestHttpServerMetricsSource {
 
     InstrumentedResourceMethodApplicationListener listener = captor.getValue();
     assertNotNull(listener);
+  }
+
+  @Test
+  void testReservoirSupplierProducesExponentiallyDecayingReservoir() throws Exception {
+    // Regression guard: HttpServerMetricsSource wires an ExponentiallyDecayingReservoir supplier
+    // into the Jersey listener so infrequently-called endpoints don't report a zero duration.
+    // This reaches into the listener's private field because dropwizard-metrics-jersey2 exposes
+    // no getter for it; it would fail if the supplier ever reverted to a
+    // SlidingTimeWindowArrayReservoir (or any other reservoir type).
+    QueuedThreadPool realQueuedThreadPool = new QueuedThreadPool(10, 5, 60000);
+    when(mockJettyServer.getThreadPool()).thenReturn(realQueuedThreadPool);
+
+    metricsSource = new HttpServerMetricsSource("test-server", mockResourceConfig, mockJettyServer);
+
+    ArgumentCaptor<InstrumentedResourceMethodApplicationListener> captor =
+        ArgumentCaptor.forClass(InstrumentedResourceMethodApplicationListener.class);
+    verify(mockResourceConfig).register(captor.capture());
+
+    Field reservoirSupplierField =
+        InstrumentedResourceMethodApplicationListener.class.getDeclaredField("reservoirSupplier");
+    reservoirSupplierField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Supplier<Reservoir> reservoirSupplier =
+        (Supplier<Reservoir>) reservoirSupplierField.get(captor.getValue());
+
+    assertInstanceOf(ExponentiallyDecayingReservoir.class, reservoirSupplier.get());
   }
 
   @Test

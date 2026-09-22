@@ -60,10 +60,11 @@ public class MetadataObjects {
           MetadataObject.Type.VIEW,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION);
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   private static final Set<MetadataObject.Type> VALID_FOUR_LEVEL_NAME_TYPES =
-      Sets.newHashSet(MetadataObject.Type.COLUMN);
+      Sets.newHashSet(MetadataObject.Type.COLUMN, MetadataObject.Type.MODEL_VERSION);
 
   private static final Map<Set<MetadataObject.Type>, Integer> TYPE_TO_EXPECT_LENGTH =
       ImmutableMap.of(
@@ -147,12 +148,16 @@ public class MetadataObjects {
       case COLUMN:
         parentType = MetadataObject.Type.TABLE;
         break;
+      case MODEL_VERSION:
+        parentType = MetadataObject.Type.MODEL;
+        break;
       case TABLE:
       case VIEW:
       case FILESET:
       case TOPIC:
       case MODEL:
       case FUNCTION:
+      case SEMANTIC_MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:

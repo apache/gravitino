@@ -19,6 +19,9 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -43,6 +46,20 @@ public interface OwnerMetaMapper {
 
   String OWNER_TABLE_NAME = "owner_meta";
 
+  /**
+   * Locks an active metadata object before owner assignment.
+   *
+   * @return the object ID, or null if the object is no longer active
+   */
+  @Nullable
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectMetadataObjectIdForUpdate")
+  Long selectMetadataObjectIdForUpdate(
+      @Param("entityId") Long entityId,
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityType") Entity.EntityType entityType);
+
   @SelectProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "selectUserOwnerMetaByMetadataObjectIdAndType")
@@ -62,6 +79,20 @@ public interface OwnerMetaMapper {
       method = "selectGroupOwnerMetaByMetadataObjectIdAndType")
   GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  /**
+   * Selects group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return group owners with their owned metadata object IDs
+   */
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "batchSelectGroupOwnerMetaByMetadataObjectIdAndType")
+  List<GroupOwnerRelPO> batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 
   @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")

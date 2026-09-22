@@ -22,9 +22,11 @@ package org.apache.gravitino.spark.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -63,6 +65,7 @@ import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
@@ -165,8 +168,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    this.sparkCatalog =
-        createAndInitSparkCatalog(name, options, gravitinoCatalogClient.properties());
+    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalogClient);
+    this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();
@@ -195,6 +198,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   @Override
+  // TableCatalog.createTable(Identifier, StructType, Transform[], Map) is deprecated from Spark 3.4
+  // in favor of the Column[] overload. Overriding the deprecated form keeps one implementation that
+  // every supported Spark version dispatches to.
+  @SuppressWarnings("deprecation")
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
@@ -280,6 +287,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         propertiesConverter,
         sparkTransformConverter,
         sparkTypeConverter);
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
+      throws NoSuchTableException {
+    return loadTableForWriting(ident);
   }
 
   @Override
@@ -707,6 +720,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               String.join(".", getDatabase(ident), ident.name())),
           e);
     }
+  }
+
+  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 
   @Override

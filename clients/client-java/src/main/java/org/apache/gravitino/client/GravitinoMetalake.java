@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -61,6 +62,7 @@ import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
@@ -86,15 +88,20 @@ import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -124,10 +131,15 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
+import org.apache.gravitino.policy.PolicyTagAssociation;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -139,7 +151,12 @@ import org.apache.gravitino.tag.TagValueConstraint;
  * create, load, alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO
-    implements SupportsCatalogs, TagOperations, SupportsRoles, SupportsJobs, PolicyOperations {
+    implements SupportsCatalogs,
+        TagOperations,
+        SupportsRoles,
+        SupportsJobs,
+        PolicyOperations,
+        SupportsSecrets {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -154,6 +171,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
   private final RESTClient restClient;
   private final MetadataObjectRoleOperations metadataObjectRoleOperations;
+  private final MetadataObjectSecretOperations metadataObjectSecretOperations;
 
   GravitinoMetalake(
       String name,
@@ -163,9 +181,11 @@ public class GravitinoMetalake extends MetalakeDTO
       RESTClient restClient) {
     super(name, comment, properties, auditDTO);
     this.restClient = restClient;
+    MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
-        new MetadataObjectRoleOperations(
-            name, MetadataObjects.of(null, name, MetadataObject.Type.METALAKE), restClient);
+        new MetadataObjectRoleOperations(name, metalakeObject, restClient);
+    this.metadataObjectSecretOperations =
+        new MetadataObjectSecretOperations(name, metalakeObject, restClient);
   }
 
   /**
@@ -256,8 +276,52 @@ public class GravitinoMetalake extends MetalakeDTO
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  /**
+   * Create a new catalog with specified identifier, type, comment, properties, and optional secret
+   * maps.
+   *
+   * @param catalogName The identifier of the catalog.
+   * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
+   * @param comment The comment of the catalog.
+   * @param properties The properties of the catalog.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created {@link Catalog}.
+   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @throws CatalogAlreadyExistsException if the catalog with specified identifier already exists.
+   */
+  @Override
+  public Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogCreateRequest req =
-        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
+        new CatalogCreateRequest(
+            catalogName,
+            type,
+            provider,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     CatalogResponse resp =
@@ -430,8 +494,78 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public void testConnection(String catalogName) throws Exception {
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            null,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(catalogName);
+      return;
+    }
+
+    List<CatalogUpdateRequest> requests =
+        Arrays.stream(changes)
+            .map(DTOConverters::toCatalogUpdateRequest)
+            .collect(Collectors.toList());
+    CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(requests);
+    updatesRequest.validate();
+
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            updatesRequest,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return metadataObjectSecretOperations.getSecrets();
   }
 
   /**
@@ -619,6 +753,65 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.dropped();
   }
 
+  @Override
+  public PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    PolicyForTagAssociationListResponse response =
+        restClient.get(
+            policyTagPath(tagName),
+            ImmutableMap.of("details", "true"),
+            PolicyForTagAssociationListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    response.validate();
+    Tag tag = getTag(tagName);
+    return Arrays.stream(response.getAssociations())
+        .map(
+            association ->
+                new GenericPolicyTagAssociation(
+                    new GenericPolicy(association.getPolicy()),
+                    tag,
+                    association.getSelector().toSelector()))
+        .toArray(PolicyTagAssociation[]::new);
+  }
+
+  @Override
+  public PolicyTagAssociation addPolicyForTag(
+      String tagName, String policyName, PolicyAssociationSelector selector) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    PolicyTagAddRequest request =
+        new PolicyTagAddRequest(PolicyAssociationSelectorDTO.fromSelector(selector));
+    PolicyTagAssociationResponse response =
+        restClient.post(
+            policyTagPath(tagName) + "/" + RESTUtils.encodeString(policyName),
+            request,
+            PolicyTagAssociationResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    response.validate();
+    return new GenericPolicyTagAssociation(
+        getPolicy(response.getPolicy()),
+        getTag(response.getTag()),
+        response.getSelector().toSelector());
+  }
+
+  @Override
+  public void removePolicyFromTag(String tagName, String policyName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    restClient.delete(
+        policyTagPath(tagName) + "/" + RESTUtils.encodeString(policyName),
+        BaseResponse.class,
+        Collections.emptyMap(),
+        ErrorHandlers.tagErrorHandler());
+  }
+
   /**
    * List all the policies under the current metalake.
    *
@@ -655,9 +848,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return Arrays.stream(resp.getPolicies())
-        .map(p -> new GenericPolicy(p, restClient, this.name()))
-        .toArray(Policy[]::new);
+    return Arrays.stream(resp.getPolicies()).map(p -> new GenericPolicy(p)).toArray(Policy[]::new);
   }
 
   /**
@@ -682,7 +873,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -712,7 +903,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -771,7 +962,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -797,6 +988,43 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.dropped();
   }
 
+  @Override
+  public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    TagForPolicyAssociationListResponse response =
+        restClient.get(
+            tagPolicyPath(policyName),
+            ImmutableMap.of("details", "true"),
+            TagForPolicyAssociationListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    response.validate();
+    Policy policy = getPolicy(policyName);
+    return Arrays.stream(response.getAssociations())
+        .map(
+            association ->
+                new GenericPolicyTagAssociation(
+                    policy,
+                    new GenericTag(association.getTag(), restClient, this.name()),
+                    association.getSelector().toSelector()))
+        .toArray(PolicyTagAssociation[]::new);
+  }
+
+  private String policyTagPath(String tagName) {
+    return String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+        + "/"
+        + RESTUtils.encodeString(tagName)
+        + "/policies";
+  }
+
+  private String tagPolicyPath(String policyName) {
+    return String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+        + "/"
+        + RESTUtils.encodeString(policyName)
+        + "/tags";
+  }
+
   /**
    * Adds a new User.
    *
@@ -808,35 +1036,6 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   public User addUser(String user) throws UserAlreadyExistsException, NoSuchMetalakeException {
     UserAddRequest req = new UserAddRequest(user);
-    req.validate();
-
-    UserResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            UserResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.getUser();
-  }
-
-  /**
-   * Adds a new User with an external identifier.
-   *
-   * @param user The name of the User.
-   * @param externalId The external identifier of the User.
-   * @param enabled Whether the User is enabled.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String user, String externalId, boolean enabled)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    UserAddRequest req = new UserAddRequest(user, externalId, enabled);
     req.validate();
 
     UserResponse resp =
@@ -953,35 +1152,6 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     GroupAddRequest req = new GroupAddRequest(group);
-    req.validate();
-
-    GroupResponse resp =
-        restClient.post(
-            String.format(
-                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
-            req,
-            GroupResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.groupErrorHandler());
-    resp.validate();
-
-    return resp.getGroup();
-  }
-
-  /**
-   * Adds a new Group with an external identifier.
-   *
-   * @param group The name of the Group.
-   * @param externalId The external identifier of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
-   *     exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String group, String externalId)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    GroupAddRequest req = new GroupAddRequest(group, externalId);
     req.validate();
 
     GroupResponse resp =
@@ -1646,13 +1816,21 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public JobHandle getJob(String jobId) throws NoSuchJobException {
+    return getJob(jobId, false);
+  }
+
+  @Override
+  public JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
     Preconditions.checkArgument(StringUtils.isNotBlank(jobId), "job id must not be null or empty");
 
+    Map<String, String> params =
+        includeOutput ? ImmutableMap.of("includeOutput", "true") : Collections.emptyMap();
     JobResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name()))
                 + "/"
                 + RESTUtils.encodeString(jobId),
+            params,
             JobResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());

@@ -37,6 +37,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -69,6 +71,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
 
+  private final CatalogManager catalogManager;
+
   @Override
   public void close() {
     // do nothing
@@ -81,8 +85,24 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    * @param idGenerator The IdGenerator to use for generating Metalake identifiers.
    */
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
+    this(store, idGenerator, null);
+  }
+
+  /**
+   * Constructs a MetalakeManager instance.
+   *
+   * @param store The EntityStore to use for managing Metalakes.
+   * @param idGenerator The IdGenerator to use for generating Metalake identifiers.
+   * @param catalogManager Used on force-drop to drop child catalogs via {@link
+   *     CatalogManager#dropCatalog} (schema/fileset secrets cleaned on that path, including {@code
+   *     FilesetCatalogOperations.dropSchema}); may be null in tests that do not exercise force-drop
+   *     with catalogs.
+   */
+  public MetalakeManager(
+      EntityStore store, IdGenerator idGenerator, CatalogManager catalogManager) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.catalogManager = catalogManager;
 
     // preload all metalakes and put them into cache, this is useful when user load schema/table
     // directly without list/get metalake first.
@@ -215,10 +235,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     Map<String, String> newProps =
         metalakeEntity.properties() == null
             ? new HashMap<>()
-            : new HashMap<>(metalakeEntity.properties());
-    newProps
-        .entrySet()
-        .removeIf(e -> metalakeEntity.propertiesMetadata().isHiddenProperty(e.getKey()));
+            : HiddenPropertyMaskUtils.maskHiddenProperties(
+                metalakeEntity.properties(), metalakeEntity.propertiesMetadata());
     newProps.putIfAbsent(
         PROPERTY_IN_USE,
         metalakeEntity.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
@@ -340,6 +358,13 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   @Override
   public boolean dropMetalake(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, MetalakeInUseException {
+    // Mirror CatalogManager.dropCatalog → ops.dropSchema: force-drop children through the real
+    // drop path so FilesetCatalogOperations / CatalogManager clean write-through secrets (and
+    // managed storage). Do this before the metalake root lock to avoid nesting tree locks.
+    if (force) {
+      dropCatalogsUnderMetalake(ident);
+    }
+
     return TreeLockUtils.doWithRootTreeLock(
         LockType.WRITE,
         () -> {
@@ -367,6 +392,37 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Force-drop child catalogs via {@link CatalogManager#dropCatalog} so schema/fileset secrets are
+   * cleaned on the same path as a normal catalog force-drop ({@code ops.dropSchema} →
+   * FilesetCatalogOperations, then catalog secrets in CatalogManager).
+   *
+   * <p>Callers typically {@code disableMetalake} before force-drop. {@link
+   * CatalogManager#dropCatalog} requires catalog {@code metalake-in-use=true}, so a disabled
+   * metalake is briefly re-enabled for child cleanup. The metalake entity is deleted immediately
+   * afterward, so the temporary enable is not restored.
+   */
+  private void dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
+    if (catalogManager == null) {
+      return;
+    }
+    try {
+      if (!metalakeInUse(store, metalakeIdent)) {
+        enableMetalake(metalakeIdent);
+      }
+      List<CatalogEntity> catalogs =
+          store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
+      for (CatalogEntity catalog : catalogs) {
+        catalogManager.dropCatalog(
+            NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
+      }
+    } catch (NoSuchMetalakeException e) {
+      // Metalake is already gone; dropMetalake will return false.
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

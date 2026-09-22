@@ -151,7 +151,20 @@ public interface Privilege {
     /** The privilege to execute (invoke) a function. */
     EXECUTE_FUNCTION(0L, 1L << 31),
     /** The privilege to alter a function's metadata. */
-    MODIFY_FUNCTION(0L, 1L << 32);
+    MODIFY_FUNCTION(0L, 1L << 32),
+    /** The privilege to probe whether a table-like object exists. */
+    PROBE_TABLE_LIKE(0L, 1L << 33),
+    /** The privilege to view a tag. */
+    VIEW_TAG(0L, 1L << 34),
+    /** The privilege to view a policy. */
+    VIEW_POLICY(0L, 1L << 35),
+    /** The privilege to list configured secrets providers. */
+    VIEW_SECRET_PROVIDERS(0L, 1L << 36),
+    /**
+     * The privilege to retrieve plaintext secrets and vend credentials for a metadata object via
+     * {@code getSecrets} / {@code getCredentials}.
+     */
+    USE_SECRET(0L, 1L << 37);
 
     private final long highBits;
     private final long lowBits;

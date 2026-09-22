@@ -51,16 +51,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -69,6 +72,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
@@ -78,17 +82,23 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -265,13 +275,17 @@ public class TestTagManager {
     tagManager = new TagManager(idGenerator, entityStore);
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "viewDispatcher", viewDispatcher, true);
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "functionDispatcher", functionDispatcher, true);
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
 
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
@@ -429,6 +443,49 @@ public class TestTagManager {
     Assertions.assertEquals("new comment", removedPropTag.comment());
     Map<String, String> expectedProp2 = ImmutableMap.of("k2", "v2");
     Assertions.assertEquals(expectedProp2, removedPropTag.properties());
+  }
+
+  @Test
+  public void testTagNameAndCommentLength() {
+    String maxLengthName = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH);
+    String tooLongName = maxLengthName + "a";
+    String maxLengthComment = StringUtils.repeat("c", EntityFieldLimits.MAX_COMMENT_LENGTH);
+    String tooLongComment = maxLengthComment + "c";
+
+    Exception e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, tooLongName, null, null));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, "tag1", tooLongComment, null));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag tag = tagManager.createTag(METALAKE, maxLengthName, maxLengthComment, null);
+    Assertions.assertEquals(maxLengthName, tag.name());
+    Assertions.assertEquals(maxLengthComment, tag.comment());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.alterTag(METALAKE, maxLengthName, TagChange.rename(tooLongName)));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagManager.alterTag(
+                    METALAKE, maxLengthName, TagChange.updateComment(tooLongComment)));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag unchanged = tagManager.getTag(METALAKE, maxLengthName);
+    Assertions.assertEquals(maxLengthComment, unchanged.comment());
   }
 
   @Test
@@ -1083,6 +1140,68 @@ public class TestTagManager {
             () -> tagManager.getTagForMetadataObject(METALAKE, nonExistentObject, tag1.name()));
     Assertions.assertTrue(
         e3.getMessage().contains("Failed to get tag for metadata object " + nonExistentObject));
+  }
+
+  @Test
+  public void testPolicyAssociationsForTag() throws IOException {
+    String tagName = "policy_tag";
+    String policyName = "policy_for_tag";
+    Assertions.assertThrows(
+        NoSuchTagException.class, () -> tagManager.listPolicyAssociationsForTag(METALAKE, tagName));
+    tagManager.createTag(
+        METALAKE, tagName, null, null, TagValueConstraint.ofAllowedValues("finance", "risk"));
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(policyName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.custom(
+                    ImmutableMap.of("rule", "value"),
+                    ImmutableSet.of(MetadataObject.Type.TABLE),
+                    null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(policy, false);
+
+    try {
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get());
+      RelationalEntity<?>[] associations =
+          tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
+      Assertions.assertEquals(1, associations.length);
+      Assertions.assertEquals(policyName, associations[0].targetEntity().name());
+      Assertions.assertEquals(tagName, associations[0].source().name());
+      Assertions.assertSame(
+          AllValuesSelector.get(),
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
+
+      Assertions.assertThrows(
+          PolicyAlreadyAssociatedException.class,
+          () -> tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get()));
+      Assertions.assertThrows(
+          PolicyAlreadyAssociatedException.class,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, tagName, policyName, TagValueSelector.of("finance")));
+
+      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
+      Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
+
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
+      associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
+      Assertions.assertEquals(
+          TagValueSelector.of("engineering"),
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
+      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
+    } finally {
+      entityStore.delete(
+          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
   }
 
   private static Set<String> tagNames(Tag[] tags) {

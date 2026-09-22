@@ -27,12 +27,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -40,32 +45,39 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.client.CustomTokenProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
-import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
-import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Option;
 
 /**
  * GravitinoDriverPlugin creates GravitinoCatalogManager to fetch catalogs from Apache Gravitino and
  * register Gravitino catalogs to Apache Spark.
+ *
+ * <p>The classes it registers differ per Spark version, so it takes them as {@link SparkBindings}
+ * from the version module's {@code GravitinoSparkPlugin} rather than naming them itself.
  */
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+
+  @VisibleForTesting static final String PAIMON_PROVIDER = "lakehouse-paimon";
 
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
@@ -75,17 +87,27 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
-  private GravitinoCatalogManager catalogManager;
+  private final SparkBindings bindings;
   private final List<String> gravitinoIcebergExtensions =
       Arrays.asList(
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
   private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
 
-  private final List<String> gravitinoDriverExtensions =
-      new ArrayList<>(
-          Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
+  private final List<String> gravitinoDriverExtensions;
+  private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+
+  /**
+   * Creates the plugin from the classes a connector build supplies.
+   *
+   * @param bindings the catalog and session extension classes of this build
+   */
+  public GravitinoDriverPlugin(SparkBindings bindings) {
+    this.bindings = bindings;
+    this.gravitinoDriverExtensions =
+        new ArrayList<>(Collections.singletonList(bindings.authorizationExtension()));
+  }
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -102,20 +124,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    this.enableIcebergSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
-    this.enablePaimonSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
-    if (enablePaimonSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
-    }
-    if (enableIcebergSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
-    }
+    registerOptInExtensions(conf);
 
     this.catalogManager =
         GravitinoCatalogManager.create(
-            () ->
+            conf,
+            sc.sparkUser(),
+            identity ->
                 createGravitinoClient(
                     gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
     catalogManager.loadRelationalCatalogs();
@@ -131,8 +146,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -140,31 +155,54 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enableIcebergSupport) {
+              if (StringUtils.isBlank(provider)) {
+                LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
-              if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enablePaimonSupport) {
+              // The provider is read once, here, and every decision below is made from the kind, so
+              // no two places can disagree about what this catalog is.
+              SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
+              if (kind == null) {
+                LOG.warn(
+                    "Skip registering {} because {} is not supported yet.", catalogName, provider);
+                return;
+              }
+              if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
+                return;
+              }
+              if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
+                return;
+              }
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
                 return;
               }
               try {
-                registerCatalog(sparkConf, catalogName, provider);
+                registerCatalog(sparkConf, catalogName, kind);
               } catch (Exception e) {
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
             });
   }
 
-  private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
-    if (StringUtils.isBlank(provider)) {
-      LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
-      return;
-    }
-
-    String catalogClassName = CatalogNameAdaptor.getCatalogName(provider);
-    if (StringUtils.isBlank(catalogClassName)) {
-      LOG.warn("Skip registering {} because {} is not supported yet.", catalogName, provider);
+  /**
+   * Registers the Spark catalog class bound to {@code kind} under {@code catalogName}, or skips the
+   * catalog when this build bound none.
+   *
+   * @param sparkConf the conf to register into
+   * @param catalogName the Gravitino catalog name, which becomes the Spark catalog name
+   * @param kind the kind of catalog to register
+   * @throws NullPointerException if the kind is null. A provider that maps to no kind is the
+   *     caller's to report, since only the caller still has the provider name.
+   */
+  @VisibleForTesting
+  void registerCatalog(SparkConf sparkConf, String catalogName, SparkCatalogKind kind) {
+    String catalogClassName = catalogClassName(kind);
+    if (catalogClassName == null) {
+      LOG.warn("Skip registering {} because this build has no {} catalog.", catalogName, kind);
       return;
     }
 
@@ -174,6 +212,57 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         catalogName + " is already registered to SparkCatalogManager");
     sparkConf.set(sparkCatalogConfigName, catalogClassName);
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
+  /**
+   * Resolves the Spark catalog class bound to a kind, from the bindings this build supplied.
+   * Returns null when the build bound no catalog for it, which is how a kind this build cannot
+   * serve, such as Paimon on Spark 4, is skipped.
+   */
+  @Nullable
+  @VisibleForTesting
+  String catalogClassName(SparkCatalogKind kind) {
+    Objects.requireNonNull(kind, "Catalog kind must not be null");
+    return bindings.catalogClassNames().get(kind);
+  }
+
+  /**
+   * Reads the two opt-in flags and queues the session extensions they ask for. Extracted from
+   * {@link #init(SparkContext, PluginContext)} so a test can exercise the flags without a live
+   * SparkContext, and takes the conf rather than two booleans so the config keys are covered too.
+   *
+   * @param conf the Spark conf to read the opt-in flags from
+   */
+  @VisibleForTesting
+  void registerOptInExtensions(SparkConf conf) {
+    this.enableIcebergSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    this.enablePaimonSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    if (enablePaimonSupport) {
+      registerPaimonExtensionsIfSupported();
+    }
+    if (enableIcebergSupport) {
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    }
+  }
+
+  /**
+   * Queues the Paimon session extensions, unless this build has no Paimon catalog. Paimon publishes
+   * no paimon-spark artifact for every Spark version and Scala version this connector supports, so
+   * some builds omit the Paimon classes; registering the extension there would fail SparkSession
+   * construction with a ClassNotFoundException. Skip it the way an unsupported catalog provider is
+   * skipped, so a config carried over from another build degrades to a warning.
+   */
+  @VisibleForTesting
+  void registerPaimonExtensionsIfSupported() {
+    if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON)) {
+      LOG.warn(
+          "Skip registering Paimon session extensions because {} is not supported yet.",
+          PAIMON_PROVIDER);
+      return;
+    }
+    gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
   }
 
   @VisibleForTesting
@@ -249,6 +338,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               .withKeyTabFile(new File(keyTabFile))
               .build();
       builder.withKerberosAuth(kerberosTokenProvider);
+    } else if (AuthProperties.isToken(authType)) {
+      builder.withCustomTokenAuth(new DynamicBearerTokenProvider(sparkConf));
     } else {
       throw new UnsupportedOperationException("Unsupported auth type: " + authType);
     }
@@ -265,6 +356,78 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   @Nullable
   private static String getOptionalConfig(SparkConf sparkConf, String configKey) {
     return sparkConf.get(configKey, null);
+  }
+
+  /**
+   * Resolves the bearer token to present to Gravitino for the operation running on the current
+   * thread.
+   *
+   * <p>The active Spark session's configuration wins over the application configuration, so a
+   * shared driver can carry a different end user's token per session, and {@code tokenFile} wins
+   * over {@code token}, so a token refreshed on disk is picked up without touching the
+   * configuration. Neither the token nor any prefix of it is ever logged.
+   *
+   * @param sparkConf the application Spark configuration, used when no session supplies a token
+   * @return the bearer token, never blank
+   * @throws IllegalArgumentException if neither token property is set
+   * @throws UncheckedIOException if the configured token file cannot be read
+   */
+  public static String resolveToken(SparkConf sparkConf) {
+    String tokenFile =
+        getSessionOrApplicationConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_FILE);
+    String token =
+        StringUtils.isNotBlank(tokenFile)
+            ? readTokenFile(tokenFile)
+            : getSessionOrApplicationConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(token),
+        String.format(
+            "Either %s or %s should be set when %s is %s",
+            GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE,
+            GravitinoSparkConfig.GRAVITINO_TOKEN_FILE,
+            GravitinoSparkConfig.GRAVITINO_AUTH_TYPE,
+            AuthProperties.TOKEN_AUTH_TYPE));
+    return token.trim();
+  }
+
+  private static String readTokenFile(String tokenFile) {
+    try {
+      return new String(Files.readAllBytes(Paths.get(tokenFile)), StandardCharsets.UTF_8).trim();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read the Gravitino token file " + tokenFile, e);
+    }
+  }
+
+  @Nullable
+  private static String getSessionOrApplicationConfig(SparkConf sparkConf, String configKey) {
+    Option<SparkSession> activeSession = SparkSession.getActiveSession();
+    if (activeSession.isDefined()) {
+      Option<String> sessionValue = activeSession.get().conf().getOption(configKey);
+      if (sessionValue.isDefined() && StringUtils.isNotBlank(sessionValue.get())) {
+        return sessionValue.get();
+      }
+    }
+    return getOptionalConfig(sparkConf, configKey);
+  }
+
+  /**
+   * Presents a bearer token that is resolved again on every request rather than captured once. See
+   * {@link #resolveToken(SparkConf)} for where the token comes from.
+   */
+  @VisibleForTesting
+  static final class DynamicBearerTokenProvider extends CustomTokenProvider {
+
+    private final SparkConf sparkConf;
+
+    DynamicBearerTokenProvider(SparkConf sparkConf) {
+      this.sparkConf = sparkConf;
+      this.schemeName = "Bearer";
+    }
+
+    @Override
+    protected String getCustomTokenInfo() {
+      return resolveToken(sparkConf);
+    }
   }
 
   @VisibleForTesting

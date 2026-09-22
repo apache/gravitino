@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -39,7 +40,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the role entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the role entity.");
+      Field.required("name", "The name of the role entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the role entity.");

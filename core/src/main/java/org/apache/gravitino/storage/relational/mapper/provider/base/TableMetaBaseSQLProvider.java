@@ -25,6 +25,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -178,6 +179,29 @@ public class TableMetaBaseSQLProvider {
         + " WHERE tm.table_id = #{tableId} AND tm.deleted_at = 0";
   }
 
+  /**
+   * Returns the active table metadata row and holds it exclusively for the current transaction.
+   *
+   * <p>Unlike the metalake, catalog and schema providers, this cannot be written as {@code
+   * selectTableMetaById(id) + " FOR UPDATE"}: that select LEFT JOINs {@code table_version_info},
+   * and locking the nullable side of an outer join is rejected by PostgreSQL and locks the wrong
+   * rows on MySQL. The projection is therefore spelled out for {@code table_meta} alone, and the
+   * returned row carries only the identity and version columns its callers read.
+   *
+   * @param tableId the table ID
+   * @return the locking select SQL
+   */
+  public String selectTableMetaByIdForUpdate(@Param("tableId") Long tableId) {
+    return "SELECT table_id as tableId, table_name as tableName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -220,11 +244,26 @@ public class TableMetaBaseSQLProvider {
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
         + " audit_info = #{tableMeta.auditInfo},"
-        + " current_version = #{tableMeta.currentVersion},"
-        + " last_version = #{tableMeta.lastVersion},"
+        // Keep the OCC token monotonic on overwrite. Resetting it to the incoming initial version
+        // would let a writer that read the same old version pass its CAS after this statement.
+        // last_version is assigned first, so both columns advance from the stored current version.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
+  /**
+   * Returns SQL that updates a table only while its OCC version is unchanged.
+   *
+   * <p>The WHERE clause intentionally compares only the stable ID, the version seen by the caller,
+   * and the active flag. Comparing serialized payload or audit fields would make harmless encoding
+   * differences look like conflicts; the version is the single source of truth for concurrency.
+   *
+   * @param newTablePO the table values to write
+   * @param oldTablePO the table values and OCC version read by the caller
+   * @param newSchemaId the target schema ID
+   * @return the version-checked update SQL
+   */
   public String updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO,
       @Param("oldTableMeta") TablePO oldTablePO,
@@ -240,37 +279,42 @@ public class TableMetaBaseSQLProvider {
         + " last_version = #{newTableMeta.lastVersion},"
         + " deleted_at = #{newTableMeta.deletedAt}"
         + " WHERE table_id = #{oldTableMeta.tableId}"
-        + " AND table_name = #{oldTableMeta.tableName}"
-        + " AND metalake_id = #{oldTableMeta.metalakeId}"
-        + " AND catalog_id = #{oldTableMeta.catalogId}"
-        + " AND schema_id = #{oldTableMeta.schemaId}"
-        + " AND audit_info = #{oldTableMeta.auditInfo}"
         + " AND current_version = #{oldTableMeta.currentVersion}"
-        + " AND last_version = #{oldTableMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  /**
+   * Returns SQL that deletes only the table version observed by the caller.
+   *
+   * <p>For example, a drop that read version 3 must not delete version 4 after a concurrent alter.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id = #{tableId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -278,8 +322,8 @@ public class TableMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"

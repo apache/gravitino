@@ -21,28 +21,39 @@ package org.apache.gravitino.client.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +62,18 @@ public class JobIT extends BaseIT {
 
   private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("job_it_metalake");
 
+  private static final long STATUS_PULL_INTERVAL_IN_MS = 3000L;
+
+  // Finished jobs, and active jobs not updated, for this long are cleaned up. The cleanup runs
+  // every tenth of it.
+  private static final long JOB_KEEP_TIME_IN_MS = 60_000L;
+
+  // A job execution id that no job executor instance of this server owns, as if the job was
+  // submitted by the local job executor of another Gravitino server sharing the metadata store.
+  private static final String OTHER_SERVER_EXECUTION_ID_PREFIX = "local-job-otherserver-";
+
   private File testStagingDir;
+  private File testSparkHome;
   private String testEntryScriptPath;
   private String testLibScriptPath;
   private ShellJobTemplate.Builder builder;
@@ -61,6 +83,9 @@ public class JobIT extends BaseIT {
   @Override
   public void startIntegrationTest() throws Exception {
     testStagingDir = Files.createTempDirectory("test_staging_dir").toFile();
+    // A Spark home without bin/spark-submit, so Spark jobs cannot be launched. The configuration
+    // takes precedence over the SPARK_HOME environment variable, keeping the test deterministic.
+    testSparkHome = Files.createTempDirectory("test_spark_home").toFile();
     testEntryScriptPath = generateTestEntryScript();
     testLibScriptPath = generateTestLibScript();
 
@@ -78,7 +103,11 @@ public class JobIT extends BaseIT {
             "gravitino.job.stagingDir",
             testStagingDir.getAbsolutePath(),
             "gravitino.job.statusPullIntervalInMs",
-            "3000");
+            String.valueOf(STATUS_PULL_INTERVAL_IN_MS),
+            "gravitino.job.stagingDirKeepTimeInMs",
+            String.valueOf(JOB_KEEP_TIME_IN_MS),
+            "gravitino.jobExecutor.local.sparkHome",
+            testSparkHome.getAbsolutePath());
     registerCustomConfigs(configs);
     super.startIntegrationTest();
   }
@@ -86,6 +115,7 @@ public class JobIT extends BaseIT {
   @AfterAll
   public void tearDown() throws Exception {
     FileUtils.deleteDirectory(testStagingDir);
+    FileUtils.deleteDirectory(testSparkHome);
   }
 
   @BeforeEach
@@ -288,6 +318,9 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle1.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle1.jobTemplateName());
+    Assertions.assertNotNull(jobHandle1.queuedAt());
+    Assertions.assertNull(jobHandle1.startedAt());
+    Assertions.assertNull(jobHandle1.finishedAt());
 
     JobHandle jobHandle2 =
         metalake.runJob(
@@ -295,6 +328,9 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value3", "arg2", "success", "env_var", "value4"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle2.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle2.jobTemplateName());
+    Assertions.assertNotNull(jobHandle2.queuedAt());
+    Assertions.assertNull(jobHandle2.startedAt());
+    Assertions.assertNull(jobHandle2.finishedAt());
 
     List<JobHandle> jobs = metalake.listJobs(template.name());
     Assertions.assertEquals(2, jobs.size());
@@ -324,6 +360,57 @@ public class JobIT extends BaseIT {
         updatedJobs.stream().map(JobHandle::jobStatus).collect(Collectors.toSet());
     Assertions.assertEquals(1, jobStatuses.size());
     Assertions.assertTrue(jobStatuses.contains(JobHandle.Status.SUCCEEDED));
+    // Finished jobs should carry a non-null queuedAt/finishedAt. startedAt is not asserted here:
+    // a fast job can transition QUEUED -> SUCCEEDED between two polls without ever being
+    // observed as STARTED, in which case startedAt legitimately stays null.
+    updatedJobs.forEach(
+        job -> {
+          Assertions.assertNotNull(job.queuedAt());
+          Assertions.assertNotNull(job.finishedAt());
+        });
+  }
+
+  @Test
+  public void testRunSparkJobRejectedWhenSparkIsNotAvailable() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("test_run_spark_without_spark_submit")
+            .withComment("Test spark job template")
+            .withExecutable(testEntryScriptPath)
+            .withClassName("org.apache.gravitino.test.SparkJob")
+            .build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    // The run request is rejected with the reason instead of being queued and failing later.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metalake.runJob(template.name(), Collections.emptyMap()));
+    Assertions.assertTrue(
+        e.getMessage()
+            .contains(
+                "spark-submit is not found or not executable: "
+                    + testSparkHome.getAbsolutePath()
+                    + "/bin/spark-submit"),
+        e.getMessage());
+
+    // No job is created, and the staging directory of the rejected job is removed.
+    Assertions.assertTrue(metalake.listJobs(template.name()).isEmpty());
+    String[] jobStagingDirs =
+        new File(testStagingDir, METALAKE_NAME + File.separator + template.name()).list();
+    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+
+    // Shell jobs are not affected by the missing Spark installation.
+    JobTemplate shellTemplate = builder.withName("test_run_shell_without_spark_submit").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(shellTemplate));
+    JobHandle jobHandle =
+        metalake.runJob(
+            shellTemplate.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+    Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> metalake.getJob(jobHandle.jobId()).jobStatus() == JobHandle.Status.SUCCEEDED);
   }
 
   @Test
@@ -338,6 +425,9 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNotNull(jobHandle.queuedAt());
+    Assertions.assertNull(jobHandle.startedAt());
+    Assertions.assertNull(jobHandle.finishedAt());
 
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -350,6 +440,10 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.queuedAt());
+    // startedAt is not asserted here: the job may transition QUEUED -> SUCCEEDED between two
+    // polls without ever being observed as STARTED, in which case it legitimately stays null.
+    Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test run a failed job
     JobHandle failedJobHandle =
@@ -357,6 +451,9 @@ public class JobIT extends BaseIT {
             template.name(),
             ImmutableMap.of("arg1", "value1", "arg2", "fail", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, failedJobHandle.jobStatus());
+    Assertions.assertNotNull(failedJobHandle.queuedAt());
+    Assertions.assertNull(failedJobHandle.startedAt());
+    Assertions.assertNull(failedJobHandle.finishedAt());
 
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -369,9 +466,92 @@ public class JobIT extends BaseIT {
     JobHandle retrievedFailedJob = metalake.getJob(failedJobHandle.jobId());
     Assertions.assertEquals(failedJobHandle.jobId(), retrievedFailedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.FAILED, retrievedFailedJob.jobStatus());
+    Assertions.assertNotNull(retrievedFailedJob.queuedAt());
+    // startedAt is not asserted here: FAILED does not prove the job ever started (it can be
+    // reached directly from QUEUED, e.g. if the executor fails to launch the job at all).
+    Assertions.assertNotNull(retrievedFailedJob.finishedAt());
 
     // Test get a non-existent job
     Assertions.assertThrows(NoSuchJobException.class, () -> metalake.getJob("non_existent_job_id"));
+  }
+
+  @Test
+  public void testRunJobPopulatesRuntimeJobTemplate() {
+    JobTemplate template = builder.withName("test_run_runtime_template").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    JobHandle jobHandle =
+        metalake.runJob(
+            template.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+
+    // The resolved runtime template is set at submission time, before the job even starts
+    // executing, and must carry the actual substituted values rather than the original
+    // template's raw {{placeholder}} strings.
+    JobTemplate runtimeJobTemplate = jobHandle.runtimeJobTemplate();
+    Assertions.assertNotNull(runtimeJobTemplate);
+    Assertions.assertEquals(template.name(), runtimeJobTemplate.name());
+    Assertions.assertEquals(template.comment(), runtimeJobTemplate.comment());
+    Assertions.assertEquals(
+        Lists.newArrayList("value1", "success"), runtimeJobTemplate.arguments());
+    Assertions.assertEquals(
+        ImmutableMap.of("ENV_VAR", "value2"), runtimeJobTemplate.environments());
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(
+            () -> {
+              JobHandle updatedJob = metalake.getJob(jobHandle.jobId());
+              return updatedJob.jobStatus() == JobHandle.Status.SUCCEEDED;
+            });
+
+    // The runtime job template is fixed at submission time, so it must be unchanged once the job
+    // reaches a terminal status and its entity has gone through the status-poll update path.
+    JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
+    Assertions.assertEquals(runtimeJobTemplate, retrievedJob.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testRunAndGetJobOutput() {
+    JobTemplate template = builder.withName("test_run_get_output").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    JobHandle jobHandle =
+        metalake.runJob(
+            template.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+
+    // Plain getJob never carries output.
+    Assertions.assertTrue(jobHandle.stdout().isEmpty());
+    Assertions.assertTrue(jobHandle.stderr().isEmpty());
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(
+            () -> {
+              JobHandle updatedJob = metalake.getJob(jobHandle.jobId());
+              return updatedJob.jobStatus() == JobHandle.Status.SUCCEEDED;
+            });
+
+    // getJob still never carries output, even after the job finishes.
+    JobHandle finishedJob = metalake.getJob(jobHandle.jobId());
+    Assertions.assertTrue(finishedJob.stdout().isEmpty());
+    Assertions.assertTrue(finishedJob.stderr().isEmpty());
+
+    // getJob(jobId, true) fetches the captured stdout/stderr.
+    JobHandle jobWithOutput = metalake.getJob(jobHandle.jobId(), true);
+    List<String> stdout = jobWithOutput.stdout();
+    Assertions.assertTrue(stdout.contains("starting test test job"));
+    Assertions.assertTrue(stdout.contains("in common script"));
+    Assertions.assertTrue(stdout.contains("value1"));
+    Assertions.assertTrue(stdout.contains("success"));
+    Assertions.assertTrue(stdout.contains("value2"));
+    // The test script never writes to stderr.
+    Assertions.assertTrue(jobWithOutput.stderr().isEmpty());
+
+    // Test get output for a non-existent job.
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> metalake.getJob("non_existent_job_id", true));
   }
 
   @Test
@@ -386,6 +566,9 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNotNull(jobHandle.queuedAt());
+    Assertions.assertNull(jobHandle.startedAt());
+    Assertions.assertNull(jobHandle.finishedAt());
 
     // Cancel the job
     metalake.cancelJob(jobHandle.jobId());
@@ -401,10 +584,91 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.CANCELLED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.queuedAt());
+    // startedAt is not asserted here: the job may be cancelled before it is ever observed as
+    // STARTED, in which case startedAt legitimately stays null.
+    Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test cancel a non-existent job
     Assertions.assertThrows(
         NoSuchJobException.class, () -> metalake.cancelJob("non_existent_job_id"));
+  }
+
+  @Test
+  public void testJobOwnedByAnotherServerIsNotFailed() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_other_server_job").build();
+    metalake.registerJobTemplate(template);
+
+    // Another server's job can't be found in this server's job executor, but this server must not
+    // mark it as FAILED when pulling job statuses.
+    JobEntity job = insertOtherServerJob(template.name(), JobHandle.Status.STARTED, Instant.now());
+    Awaitility.await()
+        .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.STARTED);
+  }
+
+  @Test
+  public void testCancelJobOwnedByAnotherServer() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_other_server_cancel").build();
+    metalake.registerJobTemplate(template);
+    JobEntity job = insertOtherServerJob(template.name(), JobHandle.Status.STARTED, Instant.now());
+
+    // This server can't cancel another server's job, so it marks the job as CANCELLING for its
+    // owner to cancel, instead of failing the request.
+    JobHandle cancellingJob = metalake.cancelJob(job.name());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, cancellingJob.jobStatus());
+    Awaitility.await()
+        .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLING);
+  }
+
+  @Test
+  public void testStaleActiveJobIsMarkedFailed() throws Exception {
+    Assumptions.assumeTrue(
+        ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
+        "Simulating another server needs direct access to the server's metadata store");
+    JobTemplate template = builder.withName("test_stale_job").build();
+    metalake.registerJobTemplate(template);
+
+    // The job was left behind by a server that exited long ago, so nobody updates it anymore.
+    JobEntity job =
+        insertOtherServerJob(
+            template.name(), JobHandle.Status.STARTED, Instant.now().minus(Duration.ofDays(30)));
+    Assertions.assertEquals(JobHandle.Status.STARTED, metalake.getJob(job.name()).jobStatus());
+
+    // The cleanup marks the job as FAILED, as it has not been updated for longer than the keep
+    // time. The failed job is kept for another keep time before being removed.
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.FAILED);
+    Assertions.assertNotNull(metalake.getJob(job.name()).finishedAt());
+  }
+
+  private JobEntity insertOtherServerJob(
+      String templateName, JobHandle.Status status, Instant createTime) throws IOException {
+    long jobId = GravitinoEnv.getInstance().idGenerator().nextId();
+    JobEntity job =
+        JobEntity.builder()
+            .withId(jobId)
+            .withJobExecutionId(OTHER_SERVER_EXECUTION_ID_PREFIX + UUID.randomUUID())
+            .withJobTemplateName(templateName)
+            .withStatus(status)
+            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(createTime).build())
+            .withStartedAt(status == JobHandle.Status.QUEUED ? 0L : createTime.toEpochMilli())
+            .withFinishedAt(0L)
+            .build();
+    GravitinoEnv.getInstance().entityStore().put(job, false /* overwrite */);
+    return job;
   }
 
   private String generateTestEntryScript() {

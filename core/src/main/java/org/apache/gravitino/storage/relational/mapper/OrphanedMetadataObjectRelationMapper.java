@@ -46,17 +46,6 @@ public interface OrphanedMetadataObjectRelationMapper {
       @Param("deletedAt") long deletedAt,
       @Param("limit") int limit);
 
-  /** Soft-deletes orphaned policy relations and returns the affected row count. */
-  @UpdateProvider(
-      type = OrphanedMetadataObjectRelationSQLProvider.class,
-      method = "softDeleteOrphanedPolicyRelations")
-  int softDeleteOrphanedPolicyRelations(
-      @Param("entityTable") String entityTable,
-      @Param("entityIdColumn") String entityIdColumn,
-      @Param("metadataObjectType") String metadataObjectType,
-      @Param("deletedAt") long deletedAt,
-      @Param("limit") int limit);
-
   /** Soft-deletes orphaned statistics and returns the affected row count. */
   @UpdateProvider(
       type = OrphanedMetadataObjectRelationSQLProvider.class,

@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -200,51 +201,6 @@ public class AccessControlIT extends BaseIT {
     // clean up
     metalake.removeGroup(anotherGroup);
     metalake.deleteRole("role2");
-  }
-
-  @Test
-  void testManageUsersAndGroupsWithExternalId() {
-    String userExtId = "ext-user-it-1";
-    String username = "ext_user_it";
-    User user = metalake.addUser(username, userExtId, false);
-    Assertions.assertEquals(userExtId, user.externalId());
-    Assertions.assertFalse(user.enabled());
-
-    user = metalake.getUser(username);
-    Assertions.assertEquals(userExtId, user.externalId());
-    Assertions.assertFalse(user.enabled());
-
-    User listedUser =
-        Arrays.stream(metalake.listUsers())
-            .filter(u -> username.equals(u.name()))
-            .findFirst()
-            .orElseThrow();
-    Assertions.assertEquals(userExtId, listedUser.externalId());
-    Assertions.assertFalse(listedUser.enabled());
-
-    Assertions.assertThrows(
-        UserAlreadyExistsException.class, () -> metalake.addUser("dup_ext_user", userExtId, true));
-
-    String groupExtId = "ext-group-it-1";
-    String groupName = "ext_group_it";
-    Group group = metalake.addGroup(groupName, groupExtId);
-    Assertions.assertEquals(groupExtId, group.externalId());
-
-    group = metalake.getGroup(groupName);
-    Assertions.assertEquals(groupExtId, group.externalId());
-
-    Group listedGroup =
-        Arrays.stream(metalake.listGroups())
-            .filter(g -> groupName.equals(g.name()))
-            .findFirst()
-            .orElseThrow();
-    Assertions.assertEquals(groupExtId, listedGroup.externalId());
-
-    Assertions.assertThrows(
-        GroupAlreadyExistsException.class, () -> metalake.addGroup("dup_ext_group", groupExtId));
-
-    Assertions.assertTrue(metalake.removeUser(username));
-    Assertions.assertTrue(metalake.removeGroup(groupName));
   }
 
   @Test
@@ -780,5 +736,48 @@ public class AccessControlIT extends BaseIT {
 
     // Cleanup.
     metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testUserGroupAndRoleNameLength() {
+    String tooLongName = StringUtils.repeat("n", 129);
+    String maxLengthName = StringUtils.repeat("n", 128);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> metalake.addUser(tooLongName));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the user must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(maxLengthName, metalake.addUser(maxLengthName).name());
+    Assertions.assertTrue(metalake.removeUser(maxLengthName));
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> metalake.addGroup(tooLongName));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the group must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(maxLengthName, metalake.addGroup(maxLengthName).name());
+    Assertions.assertTrue(metalake.removeGroup(maxLengthName));
+
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createRole(
+                    tooLongName, Collections.emptyMap(), Lists.newArrayList(metalakeObject)));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the role must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(
+        maxLengthName,
+        metalake
+            .createRole(maxLengthName, Collections.emptyMap(), Lists.newArrayList(metalakeObject))
+            .name());
+    Assertions.assertTrue(metalake.deleteRole(maxLengthName));
   }
 }

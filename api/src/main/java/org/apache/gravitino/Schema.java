@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -92,5 +93,14 @@ public interface Schema extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Schema does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the schema supports secret property operations.
+   * @throws UnsupportedOperationException if the schema does not support secret property
+   *     operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Schema does not support secret property operations.");
   }
 }

@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -58,6 +57,8 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -235,19 +236,20 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Performs `show databases` operation to check if the JDBC connection is valid.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    databaseOperation.listDatabases();
+  public void testConnection(NameIdentifier catalogIdent) {
+    try {
+      databaseOperation.listDatabases();
+    } catch (ConnectionFailedException e) {
+      throw e;
+    } catch (GravitinoRuntimeException e) {
+      if (e.getClass() == GravitinoRuntimeException.class && e.getCause() instanceof SQLException) {
+        throw new ConnectionFailedException(
+            e.getCause(), "Failed to connect to JDBC catalog: %s", e.getMessage());
+      }
+      throw e;
+    }
   }
 
   /**
@@ -568,7 +570,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
           metaData.getDriverMajorVersion(),
           metaData.getDriverMinorVersion());
     } catch (final SQLException se) {
-      throw exceptionConverter.toGravitinoException(se);
+      throw new ConnectionFailedException(
+          se, "Failed to connect to JDBC catalog: %s", se.getMessage());
     }
   }
 

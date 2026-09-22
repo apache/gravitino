@@ -106,6 +106,8 @@ def build_tag_dto(
     name: str = "tagA",
     comment: str = "commentA",
     properties: tp.Optional[dict[str, str]] = None,
+    allowed_values: tp.Optional[list[str]] = None,
+    assignment_values: tp.Optional[list[str]] = None,
 ) -> TagDTO:
     if properties is None:
         properties = {
@@ -118,6 +120,8 @@ def build_tag_dto(
         .name(name)
         .comment(comment)
         .properties(properties)
+        .allowed_values(allowed_values)
+        .assignment_values(assignment_values)
         .audit_info(build_audit_info())
         .inherited(False)
         .build()
@@ -220,15 +224,27 @@ def mock_load_schema(name: str):
         _last_modifier="test",
         _last_modified_time="2024-04-05T10:10:35.218Z",
     )
-    return SchemaDTO(
+    schema = SchemaDTO(
         _name=name,
         _comment="this is schema test",
         _properties={"schema-prop": "schema-val"},
         _audit=audit_dto,
     )
+    mock_schema = MagicMock()
+    mock_schema.properties.return_value = schema.properties()
+    mock_schema.get_secrets.return_value = {}
+    return mock_schema
 
 
 def mock_data(cls):
+    @patch(
+        "gravitino.client.generic_fileset.GenericFileset.get_secrets",
+        return_value={},
+    )
+    @patch(
+        "gravitino.client.fileset_catalog.FilesetCatalog.get_secrets",
+        return_value={},
+    )
     @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.load_metalake",
         return_value=mock_load_metalake(),
@@ -282,10 +298,13 @@ class MockTagRepo:
         tag_name: str,
         comment: str = "",
         properties=None,
+        allowed_values=None,
     ) -> TagDTO:
         if tag_name in self.tag_store:
             raise ValueError(f"Tag {tag_name} already exists")
-        self.tag_store[tag_name] = build_tag_dto(tag_name, comment, properties)
+        self.tag_store[tag_name] = build_tag_dto(
+            tag_name, comment, properties, allowed_values
+        )
         return self.tag_store[tag_name]
 
     def mock_alter_tag(self, tag_name: str, *changes) -> TagDTO:

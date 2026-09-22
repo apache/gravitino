@@ -51,7 +51,15 @@ public class MetalakeMetaSQLProviderFactory {
 
   static class MetalakeMetaMySQLProvider extends MetalakeMetaBaseSQLProvider {}
 
-  static class MetalakeMetaH2Provider extends MetalakeMetaBaseSQLProvider {}
+  static class MetalakeMetaH2Provider extends MetalakeMetaBaseSQLProvider {
+    @Override
+    public String selectMetalakeMetaByIdForShare(Long metalakeId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Catalog
+      // creations under one metalake therefore serialize on H2, and a slow creation can make a
+      // concurrent one hit H2's lock timeout instead of a clean conflict.
+      return selectMetalakeMetaByIdForUpdate(metalakeId);
+    }
+  }
 
   public String listMetalakePOs() {
     return getProvider().listMetalakePOs();
@@ -68,6 +76,11 @@ public class MetalakeMetaSQLProviderFactory {
   /** Returns SQL that selects and locks an active metalake by ID. */
   public static String selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId) {
     return getProvider().selectMetalakeMetaByIdForUpdate(metalakeId);
+  }
+
+  /** Builds SQL that returns an active metalake by ID and locks it for shared access. */
+  public static String selectMetalakeMetaByIdForShare(@Param("metalakeId") Long metalakeId) {
+    return getProvider().selectMetalakeMetaByIdForShare(metalakeId);
   }
 
   public static String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {

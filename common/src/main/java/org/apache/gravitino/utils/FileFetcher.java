@@ -202,7 +202,9 @@ public final class FileFetcher {
       Class<?> pathClass = Class.forName("org.apache.hadoop.fs.Path");
 
       Object fileSystem =
-          fileSystemClass.getMethod("get", configurationClass).invoke(null, configuration);
+          fileSystemClass
+              .getMethod("get", URI.class, configurationClass)
+              .invoke(null, uri, configuration);
       Object srcPath = pathClass.getConstructor(URI.class).newInstance(uri);
       Object destPath = pathClass.getConstructor(URI.class).newInstance(destFile.toURI());
       fileSystemClass

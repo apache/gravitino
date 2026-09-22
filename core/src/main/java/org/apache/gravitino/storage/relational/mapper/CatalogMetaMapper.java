@@ -79,6 +79,18 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
+  /** Returns an active catalog by ID and locks it. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByIdForUpdate")
+  CatalogPO selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId);
+
+  /** Selects and share-locks an active catalog by ID for the current transaction. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByIdForShare")
+  CatalogPO selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId);
+
   @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
@@ -92,10 +104,18 @@ public interface CatalogMetaMapper {
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO);
 
+  /**
+   * Soft-deletes a catalog, but only while it still carries the given version.
+   *
+   * @param catalogId the ID of the catalog to delete
+   * @param currentVersion the version the caller read before deciding to delete
+   * @return 1 when the catalog was deleted, 0 when it changed or is already gone
+   */
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
-  Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
+  Integer softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
 
   /**
    * Soft-deletes catalogs whose identifiers and OCC versions still match.

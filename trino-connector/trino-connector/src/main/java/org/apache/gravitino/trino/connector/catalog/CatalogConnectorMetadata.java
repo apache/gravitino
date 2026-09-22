@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Strings;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
 import java.util.Arrays;
@@ -47,13 +48,11 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** This class implements Apache Gravitino metadata operators. */
 public class CatalogConnectorMetadata {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadata.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorMetadata.class);
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog does not exist";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema does not exist";
@@ -80,7 +79,7 @@ public class CatalogConnectorMetadata {
       try {
         fc = catalog.asFunctionCatalog();
       } catch (UnsupportedOperationException e) {
-        LOG.debug("Catalog {} does not support function operations", catalogName);
+        LOG.debug("Catalog %s does not support function operations", catalogName);
       }
       this.functionCatalog = fc;
     } catch (NoSuchCatalogException e) {

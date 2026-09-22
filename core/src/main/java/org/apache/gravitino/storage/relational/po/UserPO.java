@@ -25,8 +25,6 @@ public class UserPO {
   private Long userId;
   private String userName;
   private Long metalakeId;
-  private String externalId;
-  private Boolean enabled;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -42,14 +40,6 @@ public class UserPO {
 
   public Long getMetalakeId() {
     return metalakeId;
-  }
-
-  public String getExternalId() {
-    return externalId;
-  }
-
-  public Boolean getEnabled() {
-    return enabled;
   }
 
   public String getAuditInfo() {
@@ -80,8 +70,6 @@ public class UserPO {
     return Objects.equal(getUserId(), tablePO.getUserId())
         && Objects.equal(getUserName(), tablePO.getUserName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
-        && Objects.equal(getExternalId(), tablePO.getExternalId())
-        && Objects.equal(getEnabled(), tablePO.getEnabled())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
@@ -94,8 +82,6 @@ public class UserPO {
         getUserId(),
         getUserName(),
         getMetalakeId(),
-        getExternalId(),
-        getEnabled(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
@@ -121,16 +107,6 @@ public class UserPO {
 
     public Builder withMetalakeId(Long metalakeId) {
       userPO.metalakeId = metalakeId;
-      return this;
-    }
-
-    public Builder withExternalId(String externalId) {
-      userPO.externalId = externalId;
-      return this;
-    }
-
-    public Builder withEnabled(Boolean enabled) {
-      userPO.enabled = enabled;
       return this;
     }
 
@@ -165,9 +141,6 @@ public class UserPO {
     }
 
     public UserPO build() {
-      if (userPO.enabled == null) {
-        userPO.enabled = true;
-      }
       validate();
       return userPO;
     }

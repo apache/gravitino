@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -50,6 +51,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
@@ -58,7 +60,9 @@ import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -67,6 +71,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
+import org.apache.ranger.plugin.util.GrantRevokeRoleRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -1473,7 +1478,8 @@ public class RangerHiveIT {
                   null,
                   null,
                   null,
-                  Lists.newArrayList(RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE));
+                  Lists.newArrayList(
+                      RangerHelper.generateMetalakeOwnerRoleName(RangerITEnv.METALAKE_ID)));
             });
 
     MetadataObject catalog =
@@ -1492,9 +1498,60 @@ public class RangerHiveIT {
                   null,
                   null,
                   Lists.newArrayList(
-                      RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE,
-                      RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE));
+                      RangerHelper.generateMetalakeOwnerRoleName(RangerITEnv.METALAKE_ID),
+                      RangerHelper.generateCatalogOwnerRoleName(RangerITEnv.CATALOG_ID)));
             });
+  }
+
+  @Test
+  public void testMigrateLegacyOwnerRolesForCatalogsSharingRangerService()
+      throws RangerServiceException {
+    String suffix = GravitinoITUtils.genRandomName(currentFunName());
+    String firstCatalogId = Long.toString(System.nanoTime());
+    String secondCatalogId = firstCatalogId + "2";
+    RangerAuthorizationHadoopSQLPlugin firstPlugin = createRangerPlugin(firstCatalogId);
+    RangerAuthorizationHadoopSQLPlugin secondPlugin = createRangerPlugin(secondCatalogId);
+    MetadataObject firstCatalog =
+        MetadataObjects.parse("catalog-first-" + suffix, MetadataObject.Type.CATALOG);
+    MetadataObject secondCatalog =
+        MetadataObjects.parse("catalog-second-" + suffix, MetadataObject.Type.CATALOG);
+    Owner firstOwner = new MockOwner("owner-first-" + suffix, Owner.Type.USER);
+    Owner secondOwner = new MockOwner("owner-second-" + suffix, Owner.Type.USER);
+    String firstOwnerRole = RangerHelper.generateCatalogOwnerRoleName(firstCatalogId);
+    String secondOwnerRole = RangerHelper.generateCatalogOwnerRoleName(secondCatalogId);
+    String legacyOwnerRole = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
+
+    Assertions.assertTrue(firstPlugin.onOwnerSet(firstCatalog, null, firstOwner));
+    Assertions.assertTrue(secondPlugin.onOwnerSet(secondCatalog, null, secondOwner));
+
+    if (rangerHelper.getRangerRole(legacyOwnerRole) == null) {
+      rangerClient.createRole(
+          RangerITEnv.RANGER_HIVE_REPO_NAME,
+          new RangerRole(legacyOwnerRole, RangerHelper.MANAGED_BY_GRAVITINO, null, null, null));
+    }
+    GrantRevokeRoleRequest legacyOwnerGrant = new GrantRevokeRoleRequest();
+    legacyOwnerGrant.setUsers(Sets.newHashSet(firstOwner.name(), secondOwner.name()));
+    legacyOwnerGrant.setGroups(Collections.emptySet());
+    legacyOwnerGrant.setGrantor(firstPlugin.rangerAdminName);
+    legacyOwnerGrant.setTargetRoles(Sets.newHashSet(legacyOwnerRole));
+    rangerClient.grantRole(RangerITEnv.RANGER_HIVE_REPO_NAME, legacyOwnerGrant);
+
+    replacePolicyOwnerRole(firstPlugin, firstCatalog, firstOwnerRole, legacyOwnerRole);
+    replacePolicyOwnerRole(secondPlugin, secondCatalog, secondOwnerRole, legacyOwnerRole);
+    rangerClient.deleteRole(
+        firstOwnerRole, firstPlugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+    rangerClient.deleteRole(
+        secondOwnerRole, secondPlugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+
+    Assertions.assertTrue(firstPlugin.onOwnerSet(firstCatalog, firstOwner, firstOwner));
+    Assertions.assertTrue(secondPlugin.onOwnerSet(secondCatalog, secondOwner, secondOwner));
+    // Repeat reconciliation to verify idempotency.
+    Assertions.assertTrue(firstPlugin.onOwnerSet(firstCatalog, firstOwner, firstOwner));
+
+    verifyOwnerRole(firstPlugin, firstOwnerRole, firstOwner.name(), secondOwner.name());
+    verifyOwnerRole(secondPlugin, secondOwnerRole, secondOwner.name(), firstOwner.name());
+    verifyPolicyOwnerRole(firstPlugin, firstCatalog, firstOwnerRole, legacyOwnerRole);
+    verifyPolicyOwnerRole(secondPlugin, secondCatalog, secondOwnerRole, legacyOwnerRole);
   }
 
   @Test
@@ -2096,5 +2153,85 @@ public class RangerHiveIT {
         excludeGroups,
         includeRoles,
         null);
+  }
+
+  private RangerAuthorizationHadoopSQLPlugin createRangerPlugin(String catalogId) {
+    return new RangerAuthorizationHadoopSQLPlugin(
+        "metalake-" + currentFunName(),
+        ImmutableMap.of(
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+            RangerITEnv.RANGER_HIVE_REPO_NAME,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true",
+            BaseAuthorization.METALAKE_ID,
+            RangerITEnv.METALAKE_ID,
+            BaseAuthorization.CATALOG_ID,
+            catalogId));
+  }
+
+  private void replacePolicyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      MetadataObject catalog,
+      String currentOwnerRole,
+      String legacyOwnerRole)
+      throws RangerServiceException {
+    for (AuthorizationSecurableObject securableObject : plugin.translateOwner(catalog)) {
+      RangerPolicy policy = plugin.findManagedPolicy(securableObject);
+      Assertions.assertNotNull(policy);
+      boolean replaced = false;
+      for (RangerPolicy.RangerPolicyItem policyItem : policy.getPolicyItems()) {
+        if (policyItem.getRoles().remove(currentOwnerRole)) {
+          if (!policyItem.getRoles().contains(legacyOwnerRole)) {
+            policyItem.getRoles().add(legacyOwnerRole);
+          }
+          replaced = true;
+        }
+      }
+      Assertions.assertTrue(replaced);
+      rangerClient.updatePolicy(policy.getId(), policy);
+    }
+  }
+
+  private void verifyPolicyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      MetadataObject catalog,
+      String expectedOwnerRole,
+      String legacyOwnerRole) {
+    for (AuthorizationSecurableObject securableObject : plugin.translateOwner(catalog)) {
+      RangerPolicy policy = plugin.findManagedPolicy(securableObject);
+      Assertions.assertNotNull(policy);
+      boolean expectedRoleFound = false;
+      for (RangerPolicy.RangerPolicyItem policyItem : policy.getPolicyItems()) {
+        if (policyItem.getRoles().contains(expectedOwnerRole)) {
+          Assertions.assertFalse(policyItem.getRoles().contains(legacyOwnerRole));
+          expectedRoleFound = true;
+        }
+      }
+      Assertions.assertTrue(expectedRoleFound);
+    }
+  }
+
+  private void verifyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      String roleName,
+      String expectedOwner,
+      String unexpectedOwner)
+      throws RangerServiceException {
+    RangerRole role =
+        rangerClient.getRole(roleName, plugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+    List<String> users =
+        role.getUsers().stream().map(user -> user.getName()).collect(Collectors.toList());
+    Assertions.assertTrue(users.contains(expectedOwner));
+    Assertions.assertFalse(users.contains(unexpectedOwner));
   }
 }

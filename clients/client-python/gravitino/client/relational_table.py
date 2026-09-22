@@ -18,6 +18,7 @@
 from typing import Any, Optional, cast
 
 from gravitino.api.audit import Audit
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.rel.column import Column
@@ -27,12 +28,19 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_statistics_operations import (
     MetadataObjectStatisticsOperations,
 )
@@ -57,8 +65,10 @@ from gravitino.utils import HTTPClient
 
 class RelationalTable(
     Table,
+    SupportsRoles,
     SupportsStatistics,
     SupportsTags,
+    SupportsSecrets,
 ):
     """Represents a relational table."""
 
@@ -75,7 +85,13 @@ class RelationalTable(
         self._object_tag_operations = MetadataObjectTagOperations(
             namespace.level(0), table_object, rest_client
         )
+        self._object_role_operations = MetadataObjectRoleOperations(
+            namespace.level(0), table_object, rest_client
+        )
         self._object_statistics_operations = MetadataObjectStatisticsOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             namespace.level(0), table_object, rest_client
         )
 
@@ -252,6 +268,13 @@ class RelationalTable(
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)
 
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._object_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
@@ -259,6 +282,12 @@ class RelationalTable(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> list[str]:
+        return self._object_role_operations.list_binding_role_names()
 
     def list_statistics(self) -> list[Statistic]:
         return self._object_statistics_operations.list_statistics()
@@ -271,3 +300,9 @@ class RelationalTable(
 
     def supports_statistics(self) -> SupportsStatistics:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> dict[str, str]:
+        return self._object_secret_operations.get_secrets()

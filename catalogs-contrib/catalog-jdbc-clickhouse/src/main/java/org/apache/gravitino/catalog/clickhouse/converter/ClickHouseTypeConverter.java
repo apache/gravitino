@@ -162,7 +162,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case DATE32:
-        // Date32 supports 1900-2299 vs Date's 1970-2149. Use ExternalType to preserve round-trip.
+        // Date32 has a wider range than Date; preserve its catalog type for round-trip.
         return Types.ExternalType.of(DATE32);
       case DATETIME:
         // Default is 0 precision
@@ -210,7 +210,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DecimalType decimalType) {
       return String.format("%s(%s,%s)", DECIMAL, decimalType.precision(), decimalType.scale());
     } else if (type instanceof Types.VarCharType) {
-      return STRING;
+      throw new IllegalArgumentException(
+          "ClickHouse does not support varchar(n) length limits; use string for unlimited text "
+              + "or fixedchar(n) for a fixed-length value");
     } else if (type instanceof Types.FixedCharType fixedCharType) {
       return FIXEDSTRING + "(" + fixedCharType.length() + ")";
     } else if (type instanceof Types.BooleanType) {

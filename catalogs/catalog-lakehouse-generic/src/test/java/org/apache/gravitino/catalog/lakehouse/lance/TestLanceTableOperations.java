@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -48,12 +49,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -64,6 +67,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
 import org.lance.index.IndexOptions;
@@ -121,6 +126,98 @@ public class TestLanceTableOperations {
                 new Index[0]));
   }
 
+  /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */
+  @Test
+  public void testExistOkRejectsNonLanceTable() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("delta-exist-ok").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            LANCE_CREATION_MODE,
+            "EXIST_OK",
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies both overwrite paths reject a non-Lance entity before mutation. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOverwriteRejectsNonLanceTableBeforeMutation(boolean register) throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location =
+        tempDir.resolve(register ? "delta-register-overwrite" : "delta-overwrite").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    if (register) {
+      properties.put(LANCE_TABLE_REGISTER, "true");
+    }
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the purge guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testPurgeTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-purge").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.purgeTable(ident));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the drop guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testDropTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-drop").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.dropTable(ident));
+    verify(store, never()).delete(any(), any());
+  }
+
   @Test
   public void testLoadDeclaredTableSchemaFromLocation() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
@@ -174,10 +271,10 @@ public class TestLanceTableOperations {
   /**
    * Reproduces the concurrent repair-on-load race seen in {@code LanceSparkRESTServiceIT}. When two
    * loads repair the same table at once, the optimistic-locked {@code store.update} of the slower
-   * one matches zero rows and {@code TableMetaService} surfaces it as {@code IOException("Failed to
-   * update the entity")}. Before the CAS retry, {@code repairTableMetadata} rethrew it as a fatal
-   * {@code RuntimeException} (HTTP 500) instead of tolerating the concurrent update. This test
-   * asserts that the lost race is benign and load returns a usable table.
+   * one matches zero rows and the store surfaces an {@link OptimisticLockException}. Before the CAS
+   * retry, {@code repairTableMetadata} rethrew it as a fatal error (HTTP 500) instead of tolerating
+   * the concurrent update. This test asserts that the lost race is benign and load returns a usable
+   * table.
    */
   @Test
   public void testLoadTableSurvivesConcurrentRepairVersionRace() throws Exception {
@@ -219,10 +316,10 @@ public class TestLanceTableOperations {
     when(idGenerator.nextId()).thenReturn(10L, 11L);
 
     // First repair attempt loses the optimistic-lock CAS (a concurrent load already bumped the
-    // version): TableMetaService surfaces exactly this IOException. The retry re-reads the winner's
-    // already-repaired entity, against which the idempotent updater succeeds.
+    // version). The retry re-reads the winner's already-repaired entity, against which the
+    // idempotent updater succeeds.
     when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenThrow(new IOException("Failed to update the entity: " + ident))
+        .thenThrow(new OptimisticLockException("mock conflict"))
         .thenAnswer(
             invocation -> {
               @SuppressWarnings("unchecked")
@@ -253,6 +350,58 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(2, loadedTable.columns().length);
     Assertions.assertEquals("id", loadedTable.columns()[0].name());
     Assertions.assertEquals("name", loadedTable.columns()[1].name());
+  }
+
+  @Test
+  public void testRepairStopsAfterBoundedOptimisticLockRetries() throws Exception {
+    NameIdentifier ident = prepareDeclaredTableForRepair("repair-conflict-exhausted");
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new OptimisticLockException("mock conflict"));
+    // Remove the real sleep so this test checks the retry bound without becoming timing-sensitive.
+    Mockito.doNothing().when(lanceTableOps).backoffBeforeRetry(any());
+
+    OptimisticLockException failure =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertInstanceOf(OptimisticLockException.class, failure.getCause());
+    verify(store, Mockito.times(5))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testRepairDoesNotRetryOrdinaryIoFailure() throws Exception {
+    NameIdentifier ident = prepareDeclaredTableForRepair("repair-io-failure");
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new IOException("database unavailable"));
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertInstanceOf(IOException.class, failure.getCause());
+    verify(store, Mockito.times(1))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testRepairBackoffPreservesThreadInterrupt() {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Thread.currentThread().interrupt();
+    try {
+      IOException failure =
+          Assertions.assertThrows(IOException.class, () -> lanceTableOps.backoffBeforeRetry(ident));
+
+      Assertions.assertInstanceOf(InterruptedException.class, failure.getCause());
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      // JUnit reuses worker threads, so do not leak this test's interrupt flag into another test.
+      Thread.interrupted();
+    }
   }
 
   @Test
@@ -326,6 +475,78 @@ public class TestLanceTableOperations {
     Assertions.assertEquals("id", loadedTable.columns()[0].name());
     Assertions.assertEquals("name", loadedTable.columns()[1].name());
     Assertions.assertEquals("9", loadedTable.properties().get(LANCE_TABLE_VERSION));
+  }
+
+  @Test
+  public void testVersionCheckRefreshKeepsExistingColumnIdsAndComments() throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("version-check-keep-ids").toString();
+    AuditInfo columnAudit =
+        AuditInfo.builder().withCreator("column_creator").withCreateTime(Instant.EPOCH).build();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("id")
+                    .withComment("the id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(columnAudit)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(11L)
+                    .withName("dropped")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withAuditInfo(columnAudit)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(12L);
+    AtomicReference<TableEntity> updated = new AtomicReference<>();
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              updated.set(updater.apply(tableEntity));
+              return updated.get();
+            });
+
+    // The dataset moved to a new version: "id" is still there, "dropped" is gone and "name" is new.
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("name", new ArrowType.Utf8()),
+                    Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loadedTable =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals("9", loadedTable.properties().get(LANCE_TABLE_VERSION));
+    List<ColumnEntity> columns = updated.get().columns();
+    Assertions.assertEquals(2, columns.size());
+
+    ColumnEntity name = columns.get(0);
+    Assertions.assertEquals("name", name.name());
+    Assertions.assertEquals(12L, name.id());
+    Assertions.assertEquals(0, name.position());
+
+    ColumnEntity id = columns.get(1);
+    Assertions.assertEquals("id", id.name());
+    Assertions.assertEquals(10L, id.id());
+    Assertions.assertEquals(1, id.position());
+    Assertions.assertEquals("the id", id.comment());
+    Assertions.assertEquals(columnAudit, id.auditInfo());
+    Assertions.assertEquals("the id", loadedTable.columns()[1].comment());
   }
 
   @Test
@@ -473,6 +694,139 @@ public class TestLanceTableOperations {
     Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
   }
 
+  @ParameterizedTest(name = "recordedVersion={0}")
+  @ValueSource(booleans = {false, true})
+  public void testAlterTableHydratesRegisteredSchemaBeforeRecordingVersion(boolean recordedVersion)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("alter-registered-table-" + recordedVersion).toString();
+    Map<String, String> properties =
+        recordedVersion
+            ? Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_REGISTER,
+                Boolean.TRUE.toString(),
+                LANCE_TABLE_VERSION,
+                "2")
+            : Map.of(
+                Table.PROPERTY_LOCATION, location, LANCE_TABLE_REGISTER, Boolean.TRUE.toString());
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    stubMutableTable(ident, storedTable);
+    when(idGenerator.nextId()).thenReturn(10L);
+
+    Dataset schemaDataset = mock(Dataset.class);
+    when(schemaDataset.version()).thenReturn(3L);
+    when(schemaDataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("embedding", new ArrowType.Utf8()))));
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doReturn(schemaDataset, alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    Table alteredTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertEquals(1, alteredTable.columns().length);
+    Assertions.assertEquals("embedding", alteredTable.columns()[0].name());
+    Assertions.assertEquals("4", alteredTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals(1, alteredTable.index().length);
+    Assertions.assertEquals("embedding_idx", alteredTable.index()[0].name());
+    Assertions.assertEquals(1, storedTable.get().columns().size());
+    Assertions.assertEquals("4", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+
+    InOrder inOrder = Mockito.inOrder(schemaDataset, alterDataset);
+    inOrder.verify(schemaDataset).getSchema();
+    inOrder.verify(alterDataset).createIndex(any(IndexOptions.class));
+    inOrder.verify(alterDataset).getVersion();
+    verify(store, Mockito.times(2))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testAlterTableStopsWhenRegisteredSchemaCannotBeHydrated() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("unavailable-registered-table").toString();
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_REGISTER,
+                    Boolean.TRUE.toString(),
+                    LANCE_TABLE_VERSION,
+                    "3")));
+    stubMutableTable(ident, storedTable);
+
+    Dataset alterDataset = mock(Dataset.class);
+    Version alteredVersion = mock(Version.class);
+    when(alterDataset.getVersion()).thenReturn(alteredVersion);
+    when(alteredVersion.getId()).thenReturn(4L);
+    Mockito.doThrow(new RuntimeException("storage unavailable"))
+        .doReturn(alterDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    IllegalStateException failure =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addIndex(
+                        Index.IndexType.SCALAR, "embedding_idx", new String[][] {{"embedding"}})));
+
+    Assertions.assertTrue(failure.getMessage().contains("schema"));
+    Assertions.assertEquals("storage unavailable", failure.getCause().getMessage());
+    Assertions.assertTrue(storedTable.get().columns().isEmpty());
+    Assertions.assertEquals("3", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+    verify(lanceTableOps).openDataset(location, Map.of());
+    verify(alterDataset, never()).createIndex(any(IndexOptions.class));
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testAddColumnRejectsUnsupportedOptions() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    List<TableChange> unsupportedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"parent", "nested"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.addColumn(
+                new String[] {"first"}, Types.StringType.get(), TableChange.ColumnPosition.first()),
+            TableChange.addColumn(
+                new String[] {"sequence"}, Types.LongType.get(), null, null, true, true),
+            TableChange.addColumn(
+                new String[] {"with_default"},
+                Types.IntegerType.get(),
+                Literals.integerLiteral(1)));
+
+    for (TableChange change : unsupportedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> lanceTableOps.handleLanceTableChange(table, new TableChange[] {change}));
+    }
+    verify(dataset, never()).addColumns(anyList());
+  }
+
   @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
@@ -486,6 +840,7 @@ public class TestLanceTableOperations {
 
     TableChange[] changes =
         new TableChange[] {
+          TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
           TableChange.renameColumn(new String[] {"old"}, "renamed"),
           TableChange.addIndex(Index.IndexType.SCALAR, "idx_renamed", new String[][] {{"renamed"}}),
           TableChange.deleteColumn(new String[] {"renamed"}, false)
@@ -495,6 +850,7 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(7L, returnedVersion);
 
     InOrder inOrder = Mockito.inOrder(dataset);
+    inOrder.verify(dataset).addColumns(List.of(Field.nullable("added", new ArrowType.Utf8())));
     inOrder.verify(dataset).alterColumns(anyList());
     inOrder.verify(dataset).createIndex(any(IndexOptions.class));
     inOrder.verify(dataset).dropColumns(anyList());
@@ -953,5 +1309,60 @@ public class TestLanceTableOperations {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
+  }
+
+  private static TableEntity nonLanceTableEntity(NameIdentifier ident, String location) {
+    return tableEntity(
+        ident,
+        List.of(),
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_TABLE_FORMAT,
+            "delta",
+            Table.PROPERTY_EXTERNAL,
+            "true"));
+  }
+
+  private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)
+      throws IOException {
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> storedTable.get());
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(storedTable.get());
+              storedTable.set(updated);
+              return updated;
+            });
+  }
+
+  private NameIdentifier prepareDeclaredTableForRepair(String directoryName) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve(directoryName).toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_DECLARED,
+                "true",
+                LANCE_STORAGE_OPTIONS_PREFIX + "endpoint",
+                "http://endpoint"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(8L);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of("endpoint", "http://endpoint"));
+    return ident;
   }
 }

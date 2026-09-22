@@ -228,6 +228,26 @@ public class RangerHelper {
     return GRAVITINO_ROLE_PREFIX + roleName;
   }
 
+  /**
+   * Generate the Ranger owner role name for a metalake.
+   *
+   * @param metalakeId The stable metalake entity ID
+   * @return The metalake-specific Ranger owner role name
+   */
+  public static String generateMetalakeOwnerRoleName(String metalakeId) {
+    return GRAVITINO_METALAKE_OWNER_ROLE + "_" + metalakeId;
+  }
+
+  /**
+   * Generate the Ranger owner role name for a catalog.
+   *
+   * @param catalogId The stable catalog entity ID
+   * @return The catalog-specific Ranger owner role name
+   */
+  public static String generateCatalogOwnerRoleName(String catalogId) {
+    return GRAVITINO_CATALOG_OWNER_ROLE + "_" + catalogId;
+  }
+
   protected GrantRevokeRoleRequest createGrantRevokeRoleRequest(
       String roleName, String userName, String groupName) {
     roleName = generateGravitinoRoleName(roleName);
@@ -259,19 +279,19 @@ public class RangerHelper {
     roleName = generateGravitinoRoleName(roleName);
     if (isOwnerRole) {
       Preconditions.checkArgument(
-          roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+          isMetalakeOwnerRole(roleName)
+              || isCatalogOwnerRole(roleName)
               || roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should be %s or %s or %s",
+              "The role name should start with %s_ or %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     } else {
       Preconditions.checkArgument(
-          !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              && !roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+          !isMetalakeOwnerRole(roleName)
+              && !isCatalogOwnerRole(roleName)
               && !roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should not be %s or %s or %s",
+              "The role name should not start with %s_ or %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
@@ -384,7 +404,8 @@ public class RangerHelper {
             });
   }
 
-  protected void updatePolicyOwnerRole(RangerPolicy policy, String ownerRoleName) {
+  protected void updatePolicyOwnerRole(
+      RangerPolicy policy, String ownerRoleName, String legacyOwnerRoleName) {
     // Find matching policy items based on the owner's privileges
     List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
         policy.getPolicyItems().stream()
@@ -401,9 +422,10 @@ public class RangerHelper {
                           });
                 })
             .collect(Collectors.toList());
-    // Add or remove the owner role in the policy item
+    // Replace the legacy shared owner role with the entity-specific owner role.
     matchPolicyItems.forEach(
         policyItem -> {
+          policyItem.getRoles().removeIf(legacyOwnerRoleName::equalsIgnoreCase);
           addRoleToPolicyItemIfNoExists(policyItem, ownerRoleName);
         });
 
@@ -439,5 +461,25 @@ public class RangerHelper {
     if (!policyItem.getRoles().contains(gravitinoRoleName)) {
       policyItem.getRoles().add(gravitinoRoleName);
     }
+  }
+
+  private static boolean isMetalakeOwnerRole(String roleName) {
+    return roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+        || roleName.regionMatches(
+            true,
+            0,
+            GRAVITINO_METALAKE_OWNER_ROLE + "_",
+            0,
+            GRAVITINO_METALAKE_OWNER_ROLE.length() + 1);
+  }
+
+  private static boolean isCatalogOwnerRole(String roleName) {
+    return roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+        || roleName.regionMatches(
+            true,
+            0,
+            GRAVITINO_CATALOG_OWNER_ROLE + "_",
+            0,
+            GRAVITINO_CATALOG_OWNER_ROLE.length() + 1);
   }
 }

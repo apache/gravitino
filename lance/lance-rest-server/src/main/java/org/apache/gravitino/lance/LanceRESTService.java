@@ -19,18 +19,26 @@
 package org.apache.gravitino.lance;
 
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import javax.inject.Singleton;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
 import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
+import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
+import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -40,6 +48,9 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
+import org.apache.gravitino.server.web.RequestContextFilter;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -69,6 +80,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
+    LanceExceptionMapper.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
 
     server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
@@ -78,13 +90,41 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
+    // Metadata authorization relies on the Gravitino authorizer running in the same process, so it
+    // is only applied when Lance REST is an auxiliary service of the Gravitino server.
+    // The Gravitino configuration is only available in auxiliary mode, so it is read behind the
+    // mode check.
+    boolean authorizationEnabled =
+        auxMode && GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    boolean enableMetadataAuthorization =
+        authorizationEnabled && lanceConfig.isGravitinoMetalakeConfigured();
+    String metalakeName = lanceConfig.getGravitinoMetalake();
+    if (authorizationEnabled && !enableMetadataAuthorization) {
+      // A missing metalake makes the Lance backend unusable, but it should not prevent the main
+      // Gravitino server from starting. The backend reports the missing setting when it is used.
+      LOG.warn("Lance REST metadata authorization is disabled because no metalake is configured");
+    }
+    if (enableMetadataAuthorization) {
+      lanceNamespace.setMetadataFilter(new LanceAuthorizationMetadataFilter(metalakeName));
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
+    resourceConfig.register(LanceExceptionMapper.class);
+    resourceConfig.register(new OutOfMemoryErrorListener());
     resourceConfig.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (enableMetadataAuthorization) {
+              // Pass the metalake through HK2 constructor injection so authorization code does not
+              // need mutable process-wide state.
+              bind(metalakeName).to(String.class).named(METALAKE_BINDING);
+              bind(LanceRESTAuthInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(lanceNamespace).to(NamespaceWrapper.class).ranked(1);
           }
         });
@@ -97,11 +137,13 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
+    // Registered before HttpAuditFilter so audit events dispatched during this request carry the
+    // request's query parameters and remote address, exactly as on the main server.
+    server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
     server.addFilter(
         new HttpAuditFilter(
             eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
         LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
     if (auxMode) {
       server.addFilter(
@@ -110,14 +152,27 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint.
+    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
+    registerMetricsPathFilters(server, eventBus);
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
+    customFilterPaths.add(LANCE_SPEC);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
+
     LOG.info(
-        "Initialized Lance REST service for backend {} in {} mode",
+        "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
-        auxMode ? "auxiliary" : "standalone");
+        auxMode ? "auxiliary" : "standalone",
+        enableMetadataAuthorization ? "enabled" : "disabled");
   }
 
   @Override
@@ -142,6 +197,26 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public void join() {
     if (server != null) {
       server.join();
+    }
+  }
+
+  /**
+   * Registers request-context tracking and audit-on-failure coverage on {@link
+   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
+   * receive no such coverage at all, with nothing in the build catching it; {@code
+   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
+   * {@link #LANCE_SPEC}. Package-private and static so a unit test can exercise it directly against
+   * a plain {@link JettyServer}, without booting the rest of {@link #serviceInit}. See GH-12760.
+   *
+   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
+   *     coverage
+   * @param eventBus the event bus audit events are dispatched through
+   */
+  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
+      server.addFilter(
+          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
     }
   }
 

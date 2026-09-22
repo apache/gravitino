@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupMetaBaseSQLProvider {
 
   public String selectIdpGroup(@Param("groupName") String groupName) {
     return "SELECT group_id as groupId, group_name as groupName,"
+        + " COALESCE(group_comment, '') as groupComment,"
+        + " audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -38,6 +40,8 @@ public class IdpGroupMetaBaseSQLProvider {
 
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
+        + " COALESCE(g.group_comment, '') as comment,"
+        + " g.audit_info as auditInfo,"
         + " COALESCE(JSON_ARRAYAGG(u.user_name), JSON_ARRAY()) as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
@@ -48,16 +52,19 @@ public class IdpGroupMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
         + " WHERE g.group_name = #{groupName} AND g.deleted_at = 0"
-        + " GROUP BY g.group_id, g.group_name";
+        + " GROUP BY g.group_id, g.group_name, g.group_comment, g.audit_info";
   }
 
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
     return "INSERT INTO "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " (group_id, group_name, current_version, last_version, deleted_at)"
+        + " (group_id, group_name, group_comment, audit_info, current_version, last_version,"
+        + " deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
+        + " COALESCE(#{groupMeta.groupComment}, ''),"
+        + " #{groupMeta.auditInfo},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
         + " #{groupMeta.deletedAt}"
@@ -80,6 +87,6 @@ public class IdpGroupMetaBaseSQLProvider {
   }
 
   protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 }

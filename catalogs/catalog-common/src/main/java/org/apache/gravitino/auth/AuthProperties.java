@@ -28,6 +28,7 @@ public class AuthProperties {
   public static final String BASIC_AUTH_TYPE = "basic";
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
+  public static final String TOKEN_AUTH_TYPE = "token";
 
   /** The configuration key for the built-in IdP username used in Basic authentication. */
   public static final String GRAVITINO_BASIC_USERNAME = "basic.username";
@@ -48,6 +49,21 @@ public class AuthProperties {
   /** The configuration key for the scope of the token. */
   public static final String GRAVITINO_OAUTH2_SCOPE = "oauth2.scope";
 
+  // token
+  /** The configuration key for the bearer token presented in Token authentication. */
+  public static final String GRAVITINO_TOKEN_VALUE = "token.value";
+
+  /**
+   * The configuration key for the file holding the bearer token presented in Token authentication.
+   */
+  public static final String GRAVITINO_TOKEN_FILE = "token.file";
+
+  /**
+   * The configuration key for the ordered claim names identifying the caller carried in the bearer
+   * token. Mirrors the server's {@code gravitino.authenticator.oauth.principalFields}.
+   */
+  public static final String GRAVITINO_TOKEN_PRINCIPAL_FIELDS = "token.principalFields";
+
   public static boolean isKerberos(String authType) {
     return KERBEROS_AUTH_TYPE.equalsIgnoreCase(authType);
   }
@@ -62,6 +78,10 @@ public class AuthProperties {
 
   public static boolean isBasic(String authType) {
     return BASIC_AUTH_TYPE.equalsIgnoreCase(authType);
+  }
+
+  public static boolean isToken(String authType) {
+    return TOKEN_AUTH_TYPE.equalsIgnoreCase(authType);
   }
 
   private AuthProperties() {}

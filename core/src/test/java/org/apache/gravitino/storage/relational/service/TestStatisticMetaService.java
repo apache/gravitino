@@ -25,8 +25,16 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -40,13 +48,180 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestStatisticMetaService extends TestJDBCBackend {
   private final StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
+
+  @TestTemplate
+  public void testTableStatisticWriteWaitsForConcurrentSchemaDelete() throws Exception {
+    String metalakeName = "metalake_for_statistic_schema_fence";
+    String catalogName = "catalog_for_statistic_schema_fence";
+    String schemaName = "schema_for_statistic_schema_fence";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalakeName, catalogName, schemaName, auditInfo);
+    SchemaPO observedSchemaPO = selectSchemaPO(metalakeName, catalogName, schemaName);
+
+    assertTableStatisticWriteWaitsForConcurrentSchemaDelete(
+        metalakeName,
+        catalogName,
+        schemaName,
+        auditInfo,
+        () -> {
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                          observedSchemaPO.getSchemaId(), observedSchemaPO.getCurrentVersion()));
+          Assertions.assertEquals(1, deleted);
+        });
+  }
+
+  @TestTemplate
+  public void testNestedSchemaTableStatisticWriteWaitsForAncestorCascadeDelete() throws Exception {
+    String metalakeName = "metalake_for_nested_statistic_fence";
+    String catalogName = "catalog_for_nested_statistic_fence";
+    String ancestorName = "fence_anc_a";
+    String nestedName = ancestorName + ":fence_anc_b";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    // Inserting the nested leaf also creates the ancestor row.
+    SchemaMetaService.getInstance()
+        .insertSchema(
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of(metalakeName, catalogName),
+                nestedName,
+                auditInfo),
+            false);
+    SchemaPO observedAncestorPO = selectSchemaPO(metalakeName, catalogName, ancestorName);
+    SchemaPO observedNestedPO = selectSchemaPO(metalakeName, catalogName, nestedName);
+
+    // The statistic only locks its direct parent, the nested schema. A cascade delete of the
+    // ancestor soft-deletes every descendant schema row in the same transaction, so the write
+    // must still wait for it and then fail once the nested schema is gone.
+    assertTableStatisticWriteWaitsForConcurrentSchemaDelete(
+        metalakeName,
+        catalogName,
+        nestedName,
+        auditInfo,
+        () -> {
+          int deletedAncestor =
+              SessionUtils.getWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                          observedAncestorPO.getSchemaId(),
+                          observedAncestorPO.getCurrentVersion()));
+          Assertions.assertEquals(1, deletedAncestor);
+          int deletedDescendants =
+              SessionUtils.getWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasWithVersion(List.of(observedNestedPO)));
+          Assertions.assertEquals(1, deletedDescendants);
+        });
+  }
+
+  private SchemaPO selectSchemaPO(String metalakeName, String catalogName, String schemaName) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));
+  }
+
+  /**
+   * Runs {@code schemaDeleteStep} in an uncommitted transaction, then verifies that a statistic
+   * upsert on a table below {@code schemaName} blocks until that transaction commits and fails with
+   * {@link NoSuchEntityException} afterwards.
+   */
+  private void assertTableStatisticWriteWaitsForConcurrentSchemaDelete(
+      String metalakeName,
+      String catalogName,
+      String schemaName,
+      AuditInfo auditInfo,
+      Runnable schemaDeleteStep)
+      throws Exception {
+    Long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalogName, schemaName),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+    StatisticEntity statistic =
+        TableStatisticEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test")
+            .withNamespace(Namespace.of(metalakeName, catalogName, schemaName, table.name()))
+            .withValue(StatisticValues.longValue(100L))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch statisticWriteStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      schemaDeleteStep.run();
+                      schemaDeleteLocked.countDown();
+                      try {
+                        Assertions.assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      Assertions.assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> statisticWriteResult =
+          executor.submit(
+              () -> {
+                statisticWriteStarted.countDown();
+                try {
+                  backend.batchPut(List.of(statistic), true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Assertions.assertTrue(statisticWriteStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> statisticWriteResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, statisticWriteResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(0, countActiveStats(metalakeId));
+  }
 
   @TestTemplate
   public void testStatisticsLifeCycle() throws Exception {

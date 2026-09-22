@@ -146,7 +146,7 @@ dependency model explicitly:
 For example, `password_hash` should store a PHC-style string such as:
 
 ```text
-$sha3-512$i=100000$<salt>$<hash>
+$sha3-512$i=5000$<salt>$<hash>
 ```
 
 This keeps verification logic simple and allows future upgrades of SHA3-512 cost parameters without
@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
+    `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'group comment',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',

@@ -28,10 +28,15 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
   @Override
+  public String selectUserMetaByIdForShare(Long userId) {
+    // H2 has no shared row-lock syntax, matching the other parent-fencing providers.
+    return selectUserMetaByIdForUpdate(userId);
+  }
+
+  @Override
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
@@ -62,7 +67,6 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"

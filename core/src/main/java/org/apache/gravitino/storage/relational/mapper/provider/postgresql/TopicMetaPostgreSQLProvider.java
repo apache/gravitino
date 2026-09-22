@@ -21,55 +21,28 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TopicMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
-
   @Override
-  public String updateTopicMeta(
-      @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO) {
+  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET topic_name = #{newTopicMeta.topicName},"
-        + " metalake_id = #{newTopicMeta.metalakeId},"
-        + " catalog_id = #{newTopicMeta.catalogId},"
-        + " schema_id = #{newTopicMeta.schemaId},"
-        + " comment = #{newTopicMeta.comment},"
-        + " properties = #{newTopicMeta.properties},"
-        + " audit_info = #{newTopicMeta.auditInfo},"
-        + " current_version = #{newTopicMeta.currentVersion},"
-        + " last_version = #{newTopicMeta.lastVersion},"
-        + " deleted_at = #{newTopicMeta.deletedAt}"
-        + " WHERE topic_id = #{oldTopicMeta.topicId}"
-        + " AND topic_name = #{oldTopicMeta.topicName}"
-        + " AND metalake_id = #{oldTopicMeta.metalakeId}"
-        + " AND catalog_id = #{oldTopicMeta.catalogId}"
-        + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND (comment = #{oldTopicMeta.comment}"
-        + "   OR (CAST(comment AS VARCHAR) IS NULL"
-        + "   AND CAST(#{oldTopicMeta.comment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldTopicMeta.properties}"
-        + " AND audit_info = #{oldTopicMeta.auditInfo}"
-        + " AND current_version = #{oldTopicMeta.currentVersion}"
-        + " AND last_version = #{oldTopicMeta.lastVersion}"
-        + " AND deleted_at = 0";
-  }
-
-  @Override
-  public String softDeleteTopicMetasByTopicId(Long topicId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE topic_id = #{topicId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteTopicMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -77,7 +50,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   public String softDeleteTopicMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -86,7 +60,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -115,7 +90,10 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
         + " #{topicMeta.lastVersion},"
         + " #{topicMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT (topic_id) DO UPDATE SET"
+        // Overwrite is selected by name, and an import can carry a different ID for a topic that
+        // already has an active registration. Target the natural key so PostgreSQL preserves the
+        // stored topic ID, matching MySQL and H2.
+        + " ON CONFLICT (schema_id, topic_name, deleted_at) DO UPDATE SET"
         + " topic_name = #{topicMeta.topicName},"
         + " metalake_id = #{topicMeta.metalakeId},"
         + " catalog_id = #{topicMeta.catalogId},"
@@ -123,8 +101,21 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
         + " comment = #{topicMeta.comment},"
         + " properties = #{topicMeta.properties},"
         + " audit_info = #{topicMeta.auditInfo},"
-        + " current_version = #{topicMeta.currentVersion},"
-        + " last_version = #{topicMeta.lastVersion},"
+        // PostgreSQL evaluates both assignments against the stored row. Qualifying the columns
+        // distinguishes them from the row that caused the conflict, and taking the larger marker
+        // prevents an inconsistent legacy row from moving either version backwards.
+        + " current_version = "
+        + "GREATEST("
+        + TABLE_NAME
+        + ".current_version, "
+        + TABLE_NAME
+        + ".last_version) + 1,"
+        + " last_version = "
+        + "GREATEST("
+        + TABLE_NAME
+        + ".current_version, "
+        + TABLE_NAME
+        + ".last_version) + 1,"
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 

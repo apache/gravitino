@@ -58,6 +58,11 @@ additionalConfigItems: {}
 ## Log4j2 configuration items
 log4j2Properties:
   status: warn
+  ## Log retention. Rolled archives are kept for logMaxAge. Their total size is also capped: when the
+  ## cap is exceeded, the oldest archives are deleted first.
+  # logMaxAge: 30d
+  # serverLogMaxTotalSize: 1GB
+
 additionalLog4j2Properties:
   appender.console.type: Console
   appender.console.name: consoleLogger
@@ -198,3 +203,5 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+topologySpreadConstraints: []

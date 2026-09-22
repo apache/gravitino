@@ -41,6 +41,10 @@ public class ModelPO {
 
   private Integer modelLatestVersion;
 
+  private Long currentVersion;
+
+  private Long lastVersion;
+
   private String modelProperties;
 
   private String auditInfo;
@@ -96,6 +100,29 @@ public class ModelPO {
       return this;
     }
 
+    /**
+     * Sets the version used to detect concurrent changes to the model, its versions, or its
+     * aliases.
+     *
+     * @param currentVersion the current version
+     * @return this builder
+     */
+    public Builder withCurrentVersion(Long currentVersion) {
+      modelPO.currentVersion = currentVersion;
+      return this;
+    }
+
+    /**
+     * Sets the highest concurrency version allocated for this model.
+     *
+     * @param lastVersion the last allocated version
+     * @return this builder
+     */
+    public Builder withLastVersion(Long lastVersion) {
+      modelPO.lastVersion = lastVersion;
+      return this;
+    }
+
     public Builder withModelProperties(String modelProperties) {
       modelPO.modelProperties = modelProperties;
       return this;
@@ -120,6 +147,8 @@ public class ModelPO {
       Preconditions.checkArgument(modelPO.schemaId != null, "Schema id is required");
       Preconditions.checkArgument(
           modelPO.modelLatestVersion != null, "Model latest version is required");
+      Preconditions.checkArgument(modelPO.currentVersion != null, "Current version is required");
+      Preconditions.checkArgument(modelPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(modelPO.auditInfo), "Audit info cannot be empty");
       Preconditions.checkArgument(modelPO.deletedAt != null, "Deleted at is required");

@@ -17,6 +17,8 @@
 
 from abc import ABC
 
+from gravitino.api.secret import SecretBinding, SecretReference
+
 
 class CatalogChange(ABC):
     """
@@ -72,6 +74,32 @@ class CatalogChange(ABC):
             The catalog change.
         """
         return CatalogChange.RemoveProperty(catalog_property)
+
+    @staticmethod
+    def set_secret_binding(catalog_property, binding: SecretBinding):
+        """Creates a catalog change to bind a write-through secret for a property.
+
+        Args:
+            catalog_property: The property name to bind.
+            binding: The write-through secret binding.
+
+        Returns:
+            The catalog change.
+        """
+        return CatalogChange.SetSecretBinding(catalog_property, binding)
+
+    @staticmethod
+    def set_secret_reference(catalog_property, reference: SecretReference):
+        """Creates a catalog change to bind an external secret reference for a property.
+
+        Args:
+            catalog_property: The property name to bind.
+            reference: The external secret reference.
+
+        Returns:
+            The catalog change.
+        """
+        return CatalogChange.SetSecretReference(catalog_property, reference)
 
     class RenameCatalog:
         """A catalog change to rename the catalog."""
@@ -265,3 +293,61 @@ class CatalogChange(ABC):
                  A string summary of the property removal operation.
             """
             return f"REMOVEPROPERTY {self._property}"
+
+    class SetSecretBinding:
+        """A catalog change to bind a write-through secret for a property."""
+
+        def __init__(self, catalog_property, binding: SecretBinding):
+            self._property = catalog_property
+            self._binding = binding
+
+        def property(self):
+            """Retrieves the property name being bound."""
+            return self._property
+
+        def binding(self):
+            """Retrieves the write-through secret binding."""
+            return self._binding
+
+        def __eq__(self, other) -> bool:
+            if not isinstance(other, CatalogChange.SetSecretBinding):
+                return False
+            return (
+                self._property == other.property()
+                and self._binding == other.binding()
+            )
+
+        def __hash__(self):
+            return hash((self._property, self._binding))
+
+        def __str__(self):
+            return f"SETSECRETBINDING {self._property} {self._binding}"
+
+    class SetSecretReference:
+        """A catalog change to bind an external secret reference for a property."""
+
+        def __init__(self, catalog_property, reference: SecretReference):
+            self._property = catalog_property
+            self._reference = reference
+
+        def property(self):
+            """Retrieves the property name being bound."""
+            return self._property
+
+        def reference(self):
+            """Retrieves the external secret reference."""
+            return self._reference
+
+        def __eq__(self, other) -> bool:
+            if not isinstance(other, CatalogChange.SetSecretReference):
+                return False
+            return (
+                self._property == other.property()
+                and self._reference == other.reference()
+            )
+
+        def __hash__(self):
+            return hash((self._property, self._reference))
+
+        def __str__(self):
+            return f"SETSECRETREFERENCE {self._property} {self._reference}"

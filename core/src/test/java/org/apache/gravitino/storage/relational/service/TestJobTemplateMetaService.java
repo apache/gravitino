@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -196,6 +197,20 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newJobEntity("job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
     backend.insert(jobEntity2, false);
 
+    Assertions.assertThrows(
+        NonEmptyEntityException.class,
+        () ->
+            jobTemplateMetaService.deleteJobTemplate(
+                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs")));
+    Assertions.assertEquals(
+        2,
+        JobMetaService.getInstance()
+            .listJobsByNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .size());
+    Assertions.assertTrue(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, jobEntity1.name())));
+
     boolean deleted =
         jobTemplateMetaService.deleteJobTemplate(
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs"));
@@ -277,6 +292,13 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {
+    // Any status other than QUEUED implies the job has at least started.
+    boolean isStarted = status != JobHandle.Status.QUEUED;
+    boolean isFinished =
+        status == JobHandle.Status.SUCCEEDED
+            || status == JobHandle.Status.FAILED
+            || status == JobHandle.Status.CANCELLED;
+
     return JobEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withJobExecutionId(RandomIdGenerator.INSTANCE.nextId() + "")
@@ -284,6 +306,8 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         .withJobTemplateName(templateName)
         .withStatus(status)
         .withAuditInfo(AUDIT_INFO)
+        .withStartedAt(isStarted ? System.currentTimeMillis() : 0L)
+        .withFinishedAt(isFinished ? System.currentTimeMillis() : 0L)
         .build();
   }
 }

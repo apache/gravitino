@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.doris.integration.test;
 
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BLOOM_FILTER_COLUMNS;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +32,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -45,6 +51,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -190,6 +197,17 @@ public class CatalogDorisIT extends BaseIT {
     catalog = loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
+  @Test
+  void testDropMissingTableReturnsFalse() {
+    String missingTable = GravitinoITUtils.genRandomName("missing_table");
+    assertFalse(catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, missingTable)));
+  }
+
   private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     String propKey = "key";
@@ -202,6 +220,41 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(createdSchema.name(), loadSchema.name());
 
     assertEquals(createdSchema.properties().get(propKey), propValue);
+  }
+
+  @Test
+  void testTableCommentRoundTrip() throws Exception {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("comment_roundtrip"));
+    String comment = "crud probe";
+
+    tables.createTable(
+        tableIdentifier,
+        createColumns(),
+        comment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null);
+
+    assertEquals(comment, tables.loadTable(tableIdentifier).comment());
+
+    String sql =
+        "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableIdentifier.name());
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        String storedComment = result.getString("TABLE_COMMENT");
+        assertTrue(StringIdentifier.fromComment(storedComment) != null);
+        assertEquals(comment, StringIdentifier.removeIdFromComment(storedComment));
+      }
+    }
   }
 
   @Test
@@ -418,6 +471,29 @@ public class CatalogDorisIT extends BaseIT {
         null,
         Transforms.EMPTY_TRANSFORM,
         renamedTable);
+  }
+
+  @Test
+  void testCreateTableWithReplicationAllocation() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("doris_replication_allocation"));
+    String replicationAllocation = "tag.location.default: 1";
+    Map<String, String> properties = ImmutableMap.of(REPLICATION_ALLOCATION, replicationAllocation);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    assertEquals(replicationAllocation, loadedTable.properties().get(REPLICATION_ALLOCATION));
+    assertFalse(loadedTable.properties().containsKey(REPLICATION_FACTOR));
   }
 
   @Test
