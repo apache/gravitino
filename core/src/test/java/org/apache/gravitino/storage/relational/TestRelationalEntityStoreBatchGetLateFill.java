@@ -127,6 +127,22 @@ public class TestRelationalEntityStoreBatchGetLateFill {
   }
 
   @Test
+  void testBatchGetSkipsWriteBackWhenUnrelatedKeyInvalidatesDuringBackendRead() {
+    TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    NameIdentifier unrelatedIdent = NameIdentifier.of(SCHEMA_NS, "t2");
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE)))
+        .thenAnswer(
+            invocation -> {
+              store.delete(unrelatedIdent, Entity.EntityType.TABLE, false);
+              return List.of(table);
+            });
+
+    store.batchGet(List.of(table.nameIdentifier()), Entity.EntityType.TABLE, TableEntity.class);
+
+    Assertions.assertFalse(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
   void testBatchGetDirectClearDuringBackendRead() {
     TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
     NameIdentifier ident = table.nameIdentifier();
