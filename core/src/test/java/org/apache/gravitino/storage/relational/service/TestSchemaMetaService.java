@@ -59,12 +59,15 @@ import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -160,6 +163,37 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       assertSchemaChildActionWaitsForConcurrentDelete(
           schema, () -> childCase.write.run(childNamespace));
     }
+
+    SchemaEntity semanticModelSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_for_entity_lock_semantic_model",
+            AUDIT_INFO);
+    backend.insert(semanticModelSchema, false);
+    Namespace semanticModelNamespace =
+        Namespace.of(metalakeName, catalogName, semanticModelSchema.name());
+    assertSchemaChildActionWaitsForConcurrentDelete(
+        semanticModelSchema,
+        () ->
+            backend.insert(
+                SemanticModelEntity.builder()
+                    .withId(RandomIdGenerator.INSTANCE.nextId())
+                    .withName("child_semantic_model")
+                    .withNamespace(semanticModelNamespace)
+                    .withDefinition(
+                        SemanticModelDefinition.builder()
+                            .withDatasets(
+                                new Dataset[] {
+                                  Dataset.builder()
+                                      .withName("child_dataset")
+                                      .withSource(NameIdentifier.of("source_table"))
+                                      .build()
+                                })
+                            .build())
+                    .withAuditInfo(AUDIT_INFO)
+                    .build(),
+                false));
   }
 
   @TestTemplate
