@@ -138,7 +138,11 @@ public class TestTableMetaService extends TestJDBCBackend {
             NamespaceUtil.ofTable(metalakeName, catalogName, otherSchemaName),
             "table_with_copied_id",
             AUDIT_INFO);
-    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, true));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, false));
+    EntityAlreadyExistsException error =
+        assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, true));
+    assertTrue(error.getMessage().contains("Table ID " + original.id()));
+    assertTrue(error.getMessage().contains("schema ID"));
 
     TableEntity stored =
         TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());

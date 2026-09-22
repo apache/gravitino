@@ -24,12 +24,15 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -41,6 +44,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -245,9 +249,50 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doReturn(aliasObject).when(ops).loadSchema(alias);
     FieldUtils.writeField(catalogInstance, "ops", ops, true);
 
+    clearInvocations(entityStore);
+    dispatcher.loadSchema(alias);
+    dispatcher.loadSchema(original);
     dispatcher.loadSchema(alias);
     Assertions.assertEquals(
-        registered.id(), entityStore.get(alias, SCHEMA, SchemaEntity.class).id());
+        registered.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(alias, SCHEMA));
+    verify(entityStore, never()).update(eq(original), eq(SchemaEntity.class), eq(SCHEMA), any());
+    verify(entityStore, never()).put(any(SchemaEntity.class), anyBoolean());
+  }
+
+  @Test
+  public void testLoadSchemaReportsCrossCatalogCopiedIdentifier() throws Exception {
+    NameIdentifier source =
+        NameIdentifier.of(Namespace.of(metalake, catalog), "schemaCrossCatalogSource");
+    dispatcher.createSchema(source, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity registered = entityStore.get(source, SCHEMA, SchemaEntity.class);
+    Map<String, String> copiedProperties =
+        new HashMap<>(testCatalogOperations().loadSchema(source).properties());
+
+    NameIdentifier otherCatalog = NameIdentifier.of(metalake, "crossCopyCatalog");
+    catalogManager.createCatalog(
+        otherCatalog,
+        Catalog.Type.RELATIONAL,
+        "test",
+        "comment",
+        ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3"));
+    NameIdentifier copy = NameIdentifier.of(metalake, "crossCopyCatalog", "schemaCopy");
+    catalogManager
+        .loadCatalogAndWrap(otherCatalog)
+        .doWithSchemaOps(ops -> ops.createSchema(copy, "copy", copiedProperties));
+
+    // The in-memory store does not enforce the relational store's unique primary key.
+    doThrow(new EntityAlreadyExistsException("Duplicate schema ID"))
+        .when(entityStore)
+        .put(any(SchemaEntity.class), eq(false));
+    IllegalArgumentException error =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> dispatcher.loadSchema(copy));
+    Assertions.assertTrue(error.getMessage().contains(copy.toString()));
+    Assertions.assertTrue(error.getMessage().contains(Long.toString(registered.id())));
+    Assertions.assertTrue(error.getMessage().contains(ID_KEY));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(source, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
   }
 
   @Test
@@ -426,9 +471,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(concurrentAudit)
             .build();
 
-    // Simulate genuine multi-catalog conflict: put fails, and the dispatcher-level retry finds
-    // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
-    // thrown).
+    // A failed insert followed by a mismatched ID must tell the caller which property to check.
     reset(entityStore);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
@@ -439,10 +482,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         .when(entityStore)
         .put(any(), anyBoolean());
 
-    UnsupportedOperationException exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Schema managed by multiple catalogs"));
+            IllegalArgumentException.class, () -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertTrue(exception.getMessage().contains(ID_KEY));
   }
 
   @Test

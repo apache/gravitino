@@ -84,7 +84,11 @@ public class TopicMetaService {
                           // A copied id must not move another schema's topic here.
                           OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
                               () -> mapper.selectTopicMetaByIdForUpdate(po.getTopicId()),
-                              owner -> Objects.equals(owner.getSchemaId(), po.getSchemaId()));
+                              owner -> Objects.equals(owner.getSchemaId(), po.getSchemaId()),
+                              owner ->
+                                  String.format(
+                                      "Topic ID %d belongs to schema ID %d, not schema ID %d",
+                                      po.getTopicId(), owner.getSchemaId(), po.getSchemaId()));
                           mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
                         } else {
                           mapper.insertTopicMeta(po);

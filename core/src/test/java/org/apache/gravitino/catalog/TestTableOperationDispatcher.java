@@ -28,12 +28,15 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -338,8 +341,49 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doReturn(aliasObject).when(ops).loadTable(alias);
     FieldUtils.writeField(catalogInstance, "ops", ops, true);
 
+    clearInvocations(entityStore);
     tableOperationDispatcher.loadTable(alias);
-    Assertions.assertEquals(registered.id(), entityStore.get(alias, TABLE, TableEntity.class).id());
+    tableOperationDispatcher.loadTable(original);
+    tableOperationDispatcher.loadTable(alias);
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(original, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(alias, TABLE));
+    verify(entityStore, never()).update(eq(original), eq(TableEntity.class), eq(TABLE), any());
+    verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+  }
+
+  @Test
+  public void testLoadTableReportsCrossSchemaCopiedIdentifier() throws IOException {
+    Namespace sourceNs = Namespace.of(metalake, catalog, "schemaCrossCopySource");
+    Namespace targetNs = Namespace.of(metalake, catalog, "schemaCrossCopyTarget");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(sourceNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(targetNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier source = NameIdentifier.of(sourceNs, "orders");
+    NameIdentifier copy = NameIdentifier.of(targetNs, "orders_copy");
+    tableOperationDispatcher.createTable(
+        source, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity registered = entityStore.get(source, TABLE, TableEntity.class);
+    Map<String, String> copiedProperties =
+        new HashMap<>(testCatalogOperations().loadTable(source).properties());
+    testCatalogOperations()
+        .createTable(
+            copy, new Column[0], "copy", copiedProperties, new Transform[0], null, null, null);
+
+    // The in-memory store does not enforce the relational store's unique primary key.
+    doThrow(new EntityAlreadyExistsException("Duplicate table ID"))
+        .when(entityStore)
+        .put(any(TableEntity.class), eq(false));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copy));
+    Assertions.assertTrue(error.getMessage().contains(copy.toString()));
+    Assertions.assertTrue(error.getMessage().contains(Long.toString(registered.id())));
+    Assertions.assertTrue(error.getMessage().contains(ID_KEY));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(source, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copy, TABLE));
   }
 
   @Test
@@ -623,9 +667,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(concurrentAudit)
             .build();
 
-    // Simulate genuine multi-catalog conflict: put fails, and the dispatcher-level retry finds
-    // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
-    // thrown).
+    // A failed insert followed by a mismatched ID must tell the caller which property to check.
     reset(entityStore);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
@@ -636,11 +678,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .when(entityStore)
         .put(any(), anyBoolean());
 
-    UnsupportedOperationException exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> tableOperationDispatcher.loadTable(tableIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Table managed by multiple catalogs"));
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(tableIdent));
+    Assertions.assertTrue(exception.getMessage().contains(ID_KEY));
   }
 
   @Test

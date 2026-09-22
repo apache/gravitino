@@ -62,9 +62,8 @@ public class OccWriteSupport {
       return current;
     }
     current = byIdLookup.get();
-    if (current != null && !sameParent.test(current)) {
-      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
-    }
+    requireSameParent(
+        current, sameParent, owner -> "The entity ID already belongs to a different parent");
     return current;
   }
 
@@ -80,13 +79,21 @@ public class OccWriteSupport {
    * @param <T> the persistent object type
    * @param byIdLockingLookup the locking lookup by stable ID
    * @param sameParent checks whether the ID owner belongs to the target parent
+   * @param conflictDescription describes the conflicting owner
    * @throws EntityAlreadyExistsException if the ID belongs to a live row under another parent
    */
   public static <T> void checkOverwriteIdNotOwnedByOtherParent(
-      Supplier<T> byIdLockingLookup, Predicate<T> sameParent) {
+      Supplier<T> byIdLockingLookup,
+      Predicate<T> sameParent,
+      Function<T, String> conflictDescription) {
     T owner = byIdLockingLookup.get();
+    requireSameParent(owner, sameParent, conflictDescription);
+  }
+
+  private static <T> void requireSameParent(
+      @Nullable T owner, Predicate<T> sameParent, Function<T, String> conflictDescription) {
     if (owner != null && !sameParent.test(owner)) {
-      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
+      throw new EntityAlreadyExistsException("%s", conflictDescription.apply(owner));
     }
   }
 

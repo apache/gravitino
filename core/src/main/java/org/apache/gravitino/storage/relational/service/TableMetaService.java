@@ -131,7 +131,11 @@ public class TableMetaService {
                           // A copied StringIdentifier must not move another schema's table here.
                           OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
                               () -> mapper.selectTableMetaByIdForUpdate(po.getTableId()),
-                              owner -> Objects.equals(owner.getSchemaId(), po.getSchemaId()));
+                              owner -> Objects.equals(owner.getSchemaId(), po.getSchemaId()),
+                              owner ->
+                                  String.format(
+                                      "Table ID %d belongs to schema ID %d, not schema ID %d",
+                                      po.getTableId(), owner.getSchemaId(), po.getSchemaId()));
                         }
                         ops.insertPO(mapper, po, overwrite);
                         if (overwrite) {

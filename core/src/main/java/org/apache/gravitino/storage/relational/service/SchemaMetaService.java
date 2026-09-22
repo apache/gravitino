@@ -218,7 +218,13 @@ public class SchemaMetaService {
                       // A copied StringIdentifier must not move another catalog's schema here.
                       OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
                           () -> mapper.selectSchemaMetaByIdForUpdate(leafPO.getSchemaId()),
-                          owner -> Objects.equals(owner.getCatalogId(), leafPO.getCatalogId()));
+                          owner -> Objects.equals(owner.getCatalogId(), leafPO.getCatalogId()),
+                          owner ->
+                              String.format(
+                                  "Schema ID %d belongs to catalog ID %d, not catalog ID %d",
+                                  leafPO.getSchemaId(),
+                                  owner.getCatalogId(),
+                                  leafPO.getCatalogId()));
                     }
                     ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), overwrite);
                   }));

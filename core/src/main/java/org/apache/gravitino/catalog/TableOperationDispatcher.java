@@ -181,6 +181,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
+          StringIdentifier conflictingId =
+              getStringIdFromProperties(entityCombinedTable.tableFromCatalog().properties());
+          if (conflictingId != null) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Table %s could not be imported because its Gravitino identifier %d "
+                        + "conflicts with an existing registration. Check the property '%s' on this table "
+                        + "and remove a copied identifier before loading it again",
+                    ident, conflictingId.id(), StringIdentifier.ID_KEY),
+                e);
+          }
           throw new UnsupportedOperationException(
               "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
                   + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
@@ -190,7 +201,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    TableEntity updatedEntity =
+        updateColumnsIfNecessaryWhenLoad(
+            entityCombinedTable.tableFromGravitino() == null
+                ? ident
+                : entityCombinedTable.tableFromGravitino().nameIdentifier(),
+            entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
@@ -543,15 +559,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     long uid;
     NameIdentifier observedOwner = null;
+    boolean caseAlias = false;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
-      LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
+      LOG.info(
+          "Table {} has external identifier {}; checking for a rename, alias, or copied ID",
+          identifier,
           stringId);
-      observedOwner = checkImportedIdNotCopied(identifier, stringId.id());
+      Pair<NameIdentifier, Boolean> owner = checkImportedIdNotCopied(identifier, stringId.id());
+      observedOwner = owner.getLeft();
+      caseAlias = owner.getRight();
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -576,6 +592,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
+      if (caseAlias) {
+        TableEntity registered = store.get(observedOwner, TABLE, TableEntity.class);
+        if (registered.id() != uid) {
+          throw new OptimisticLockException(
+              "The registered owner of table ID %d changed during import; retry the load", uid);
+        }
+        return EntityCombinedTable.of(table.tableFromCatalog(), registered)
+            .withHiddenProperties(table.hiddenProperties());
+      }
       if (observedOwner != null && !observedOwner.equals(identifier)) {
         // Updating the observed row uses the store's version check. A second server that observed
         // the same old name cannot move the row again after the first import commits.
@@ -592,7 +617,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw new OptimisticLockException(
           e, "The registered owner of table ID %d changed during import; retry the load", uid);
     } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "import", identifier, e);
       throw new RuntimeException("Failed to import the table entity to the store", e);
     }
 
@@ -601,7 +626,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   /**
-   * Tells an external rename apart from a copied id before an import re-binds a row.
+   * Tells an external rename or case alias apart from a copied id before import.
    *
    * <p>An import that finds a {@link StringIdentifier} but no row under this name overwrites the
    * row that owns the id. That is right after an external rename: the old name is gone and the row
@@ -611,20 +636,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * tags, policies, role grants) to the copy. The store cannot tell the two apart; only the
    * external catalog can, so this asks it whether the id's current owner still exists.
    */
-  private NameIdentifier checkImportedIdNotCopied(NameIdentifier identifier, long id) {
+  private Pair<NameIdentifier, Boolean> checkImportedIdNotCopied(
+      NameIdentifier identifier, long id) {
     NameIdentifier currentOwner = findRegisteredTableById(identifier.namespace(), id);
     if (currentOwner == null || currentOwner.equals(identifier)) {
-      return currentOwner;
+      return Pair.of(currentOwner, false);
     }
     NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
-    boolean distinctOwnerStillExists =
+    Pair<Boolean, Boolean> ownerStatus =
         doWithCatalog(
             catalogIdent,
             c ->
                 c.doWithTableOps(
                     ops -> {
                       if (!ops.tableExists(currentOwner)) {
-                        return false;
+                        return Pair.of(false, false);
                       }
                       // REST backends may resolve case aliases without advertising this capability.
                       // Only accept an alias when listing confirms a single matching object; two
@@ -637,13 +663,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .distinct()
                                 .count();
                         if (matchingNames == 1) {
-                          return false;
+                          return Pair.of(false, true);
                         }
                       }
-                      return true;
+                      return Pair.of(true, false);
                     }),
             RuntimeException.class);
-    if (distinctOwnerStillExists) {
+    if (ownerStatus.getLeft()) {
       throw new IllegalArgumentException(
           String.format(
               "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
@@ -652,11 +678,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier));
     }
     LOG.info(
-        "Table {} resolves to {} after an external rename or case-alias lookup; re-binding registration {}",
+        "Table {} resolves to {} after an external rename or case-alias lookup; registration {}",
         currentOwner,
         identifier,
         id);
-    return currentOwner;
+    return Pair.of(currentOwner, ownerStatus.getRight());
   }
 
   /** Returns the identifier of the live table in the schema that owns this id, if any. */
