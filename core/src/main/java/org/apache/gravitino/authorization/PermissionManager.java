@@ -874,8 +874,9 @@ class PermissionManager {
       // the replacement, even when that replacement is active and would pass the storage fence.
       if (!role.id().equals(roleIds.get(i))) {
         throw new IllegalRoleException(
-            "Role %s in metalake %s no longer has the observed ID %s",
-            role.name(), metalake, roleIds.get(i));
+            "Role %s in metalake %s was deleted and recreated concurrently (observed ID %s, "
+                + "current ID %s); retry the operation",
+            role.name(), metalake, roleIds.get(i), role.id());
       }
       roles.add(role);
     }

@@ -193,7 +193,10 @@ public class GroupMetaService {
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeForGroupWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
+          () ->
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
@@ -312,8 +315,9 @@ public class GroupMetaService {
               // Fence grants and revokes before the principal CAS to avoid both orphan grants and
               // a revoke/cascade deadlock. Metadata-only updates write no membership rows, so they
               // need no parent lock (which would serialize unrelated updates on H2).
-              lockMetalakeForGroupWrite(
-                  identifier.namespace().level(0), oldGroupPO.getMetalakeId());
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      identifier.namespace().level(0), oldGroupPO.getMetalakeId());
             }
           },
           () -> {
@@ -457,25 +461,6 @@ public class GroupMetaService {
                         po, AuthorizationUtils.ofGroupNamespace(metalakeName)))
             .collect(Collectors.toList());
     return new PagedResult<>(totalCount, groups);
-  }
-
-  /**
-   * Keeps the metalake alive while creating a group or changing role memberships.
-   *
-   * <p>Take this shared lock before the principal write, matching the metalake cascade's root lock.
-   * Concurrent writes can share it on MySQL/PostgreSQL; H2 uses an exclusive lock. Validate the
-   * observed identity and name, not the version, so unrelated metalake edits remain allowed.
-   */
-  private void lockMetalakeForGroupWrite(String metalakeName, Long metalakeId) {
-    OccWriteSupport.lockParentForChildWrite(
-        metalakeName,
-        Entity.EntityType.METALAKE,
-        () ->
-            SessionUtils.getWithoutCommit(
-                MetalakeMetaMapper.class,
-                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
-        null,
-        current -> Objects.equals(current.getMetalakeName(), metalakeName));
   }
 
   private RuntimeException groupWriteFailure(
