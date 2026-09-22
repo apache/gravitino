@@ -39,10 +39,12 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
@@ -104,6 +106,21 @@ public class TestDorisTableOperationsSqlGeneration {
           Indexes.EMPTY_INDEXES);
     }
 
+    public String createTableSqlWithPartitioning(
+        String tableName,
+        JdbcColumn[] columns,
+        Distribution distribution,
+        Transform[] partitioning) {
+      return generateCreateTableSql(
+          tableName,
+          columns,
+          "comment",
+          Collections.emptyMap(),
+          partitioning,
+          distribution,
+          Indexes.EMPTY_INDEXES);
+    }
+
     public String alterTableSql(String tableName, TableChange... changes) {
       return generateAlterTableSql("database", tableName, changes);
     }
@@ -134,6 +151,58 @@ public class TestDorisTableOperationsSqlGeneration {
         throws SQLException {
       return getIndexes(connection, databaseName, tableName);
     }
+  }
+
+  @Test
+  public void testAutoRangeDateTruncSqlGeneration() {
+    TestableDorisTableOperations operations = new TestableDorisTableOperations();
+    TestableDorisTableOperations mockOperations = Mockito.spy(operations);
+    Mockito.doAnswer(answer -> answer.getArgument(0))
+        .when(mockOperations)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("dt")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn[] columns = new JdbcColumn[] {column};
+    Distribution distribution = Distributions.hash(1, NamedReference.field("dt"));
+    String quote = String.valueOf((char) 96);
+
+    Transform autoRange =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+    String autoSql =
+        mockOperations.createTableSqlWithPartitioning(
+            "auto_range_table", columns, distribution, new Transform[] {autoRange});
+    Assertions.assertTrue(
+        autoSql.contains(
+            "AUTO PARTITION BY RANGE (date_trunc(" + quote + "dt" + quote + ", 'month'))"),
+        autoSql);
+    Assertions.assertTrue(autoSql.contains("()"), autoSql);
+
+    Transform manualRange = Transforms.range(new String[] {"dt"});
+    String manualSql =
+        mockOperations.createTableSqlWithPartitioning(
+            "manual_range_table", columns, distribution, new Transform[] {manualRange});
+    Assertions.assertTrue(
+        manualSql.contains("PARTITION BY RANGE(" + quote + "dt" + quote + ")"), manualSql);
+    Assertions.assertFalse(manualSql.contains("AUTO PARTITION"), manualSql);
+
+    String unsafeInterval = "month'); DROP TABLE marker; --";
+    Transform escapedAutoRange =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral(unsafeInterval)});
+    String escapedSql =
+        mockOperations.createTableSqlWithPartitioning(
+            "escaped_auto_range_table", columns, distribution, new Transform[] {escapedAutoRange});
+    String escapedExpression =
+        "date_trunc(" + quote + "dt" + quote + ", 'month''); DROP TABLE marker; --')";
+    Assertions.assertTrue(escapedSql.contains(escapedExpression), escapedSql);
   }
 
   @Test

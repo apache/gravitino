@@ -59,6 +59,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -706,6 +707,123 @@ public class CatalogDoris3xIT extends BaseIT {
             tomorrowLiteral,
             Collections.emptyMap()),
         partitions.get("p3"));
+  }
+
+  @Test
+  void testAutoRangeDateTruncRoundTrip() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_auto_range");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    Column dateColumn = Column.of("dt", Types.DateType.get(), "date", false, false, null);
+    Distribution distribution = Distributions.hash(1, NamedReference.field("dt"));
+    Transform autoRange =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+
+    tc.createTable(
+        tid,
+        new Column[] {dateColumn},
+        tableComment,
+        Collections.emptyMap(),
+        new Transform[] {autoRange},
+        distribution,
+        null,
+        null);
+
+    Table loaded = tc.loadTable(tid);
+    assertEquals(1, loaded.partitioning().length);
+    assertEquals(autoRange, loaded.partitioning()[0]);
+    SupportsPartitions emptyPartitionOps = loaded.supportPartitions();
+    assertEquals(0, emptyPartitionOps.listPartitions().length);
+
+    RangePartition attemptedManualPartition =
+        Partitions.range(
+            "p_manual",
+            Literals.of("2024-01-01", Types.DateType.get()),
+            Literals.of("2023-12-01", Types.DateType.get()),
+            Collections.emptyMap());
+    assertPartition(
+        attemptedManualPartition, emptyPartitionOps.addPartition(attemptedManualPartition));
+    assertPartition(
+        attemptedManualPartition, emptyPartitionOps.getPartition(attemptedManualPartition.name()));
+
+    executeSql(
+        String.format(
+            "INSERT INTO `%s`.`%s` VALUES ('2024-01-15'), ('2024-02-15')", schemaName, tableName));
+    Table tableAfterInsert = tc.loadTable(tid);
+    SupportsPartitions partitionOps = tableAfterInsert.supportPartitions();
+    Partition[] partitions = partitionOps.listPartitions();
+    assertEquals(3, partitions.length);
+    assertTrue(
+        Arrays.stream(partitions).allMatch(partition -> partition instanceof RangePartition));
+    assertPartition(
+        attemptedManualPartition,
+        Arrays.stream(partitions)
+            .map(partition -> (RangePartition) partition)
+            .filter(partition -> partition.name().equals(attemptedManualPartition.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Manual partition was not found")));
+    boolean hasJanuaryPartition =
+        Arrays.stream(partitions)
+            .map(partition -> (RangePartition) partition)
+            .anyMatch(
+                partition ->
+                    "2024-01-01".equals(partition.lower().value())
+                        && "2024-02-01".equals(partition.upper().value()));
+    boolean hasFebruaryPartition =
+        Arrays.stream(partitions)
+            .map(partition -> (RangePartition) partition)
+            .anyMatch(
+                partition ->
+                    "2024-02-01".equals(partition.lower().value())
+                        && "2024-03-01".equals(partition.upper().value()));
+    String partitionSummary =
+        Arrays.stream(partitions)
+            .map(
+                partition -> {
+                  RangePartition rangePartition = (RangePartition) partition;
+                  return String.format(
+                      "%s=[%s, %s)",
+                      rangePartition.name(), rangePartition.lower(), rangePartition.upper());
+                })
+            .collect(Collectors.joining(", "));
+    assertTrue(hasJanuaryPartition, partitionSummary);
+    assertTrue(hasFebruaryPartition, partitionSummary);
+    for (Partition partition : partitions) {
+      assertEquals(partition, partitionOps.getPartition(partition.name()));
+    }
+
+    String createTableSql;
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName))) {
+      assertTrue(result.next());
+      createTableSql = result.getString("Create Table");
+    }
+    assertTrue(createTableSql.contains("AUTO PARTITION BY RANGE"), createTableSql);
+    assertTrue(createTableSql.contains("date_trunc(`dt`, 'month')"), createTableSql);
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                String.format(
+                    "SELECT PARTITION_EXPRESSION FROM information_schema.partitions "
+                        + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' LIMIT 1",
+                    schemaName, tableName))) {
+      assertTrue(result.next());
+      assertEquals("dt", result.getString(1));
+    }
+
+    assertTrue(partitionOps.dropPartition(partitions[0].name()));
+    assertEquals(2, partitionOps.listPartitions().length);
   }
 
   @Test

@@ -59,6 +59,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -740,6 +741,134 @@ public class CatalogDoris4xIT extends BaseIT {
             tomorrowLiteral,
             Collections.emptyMap()),
         partitions.get("p3"));
+  }
+
+  @Test
+  void testAutoRangeOriginPartitionRoundTripAndOperations() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_auto_range_origin");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    Types.TimestampType dateTimeType = Types.TimestampType.withoutTimeZone();
+    Transform expectedTransform =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+
+    executeSql(
+        String.format(
+            "CREATE TABLE %s.%s (dt DATETIME NOT NULL) ENGINE=OLAP "
+                + "DUPLICATE KEY(dt) AUTO PARTITION BY RANGE (date_trunc(dt, 'month')) "
+                + "(PARTITION p_seed VALUES [('2024-01-01 00:00:00'), "
+                + "('2024-02-01 00:00:00'))) DISTRIBUTED BY HASH(dt) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            schemaName, tableName));
+
+    Table loaded = tc.loadTable(tid);
+    assertEquals(1, loaded.partitioning().length);
+    assertEquals(expectedTransform, loaded.partitioning()[0]);
+
+    SupportsPartitions partitionOps = loaded.supportPartitions();
+    RangePartition seedPartition =
+        Partitions.range(
+            "p_seed",
+            Literals.of("2024-02-01 00:00:00", dateTimeType),
+            Literals.of("2024-01-01 00:00:00", dateTimeType),
+            Collections.emptyMap());
+    assertPartition(seedPartition, partitionOps.getPartition("p_seed"));
+
+    RangePartition manuallyAddedPartition =
+        Partitions.range(
+            "p_manual",
+            Literals.of("2024-03-01 00:00:00", dateTimeType),
+            Literals.of("2024-02-01 00:00:00", dateTimeType),
+            Collections.emptyMap());
+    assertPartition(manuallyAddedPartition, partitionOps.addPartition(manuallyAddedPartition));
+
+    executeSql(
+        String.format(
+            "INSERT INTO `%s`.`%s` VALUES ('2024-03-15 12:00:00')", schemaName, tableName));
+    loaded = tc.loadTable(tid);
+    partitionOps = loaded.supportPartitions();
+    Map<String, RangePartition> partitions =
+        Arrays.stream(partitionOps.listPartitions())
+            .collect(Collectors.toMap(Partition::name, partition -> (RangePartition) partition));
+    assertEquals(3, partitions.size());
+    assertPartition(seedPartition, partitions.get("p_seed"));
+    assertPartition(manuallyAddedPartition, partitions.get("p_manual"));
+
+    RangePartition autoCreatedPartition =
+        partitions.values().stream()
+            .filter(partition -> "2024-03-01 00:00:00".equals(partition.lower().value()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Auto-created March partition was not found"));
+    assertEquals("2024-04-01 00:00:00", autoCreatedPartition.upper().value());
+    assertEquals(autoCreatedPartition, partitionOps.getPartition(autoCreatedPartition.name()));
+
+    String createTableSql;
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName))) {
+      assertTrue(result.next());
+      createTableSql = result.getString("Create Table");
+    }
+    assertTrue(createTableSql.contains("date_trunc(`dt`, 'month')"), createTableSql);
+    assertTrue(createTableSql.contains("PARTITION p_seed"), createTableSql);
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                String.format(
+                    "SELECT PARTITION_EXPRESSION FROM information_schema.partitions "
+                        + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' LIMIT 1",
+                    schemaName, tableName))) {
+      assertTrue(result.next());
+      assertEquals("dt", result.getString(1));
+    }
+
+    assertTrue(partitionOps.dropPartition("p_manual"));
+    assertEquals(2, partitionOps.listPartitions().length);
+  }
+
+  @Test
+  void testAutoRangeEmptyOriginAddPreservesNativeBehavior() {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_auto_range_empty_origin");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    Types.TimestampType dateTimeType = Types.TimestampType.withoutTimeZone();
+    Transform autoRange =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+
+    tc.createTable(
+        tid,
+        new Column[] {Column.of("dt", dateTimeType, "date_time", false, false, null)},
+        tableComment,
+        Collections.emptyMap(),
+        new Transform[] {autoRange},
+        Distributions.hash(1, NamedReference.field("dt")),
+        null,
+        null);
+
+    SupportsPartitions partitionOps = tc.loadTable(tid).supportPartitions();
+    assertEquals(0, partitionOps.listPartitions().length);
+    RangePartition attemptedManualPartition =
+        Partitions.range(
+            "p_manual",
+            Literals.of("2024-03-01 00:00:00", dateTimeType),
+            Literals.of("2024-02-01 00:00:00", dateTimeType),
+            Collections.emptyMap());
+    assertPartition(attemptedManualPartition, partitionOps.addPartition(attemptedManualPartition));
+    assertEquals(1, partitionOps.listPartitions().length);
+    assertPartition(
+        attemptedManualPartition, partitionOps.getPartition(attemptedManualPartition.name()));
   }
 
   @Test

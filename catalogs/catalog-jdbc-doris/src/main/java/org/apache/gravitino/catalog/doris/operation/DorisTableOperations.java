@@ -64,6 +64,7 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -441,6 +442,25 @@ public class DorisTableOperations extends JdbcTableOperations {
       // We do not support multi-column range partitioning in doris for now
       Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) partitioning[0];
       partitionSqlBuilder = generateRangePartitionSql(rangePartition, columnNames);
+    } else if (DorisUtils.isAutoRangeTransform(partitioning[0])) {
+      Transforms.ApplyTransform autoRange = (Transforms.ApplyTransform) partitioning[0];
+      String[] fieldName = ((NamedReference.FieldReference) autoRange.arguments()[0]).fieldName();
+      Preconditions.checkArgument(
+          columnNames.contains(fieldName[0]), "The partition field must be one of the columns");
+
+      String columnName = fieldName[0];
+      String interval = (String) ((Literal<?>) autoRange.arguments()[1]).value();
+      partitionSqlBuilder = new StringBuilder(NEW_LINE);
+      partitionSqlBuilder
+          .append(" AUTO PARTITION BY RANGE (date_trunc(")
+          .append(BACK_QUOTE)
+          .append(columnName)
+          .append(BACK_QUOTE)
+          .append(", '")
+          .append(escapeSqlLiteral(interval, '\''))
+          .append("'))")
+          .append(NEW_LINE)
+          .append("()");
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
       partitionSqlBuilder = generateListPartitionSql(listPartition, columnNames);
