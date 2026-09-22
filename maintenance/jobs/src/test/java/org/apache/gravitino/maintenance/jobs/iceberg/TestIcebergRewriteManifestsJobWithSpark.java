@@ -19,9 +19,12 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -114,7 +117,20 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     Set<String> oldManifests = manifests(0);
     Set<String> newManifests = manifests(1);
     SparkSession running = spark;
-    assertThrows(Exception.class, () -> IcebergRewriteManifestsJob.main(arguments("999", null)));
+    PrintStream originalErr = System.err;
+    ByteArrayOutputStream errors = new ByteArrayOutputStream();
+    try (PrintStream captured = new PrintStream(errors, true, StandardCharsets.UTF_8)) {
+      System.setErr(captured);
+      assertEquals(1, IcebergRewriteManifestsJob.run(arguments("999", null)));
+    } finally {
+      System.setErr(originalErr);
+    }
+    String message = errors.toString(StandardCharsets.UTF_8);
+    assertTrue(message.contains("Error rewriting manifests:"));
+    assertTrue(message.contains("999"));
+    assertFalse(
+        message.contains(
+            "\tat org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob"));
     assertTrue(running.sparkContext().isStopped());
     startSpark();
     assertEquals(snapshot, currentSnapshot());
@@ -127,7 +143,18 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     spark.stop();
     SparkSession.clearActiveSession();
     SparkSession.clearDefaultSession();
-    IcebergRewriteManifestsJob.main(arguments(spec, caching));
+    PrintStream originalOut = System.out;
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try (PrintStream captured = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+      System.setOut(captured);
+      IcebergRewriteManifestsJob.main(arguments(spec, caching));
+    } finally {
+      System.setOut(originalOut);
+    }
+    assertTrue(
+        output
+            .toString(StandardCharsets.UTF_8)
+            .contains("Rewrite Manifests Results: Rewritten manifests:"));
     if (SparkSession.getActiveSession().isDefined()) {
       assertTrue(SparkSession.getActiveSession().get().sparkContext().isStopped());
     }

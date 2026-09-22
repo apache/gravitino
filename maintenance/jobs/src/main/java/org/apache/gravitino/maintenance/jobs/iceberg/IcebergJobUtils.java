@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
@@ -123,6 +124,45 @@ public final class IcebergJobUtils {
     }
 
     return argMap;
+  }
+
+  /**
+   * Parse named arguments with explicit values and validate supported and required names.
+   *
+   * <p>Blank values and unresolved template placeholders are normalized to null. Duplicate names,
+   * unknown names, missing values, and absent required arguments are rejected. Unlike the
+   * single-argument overload, this parser does not accept bare boolean flags.
+   *
+   * @param args command line arguments
+   * @param supported allowed argument names without the leading dashes
+   * @param requiredArguments required argument names without the leading dashes
+   * @return map of argument names to normalized values
+   * @throws IllegalArgumentException if arguments are invalid
+   */
+  public static Map<String, String> parseArguments(
+      String[] args, Set<String> supported, Set<String> requiredArguments) {
+    Map<String, String> parsed = new HashMap<>();
+    for (int i = 0; i < args.length; i += 2) {
+      String flag = args[i];
+      if (flag == null || !flag.startsWith("--") || !supported.contains(flag.substring(2))) {
+        throw new IllegalArgumentException("Unknown argument: " + flag);
+      }
+      if (i + 1 == args.length || args[i + 1] == null || args[i + 1].startsWith("--")) {
+        throw new IllegalArgumentException("Missing value for " + flag);
+      }
+      String key = flag.substring(2);
+      if (parsed.containsKey(key)) {
+        throw new IllegalArgumentException("Duplicate argument: " + flag);
+      }
+      String value = nullIfUnresolvedPlaceholder(args[i + 1].trim());
+      parsed.put(key, value == null || value.isEmpty() ? null : value);
+    }
+    for (String required : requiredArguments) {
+      if (parsed.get(required) == null) {
+        throw new IllegalArgumentException("--" + required + " is required");
+      }
+    }
+    return parsed;
   }
 
   /**

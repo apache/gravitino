@@ -20,11 +20,9 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -32,8 +30,6 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for rewriting Iceberg table manifest files.
@@ -42,8 +38,6 @@ import org.slf4j.LoggerFactory;
  * cluster manifest entries within an existing partition spec to improve scan planning.
  */
 public class IcebergRewriteManifestsJob implements BuiltInJob {
-
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergRewriteManifestsJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-manifests";
@@ -102,56 +96,30 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @param args named job arguments
    */
   public static void main(String[] args) {
-    Map<String, String> argMap = parseArguments(args);
-    String sql =
-        buildProcedureCall(
-            argMap.get("catalog"),
-            argMap.get("table"),
-            argMap.get("use-caching"),
-            argMap.get("spec-id"));
-    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
-    SparkSession.Builder builder =
-        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
-    configs.forEach(builder::config);
+    int exitCode = run(args);
+    if (exitCode != 0) {
+      System.exit(exitCode);
+    }
+  }
 
-    try (SparkSession spark = builder.getOrCreate()) {
-      IcebergJobUtils.requireIcebergSparkRuntime();
-      List<Row> results = spark.sql(sql).collectAsList();
-      if (!results.isEmpty()) {
-        Row result = results.get(0);
-        LOG.info(
-            "Rewrite Manifests Results: Rewritten manifests: {}, Added manifests: {}",
-            ((Number) result.get(0)).longValue(),
-            ((Number) result.get(1)).longValue());
-      }
-      LOG.info("Rewrite manifests job completed successfully");
+  static int run(String[] args) {
+    try {
+      execute(args);
+      return 0;
+    } catch (Exception e) {
+      System.err.println("Error rewriting manifests: " + e.getMessage());
+      printUsage();
+      return 1;
     }
   }
 
   static Map<String, String> parseArguments(String[] args) {
-    Set<String> supported =
-        new HashSet<>(Arrays.asList("catalog", "table", "use-caching", "spec-id", "spark-conf"));
-    Map<String, String> parsed = new HashMap<>();
-    for (int i = 0; i < args.length; i += 2) {
-      String flag = args[i];
-      if (flag == null || !flag.startsWith("--") || !supported.contains(flag.substring(2))) {
-        throw new IllegalArgumentException("Unknown argument: " + flag);
-      }
-      if (i + 1 == args.length || args[i + 1] == null || args[i + 1].startsWith("--")) {
-        throw new IllegalArgumentException("Missing value for " + flag);
-      }
-      String key = flag.substring(2);
-      if (parsed.containsKey(key)) {
-        throw new IllegalArgumentException("Duplicate argument: " + flag);
-      }
-      String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(args[i + 1].trim());
-      parsed.put(key, value == null || value.isEmpty() ? null : value);
-    }
-    for (String required : Arrays.asList("catalog", "table")) {
-      if (parsed.get(required) == null) {
-        throw new IllegalArgumentException("--" + required + " is required");
-      }
-    }
+    Map<String, String> parsed =
+        IcebergJobUtils.parseArguments(
+            args,
+            new HashSet<>(
+                Arrays.asList("catalog", "table", "use-caching", "spec-id", "spark-conf")),
+            new HashSet<>(Arrays.asList("catalog", "table")));
     validateUseCaching(parsed.get("use-caching"));
     validateSpecId(parsed.get("spec-id"));
     return parsed;
@@ -232,6 +200,39 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
       throw new IllegalArgumentException(
           "Invalid spec-id value '" + specId + "'. Must be a non-negative integer");
     }
+  }
+
+  private static void execute(String[] args) {
+    Map<String, String> argMap = parseArguments(args);
+    String sql =
+        buildProcedureCall(
+            argMap.get("catalog"),
+            argMap.get("table"),
+            argMap.get("use-caching"),
+            argMap.get("spec-id"));
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
+    SparkSession.Builder builder =
+        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
+    configs.forEach(builder::config);
+
+    try (SparkSession spark = builder.getOrCreate()) {
+      IcebergJobUtils.requireIcebergSparkRuntime();
+      List<Row> results = spark.sql(sql).collectAsList();
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
+        System.out.printf(
+            "Rewrite Manifests Results: Rewritten manifests: %d, Added manifests: %d%n",
+            ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
+      }
+      System.out.println("Rewrite manifests job completed successfully");
+    }
+  }
+
+  private static void printUsage() {
+    System.err.println(
+        "Usage: IcebergRewriteManifestsJob --catalog <catalog_name> --table <table_identifier>"
+            + " [--use-caching <true|false>] [--spec-id <non-negative integer>]"
+            + " [--spark-conf <json>]");
   }
 
   /**

@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -47,7 +50,35 @@ public class TestIcebergRewriteManifestsJob {
       {"--catalog", "cat", "--table", "db.t", "--catalog", "other"}
     };
     for (String[] args : invalid) {
-      assertThrows(IllegalArgumentException.class, () -> IcebergRewriteManifestsJob.main(args));
+      PrintStream originalErr = System.err;
+      ByteArrayOutputStream errors = new ByteArrayOutputStream();
+      try (PrintStream captured = new PrintStream(errors, true, StandardCharsets.UTF_8)) {
+        System.setErr(captured);
+        assertEquals(1, IcebergRewriteManifestsJob.run(args));
+      } finally {
+        System.setErr(originalErr);
+      }
+      String message = errors.toString(StandardCharsets.UTF_8);
+      assertTrue(message.startsWith("Error rewriting manifests:"));
+      assertTrue(message.contains("Usage: IcebergRewriteManifestsJob"));
+      assertFalse(message.contains("\tat "));
+    }
+  }
+
+  @Test
+  public void testParseArgumentsRejectsInvalidNamesAndMissingValues() {
+    String[][] invalid = {
+      {"--catalog", "cat", "--table", "db.t", "--unknown", "value"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "", "--spec-id", "0"},
+      {"--catalog", "cat", "--table", "{{table_identifier}}"},
+      {"--catalog", "cat", "--table", "db.t", "--use-caching"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "--use-caching", "true"},
+      {"--catalog", "cat", "--table", null},
+      {null, "cat", "--table", "db.t"}
+    };
+    for (String[] args : invalid) {
+      assertThrows(
+          IllegalArgumentException.class, () -> IcebergRewriteManifestsJob.parseArguments(args));
     }
   }
 
@@ -182,7 +213,7 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithAllRequired() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
     assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -196,7 +227,7 @@ public class TestIcebergRewriteManifestsJob {
       "--table", "db.sample",
       "--use-caching", "false"
     };
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
     assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -207,13 +238,13 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithEmptyValues() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--use-caching", ""};
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
-    // Empty values should be ignored
-    assertEquals(2, result.size());
+    // Empty optional values are normalized to null.
+    assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
     assertEquals("db.sample", result.get("table"));
-    assertFalse(result.containsKey("use-caching"));
+    assertNull(result.get("use-caching"));
   }
 
   @Test
@@ -221,8 +252,8 @@ public class TestIcebergRewriteManifestsJob {
     String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--use-caching", "true"};
     String[] args2 = {"--use-caching", "true", "--table", "tbl1", "--catalog", "cat1"};
 
-    Map<String, String> result1 = IcebergJobUtils.parseArguments(args1);
-    Map<String, String> result2 = IcebergJobUtils.parseArguments(args2);
+    Map<String, String> result1 = IcebergRewriteManifestsJob.parseArguments(args1);
+    Map<String, String> result2 = IcebergRewriteManifestsJob.parseArguments(args2);
 
     assertEquals(result1, result2);
   }
@@ -239,9 +270,9 @@ public class TestIcebergRewriteManifestsJob {
       "--use-caching", "{{use_caching}}",
       "--spark-conf", "{{spark_conf}}"
     };
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
-    assertEquals("{{use_caching}}", result.get("use-caching"));
+    assertNull(result.get("use-caching"));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("use-caching")));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("spark-conf")));
   }
