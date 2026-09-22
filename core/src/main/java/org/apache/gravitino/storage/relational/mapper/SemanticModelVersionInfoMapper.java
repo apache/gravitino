@@ -34,11 +34,4 @@ public interface SemanticModelVersionInfoMapper {
       method = "insertSemanticModelVersionInfo")
   void insertSemanticModelVersionInfo(
       @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO);
-
-  /** Inserts or overwrites a Semantic Model version snapshot. */
-  @InsertProvider(
-      type = SemanticModelVersionInfoSQLProviderFactory.class,
-      method = "insertSemanticModelVersionInfoOnDuplicateKeyUpdate")
-  void insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-      @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO);
 }

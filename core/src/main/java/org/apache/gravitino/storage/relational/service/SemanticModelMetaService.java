@@ -25,6 +25,7 @@ import static org.apache.gravitino.storage.relational.po.SemanticModelPO.initial
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -136,11 +137,10 @@ public class SemanticModelMetaService {
 
                         SemanticModelPO replacementPO = semanticModelForOverwrite(po, storedPO);
                         Integer updated = mapper.updateSemanticModelMeta(replacementPO, storedPO);
-                        Preconditions.checkState(
-                            updated != null && updated == 1,
-                            "The overwritten Semantic Model %s in schema %s changed while its row was held",
-                            po.getSemanticModelName(),
-                            po.getSchemaId());
+                        if (updated == null || updated != 1) {
+                          throw semanticModelWriteFailure(
+                              semanticModelEntity.nameIdentifier(), storedPO);
+                        }
                         persistedPO.set(replacementPO);
                       }),
               () ->
@@ -217,5 +217,26 @@ public class SemanticModelMetaService {
           identifier.name());
     }
     return semanticModelPO;
+  }
+
+  private RuntimeException semanticModelWriteFailure(
+      NameIdentifier identifier, SemanticModelPO observedSemanticModelPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.SEMANTIC_MODEL,
+        () ->
+            SessionUtils.getWithoutCommit(
+                SemanticModelMetaMapper.class,
+                mapper ->
+                    mapper.selectSemanticModelMetaByIdForUpdate(
+                        observedSemanticModelPO.getSemanticModelId())),
+        null,
+        current ->
+            Objects.equals(
+                    current.getSemanticModelName(), observedSemanticModelPO.getSemanticModelName())
+                && Objects.equals(current.getSchemaId(), observedSemanticModelPO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedSemanticModelPO.getCatalogId())
+                && Objects.equals(
+                    current.getMetalakeId(), observedSemanticModelPO.getMetalakeId()));
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -33,14 +34,19 @@ public class SemanticModelPOStorageOps
   /** Creates Semantic Model persistent-object operations. */
   public SemanticModelPOStorageOps() {}
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Overwrite is handled by {@link SemanticModelMetaService} through a locked, version-checked
+   * update. A database-specific upsert would bypass the persisted identity and version resolution.
+   */
   @Override
   public void insertPO(
       SemanticModelMetaMapper mapper, SemanticModelPO semanticModelPO, boolean overwrite) {
-    if (overwrite) {
-      mapper.insertSemanticModelMetaOnDuplicateKeyUpdate(semanticModelPO);
-    } else {
-      mapper.insertSemanticModelMeta(semanticModelPO);
-    }
+    Preconditions.checkArgument(
+        !overwrite,
+        "Semantic Model overwrite is handled by SemanticModelMetaService, not by an upsert");
+    mapper.insertSemanticModelMeta(semanticModelPO);
   }
 
   @Override

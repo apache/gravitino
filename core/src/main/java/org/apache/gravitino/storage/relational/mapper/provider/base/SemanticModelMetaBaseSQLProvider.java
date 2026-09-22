@@ -179,23 +179,6 @@ public class SemanticModelMetaBaseSQLProvider {
         + " #{semanticModelMeta.auditInfo}, #{semanticModelMeta.deletedAt})";
   }
 
-  /** Returns SQL for inserting or overwriting a Semantic Model identity row. */
-  public String insertSemanticModelMetaOnDuplicateKeyUpdate(
-      @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
-    return insertSemanticModelMeta(semanticModelPO)
-        + " ON DUPLICATE KEY UPDATE"
-        + " semantic_model_name = #{semanticModelMeta.semanticModelName},"
-        + " metalake_id = #{semanticModelMeta.metalakeId},"
-        + " catalog_id = #{semanticModelMeta.catalogId},"
-        + " schema_id = #{semanticModelMeta.schemaId},"
-        // Keep versions monotonic when an existing Semantic Model is overwritten. Assign
-        // last_version first so both columns advance from the stored current version.
-        + " last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
-        + " audit_info = #{semanticModelMeta.auditInfo},"
-        + " deleted_at = #{semanticModelMeta.deletedAt}";
-  }
-
   /** Returns SQL for updating a Semantic Model identity with a version check. */
   public String updateSemanticModelMeta(
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,

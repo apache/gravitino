@@ -98,12 +98,6 @@ public class SemanticModelMetaSQLProviderFactory {
     return getProvider().insertSemanticModelMeta(semanticModelPO);
   }
 
-  /** Provides SQL for inserting or overwriting a Semantic Model identity. */
-  public static String insertSemanticModelMetaOnDuplicateKeyUpdate(
-      @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
-    return getProvider().insertSemanticModelMetaOnDuplicateKeyUpdate(semanticModelPO);
-  }
-
   /** Provides SQL for updating a Semantic Model identity when its version is unchanged. */
   public static String updateSemanticModelMeta(
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,

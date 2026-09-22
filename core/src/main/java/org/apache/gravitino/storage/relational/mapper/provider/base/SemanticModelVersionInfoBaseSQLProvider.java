@@ -42,17 +42,4 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " #{semanticModelVersionInfo.properties}, #{semanticModelVersionInfo.auditInfo},"
         + " #{semanticModelVersionInfo.deletedAt})";
   }
-
-  /** Returns SQL for inserting or overwriting a Semantic Model version snapshot. */
-  public String insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-      @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO) {
-    return insertSemanticModelVersionInfo(versionInfoPO)
-        + " ON DUPLICATE KEY UPDATE"
-        + " semantic_model_name = #{semanticModelVersionInfo.semanticModelName},"
-        + " semantic_model_comment = #{semanticModelVersionInfo.semanticModelComment},"
-        + " semantic_model_definition = #{semanticModelVersionInfo.semanticModelDefinition},"
-        + " properties = #{semanticModelVersionInfo.properties},"
-        + " audit_info = #{semanticModelVersionInfo.auditInfo},"
-        + " deleted_at = #{semanticModelVersionInfo.deletedAt}";
-  }
 }

@@ -19,23 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelVersionInfoBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
-import org.apache.ibatis.annotations.Param;
 
 /** Provides PostgreSQL SQL for creating Semantic Model version snapshots. */
 public class SemanticModelVersionInfoPostgreSQLProvider
-    extends SemanticModelVersionInfoBaseSQLProvider {
-
-  @Override
-  public String insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-      @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO) {
-    return insertSemanticModelVersionInfo(versionInfoPO)
-        + " ON CONFLICT (semantic_model_id, version, deleted_at) DO UPDATE SET"
-        + " semantic_model_name = #{semanticModelVersionInfo.semanticModelName},"
-        + " semantic_model_comment = #{semanticModelVersionInfo.semanticModelComment},"
-        + " semantic_model_definition = #{semanticModelVersionInfo.semanticModelDefinition},"
-        + " properties = #{semanticModelVersionInfo.properties},"
-        + " audit_info = #{semanticModelVersionInfo.auditInfo},"
-        + " deleted_at = #{semanticModelVersionInfo.deletedAt}";
-  }
-}
+    extends SemanticModelVersionInfoBaseSQLProvider {}

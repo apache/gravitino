@@ -18,31 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import static org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper.TABLE_NAME;
-
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.SemanticModelPO;
-import org.apache.ibatis.annotations.Param;
 
 /** Provides PostgreSQL SQL for Semantic Model create and load operations. */
-public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQLProvider {
-
-  @Override
-  public String insertSemanticModelMetaOnDuplicateKeyUpdate(
-      @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
-    return insertSemanticModelMeta(semanticModelPO)
-        + " ON CONFLICT (semantic_model_id) DO UPDATE SET"
-        + " semantic_model_name = #{semanticModelMeta.semanticModelName},"
-        + " metalake_id = #{semanticModelMeta.metalakeId},"
-        + " catalog_id = #{semanticModelMeta.catalogId},"
-        + " schema_id = #{semanticModelMeta.schemaId},"
-        + " current_version = "
-        + TABLE_NAME
-        + ".current_version + 1,"
-        + " last_version = "
-        + TABLE_NAME
-        + ".current_version + 1,"
-        + " audit_info = #{semanticModelMeta.auditInfo},"
-        + " deleted_at = #{semanticModelMeta.deletedAt}";
-  }
-}
+public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQLProvider {}

@@ -134,13 +134,6 @@ public interface SemanticModelMetaMapper {
       method = "insertSemanticModelMeta")
   void insertSemanticModelMeta(@Param("semanticModelMeta") SemanticModelPO semanticModelPO);
 
-  /** Inserts or overwrites a Semantic Model identity row. */
-  @InsertProvider(
-      type = SemanticModelMetaSQLProviderFactory.class,
-      method = "insertSemanticModelMetaOnDuplicateKeyUpdate")
-  void insertSemanticModelMetaOnDuplicateKeyUpdate(
-      @Param("semanticModelMeta") SemanticModelPO semanticModelPO);
-
   /** Updates a Semantic Model identity while its current version is unchanged. */
   @UpdateProvider(
       type = SemanticModelMetaSQLProviderFactory.class,

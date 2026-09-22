@@ -57,10 +57,4 @@ public class SemanticModelVersionInfoSQLProviderFactory {
       @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO) {
     return getProvider().insertSemanticModelVersionInfo(versionInfoPO);
   }
-
-  /** Provides SQL for inserting or overwriting a Semantic Model version snapshot. */
-  public static String insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-      @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO) {
-    return getProvider().insertSemanticModelVersionInfoOnDuplicateKeyUpdate(versionInfoPO);
-  }
 }
