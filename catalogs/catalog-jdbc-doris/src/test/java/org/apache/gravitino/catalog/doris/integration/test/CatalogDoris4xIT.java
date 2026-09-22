@@ -33,11 +33,13 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -46,6 +48,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.container.DorisImageName;
@@ -163,6 +166,24 @@ public class CatalogDoris4xIT extends BaseIT {
 
   private Distribution hashDist() {
     return Distributions.hash(1, NamedReference.field(colName1));
+  }
+
+  @Test
+  void testTableCommentRoundTrip() {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "comment_roundtrip");
+    String comment = "crud probe";
+
+    tables.createTable(
+        tableIdentifier,
+        basicColumns(),
+        comment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null);
+
+    assertEquals(comment, tables.loadTable(tableIdentifier).comment());
   }
 
   @Test
@@ -325,6 +346,311 @@ public class CatalogDoris4xIT extends BaseIT {
   }
 
   @Test
+  void testAddColumnPreservesDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_add_column_preserves_default"));
+    String defaultedColumnName = "defaulted_col";
+    String nullableDefaultColumnName = "nullable_default_col";
+    String requestedDefaultValue = "owner's a\"\"b \"value\"\\path";
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {defaultedColumnName},
+            Types.VarCharType.of(255),
+            "defaulted column",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.of(requestedDefaultValue, Types.VarCharType.of(255))));
+
+    String diagnosticQualifiedTableName = schemaName + "." + tid.name();
+    String[] rawDefaults = new String[3];
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(
+                          jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+                  Statement statement = connection.createStatement();
+                  ResultSet columns =
+                      connection
+                          .getMetaData()
+                          .getColumns(schemaName, null, tid.name(), defaultedColumnName)) {
+                String jdbcColumnDefault = null;
+                while (columns.next()) {
+                  if (defaultedColumnName.equals(columns.getString("COLUMN_NAME"))) {
+                    jdbcColumnDefault = columns.getString("COLUMN_DEF");
+                    break;
+                  }
+                }
+                assertNotNull(jdbcColumnDefault, "JDBC COLUMN_DEF was not returned");
+                rawDefaults[0] = jdbcColumnDefault;
+
+                try (ResultSet showColumns =
+                    statement.executeQuery(
+                        "SHOW FULL COLUMNS FROM " + diagnosticQualifiedTableName)) {
+                  while (showColumns.next()) {
+                    if (defaultedColumnName.equals(showColumns.getString("Field"))) {
+                      rawDefaults[1] = showColumns.getString("Default");
+                      break;
+                    }
+                  }
+                }
+                assertNotNull(
+                    rawDefaults[1], "SHOW FULL COLUMNS did not return the string default");
+
+                String infoSchemaQuery =
+                    String.format(
+                        "SELECT COLUMN_DEFAULT FROM information_schema.columns "
+                            + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' "
+                            + "AND COLUMN_NAME = '%s'",
+                        schemaName, tid.name(), defaultedColumnName);
+                try (ResultSet infoSchema = statement.executeQuery(infoSchemaQuery)) {
+                  assertTrue(infoSchema.next(), "information_schema.columns row was not returned");
+                  rawDefaults[2] = infoSchema.getString("COLUMN_DEFAULT");
+                }
+              }
+            });
+
+    String metadataDiagnostic =
+        String.format(
+            "JDBC COLUMN_DEF=[%s], SHOW FULL COLUMNS Default=[%s], "
+                + "information_schema.COLUMN_DEFAULT=[%s]",
+            rawDefaults[0], rawDefaults[1], rawDefaults[2]);
+    DorisContainer.LOG.info("Doris default metadata diagnostic: {}", metadataDiagnostic);
+    String[] insertedDefaultValue = new String[1];
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (%s, %s) VALUES (102, 'data')",
+              diagnosticQualifiedTableName, colName1, colName2));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT %s FROM %s WHERE %s = 102",
+                  defaultedColumnName, diagnosticQualifiedTableName, colName1))) {
+        assertTrue(resultSet.next());
+        insertedDefaultValue[0] = resultSet.getString(1);
+        assertFalse(resultSet.next());
+      }
+    }
+    assertEquals(
+        requestedDefaultValue,
+        insertedDefaultValue[0],
+        metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), defaultedColumnName);
+              assertEquals(Types.VarCharType.of(255), addedColumn.dataType());
+              assertFalse(addedColumn.nullable());
+              assertEquals("defaulted column", addedColumn.comment());
+              assertEquals(
+                  Literals.of(requestedDefaultValue, Types.VarCharType.of(255)),
+                  addedColumn.defaultValue(),
+                  metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+            });
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {nullableDefaultColumnName},
+            Types.IntegerType.get(),
+            "nullable default column",
+            TableChange.ColumnPosition.defaultPos(),
+            true,
+            false,
+            Literals.integerLiteral(9)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), nullableDefaultColumnName);
+              assertEquals(Types.IntegerType.get(), addedColumn.dataType());
+              assertTrue(addedColumn.nullable());
+              assertEquals("nullable default column", addedColumn.comment());
+              assertEquals(Literals.integerLiteral(9), addedColumn.defaultValue());
+            });
+
+    String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tid.name());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (`%s`, `%s`) VALUES (101, 'data')",
+              qualifiedTableName, colName1, colName2));
+
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT `%s`, `%s` FROM %s WHERE `%s` = 101",
+                  defaultedColumnName, nullableDefaultColumnName, qualifiedTableName, colName1))) {
+        assertTrue(resultSet.next());
+        assertEquals(requestedDefaultValue, resultSet.getString(1));
+        assertEquals(9, resultSet.getInt(2));
+        assertFalse(resultSet.wasNull());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testDeleteMissingIndexIfExists() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_missing_idx"));
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(tid, TableChange.deleteIndex("idx_missing", true));
+    assertEquals(0, tc.loadTable(tid).index().length);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tc.alterTable(tid, TableChange.deleteIndex("idx_missing", false)));
+    assertTrue(exception.getMessage().contains("Index does not exist"), exception.getMessage());
+  }
+
+  @Test
+  void testDeleteExistingInvertedIndexWithIfExistsFalse() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_existing_idx_strict"));
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+    tc.alterTable(
+        tid,
+        TableChange.addIndex(Index.IndexType.INVERTED, "idx_strict", new String[][] {{colName2}}));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(() -> assertEquals(1, tc.loadTable(tid).index().length));
+
+    tc.alterTable(tid, TableChange.deleteIndex("idx_strict", false));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testNoOpDeleteComposesWithUnrelatedChanges() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier addColumnFirst =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_column_first"));
+    NameIdentifier addColumnLast =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_column_last"));
+    NameIdentifier addIndexFirst =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_index_first"));
+    NameIdentifier addIndexLast =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_index_last"));
+
+    for (NameIdentifier tid :
+        new NameIdentifier[] {addColumnFirst, addColumnLast, addIndexFirst, addIndexLast}) {
+      tc.createTable(
+          tid,
+          basicColumns(),
+          tableComment,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          hashDist(),
+          null,
+          null);
+    }
+
+    tc.alterTable(
+        addColumnFirst,
+        TableChange.deleteIndex("idx_missing", true),
+        TableChange.addColumn(new String[] {"col_extra"}, Types.VarCharType.of(100)));
+    tc.alterTable(
+        addColumnLast,
+        TableChange.addColumn(new String[] {"col_extra"}, Types.VarCharType.of(100)),
+        TableChange.deleteIndex("idx_missing", true));
+
+    for (NameIdentifier tid : new NameIdentifier[] {addColumnFirst, addColumnLast}) {
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(() -> assertEquals(3, tc.loadTable(tid).columns().length));
+    }
+
+    tc.alterTable(
+        addIndexFirst,
+        TableChange.deleteIndex("idx_missing", true),
+        TableChange.addIndex(
+            Index.IndexType.INVERTED, "idx_unrelated", new String[][] {{colName2}}));
+    tc.alterTable(
+        addIndexLast,
+        TableChange.addIndex(
+            Index.IndexType.INVERTED, "idx_unrelated", new String[][] {{colName2}}),
+        TableChange.deleteIndex("idx_missing", true));
+
+    for (NameIdentifier tid : new NameIdentifier[] {addIndexFirst, addIndexLast}) {
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(() -> assertEquals(1, tc.loadTable(tid).index().length));
+    }
+  }
+
+  @Test
+  void testDeleteIndexDoesNotSuppressMissingTable() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_missing_table"));
+
+    NoSuchTableException exception =
+        assertThrows(
+            NoSuchTableException.class,
+            () -> tc.alterTable(tid, TableChange.deleteIndex("idx_missing", true)));
+    assertTrue(exception.getMessage().contains(tid.name()), exception.getMessage());
+  }
+
+  @Test
   void testCreateTableWithAutoIncrement() {
     TableCatalog tc = catalog.asTableCatalog();
     NameIdentifier tid = NameIdentifier.of(schemaName, "t_auto_incr");
@@ -400,6 +726,60 @@ public class CatalogDoris4xIT extends BaseIT {
     assertEquals(Index.IndexType.INVERTED, t.index()[0].type());
     assertEquals("idx_data", t.index()[0].name());
     assertEquals(colName2, t.index()[0].fieldNames()[0][0]);
+  }
+
+  @Test
+  void testNativeNgramBfIndexFailsClosed() throws Exception {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_ngram_bf");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String indexName = "PRIMARY";
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_4_0);
+    String jdbcUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/%s",
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort(), schemaName);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          String.format(
+              "CREATE INDEX `%s` ON `%s` (`%s`) USING NGRAM_BF "
+                  + "PROPERTIES(\"gram_size\"=\"3\", \"bf_size\"=\"256\")",
+              indexName, tableName, colName2));
+
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  assertEquals(
+                      "NGRAM_BF", getNativeIndexMetadata(statement, tableName, indexName).get(0)));
+
+      List<String> metadataBefore = getNativeIndexMetadata(statement, tableName, indexName);
+      UnsupportedOperationException exception =
+          assertThrows(UnsupportedOperationException.class, () -> tc.loadTable(tid));
+
+      assertTrue(exception.getMessage().contains(schemaName));
+      assertTrue(exception.getMessage().contains(tableName));
+      assertTrue(exception.getMessage().contains(indexName));
+      assertTrue(exception.getMessage().contains("NGRAM_BF"));
+      assertFalse(exception.getMessage().contains("gram_size"));
+      assertFalse(exception.getMessage().contains("bf_size"));
+      assertEquals(metadataBefore, getNativeIndexMetadata(statement, tableName, indexName));
+    }
   }
 
   @Test
@@ -657,6 +1037,20 @@ public class CatalogDoris4xIT extends BaseIT {
                 assertTrue(
                     tc.loadTable(tid).properties().containsKey(LIGHT_SCHEMA_CHANGE),
                     "light_schema_change=true should appear after ALTER TABLE SET"));
+  }
+
+  private List<String> getNativeIndexMetadata(
+      Statement statement, String tableName, String indexName) throws SQLException {
+    try (ResultSet resultSet =
+        statement.executeQuery(String.format("SHOW INDEX FROM `%s`", tableName))) {
+      while (resultSet.next()) {
+        if (indexName.equals(resultSet.getString("Key_name"))) {
+          return Arrays.asList(
+              resultSet.getString("Index_type"), resultSet.getString("Properties"));
+        }
+      }
+    }
+    throw new AssertionError("Index not found: " + indexName);
   }
 
   private void executeSql(String sql) throws SQLException {

@@ -146,6 +146,11 @@ a three second poll, and a server that cannot keep its caches current exits rath
 metadata it knows to be stale. Point the load balancer's health check at `GET /health/ready` so a
 server that has lost its database stops receiving traffic.
 
+Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
+that directory on storage shared by all servers, for example an NFS mount, so that a request for a
+job's output can be served by any server. Otherwise only the server that ran the job can return
+it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
+
 ## Server Configuration
 
 Every property in this section belongs in `${GRAVITINO_HOME}/conf/gravitino.conf`, one
@@ -302,7 +307,10 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
 Two eviction limits apply at once. Time to live always applies: an entry older than
-`expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
+`expireTimeInMs` expires and is cleaned up asynchronously. The clock starts when the entry is
+written and is not reset by reads, so in a multi-node deployment `expireTimeInMs` is also the upper
+bound on how long a node can serve a stale entry if a cross-node invalidation is ever missed (see
+[Change Log Propagation](#change-log-propagation)). Alongside it, the cache bounds its size
 either by count or by weight. With `enableWeigher` disabled, Caffeine's W-TinyLFU policy evicts the
 least-used entries once `maxEntries` is reached. With `enableWeigher` enabled, each entity type
 carries a weight, larger for entities higher in the hierarchy, and eviction targets a total weight
@@ -347,6 +355,23 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.classloader.isolated`            | Whether to load each catalog's libraries and configuration in an isolated classloader rather than the application classloader.                                                                                                                                                                         | `true`        |
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
 | `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
+
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. By default, a key matches when its name contains `secret`,
+`password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+`gravitino.secret.sensitiveKeyKeywords` **replaces** that default list. Use it to drop a default
+keyword that masks unrelated properties (for example omit `access` and `account`), to add a typo
+or extra word (for example `passwrod` or `private`), or set it to empty to disable name-based
+matching. The value is a comma-separated list. Each entry is a case-insensitive literal substring
+of the property key, not a regular expression. Keep entries specific; overly broad values such as
+`key` can mask unrelated properties.
+
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
 
 ### Securing the Server
 
@@ -434,16 +459,26 @@ frequently — this can measurably increase audit log volume; size log rotation 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
-`gravitino_audit.log` under the log directory, rotates daily and at 256 MB, gzips what it rotates,
-and deletes anything older than 30 days. Change the path or the retention there:
+`gravitino_audit.log` under the log directory and rotates it daily and at 256 MB into numbered gzip
+archives. It deletes archives older than 30 days and, oldest first, archives beyond 10 GB in total.
+Change the retention or the path there:
 
 ```properties
 # conf/log4j2.properties
+property.auditLogMaxTotalSize = 30GB
+appender.audit_file.strategy.delete.ifFileName.ifAny.ifLastModified.age = 90d
+
 appender.audit_file.fileName    = /var/log/gravitino/my_audit.log
 appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
-
-appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 90d
+# Deletion must look in the new directory and match the new archive names.
+appender.audit_file.strategy.delete.basePath = /var/log/gravitino
+appender.audit_file.strategy.delete.ifFileName.glob = my_audit_*.log.gz
 ```
+
+Earlier releases set the audit retention with
+`appender.audit_file.strategy.delete.ifAll.ifLastModified.age`. That key no longer exists. Log4j2
+rejects a configuration file that still sets it, and the server then writes no log files. See
+[Log rotation and retention](./how-to-install.md#log-rotation-and-retention) for all logs.
 
 Earlier releases configured the writer directly through `gravitino.audit.writer.file.*`. Those
 properties now do nothing, and `FileAuditWriter` logs a warning at startup if it finds any of them.
@@ -511,12 +546,14 @@ server, are documented with those services. See
 
 #### Jobs
 
-| Configuration Item                     | Description                                                                                                | Default Value                 |
-|----------------------------------------|------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                  | `local`                       |
-| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs.                                                          | `/tmp/gravitino/jobs/staging` |
-| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
-| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
+| Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
+| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
+| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |
+| `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
+| `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
 
 ### Key Management
 

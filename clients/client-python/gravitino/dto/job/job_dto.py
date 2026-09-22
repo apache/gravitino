@@ -17,7 +17,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from dataclasses_json import config, DataClassJsonMixin
 
@@ -88,6 +88,12 @@ class JobDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attribute
             decoder=_deserialize_runtime_job_template,
         ),
     )
+    _stdout: Optional[List[str]] = field(
+        default=None, metadata=config(field_name="stdout")
+    )
+    _stderr: Optional[List[str]] = field(
+        default=None, metadata=config(field_name="stderr")
+    )
 
     def __post_init__(self) -> None:
         self._queued_at = _deserialize_datetime(self._queued_at)
@@ -131,6 +137,18 @@ class JobDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attribute
         ``None`` for jobs run before this field was introduced.
         """
         return self._runtime_job_template
+
+    def stdout(self) -> Optional[List[str]]:
+        """Returns the captured standard output of the job, as a list of lines, or ``None`` if
+        output was not requested.
+        """
+        return self._stdout
+
+    def stderr(self) -> Optional[List[str]]:
+        """Returns the captured standard error output of the job, as a list of lines, or ``None``
+        if output was not requested.
+        """
+        return self._stderr
 
     def validate(self) -> None:
         """Validates the JobDTO, ensuring required fields are present and non-empty."""

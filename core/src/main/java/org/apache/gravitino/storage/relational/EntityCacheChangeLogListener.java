@@ -61,16 +61,58 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheChangeLogListener.class);
 
-  private final EntityCache cache;
+  /**
+   * The two invalidation entry points this listener needs from the cache it keeps coherent. The
+   * entity store hands in its own implementation so that it observes every invalidation, including
+   * the ones replayed from other nodes (see {@code RelationalEntityStore#batchGet}).
+   */
+  public interface Target {
+    /**
+     * Invalidates the cache entry of the given entity, see {@link EntityCache#invalidate}.
+     *
+     * @param ident the identifier of the changed entity
+     * @param type the type of the changed entity
+     */
+    void invalidate(NameIdentifier ident, EntityType type);
+
+    /** Clears the whole cache, see {@link EntityCache#clear()}. */
+    void clear();
+  }
+
+  private final Target target;
 
   /**
-   * Creates a listener that invalidates the given entity store cache.
+   * Creates a listener that invalidates the given entity store cache directly.
    *
    * @param cache the per-node entity store cache to keep coherent
    */
   public EntityCacheChangeLogListener(EntityCache cache) {
+    this(asTarget(cache));
+  }
+
+  /**
+   * Creates a listener that invalidates through the given target.
+   *
+   * @param target the invalidation entry points of the per-node cache to keep coherent
+   */
+  public EntityCacheChangeLogListener(Target target) {
+    Preconditions.checkArgument(target != null, "target cannot be null");
+    this.target = target;
+  }
+
+  private static Target asTarget(EntityCache cache) {
     Preconditions.checkArgument(cache != null, "cache cannot be null");
-    this.cache = cache;
+    return new Target() {
+      @Override
+      public void invalidate(NameIdentifier ident, EntityType type) {
+        cache.invalidate(ident, type);
+      }
+
+      @Override
+      public void clear() {
+        cache.clear();
+      }
+    };
   }
 
   @Override
@@ -86,7 +128,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
 
       try {
         LOG.debug("Invalidating entity cache due to entity change log: {} ({})", ident, type);
-        cache.invalidate(ident, type);
+        target.invalidate(ident, type);
       } catch (RuntimeException e) {
         // Dropping a single invalidation would leave this node serving that entity stale until it
         // expires. Clearing the whole cache is the safe superset, and it also covers the rest of
@@ -97,7 +139,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
             ident,
             type,
             e);
-        cache.clear();
+        target.clear();
         return;
       }
     }

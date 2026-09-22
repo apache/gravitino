@@ -37,7 +37,7 @@ public class OSSPropertiesMetadata {
                   "OSS access key ID",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(
@@ -46,6 +46,38 @@ public class OSSPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_REGION,
+              stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_REGION,
+                  "OSS service region",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_ENDPOINT,
+                  "OSS service endpoint",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_ROLE_ARN,
+                  "OSS role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_EXTERNAL_ID,
+                  "OSS external ID for cross-account AssumeRole",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   private OSSPropertiesMetadata() {}

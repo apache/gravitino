@@ -22,6 +22,7 @@ package org.apache.gravitino.meta;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -79,6 +80,13 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   private Long startedAt;
   private Long finishedAt;
   private String runtimeJobTemplate;
+
+  // The stdout/stderr of the job, fetched live from the JobExecutor on demand (e.g. via
+  // JobOperationDispatcher#getJob(String, String, boolean)). Deliberately not included in
+  // fields()/equals()/hashCode() - this is never persisted, it only exists on the in-memory copy
+  // returned when output was explicitly requested.
+  private List<String> stdout;
+  private List<String> stderr;
 
   private JobEntity() {}
 
@@ -167,6 +175,52 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   @Nullable
   public String runtimeJobTemplate() {
     return runtimeJobTemplate;
+  }
+
+  /**
+   * Get the captured standard output of the job.
+   *
+   * @return the stdout lines of the job, or {@code null} if output was not requested for this
+   *     entity (see {@link #withOutput(List, List)}).
+   */
+  @Nullable
+  public List<String> stdout() {
+    return stdout;
+  }
+
+  /**
+   * Get the captured standard error output of the job.
+   *
+   * @return the stderr lines of the job, or {@code null} if output was not requested for this
+   *     entity (see {@link #withOutput(List, List)}).
+   */
+  @Nullable
+  public List<String> stderr() {
+    return stderr;
+  }
+
+  /**
+   * Returns a copy of this entity with the given stdout/stderr attached. This entity is left
+   * unmodified.
+   *
+   * @param stdout the stdout lines to attach
+   * @param stderr the stderr lines to attach
+   * @return a new {@link JobEntity} with the given output attached
+   */
+  public JobEntity withOutput(List<String> stdout, List<String> stderr) {
+    return JobEntity.builder()
+        .withId(id)
+        .withJobExecutionId(jobExecutionId)
+        .withNamespace(namespace)
+        .withStatus(status)
+        .withJobTemplateName(jobTemplateName)
+        .withAuditInfo(auditInfo)
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        .withRuntimeJobTemplate(runtimeJobTemplate)
+        .withStdout(stdout)
+        .withStderr(stderr)
+        .build();
   }
 
   @Override
@@ -267,6 +321,16 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withRuntimeJobTemplate(String runtimeJobTemplate) {
       jobEntity.runtimeJobTemplate = runtimeJobTemplate;
+      return this;
+    }
+
+    public Builder withStdout(List<String> stdout) {
+      jobEntity.stdout = stdout;
+      return this;
+    }
+
+    public Builder withStderr(List<String> stderr) {
+      jobEntity.stderr = stderr;
       return this;
     }
 

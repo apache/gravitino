@@ -65,14 +65,21 @@ public interface TableCatalog {
   /**
    * Load table metadata by {@link NameIdentifier} from the catalog with required privileges.
    *
+   * <p>The default implementation throws {@link UnsupportedOperationException}: a catalog that
+   * cannot enforce the required privileges must fail closed instead of silently returning the table
+   * metadata. Catalogs that support privilege-aware loading must override this method.
+   *
    * @param ident A table identifier.
    * @param requiredPrivilegeNames The required privilege names to access the table.
    * @return The table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws UnsupportedOperationException If the catalog does not support loading a table with
+   *     required privileges.
    */
   default Table loadTable(NameIdentifier ident, Set<Privilege.Name> requiredPrivilegeNames)
       throws NoSuchTableException {
-    return loadTable(ident);
+    throw new UnsupportedOperationException(
+        "The catalog does not support loading a table with required privileges");
   }
 
   /**

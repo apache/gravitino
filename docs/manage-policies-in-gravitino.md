@@ -195,7 +195,7 @@ client.enablePolicy("retention_30d");
 
 ### Delete a Policy
 
-Deleting a policy also removes it from every object it was attached to.
+Deleting a policy also removes its associations with tags.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -217,42 +217,17 @@ client.deletePolicy("retention_30d");
 
 ## Object Operations
 
-### Attach and Detach Policies
-
-Both happen in one request, and either list can be omitted. Catalogs, schemas, tables, filesets,
-topics, models, views, and functions can carry a policy.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="REST">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" -d '{
-  "policiesToAdd": ["retention_30d"],
-  "policiesToRemove": ["retention_7d"]
-}' http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/policies
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Catalog catalog = client.loadCatalog("catalog1");
-catalog.supportsPolicies().associatePolicies(
-    new String[] {"retention_30d"},
-    new String[] {"retention_7d"});
-
-Schema schema = catalog.asSchemas().loadSchema("schema1");
-schema.supportsPolicies().associatePolicies(new String[] {"retention_30d"}, null);
-```
-
-</TabItem>
-</Tabs>
+Object policies are read-only results derived from effective tags. To change the policies that apply
+to an object, associate a policy with a tag and then assign or remove that tag on the object or one
+of its ancestors. See [Manage tags in Gravitino](./manage-tags-in-gravitino.md) for tag assignment
+operations.
 
 ### List Policies on an Object
 
-The response includes policies inherited from ancestors. With `details=true` each policy carries an
-`inherited` field, which a plain name listing does not.
+The response includes policies derived from effective tags assigned to the object or its ancestors.
+With `details=true`, the response returns full policy objects instead of policy names.
+Each policy includes an `inherited` field, which is `true` when it matches only through a tag
+assigned to an ancestor of the object.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -269,51 +244,6 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 Catalog catalog = client.loadCatalog("catalog1");
 String[] policyNames = catalog.supportsPolicies().listPolicies();
 Policy[] policies = catalog.supportsPolicies().listPolicyInfos();
-```
-
-</TabItem>
-</Tabs>
-
-### Get One Policy on an Object
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="REST">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/policies/retention_30d
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Policy policy = catalog.supportsPolicies().getPolicy("retention_30d");
-```
-
-</TabItem>
-</Tabs>
-
-### List Objects Carrying a Policy
-
-The response lists direct attachments only, so a policy attached to a catalog returns that catalog
-rather than the objects beneath it.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="REST">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/test/policies/retention_30d/objects
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Policy policy = client.getPolicy("retention_30d");
-MetadataObject[] objects = policy.associatedObjects().objects();
-int count = policy.associatedObjects().count();
 ```
 
 </TabItem>

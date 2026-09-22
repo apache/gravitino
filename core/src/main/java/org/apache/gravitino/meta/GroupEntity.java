@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -37,7 +38,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the group entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the group entity.");
+      Field.required("name", "The name of the group entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field ROLE_NAMES =
       Field.optional("role_names", List.class, "The role names of the group entity.");

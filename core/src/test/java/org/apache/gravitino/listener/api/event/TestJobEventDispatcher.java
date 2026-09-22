@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -341,7 +342,7 @@ public class TestJobEventDispatcher {
 
   @Test
   void testGetJobEvent() {
-    dispatcher.getJob("metalake", jobInfo.jobId());
+    dispatcher.getJob("metalake", jobInfo.jobId(), false);
     PreEvent preEvent = dummyEventListener.popPreEvent();
 
     Assertions.assertEquals(
@@ -438,7 +439,7 @@ public class TestJobEventDispatcher {
   void testGetJobFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
-        () -> failureDispatcher.getJob("metalake", jobInfo.jobId()));
+        () -> failureDispatcher.getJob("metalake", jobInfo.jobId(), false));
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertInstanceOf(GetJobFailureEvent.class, event);
     Assertions.assertEquals(
@@ -510,7 +511,8 @@ public class TestJobEventDispatcher {
       // Job operations
       when(dispatcher.listJobs(any(String.class), any(Optional.class)))
           .thenReturn(Collections.singletonList(jobEntity));
-      when(dispatcher.getJob(any(String.class), any(String.class))).thenReturn(jobEntity);
+      when(dispatcher.getJob(any(String.class), any(String.class), anyBoolean(), any(), any()))
+          .thenReturn(jobEntity);
       when(dispatcher.runJob(any(String.class), any(String.class), any(Map.class)))
           .thenReturn(jobEntity);
       when(dispatcher.cancelJob(any(String.class), any(String.class))).thenReturn(jobEntity);

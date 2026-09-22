@@ -222,6 +222,23 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " AND metadata_object_type = #{metadataObjectType}";
   }
 
+  public String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "UPDATE "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE deleted_at = 0 AND metadata_object_type = #{metadataObjectType}"
+        + " AND metadata_object_id IN ("
+        + "<foreach collection='metadataObjectIds' item='metadataObjectId' separator=','>"
+        + "#{metadataObjectId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME

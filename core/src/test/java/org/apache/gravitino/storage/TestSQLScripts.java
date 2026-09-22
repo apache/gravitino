@@ -126,6 +126,81 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  /**
+   * The owner unique key allows one live row per (owner, object). Rows left by concurrent
+   * assignments are merged during the upgrade: the newest live row (largest id) stays, while older
+   * ones are soft-deleted.
+   */
+  @TestTemplate
+  public void testUpgradeToTwoZeroMergesDuplicateLiveOwners() throws SQLException, IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
+    Path scriptDir = Path.of(gravitinoHome, "scripts", backendType.toLowerCase());
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
+
+    String insert =
+        "INSERT INTO owner_meta (id, metalake_id, owner_id, owner_type, metadata_object_id,"
+            + " metadata_object_type, audit_info, current_version, last_version, deleted_at,"
+            + " updated_at) VALUES (%d, 1, %d, 'USER', %d, 'CATALOG', '{}', 1, 1, %d, 0)";
+    List<String> rows =
+        List.of(
+            // Three owners of object 10 leave two rows to retire in the same statement.
+            String.format(insert, 1, 100, 10, 0),
+            String.format(insert, 2, 200, 10, 0),
+            String.format(insert, 3, 300, 10, 0),
+            // Historical rows may already share a deletion timestamp.
+            String.format(insert, 4, 100, 20, 0),
+            String.format(insert, 5, 200, 20, 5),
+            String.format(insert, 6, 300, 20, 5),
+            // Object 10 as a SCHEMA is a different object.
+            String.format(insert, 7, 400, 10, 0).replace("'CATALOG'", "'SCHEMA'"));
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String row : rows) {
+        statement.execute(row);
+      }
+    }
+
+    executeScript(scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile());
+
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet live =
+            statement.executeQuery("SELECT id FROM owner_meta WHERE deleted_at = 0 ORDER BY id")) {
+      List<Long> liveIds = new ArrayList<>();
+      while (live.next()) {
+        liveIds.add(live.getLong(1));
+      }
+      Assertions.assertEquals(List.of(3L, 4L, 7L), liveIds);
+    }
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet retired =
+            statement.executeQuery("SELECT deleted_at, updated_at FROM owner_meta WHERE id = 1")) {
+      Assertions.assertTrue(retired.next());
+      Assertions.assertTrue(retired.getLong(1) > 0, "older duplicate must be soft-deleted");
+      Assertions.assertEquals(retired.getLong(1), retired.getLong(2));
+    }
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      // Historical rows can share a deletion timestamp after the upgrade.
+      statement.execute(String.format(insert, 8, 500, 20, 5));
+      // The existing key still rejects a second live row for the same owner and object.
+      Assertions.assertThrows(
+          SQLException.class, () -> statement.execute(String.format(insert, 9, 100, 20, 0)));
+    }
+  }
+
   private void executeScript(File scriptFile) throws IOException, SQLException {
     List<String> ddls = extractStatements(scriptFile.toPath());
     try (SqlSession sqlSession =

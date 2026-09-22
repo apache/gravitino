@@ -44,6 +44,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +68,7 @@ import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -79,6 +81,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.ClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
@@ -92,7 +96,6 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(26, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
@@ -102,6 +105,18 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
     Assertions.assertTrue(propertyEntryMap.containsKey(DEFAULT_CATALOG));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(
+            org.apache.gravitino.credential.CredentialConstants.CREDENTIAL_PROVIDERS));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(
+            org.apache.gravitino.credential.CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS));
+    Assertions.assertTrue(propertyEntryMap.containsKey(S3Properties.GRAVITINO_S3_ROLE_ARN));
+    Assertions.assertTrue(propertyEntryMap.containsKey(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertFalse(
+        propertyEntryMap.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID).isHidden());
+    Assertions.assertTrue(
+        propertyEntryMap.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET).isHidden());
     Assertions.assertTrue(
         propertyEntryMap.get(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET).isHidden());
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
@@ -160,6 +175,45 @@ class TestHiveCatalogOperations {
     // Verify that the empty bypass configuration is not applied
     // This will fail if the empty key is incorrectly added
     Assertions.assertNull(pp.getProperty(""));
+  }
+
+  @Test
+  void testHiveVersionIsCached() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.hiveVersion()).thenReturn(HiveVersion.HIVE3);
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    Assertions.assertEquals(HiveVersion.HIVE3, op.hiveVersion());
+    Assertions.assertEquals(HiveVersion.HIVE3, op.hiveVersion());
+    verify(hiveClient, times(1)).hiveVersion();
+  }
+
+  @Test
+  void testHiveVersionRetriesAfterFailure() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    when(clientPool.run(any()))
+        .thenThrow(new ConnectionFailedException("mock connection exception"))
+        .thenReturn(HiveVersion.HIVE2);
+    op.clientPool = clientPool;
+
+    Assertions.assertThrows(ConnectionFailedException.class, op::hiveVersion);
+    Assertions.assertEquals(HiveVersion.HIVE2, op.hiveVersion());
+  }
+
+  @Test
+  void testHiveVersionBeforeInitialize() {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    IllegalStateException e = Assertions.assertThrows(IllegalStateException.class, op::hiveVersion);
+    Assertions.assertTrue(e.getMessage().contains("not initialized"));
   }
 
   @Test
