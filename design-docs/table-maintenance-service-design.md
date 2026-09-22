@@ -323,10 +323,6 @@ This order matches a commit-driven / query-first path (typical for TMS and strea
 - Orphan last to delete physical leftovers after expiry (and failed-write debris), behind a safety
   retention window.
 
-An alternate full-cleanup order (`expire → orphan → compact → manifests`) favors overnight
-storage reclaim and avoids compacting data that expiry would drop. That order is optional for a
-separate batch package; the default combined job for TMS uses the compact-first sequence above.
-
 **Minimum intervals:** yes — add a **job-level** interval for the combined policy, and keep
 **per-operation** intervals for steps inside the job (§8.3).
 
