@@ -37,7 +37,7 @@ Gravitino offers **two plugin variants** to cover different Flink versions:
 The Gravitino OpenLineage Flink plugin transforms the Gravitino metalake name into the dataset
 namespace. The dataset name follows the format `${catalogName}.${databaseName}.${tableName}`.
 
-When using the [Gravitino Flink Connector](/flink-connector/flink-connector.md) to access tables
+When using the [Gravitino Flink Connector](../flink-connector/flink-connector.md) to access tables
 managed by Gravitino, the dataset name follows this format:
 
 | Dataset Type    | Dataset name                                         | Example                          | Since Version |
@@ -169,7 +169,7 @@ openlineage.transport.endpoint: /api/lineage
 ```
 
 This requires the Gravitino server to have its lineage HTTP source enabled (it is the default
-`gravitino.lineage.source`). See [Server Lineage](/lineage/gravitino-server-lineage.md) for the
+`gravitino.lineage.source`). See [Server Lineage](./gravitino-server-lineage.md) for the
 server-side configuration.
 
 Alternatively, transport can be configured via an external `openlineage.yml` file:
@@ -190,7 +190,7 @@ transport:
 ```
 
 Refer to [OpenLineage Flink guides](https://openlineage.io/docs/integrations/flink/) and
-[Gravitino Flink Connector](/flink-connector/flink-connector.md) for more details.
+[Gravitino Flink Connector](../flink-connector/flink-connector.md) for more details.
 
 ## Getting Started (Flink1 plugin)
 
