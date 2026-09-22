@@ -33,8 +33,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
@@ -137,7 +136,11 @@ public class TestGravitinoCatalogManager {
   @Test
   void testCloseClosesEveryCachedClient() {
     SparkConf sparkConf = tokenConf();
-    GravitinoCatalogManager manager = createManager(sparkConf);
+    // Run the client cache's removal listener on the calling thread. close() first drains and
+    // closes every cached client, then invalidateAll() fires the removal listener for each of the
+    // same entries; with a same-thread executor both happen before close() returns, so the
+    // close-once contract is observable with no wait. A broken CAS would close a client twice here.
+    GravitinoCatalogManager manager = createManager(sparkConf, Runnable::run);
 
     for (String user : new String[] {"alice", "bob", "carol"}) {
       sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt(user));
@@ -147,18 +150,11 @@ public class TestGravitinoCatalogManager {
 
     manager.close();
 
-    // Exact already here: no client the shutdown drain saw may outlive close().
     assertEquals(
         List.of(1, 1, 1),
         clientFactory.closeCounts(),
-        "Shutdown must close each cached client on the calling thread");
-    // Caffeine dispatches removal listeners on the common pool, so a second close would land after
-    // close() returned. Draining the pool makes that visible instead of leaving it to timing.
-    ForkJoinPool.commonPool().awaitQuiescence(30, TimeUnit.SECONDS);
-    assertEquals(
-        List.of(1, 1, 1),
-        clientFactory.closeCounts(),
-        "No cached client may be closed a second time");
+        "close() must close each cached client exactly once, though the drain and the removal"
+            + " listener both try");
   }
 
   @Test
@@ -266,6 +262,11 @@ public class TestGravitinoCatalogManager {
   private GravitinoCatalogManager createManager(SparkConf sparkConf) {
     clientFactory = new ClientFactory();
     return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory);
+  }
+
+  private GravitinoCatalogManager createManager(SparkConf sparkConf, Executor cacheExecutor) {
+    clientFactory = new ClientFactory();
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory, cacheExecutor);
   }
 
   private static SparkConf tokenConf() {
