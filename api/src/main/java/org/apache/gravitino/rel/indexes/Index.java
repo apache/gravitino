@@ -149,5 +149,12 @@ public interface Index {
      * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
      */
     DATA_SKIPPING_VECTOR_SIMILARITY,
+
+    /**
+     * Text data skipping index. ClickHouse's server-wide full-text index, whose type keyword and
+     * DDL grammar changed across releases ({@code inverted}, {@code full_text}, {@code gin}, and
+     * finally {@code text}). The catalog selects the grammar matching the connected server version.
+     */
+    DATA_SKIPPING_TEXT,
   }
 }

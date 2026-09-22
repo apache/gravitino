@@ -105,6 +105,19 @@ public class ClickHouseConstants {
     /** The property key for the HNSW candidate list size used during construction. */
     public static final String HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION =
         "hnsw_candidate_list_size_for_construction";
+    /** The name of the ClickHouse server-wide text data skipping index. */
+    public static final String DATA_SKIPPING_TEXT = "text";
+
+    /** Property key selecting the text index tokenizer (e.g. "default", "ngram", "split"). */
+    public static final String TOKENIZER = "tokenizer";
+
+    /** Property key for the n-gram size when the text index tokenizer is ngram-based. */
+    public static final String TEXT_NGRAM_SIZE = "ngram_size";
+
+    /** Lowest and highest n-gram size accepted by ClickHouse for text index tokenizers. */
+    public static final int MIN_TEXT_NGRAM_SIZE = 2;
+
+    public static final int MAX_TEXT_NGRAM_SIZE = 8;
 
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
