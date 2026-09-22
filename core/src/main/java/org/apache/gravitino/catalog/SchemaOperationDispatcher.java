@@ -574,13 +574,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result is ambiguous: the external schema may have been renamed or dropped out
-          // of band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
             try {
-              store.delete(ident, SCHEMA, true);
+              droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
             } catch (Exception e) {
@@ -597,10 +596,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          if (droppedFromCatalog) {
+          if (droppedFromCatalog || droppedFromStore) {
             secretManager.deleteSecretsFromProperties(schemaProperties);
           }
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 

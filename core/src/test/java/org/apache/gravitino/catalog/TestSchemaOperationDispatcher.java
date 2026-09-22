@@ -512,6 +512,57 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testDropSchemaRemovedFromSourceReportsMetadataCleanup() throws Exception {
+    reset(entityStore);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "externally_dropped_schema");
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    boolean droppedFromSource =
+        catalogManager.doWithCatalogWrapper(
+            NameIdentifier.of(metalake, catalog),
+            wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+    Assertions.assertTrue(droppedFromSource);
+    Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
+
+    Assertions.assertTrue(dispatcher.dropSchema(ident, true));
+    Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+    Assertions.assertFalse(dispatcher.dropSchema(ident, true));
+  }
+
+  @Test
+  void testCascadingDropOfMissingSchemaDeletesStoredSecrets() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "missing_schema_secret");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "s3cr3t")),
+          Map.of());
+      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      boolean sourceDropped =
+          catalogManager.doWithCatalogWrapper(
+              NameIdentifier.of(metalake, catalog),
+              wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+      Assertions.assertTrue(sourceDropped);
+      Assertions.assertFalse(d.dropSchema(ident, false));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      Assertions.assertTrue(d.dropSchema(ident, true));
+      Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
   public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);

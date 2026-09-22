@@ -39,8 +39,6 @@ public interface SupportsRelationOperations {
     ROLE_USER_REL,
     /** Role and group relationship */
     ROLE_GROUP_REL,
-    /** Policy and metadata object relationship */
-    POLICY_METADATA_OBJECT_REL,
     /** Metadata object to tag relationship */
     TAG_METADATA_OBJECT_REL,
     /** Policy to tag relationship */
@@ -220,11 +218,10 @@ public interface SupportsRelationOperations {
    * removing another set of relation targets. Compatibility adapter for {@link
    * #updateEntityRelations(RelationUpdate)}.
    *
-   * <p>For {@link Type#POLICY_METADATA_OBJECT_REL} and {@link Type#TAG_METADATA_OBJECT_REL}, this
-   * update adapter treats the source entity as the metadata object and the destination identifiers
-   * as policies or tags. Reverse traversal is done by {@link
-   * #listEntitiesByRelation(RelationQuery)} using the same relation type with the policy or tag as
-   * the query anchor.
+   * <p>For {@link Type#TAG_METADATA_OBJECT_REL}, this update adapter treats the source entity as
+   * the metadata object and the destination identifiers as tags. Reverse traversal is done by
+   * {@link #listEntitiesByRelation(RelationQuery)} using the same relation type with the tag as the
+   * query anchor.
    *
    * @param <E> The type of the entity returned in the list, which represents the final state of
    *     related entities.
@@ -289,8 +286,6 @@ public interface SupportsRelationOperations {
   private static Entity.EntityType relationUpdateTargetType(
       Type relType, Entity.EntityType srcEntityType) {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
       case POLICY_TAG_REL:
