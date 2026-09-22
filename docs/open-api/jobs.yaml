@@ -370,6 +370,9 @@ components:
         Whether to also fetch and include the job's captured stdout/stderr output. Output is
         fetched live from the job executor on every request, so this should only be set to true
         when the caller actually needs it - it is never included when this parameter is omitted.
+        With the local job executor and multiple Gravitino servers, gravitino.job.stagingDir must
+        be shared by all servers for any server to return the output; otherwise a server that
+        didn't run the job returns empty output.
       required: false
       schema:
         type: boolean
