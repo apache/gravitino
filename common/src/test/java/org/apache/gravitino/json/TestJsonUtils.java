@@ -511,6 +511,22 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expected, IndexDTO.class),
         objectMapper.readValue(jsonValue, IndexDTO.class));
+
+    Index vectorIndex =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY)
+            .withName("idx_vector")
+            .withFieldNames(new String[][] {{"embedding"}})
+            .withProperties(
+                Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"))
+            .build();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(vectorIndex);
+    expected =
+        "{\"indexType\":\"DATA_SKIPPING_VECTOR_SIMILARITY\",\"name\":\"idx_vector\","
+            + "\"fieldNames\":[[\"embedding\"]],\"properties\":{\"dimensions\":\"3\","
+            + "\"distance_function\":\"L2Distance\",\"type\":\"hnsw\"}}";
+    Assertions.assertEquals(expected, jsonValue);
+    Assertions.assertEquals(vectorIndex, objectMapper.readValue(jsonValue, IndexDTO.class));
   }
 
   @Test

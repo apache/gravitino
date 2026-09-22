@@ -24,11 +24,18 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_VECTOR_SIMILARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HASH_FUNCTIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HNSW_MAX_CONNECTIONS_PER_LAYER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DIMENSIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_QUANTIZATION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_TYPE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -103,8 +110,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       "Clickhouse does not support nested column names.";
   private static final String INVALID_SETTINGS_METADATA_MSG =
       "Invalid ClickHouse table SETTINGS metadata";
-  /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
+  /** Default GRANULARITY for ordinary data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
+
+  private static final int DEFAULT_VECTOR_SIMILARITY_GRANULARITY = 100_000_000;
+  private static final int DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER = 32;
+  private static final int DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION = 128;
+  private static final String DEFAULT_VECTOR_SIMILARITY_TYPE = "hnsw";
+  private static final String DEFAULT_VECTOR_SIMILARITY_QUANTIZATION = "bf16";
+  private static final Set<String> VECTOR_SIMILARITY_DISTANCE_FUNCTIONS =
+      Set.of("L2Distance", "cosineDistance");
+  private static final Set<String> VECTOR_SIMILARITY_QUANTIZATIONS =
+      Set.of("f64", "f32", "f16", "bf16", "i8", "b1");
+  private static final Set<String> VECTOR_SIMILARITY_PROPERTIES =
+      Set.of(
+          VECTOR_SIMILARITY_TYPE,
+          VECTOR_SIMILARITY_DISTANCE_FUNCTION,
+          VECTOR_SIMILARITY_DIMENSIONS,
+          VECTOR_SIMILARITY_QUANTIZATION,
+          HNSW_MAX_CONNECTIONS_PER_LAYER,
+          HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+          GRANULARITY);
 
   private static final BigInteger MIN_SET_MAX_VALUES = BigInteger.ZERO;
   private static final BigInteger MAX_SET_MAX_VALUES = BigInteger.valueOf(Integer.MAX_VALUE);
@@ -669,6 +695,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_SET:
         case DATA_SKIPPING_NGRAMBFV1:
         case DATA_SKIPPING_TOKENBFV1:
+        case DATA_SKIPPING_VECTOR_SIMILARITY:
           sqlBuilder
               .append(" ")
               .append(
@@ -1207,6 +1234,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_SET:
       case DATA_SKIPPING_NGRAMBFV1:
       case DATA_SKIPPING_TOKENBFV1:
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
         return "ADD "
             + buildDataSkippingIndexDdl(
                 addIndex.getName(), fieldStr, addIndex.getType(), properties);
@@ -1932,8 +1960,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             continue;
           }
 
+          if (indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+              && !includesTypeFull
+              && !StringUtils.contains(parameterSource, "(")) {
+            LOG.warn(
+                "Skip vector similarity index '{}' on {}.{} because the legacy metadata query "
+                    + "does not expose its required parameters",
+                name,
+                databaseName,
+                tableName);
+            continue;
+          }
+
           if (indexType == Index.IndexType.DATA_SKIPPING_SET
-              || isParameterizedBloomFilterIndex(indexType)) {
+              || isParameterizedBloomFilterIndex(indexType)
+              || indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY) {
             try {
               parameterProperties =
                   parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
@@ -1955,7 +1996,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           // so that indexes created without explicit granularity have empty properties
           // and match the original creation state (avoids false index-change diffs).
           Map<String, String> properties = new HashMap<>();
-          if (granularity != DEFAULT_INDEX_GRANULARITY) {
+          long defaultGranularity =
+              indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+                  ? DEFAULT_VECTOR_SIMILARITY_GRANULARITY
+                  : DEFAULT_INDEX_GRANULARITY;
+          if (granularity != defaultGranularity) {
             properties.put(GRANULARITY, String.valueOf(granularity));
           }
           if (!includesTypeFull
@@ -2090,6 +2135,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_TOKENBFV1:
         return parseBloomFilterPropertiesForQuery(
             indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+          return Collections.emptyMap();
+        }
+        return parseVectorSimilarityProperties(parameterSource, indexName);
       default:
         return Collections.emptyMap();
     }
@@ -2188,6 +2238,188 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return parseBloomFilterProperties(indexType, parameterSource, indexName);
   }
 
+  /**
+   * Parses the positional parameters reported for a ClickHouse vector similarity index.
+   *
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the canonical Gravitino properties for the index
+   * @throws IllegalArgumentException if the type expression or any parameter is invalid
+   */
+  @VisibleForTesting
+  static Map<String, String> parseVectorSimilarityProperties(String typeFull, String indexName) {
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    Preconditions.checkArgument(
+        paramsStart > 0 && normalizedTypeFull.endsWith(")"),
+        "Invalid type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            DATA_SKIPPING_VECTOR_SIMILARITY, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "type_full '%s' does not match vector_similarity index '%s'",
+        typeFull,
+        indexName);
+
+    String parameterText =
+        normalizedTypeFull.substring(paramsStart + 1, normalizedTypeFull.length() - 1);
+    List<String> parameters = splitVectorSimilarityParameters(parameterText, typeFull, indexName);
+    Preconditions.checkArgument(
+        parameters.size() >= 3 && parameters.size() <= 6,
+        "Expected 3 to 6 parameters for vector_similarity index '%s', but got %s in '%s'",
+        indexName,
+        parameters.size(),
+        typeFull);
+
+    String type =
+        parseVectorSimilarityStringParameter(parameters.get(0), VECTOR_SIMILARITY_TYPE, indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_TYPE,
+        type,
+        indexName);
+    String distanceFunction =
+        parseVectorSimilarityStringParameter(
+            parameters.get(1), VECTOR_SIMILARITY_DISTANCE_FUNCTION, indexName);
+    Preconditions.checkArgument(
+        VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_DISTANCE_FUNCTION,
+        distanceFunction,
+        indexName);
+    String dimensions =
+        requireIntWithMin(
+            parameters.get(2),
+            VECTOR_SIMILARITY_DIMENSIONS,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1);
+
+    String quantization = DEFAULT_VECTOR_SIMILARITY_QUANTIZATION;
+    if (parameters.size() >= 4) {
+      quantization =
+          parseVectorSimilarityStringParameter(
+              parameters.get(3), VECTOR_SIMILARITY_QUANTIZATION, indexName);
+      Preconditions.checkArgument(
+          VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization),
+          "Unsupported %s '%s' for vector_similarity index '%s'",
+          VECTOR_SIMILARITY_QUANTIZATION,
+          quantization,
+          indexName);
+    }
+
+    int maxConnections = DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER;
+    if (parameters.size() >= 5) {
+      maxConnections =
+          Integer.parseInt(
+              requireIntWithMin(
+                  parameters.get(4),
+                  HNSW_MAX_CONNECTIONS_PER_LAYER,
+                  DATA_SKIPPING_VECTOR_SIMILARITY,
+                  indexName,
+                  0));
+    }
+
+    int candidateListSize = DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION;
+    if (parameters.size() >= 6) {
+      candidateListSize =
+          Integer.parseInt(
+              requireIntWithMin(
+                  parameters.get(5),
+                  HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+                  DATA_SKIPPING_VECTOR_SIMILARITY,
+                  indexName,
+                  0));
+    }
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(VECTOR_SIMILARITY_TYPE, DEFAULT_VECTOR_SIMILARITY_TYPE);
+    properties.put(VECTOR_SIMILARITY_DISTANCE_FUNCTION, distanceFunction);
+    properties.put(VECTOR_SIMILARITY_DIMENSIONS, dimensions);
+    if (!DEFAULT_VECTOR_SIMILARITY_QUANTIZATION.equals(quantization)) {
+      properties.put(VECTOR_SIMILARITY_QUANTIZATION, quantization);
+    }
+    if (maxConnections != 0 && maxConnections != DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER) {
+      properties.put(HNSW_MAX_CONNECTIONS_PER_LAYER, String.valueOf(maxConnections));
+    }
+    if (candidateListSize != 0
+        && candidateListSize != DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION) {
+      properties.put(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION, String.valueOf(candidateListSize));
+    }
+    return Map.copyOf(properties);
+  }
+
+  private static List<String> splitVectorSimilarityParameters(
+      String parameterText, String typeFull, String indexName) {
+    List<String> parameters = new ArrayList<>();
+    StringBuilder parameter = new StringBuilder();
+    boolean inSingleQuotedString = false;
+    for (int i = 0; i < parameterText.length(); i++) {
+      char current = parameterText.charAt(i);
+      if (current == '\'') {
+        if (inSingleQuotedString
+            && i + 1 < parameterText.length()
+            && parameterText.charAt(i + 1) == '\'') {
+          parameter.append("''");
+          i++;
+        } else {
+          inSingleQuotedString = !inSingleQuotedString;
+          parameter.append(current);
+        }
+      } else if (!inSingleQuotedString && current == ',') {
+        parameters.add(parameter.toString().trim());
+        parameter.setLength(0);
+      } else if (!inSingleQuotedString && (current == '(' || current == ')')) {
+        throw new IllegalArgumentException(
+            "Invalid nested parentheses in type_full '%s' for vector_similarity index '%s'"
+                .formatted(typeFull, indexName));
+      } else {
+        parameter.append(current);
+      }
+    }
+    Preconditions.checkArgument(
+        !inSingleQuotedString,
+        "Invalid quoted parameter in type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    parameters.add(parameter.toString().trim());
+    Preconditions.checkArgument(
+        parameters.stream().noneMatch(StringUtils::isBlank),
+        "Empty parameter in type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    return List.copyOf(parameters);
+  }
+
+  private static String parseVectorSimilarityStringParameter(
+      String rawValue, String propertyName, String indexName) {
+    String value = StringUtils.trimToEmpty(rawValue);
+    if (value.startsWith("'") || value.endsWith("'")) {
+      Preconditions.checkArgument(
+          value.length() >= 2 && value.startsWith("'") && value.endsWith("'"),
+          "Malformed %s parameter '%s' for vector_similarity index '%s'",
+          propertyName,
+          rawValue,
+          indexName);
+      value = value.substring(1, value.length() - 1).replace("''", "'");
+    } else {
+      Preconditions.checkArgument(
+          !StringUtils.contains(value, "'"),
+          "Malformed %s parameter '%s' for vector_similarity index '%s'",
+          propertyName,
+          rawValue,
+          indexName);
+    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value),
+        "%s is required for vector_similarity index '%s'",
+        propertyName,
+        indexName);
+    return value;
+  }
+
   private static boolean isParameterizedBloomFilterIndex(Index.IndexType indexType) {
     return indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
         || indexType == Index.IndexType.DATA_SKIPPING_TOKENBFV1;
@@ -2196,11 +2428,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /**
    * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
    * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
-   * default). Also handles the {@code set(N)} parameterized format that some ClickHouse versions
-   * may return from {@code system.data_skipping_indices}.
+   * default). Also handles parameterized formats that some ClickHouse versions may return from
+   * {@code system.data_skipping_indices}.
    *
    * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
-   *     "set", "set(0)")
+   *     "set", "set(0)", or "vector_similarity")
    * @return the corresponding Gravitino IndexType
    * @throws IllegalArgumentException if the type is not supported
    */
@@ -2221,10 +2453,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
       case DATA_SKIPPING_TOKENBFV1:
         return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        return Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY;
       default:
-        // ClickHouse may return type with parameters in some versions (e.g. "set(0)",
-        // "ngrambf_v1(3, 512, 3, 0)"). Match on prefix to handle both bare and
-        // parameterized formats.
+        // ClickHouse may return type with parameters in some versions. Match on prefix to handle
+        // both bare and parameterized formats.
         if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
           return Index.IndexType.DATA_SKIPPING_SET;
         }
@@ -2233,6 +2466,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
         if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
           return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+        }
+        if (rawType.startsWith(DATA_SKIPPING_VECTOR_SIMILARITY + "(")) {
+          return Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY;
         }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
@@ -2332,11 +2568,20 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       String fieldStr,
       Index.IndexType indexType,
       Map<String, String> properties) {
+    Map<String, String> safeProperties = properties == null ? Collections.emptyMap() : properties;
+    int defaultGranularity =
+        indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+            ? DEFAULT_VECTOR_SIMILARITY_GRANULARITY
+            : (int) DEFAULT_INDEX_GRANULARITY;
+    int granularity =
+        indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+            ? resolveVectorSimilarityGranularity(safeProperties, indexName)
+            : resolveGranularity(safeProperties, defaultGranularity);
     return buildDataSkippingIndexDdl(
         indexName,
         fieldStr,
-        resolveDataSkippingIndexTypeClause(indexType, properties, indexName),
-        resolveGranularity(properties, 1));
+        resolveDataSkippingIndexTypeClause(indexType, safeProperties, indexName),
+        granularity);
   }
 
   private String resolveDataSkippingIndexTypeClause(
@@ -2353,10 +2598,141 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, indexName);
       case DATA_SKIPPING_TOKENBFV1:
         return buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, indexName);
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        return buildVectorSimilarityTypeClause(properties, indexName);
       default:
         throw new IllegalArgumentException(
             "Gravitino ClickHouse doesn't support index : " + indexType);
     }
+  }
+
+  private static String buildVectorSimilarityTypeClause(
+      Map<String, String> properties, String indexName) {
+    Map<String, String> safeProperties = properties == null ? Collections.emptyMap() : properties;
+    for (String propertyName : safeProperties.keySet()) {
+      Preconditions.checkArgument(
+          VECTOR_SIMILARITY_PROPERTIES.contains(propertyName),
+          "Unsupported property '%s' for vector_similarity index '%s'",
+          propertyName,
+          indexName);
+    }
+
+    String type =
+        requireVectorSimilarityProperty(safeProperties, VECTOR_SIMILARITY_TYPE, indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_TYPE,
+        type,
+        indexName);
+
+    String distanceFunction =
+        requireVectorSimilarityProperty(
+            safeProperties, VECTOR_SIMILARITY_DISTANCE_FUNCTION, indexName);
+    Preconditions.checkArgument(
+        VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_DISTANCE_FUNCTION,
+        distanceFunction,
+        indexName);
+
+    String dimensions =
+        requireIntWithMin(
+            safeProperties.get(VECTOR_SIMILARITY_DIMENSIONS),
+            VECTOR_SIMILARITY_DIMENSIONS,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1);
+
+    String quantization = DEFAULT_VECTOR_SIMILARITY_QUANTIZATION;
+    if (safeProperties.containsKey(VECTOR_SIMILARITY_QUANTIZATION)) {
+      quantization =
+          requireVectorSimilarityProperty(
+              safeProperties, VECTOR_SIMILARITY_QUANTIZATION, indexName);
+      Preconditions.checkArgument(
+          VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization),
+          "Unsupported %s '%s' for vector_similarity index '%s'",
+          VECTOR_SIMILARITY_QUANTIZATION,
+          quantization,
+          indexName);
+    }
+
+    String maxConnections = null;
+    if (safeProperties.containsKey(HNSW_MAX_CONNECTIONS_PER_LAYER)) {
+      maxConnections =
+          requireIntWithMin(
+              safeProperties.get(HNSW_MAX_CONNECTIONS_PER_LAYER),
+              HNSW_MAX_CONNECTIONS_PER_LAYER,
+              DATA_SKIPPING_VECTOR_SIMILARITY,
+              indexName,
+              0);
+    }
+
+    String candidateListSize = null;
+    if (safeProperties.containsKey(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION)) {
+      candidateListSize =
+          requireIntWithMin(
+              safeProperties.get(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION),
+              HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+              DATA_SKIPPING_VECTOR_SIMILARITY,
+              indexName,
+              0);
+    }
+
+    List<String> parameters =
+        new ArrayList<>(List.of("'hnsw'", "'" + distanceFunction + "'", dimensions));
+    boolean includeQuantization =
+        !DEFAULT_VECTOR_SIMILARITY_QUANTIZATION.equals(quantization)
+            || hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+            || hasNonDefaultInteger(
+                candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION);
+    if (includeQuantization) {
+      parameters.add("'" + quantization + "'");
+    }
+    boolean includeMaxConnections =
+        hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+            || hasNonDefaultInteger(
+                candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION);
+    if (includeMaxConnections) {
+      parameters.add(
+          hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+              ? maxConnections
+              : String.valueOf(DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER));
+    }
+    if (hasNonDefaultInteger(
+        candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION)) {
+      parameters.add(candidateListSize);
+    }
+    return DATA_SKIPPING_VECTOR_SIMILARITY + "(" + String.join(", ", parameters) + ")";
+  }
+
+  private static boolean hasNonDefaultInteger(String value, int defaultValue) {
+    return value != null && !value.equals("0") && !value.equals(String.valueOf(defaultValue));
+  }
+
+  private static String requireVectorSimilarityProperty(
+      Map<String, String> properties, String propertyName, String indexName) {
+    String value = properties.get(propertyName);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value),
+        "%s is required for vector_similarity index '%s'",
+        propertyName,
+        indexName);
+    return value.trim();
+  }
+
+  private static int resolveVectorSimilarityGranularity(
+      Map<String, String> properties, String indexName) {
+    if (!properties.containsKey(GRANULARITY)) {
+      return DEFAULT_VECTOR_SIMILARITY_GRANULARITY;
+    }
+    return Integer.parseInt(
+        requireIntWithMin(
+            properties.get(GRANULARITY),
+            GRANULARITY,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1));
   }
 
   private String buildDataSkippingIndexDdl(

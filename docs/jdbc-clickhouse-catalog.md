@@ -37,6 +37,8 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 |--------------------------------|-------------------------------------------|
 | `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
 
+The `DATA_SKIPPING_VECTOR_SIMILARITY` index requires ClickHouse `25.8` or later. This feature-specific requirement does not change the compatibility baseline for other catalog capabilities.
+
 :::tip
 For other ClickHouse versions (not 24.8.x), the required JDBC driver version may be different.
 Use your staging validation results and the official ClickHouse documentation as the final reference.
@@ -258,10 +260,15 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
   - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
   - `DATA_SKIPPING_NGRAMBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `ngram_size`, `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
   - `DATA_SKIPPING_TOKENBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
+  - `DATA_SKIPPING_VECTOR_SIMILARITY` (requires ClickHouse 25.8+; default `GRANULARITY 100000000`; requires `type=hnsw`, `distance_function`, and `dimensions` in `Index.properties()`)
+
+  `DATA_SKIPPING_VECTOR_SIMILARITY` supports `distance_function` values `L2Distance` and `cosineDistance` on ClickHouse 25.8+. Optional properties are `quantization` (`f64`, `f32`, `f16`, `bf16`, `i8`, or `b1`; default `bf16`), `hnsw_max_connections_per_layer` (default 32), and `hnsw_candidate_list_size_for_construction` (default 128). A value of 0 for either HNSW numeric property requests the ClickHouse default. Custom `granularity` must be a positive integer. See the [ClickHouse vector similarity index documentation](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/annindexes) for server-side vector-column restrictions.
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
   On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  For `DATA_SKIPPING_VECTOR_SIMILARITY`, Gravitino restores parameters from the legacy `type` value when present. If the legacy value is bare and cannot provide the required parameters, the index is skipped with a warning.
 
   ClickHouse data-skipping indexes whose field expressions cannot be represented as Gravitino field names, such as `lower(name)` or `name + 1`, are skipped with a warning when the table is loaded and are not recreated. Direct column references and tuples containing only column references remain supported.
 

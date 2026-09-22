@@ -84,6 +84,28 @@ public class ClickHouseConstants {
     /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
     public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
 
+    /** The name of the vector similarity data skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_VECTOR_SIMILARITY = "vector_similarity";
+
+    /** The property key for the algorithm used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_TYPE = "type";
+
+    /** The property key for the distance function used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_DISTANCE_FUNCTION = "distance_function";
+
+    /** The property key for the vector dimension used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_DIMENSIONS = "dimensions";
+
+    /** The property key for HNSW vector quantization. */
+    public static final String VECTOR_SIMILARITY_QUANTIZATION = "quantization";
+
+    /** The property key for the HNSW maximum connections per layer. */
+    public static final String HNSW_MAX_CONNECTIONS_PER_LAYER = "hnsw_max_connections_per_layer";
+
+    /** The property key for the HNSW candidate list size used during construction. */
+    public static final String HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION =
+        "hnsw_candidate_list_size_for_construction";
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
