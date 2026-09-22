@@ -30,6 +30,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * AWS credentials provider for Iceberg {@code GlueCatalog} that reads static credentials from a
  * properties map.
  *
+<<<<<<< HEAD:spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/glue/GravitinoGlueCredentialsProvider.java
  * <p>Iceberg 1.10+ loads credentials via {@code client.credentials-provider}. This class is
  * instantiated dynamically by Iceberg's {@code AwsClientProperties} using the {@code create(Map)}
  * static factory. The properties map contains the {@code client.credentials-provider.*} entries
@@ -37,6 +38,15 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  *
  * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
  * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
+=======
+ * <p>Adapted from Apache Doris's <a
+ * href="https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java">CustomAwsCredentialsProvider</a>.
+ *
+ * <p>Iceberg 1.10+ no longer supports {@code client.access-key-id} directly; credentials must be
+ * supplied via {@code client.credentials-provider}. This class is configured in {@code
+ * org.apache.gravitino.catalog.glue.GlueIcebergTableHelper#createGlueCatalog} when explicit
+ * credentials are provided.
+>>>>>>> f71b21328 ([#12755] fix(build): Correct legal documents in Maven artifacts (#13257)):catalogs/catalog-common/src/main/java/org/apache/gravitino/catalog/glue/GravitinoGlueCredentialsProvider.java
  */
 public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
 
