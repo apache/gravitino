@@ -1204,6 +1204,13 @@ public class TestClickHouseTableOperationsUnit {
         ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
             "text(tokenizer = ngrams(8))", "idx_ngrams"));
     Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "1"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = ngrams(1))", "idx_ngrams"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "1"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("inverted(1)", "idx_ngrams"));
+    Assertions.assertEquals(
         Map.of("tokenizer", "ngrams", "ngram_size", "4"),
         ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
             "text(tokenizer = 'ngram', ngram_size = 4, "
@@ -1226,8 +1233,7 @@ public class TestClickHouseTableOperationsUnit {
   void testParseTextIndexPropertiesRejectsMalformedNgramSize() {
     for (String typeFull :
         List.of(
-            "inverted(1)",
-            "text(tokenizer = ngrams(1))",
+            "text(tokenizer = ngrams(0))",
             "text(tokenizer = 'ngram', ngram_size = 9)",
             "text(tokenizer = ngrams(abc))")) {
       IllegalArgumentException exception =

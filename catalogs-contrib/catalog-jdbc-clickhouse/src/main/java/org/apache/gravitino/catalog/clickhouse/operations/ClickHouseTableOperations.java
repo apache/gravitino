@@ -2352,8 +2352,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return Map.of(TOKENIZER, TEXT_INDEX_TOKENS);
     }
     Preconditions.checkArgument(
-        value >= 2 && value <= 8,
-        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [2, 8]",
+        value >= 1 && value <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
         typeFull,
         indexName,
         value);
@@ -2378,8 +2378,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           e);
     }
     Preconditions.checkArgument(
-        ngramSize >= 2 && ngramSize <= 8,
-        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [2, 8]",
+        ngramSize >= 1 && ngramSize <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
         typeFull,
         indexName,
         ngramSize);
