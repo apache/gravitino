@@ -250,6 +250,28 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetJobOutputDoesNotFollowSymlinkFromAnotherNode() throws IOException {
+    // A file on the node reading the output, outside the staging directory.
+    File secret = new File(testDir, "secret.txt");
+    Files.writeString(secret.toPath(), "top secret\n");
+    // The job replaces its own output file with an absolute symlink while running.
+    String templateName = "symlink_job";
+    backend.insert(
+        newScriptJobTemplateEntity(
+            templateName, "echo \"hello\"\nln -sf \"$1\" output.log\n", "{{target}}"),
+        false);
+
+    JobEntity job =
+        nodeA.runJob(METALAKE, templateName, ImmutableMap.of("target", secret.getAbsolutePath()));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+
+    Assertions.assertEquals(
+        Collections.emptyList(), nodeB.getJob(METALAKE, job.name(), true).stdout());
+  }
+
+  @TestTemplate
   public void testGetJobOutputFromNodeNotSharingStagingDir() throws IOException {
     JobEntity job = runEchoJobOnNodeA("c");
 

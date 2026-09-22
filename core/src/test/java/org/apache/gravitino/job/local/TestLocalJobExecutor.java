@@ -917,6 +917,55 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testGetJobOutputDoesNotFollowSymlinks() throws IOException {
+    // A readable file outside the staging directory, next to it.
+    File outsideDir = Files.createTempDirectory("gravitino-test-local-job-outside").toFile();
+    File anotherJobDir = Files.createTempDirectory(stagingRoot.toPath(), "another").toFile();
+    LocalJobExecutor anotherExecutor = new LocalJobExecutor();
+    try {
+      FileUtils.writeStringToFile(
+          new File(outsideDir, "output.log"), "outside\n", StandardCharsets.UTF_8);
+      runSucceededJob(anotherJobDir);
+      // Another server sharing the staging directory.
+      anotherExecutor.initialize(withStagingDir(Collections.emptyMap()));
+
+      // The job replaces its output file with a symlink to a file outside the staging directory.
+      File jobDir = new File(workingDir, "output-file");
+      Assertions.assertTrue(jobDir.mkdirs());
+      String outputFileJobId = runSucceededJob(jobDir);
+      replaceWithSymlink(new File(jobDir, "output.log"), new File(outsideDir, "output.log"));
+
+      // The job replaces its working directory with a symlink to a directory outside.
+      jobDir = new File(workingDir, "working-dir");
+      Assertions.assertTrue(jobDir.mkdirs());
+      String workingDirJobId = runSucceededJob(jobDir);
+      replaceWithSymlink(jobDir, outsideDir);
+
+      // The job replaces a directory above its working directory with a symlink to the one of
+      // another job, e.g. of another metalake: tpl/job -> another-tpl/job.
+      File anotherTemplateDir = new File(workingDir, "another-tpl");
+      FileUtils.copyDirectory(anotherJobDir, new File(anotherTemplateDir, "job"));
+      jobDir = new File(workingDir, "tpl" + File.separator + "job");
+      Assertions.assertTrue(jobDir.mkdirs());
+      String parentDirJobId = runSucceededJob(jobDir);
+      replaceWithSymlink(jobDir.getParentFile(), anotherTemplateDir);
+
+      for (String jobId : ImmutableList.of(outputFileJobId, workingDirJobId, parentDirJobId)) {
+        for (JobExecutor executor : ImmutableList.of(jobExecutor, anotherExecutor)) {
+          Assertions.assertEquals(
+              Collections.emptyList(),
+              executor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES),
+              jobId);
+        }
+      }
+    } finally {
+      anotherExecutor.close();
+      FileUtils.deleteDirectory(outsideDir);
+      FileUtils.deleteDirectory(anotherJobDir);
+    }
+  }
+
+  @Test
   public void testGetJobOutputWithInvalidJobIdReturnsEmpty() {
     // The job id is used as a file name, so it must never be able to carry path elements.
     List<String> jobIds =
@@ -1152,6 +1201,11 @@ public class TestLocalJobExecutor {
       context.updateLoggers();
     }
     return ImmutableList.copyOf(collector.messages);
+  }
+
+  private static void replaceWithSymlink(File file, File target) throws IOException {
+    FileUtils.forceDelete(file);
+    Files.createSymbolicLink(file.toPath(), target.toPath().toAbsolutePath());
   }
 
   // Makes the index old enough for the cleanup to consider it.

@@ -63,14 +63,15 @@ public class JobExecutorFactory {
     Map<String, String> configs =
         Maps.newHashMap(
             config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + "."));
-    if (LocalJobExecutor.class.getCanonicalName().equals(clzName)) {
-      // The local job executor keeps its output index under the job staging directory, so it must
-      // resolve paths against exactly the directory JobManager stages jobs in.
-      configs.put(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR));
-    }
     try {
       JobExecutor jobExecutor =
           (JobExecutor) Class.forName(clzName).getDeclaredConstructor().newInstance();
+      if (jobExecutor instanceof LocalJobExecutor) {
+        // The local job executor, and any subclass of it, keeps its output index under the job
+        // staging directory, so it must resolve paths against exactly the directory JobManager
+        // stages jobs in.
+        configs.put(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR));
+      }
       jobExecutor.initialize(configs);
       return jobExecutor;
 

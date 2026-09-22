@@ -96,6 +96,20 @@ public class TestJobExecutorFactory {
   }
 
   @Test
+  public void testLocalJobExecutorSubclassUsesJobStagingDir() throws IOException {
+    config.set(Configs.JOB_EXECUTOR, "custom");
+    config.loadFromMap(
+        ImmutableMap.of(
+            "gravitino.jobExecutor.custom.class", CustomLocalJobExecutor.class.getName()),
+        key -> true);
+
+    try (JobExecutor executor = JobExecutorFactory.create(config)) {
+      Assertions.assertInstanceOf(CustomLocalJobExecutor.class, executor);
+      Assertions.assertTrue(new File(stagingDir, OUTPUT_INDEX_DIR_NAME).isDirectory());
+    }
+  }
+
+  @Test
   public void testCustomJobExecutorConfigsAreUnchanged() throws IOException {
     config.set(Configs.JOB_EXECUTOR, "recording");
     config.loadFromMap(
@@ -113,6 +127,9 @@ public class TestJobExecutorFactory {
       Assertions.assertFalse(configs.containsKey(LocalJobExecutorConfigs.STAGING_DIR));
     }
   }
+
+  /** A user's subclass of the local job executor, inheriting its initialization. */
+  public static class CustomLocalJobExecutor extends LocalJobExecutor {}
 
   /** A job executor that only records the configurations it's initialized with. */
   public static class RecordingJobExecutor implements JobExecutor {

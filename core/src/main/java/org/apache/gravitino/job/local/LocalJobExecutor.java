@@ -36,11 +36,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -50,6 +49,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -163,6 +163,8 @@ public class LocalJobExecutor implements JobExecutor {
   private final AtomicBoolean missingOutputIndexWarned = new AtomicBoolean(false);
 
   private final AtomicBoolean invalidOutputIndexWarned = new AtomicBoolean(false);
+
+  private final AtomicBoolean unsafeOutputWarned = new AtomicBoolean(false);
 
   @Override
   public void initialize(Map<String, String> configs) {
@@ -561,10 +563,39 @@ public class LocalJobExecutor implements JobExecutor {
 
   private List<String> getJobOutput(String jobId, String fileName, int maxLines, int maxBytes) {
     Path workingDir = locateWorkingDir(jobId);
-    if (workingDir == null) {
+    if (workingDir == null || !isRealWorkingDir(jobId, workingDir)) {
       return ImmutableList.of();
     }
-    return readLastLines(workingDir.resolve(fileName).toFile(), maxLines, maxBytes);
+    return readLastLines(jobId, workingDir.resolve(fileName), maxLines, maxBytes);
+  }
+
+  // The job itself can replace its working directory, or a directory above it, with a symlink,
+  // e.g. to another job's directory, or to a directory that only exists on another server sharing
+  // the staging directory. Only read from the working directory if its real location is exactly
+  // where the index says it is.
+  private boolean isRealWorkingDir(String jobId, Path workingDir) {
+    Path expected;
+    Path actual;
+    try {
+      expected = stagingRoot.toRealPath().resolve(stagingRoot.relativize(workingDir));
+      actual = workingDir.toRealPath();
+    } catch (NoSuchFileException e) {
+      // Not started yet, or removed, e.g. by JobManager#cleanUpStagingDirs.
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to resolve the working directory of job " + jobId, e);
+    }
+    if (!actual.equals(expected)) {
+      warnOnce(
+          unsafeOutputWarned,
+          "The working directory {} of job {} resolves to {} through a symlink, so its output "
+              + "isn't returned",
+          workingDir,
+          jobId,
+          actual);
+      return false;
+    }
+    return true;
   }
 
   private void writeOutputIndex(String jobId, JobTemplate jobTemplate) {
@@ -705,25 +736,42 @@ public class LocalJobExecutor implements JobExecutor {
     }
   }
 
-  private List<String> readLastLines(File file, int maxLines, int maxBytes) {
-    if (!file.exists()) {
+  private List<String> readLastLines(String jobId, Path file, int maxLines, int maxBytes) {
+    if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
       // The job hasn't started (or hasn't produced this stream) yet.
       return ImmutableList.of();
     }
+    // The job itself can replace its output file with a symlink, e.g. to a file that only exists
+    // on another server sharing the staging directory, so a symlink is never followed.
+    if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+      warnOnce(
+          unsafeOutputWarned,
+          "The output file {} of job {} is not a regular file, so it isn't returned",
+          file,
+          jobId);
+      return ImmutableList.of();
+    }
 
-    long fileLength = file.length();
-    int windowSize = (int) Math.min(fileLength, maxBytes);
-    long startOffset = fileLength - windowSize;
+    long startOffset;
+    byte[] probeWindow;
+    // NOFOLLOW_LINKS also covers the file being replaced with a symlink after the check above.
+    try (SeekableByteChannel channel =
+        Files.newByteChannel(file, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
+      long fileLength = channel.size();
+      int windowSize = (int) Math.min(fileLength, maxBytes);
+      startOffset = fileLength - windowSize;
 
-    // Read one extra leading byte (when available) so we can tell whether the window's first
-    // line is already complete - i.e. the file byte immediately before the window is itself a
-    // line terminator - rather than always assuming it's a partial line and discarding it.
-    long readOffset = Math.max(0, startOffset - 1);
-    byte[] probeWindow = new byte[(int) (fileLength - readOffset)];
-    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-      raf.seek(readOffset);
-      raf.readFully(probeWindow);
-    } catch (FileNotFoundException e) {
+      // Read one extra leading byte (when available) so we can tell whether the window's first
+      // line is already complete - i.e. the file byte immediately before the window is itself a
+      // line terminator - rather than always assuming it's a partial line and discarding it.
+      long readOffset = Math.max(0, startOffset - 1);
+      ByteBuffer buffer = ByteBuffer.allocate((int) (fileLength - readOffset));
+      channel.position(readOffset);
+      while (buffer.hasRemaining() && channel.read(buffer) >= 0) {
+        // Keep reading until the window is full or the end of the file is reached.
+      }
+      probeWindow = Arrays.copyOf(buffer.array(), buffer.position());
+    } catch (NoSuchFileException e) {
       // The file existed at the check above but is gone now - most likely
       // JobManager#cleanUpStagingDirs deleted the staging directory concurrently with this call.
       // That's the same "output no longer available" situation the file-doesn't-exist check above
@@ -736,6 +784,9 @@ public class LocalJobExecutor implements JobExecutor {
       throw new RuntimeException("Failed to read job output file: " + file, e);
     }
 
+    if (probeWindow.length == 0) {
+      return ImmutableList.of();
+    }
     boolean windowStartsAtLineBoundary = startOffset == 0 || probeWindow[0] == '\n';
     int contentStart = startOffset == 0 ? 0 : 1;
     // The window may start mid-character if the file byte at contentStart happens to be a UTF-8
