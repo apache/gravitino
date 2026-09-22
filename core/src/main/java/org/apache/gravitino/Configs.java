@@ -548,7 +548,11 @@ public class Configs {
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
-          .doc("Directory for managing staging files when running jobs.")
+          .doc(
+              "Directory for managing staging files when running jobs. When multiple Gravitino "
+                  + "servers share the same metadata store, it must be on storage shared by all "
+                  + "servers, otherwise the output of a job run by the local job executor can "
+                  + "only be retrieved from the server that ran it.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)

@@ -29,6 +29,9 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * AWS credentials provider for Iceberg {@code GlueCatalog} that reads static credentials from a
  * properties map.
  *
+ * <p>Adapted from Apache Doris's <a
+ * href="https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java">CustomAwsCredentialsProvider</a>.
+ *
  * <p>Iceberg 1.10+ no longer supports {@code client.access-key-id} directly; credentials must be
  * supplied via {@code client.credentials-provider}. This class is configured in {@code
  * org.apache.gravitino.catalog.glue.GlueIcebergTableHelper#createGlueCatalog} when explicit

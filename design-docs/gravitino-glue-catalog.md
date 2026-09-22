@@ -124,15 +124,15 @@ Extend existing Hive and Iceberg catalogs with `metastore-type=glue` / `catalog-
 
 Glue is a separate AWS service from S3. The Glue region and credentials may differ from S3 storage credentials, so Glue properties use their own `aws-*` namespace:
 
-| Property | Required | Default | Description |
-|---|---|---|---|
-| `aws-region` | Yes | — | AWS region for the Glue Data Catalog |
-| `aws-access-key-id` | No | Default credential chain | AWS access key for Glue API authentication. **Sensitive**: not visible to catalog readers via Gravitino API. |
-| `aws-secret-access-key` | No | Default credential chain | AWS secret key for Glue API authentication. **Sensitive**: not visible to catalog readers via Gravitino API. |
-| `aws-glue-catalog-id` | Yes | — | Glue catalog ID. Required because an AWS account can have multiple Glue catalogs (e.g., default catalog and federated S3 Tables catalog). |
-| `aws-glue-endpoint` | No | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing). |
-| `default-table-format` | No | `iceberg` | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`. |
-| `table-type-filter` | No | `all` | Comma-separated list of table types exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types for backwards compatibility with existing systems that cannot handle mixed-format catalogs. |
+| Property                | Required | Default                       | Description                                                                                                                                                                                                                                                                     |
+| ----------------------- | -------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aws-region`            | Yes      | —                             | AWS region for the Glue Data Catalog                                                                                                                                                                                                                                            |
+| `aws-access-key-id`     | No       | Default credential chain      | AWS access key for Glue API authentication. Visible in cleartext to catalog readers.                                                                                                                                                                                            |
+| `aws-secret-access-key` | No       | Default credential chain      | AWS secret key for Glue API authentication. Hidden from catalog readers; returned as `******`.                                                                                                                                                                                  |
+| `aws-glue-catalog-id`   | Yes      | —                             | Glue catalog ID. Required because an AWS account can have multiple Glue catalogs (e.g., default catalog and federated S3 Tables catalog).                                                                                                                                       |
+| `aws-glue-endpoint`     | No       | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing).                                                                                                                                                                                                             |
+| `default-table-format`  | No       | `iceberg`                     | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                                                                                      |
+| `table-type-filter`     | No       | `all`                         | Comma-separated list of table types exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types for backwards compatibility with existing systems that cannot handle mixed-format catalogs. |
 
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) → Default credential chain (environment variables, instance profile, container credentials). STS AssumeRole (`aws-role-arn`) is a future enhancement — static credentials are sufficient for the initial release, including cross-account access.
 
