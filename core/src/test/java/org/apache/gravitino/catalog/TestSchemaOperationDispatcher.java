@@ -24,6 +24,7 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -38,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -53,8 +55,8 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -263,9 +265,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(copiedProps.containsKey(StringIdentifier.ID_KEY));
     testCatalogOperations.createSchema(copyIdent, "copy", copiedProps);
 
-    GravitinoRuntimeException e =
+    IllegalArgumentException e =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> dispatcher.loadSchema(copyIdent));
+            IllegalArgumentException.class, () -> dispatcher.loadSchema(copyIdent));
     Assertions.assertTrue(e.getMessage().contains(StringIdentifier.ID_KEY), e.getMessage());
 
     SchemaEntity sourceAfter = entityStore.get(sourceIdent, SCHEMA, SchemaEntity.class);
@@ -289,9 +291,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(copiedProps.containsKey(StringIdentifier.ID_KEY));
     testCatalogOperations.createSchema(copyIdent, "copy", copiedProps);
 
-    GravitinoRuntimeException e =
+    IllegalArgumentException e =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> dispatcher.loadSchema(copyIdent));
+            IllegalArgumentException.class, () -> dispatcher.loadSchema(copyIdent));
     Assertions.assertTrue(e.getMessage().contains(StringIdentifier.ID_KEY), e.getMessage());
 
     SchemaEntity sourceAfter = entityStore.get(sourceIdent, SCHEMA, SchemaEntity.class);
@@ -317,9 +319,51 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Schema loaded = dispatcher.loadSchema(newIdent);
     Assertions.assertEquals(newIdent.name(), loaded.name());
     SchemaEntity newEntity = entityStore.get(newIdent, SCHEMA, SchemaEntity.class);
-    // The relational store renames the row in place (see the meta service tests); the in-memory
-    // test store keeps the old key, so only the id continuity is asserted here.
     Assertions.assertEquals(oldEntity.id(), newEntity.id());
+    Assertions.assertFalse(entityStore.exists(oldIdent, SCHEMA));
+  }
+
+  @Test
+  public void testLoadSchemaDoesNotRebindAfterOwnerChangesOnAnotherNode() throws IOException {
+    Namespace schemaNs = Namespace.of(metalake, catalog);
+    NameIdentifier oldIdent = NameIdentifier.of(schemaNs, "schemaBeforeConcurrentCopy");
+    NameIdentifier renamedIdent = NameIdentifier.of(schemaNs, "schemaAfterConcurrentRename");
+    NameIdentifier copyIdent = NameIdentifier.of(schemaNs, "schemaConcurrentCopy");
+    dispatcher.createSchema(oldIdent, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity original = entityStore.get(oldIdent, SCHEMA, SchemaEntity.class);
+
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> copiedProperties = new HashMap<>(ops.loadSchema(oldIdent).properties());
+    Assertions.assertTrue(ops.dropSchema(oldIdent, false));
+    ops.createSchema(renamedIdent, "renamed", copiedProperties);
+    ops.createSchema(copyIdent, "copy", copiedProperties);
+
+    AtomicBoolean moved = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              if (moved.compareAndSet(false, true)) {
+                entityStore.update(
+                    oldIdent,
+                    SchemaEntity.class,
+                    SCHEMA,
+                    current ->
+                        SchemaEntity.builder()
+                            .withId(current.id())
+                            .withName(renamedIdent.name())
+                            .withNamespace(current.namespace())
+                            .withProperties(current.properties())
+                            .withAuditInfo(current.auditInfo())
+                            .build());
+              }
+              return invocation.callRealMethod();
+            })
+        .when(entityStore)
+        .update(eq(oldIdent), eq(SchemaEntity.class), eq(SCHEMA), any());
+
+    Assertions.assertThrows(OptimisticLockException.class, () -> dispatcher.loadSchema(copyIdent));
+    Assertions.assertEquals(
+        original.id(), entityStore.get(renamedIdent, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, SCHEMA));
   }
 
   private TestCatalogOperations testCatalogOperations() {

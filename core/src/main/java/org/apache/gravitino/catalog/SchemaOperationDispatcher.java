@@ -47,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -637,6 +638,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
 
     long uid;
+    NameIdentifier observedOwner = null;
     if (stringId != null) {
       // If the entity in the store doesn't match the one in the external system, we use the data
       // of external system to correct it.
@@ -645,7 +647,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
               + "we need to overwrite the stored entity to keep consistency.",
           stringId);
-      checkImportedIdNotCopied(identifier, stringId.id());
+      observedOwner = checkImportedIdNotCopied(identifier, stringId.id());
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
@@ -668,9 +670,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
-    } catch (EntityAlreadyExistsException e) {
+      if (observedOwner != null && !observedOwner.equals(identifier)) {
+        store.update(observedOwner, SchemaEntity.class, SCHEMA, current -> schemaEntity);
+      } else {
+        // A new name must not overwrite an ID imported concurrently on another node.
+        boolean overwriteByName = stringId == null || store.exists(identifier, SCHEMA);
+        store.put(schemaEntity, overwriteByName);
+      }
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       throw e;
+    } catch (NoSuchEntityException e) {
+      throw new OptimisticLockException(
+          e, "The registered owner of schema ID %d changed during import; retry the load", uid);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import schema entity to the store", e);
@@ -682,10 +693,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * TableOperationDispatcher#checkImportedIdNotCopied}: the store cannot distinguish the two, so
    * the external catalog is asked whether the id's current owner still exists.
    */
-  private void checkImportedIdNotCopied(NameIdentifier identifier, long id) {
+  private NameIdentifier checkImportedIdNotCopied(NameIdentifier identifier, long id) {
     NameIdentifier currentOwner = findRegisteredSchemaById(identifier.namespace(), id);
     if (currentOwner == null || currentOwner.equals(identifier)) {
-      return;
+      return currentOwner;
     }
     NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
     boolean distinctOwnerStillExists =
@@ -715,17 +726,19 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     }),
             RuntimeException.class);
     if (distinctOwnerStillExists) {
-      throw new GravitinoRuntimeException(
-          "Schema %s carries the Gravitino identifier %d of schema %s, which still exists. The "
-              + "identifier was most likely copied with the schema properties. Remove the property "
-              + "'%s' from %s and load it again",
-          identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
+      throw new IllegalArgumentException(
+          String.format(
+              "Schema %s carries the Gravitino identifier %d of schema %s, which still exists. "
+                  + "The identifier was most likely copied with the schema properties. Remove "
+                  + "the property '%s' from %s and load it again",
+              identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier));
     }
     LOG.info(
         "Schema {} resolves to {} after an external rename or case-alias lookup; re-binding registration {}",
         currentOwner,
         identifier,
         id);
+    return currentOwner;
   }
 
   /** Returns the identifier of the live schema in the catalog that owns this id, if any. */

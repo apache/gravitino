@@ -500,6 +500,14 @@ public class TestTableMetaService extends TestJDBCBackend {
                                         metalakeName, catalogName, schemaName, "table1")
                                     .toString())
                         && record.getOperateType() == OperateType.ALTER));
+    Assertions.assertTrue(
+        listEntityChanges(maxIdBeforeRename).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record.getFullName().equals(updatedTable.nameIdentifier().toString())
+                        && record.getOperateType() == OperateType.ALTER));
 
     // test update table with changing schema name to a non-existing schema
     String newSchemaName = "schema2";

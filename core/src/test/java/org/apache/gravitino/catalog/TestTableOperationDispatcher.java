@@ -369,9 +369,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     testCatalogOperations.createTable(
         copyIdent, columns, "copy", copiedProps, new Transform[0], null, null, null);
 
-    GravitinoRuntimeException e =
+    IllegalArgumentException e =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
     Assertions.assertTrue(e.getMessage().contains(ID_KEY), e.getMessage());
 
     // The source keeps its registration; nothing was moved to the copy.
@@ -408,9 +408,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     testCatalogOperations.createTable(
         copyIdent, columns, "copy", copiedProps, new Transform[0], null, null, null);
 
-    GravitinoRuntimeException e =
+    IllegalArgumentException e =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
     Assertions.assertTrue(e.getMessage().contains(ID_KEY), e.getMessage());
 
     // The source keeps its registration; nothing was moved to the copy.
@@ -450,9 +450,66 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Table loaded = tableOperationDispatcher.loadTable(newIdent);
     Assertions.assertEquals(newIdent.name(), loaded.name());
     TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
-    // The relational store renames the row in place (see the meta service tests); the in-memory
-    // test store keeps the old key, so only the id continuity is asserted here.
     Assertions.assertEquals(oldEntity.id(), newEntity.id());
+    Assertions.assertFalse(entityStore.exists(oldIdent, TABLE));
+  }
+
+  @Test
+  public void testLoadTableDoesNotRebindAfterOwnerChangesOnAnotherNode() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaConcurrentCopiedId");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier renamedIdent = NameIdentifier.of(tableNs, "renamed");
+    NameIdentifier copyIdent = NameIdentifier.of(tableNs, "copy");
+    tableOperationDispatcher.createTable(
+        oldIdent, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity original = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> copiedProperties = new HashMap<>(ops.loadTable(oldIdent).properties());
+    Assertions.assertTrue(ops.dropTable(oldIdent));
+    ops.createTable(
+        renamedIdent,
+        new Column[0],
+        "renamed",
+        copiedProperties,
+        new Transform[0],
+        null,
+        null,
+        null);
+    ops.createTable(
+        copyIdent, new Column[0], "copy", copiedProperties, new Transform[0], null, null, null);
+
+    // Both nodes saw the old registration and an absent external old name. Simulate the first
+    // node committing its rename after this request's check but before its store update.
+    AtomicBoolean moved = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              if (moved.compareAndSet(false, true)) {
+                entityStore.update(
+                    oldIdent,
+                    TableEntity.class,
+                    TABLE,
+                    current ->
+                        TableEntity.builder()
+                            .withId(current.id())
+                            .withName(renamedIdent.name())
+                            .withNamespace(current.namespace())
+                            .withColumns(current.columns())
+                            .withAuditInfo(current.auditInfo())
+                            .build());
+              }
+              return invocation.callRealMethod();
+            })
+        .when(entityStore)
+        .update(eq(oldIdent), eq(TableEntity.class), eq(TABLE), any());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+    Assertions.assertEquals(
+        original.id(), entityStore.get(renamedIdent, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, TABLE));
   }
 
   private TestCatalogOperations testCatalogOperations() {

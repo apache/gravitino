@@ -232,6 +232,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     try {
       E updatedEntity = updateEntity(ident, entityType, updater);
       insertEntityChange(ident, entityType, OperateType.ALTER);
+      if (!ident.equals(updatedEntity.nameIdentifier())) {
+        insertEntityChange(updatedEntity.nameIdentifier(), entityType, OperateType.ALTER);
+      }
       if (transactionOwner) {
         SessionUtils.commitTransaction();
       }

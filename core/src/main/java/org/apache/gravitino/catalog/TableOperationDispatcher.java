@@ -542,6 +542,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
 
     long uid;
+    NameIdentifier observedOwner = null;
     if (stringId != null) {
       // If the entity in the store doesn't match the external system, we use the data
       // of external system to correct it.
@@ -550,7 +551,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               + "when Table is renamed by external systems not controlled by Gravitino. In this "
               + "case, we need to overwrite the stored entity to keep the consistency.",
           stringId);
-      checkImportedIdNotCopied(identifier, stringId.id());
+      observedOwner = checkImportedIdNotCopied(identifier, stringId.id());
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -575,9 +576,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
-    } catch (EntityAlreadyExistsException e) {
+      if (observedOwner != null && !observedOwner.equals(identifier)) {
+        // Updating the observed row uses the store's version check. A second server that observed
+        // the same old name cannot move the row again after the first import commits.
+        store.update(observedOwner, TableEntity.class, TABLE, current -> tableEntity);
+      } else {
+        // Import a new name without overwrite so a concurrent import of the same ID cannot move
+        // its row. Preserve overwrite when repairing a registration already stored at this name.
+        boolean overwriteByName = stringId == null || store.exists(identifier, TABLE);
+        store.put(tableEntity, overwriteByName);
+      }
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       throw e;
+    } catch (NoSuchEntityException e) {
+      throw new OptimisticLockException(
+          e, "The registered owner of table ID %d changed during import; retry the load", uid);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import the table entity to the store", e);
@@ -598,10 +611,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * tags, policies, role grants) to the copy. The store cannot tell the two apart; only the
    * external catalog can, so this asks it whether the id's current owner still exists.
    */
-  private void checkImportedIdNotCopied(NameIdentifier identifier, long id) {
+  private NameIdentifier checkImportedIdNotCopied(NameIdentifier identifier, long id) {
     NameIdentifier currentOwner = findRegisteredTableById(identifier.namespace(), id);
     if (currentOwner == null || currentOwner.equals(identifier)) {
-      return;
+      return currentOwner;
     }
     NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
     boolean distinctOwnerStillExists =
@@ -631,17 +644,19 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     }),
             RuntimeException.class);
     if (distinctOwnerStillExists) {
-      throw new GravitinoRuntimeException(
-          "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
-              + "identifier was most likely copied with the table properties. Remove the property "
-              + "'%s' from %s and load it again",
-          identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier);
+      throw new IllegalArgumentException(
+          String.format(
+              "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
+                  + "identifier was most likely copied with the table properties. Remove the "
+                  + "property '%s' from %s and load it again",
+              identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier));
     }
     LOG.info(
         "Table {} resolves to {} after an external rename or case-alias lookup; re-binding registration {}",
         currentOwner,
         identifier,
         id);
+    return currentOwner;
   }
 
   /** Returns the identifier of the live table in the schema that owns this id, if any. */
