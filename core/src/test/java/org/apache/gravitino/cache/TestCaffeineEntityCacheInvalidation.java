@@ -376,8 +376,10 @@ public class TestCaffeineEntityCacheInvalidation {
         .untilAsserted(
             () ->
                 Assertions.assertNull(
-                    cache.getCacheData().getIfPresent(
-                        EntityCacheKey.of(table.nameIdentifier(), Entity.EntityType.TABLE))));
+                    cache
+                        .getCacheData()
+                        .getIfPresent(
+                            EntityCacheKey.of(table.nameIdentifier(), Entity.EntityType.TABLE))));
 
     // Reinsert the table: cacheData now holds a fresh entry and cacheIndex holds its key again.
     cache.put(table);
