@@ -38,8 +38,11 @@ public class SegmentedLock {
    * Gates segment operations against global operations: segment operations hold the read lock
    * across their whole critical section, global operations hold the write lock, so a global
    * operation excludes every segment operation, including ones already in flight when it starts.
+   * The lock is fair so that a steady stream of segment operations cannot indefinitely starve a
+   * waiting global operation; reentrant read reacquisition is still permitted while a writer is
+   * queued, so the nested cache paths that reacquire the read lock do not deadlock.
    */
-  private final ReentrantReadWriteLock globalGate = new ReentrantReadWriteLock();
+  private final ReentrantReadWriteLock globalGate = new ReentrantReadWriteLock(true);
 
   /** True while a global operation is in progress, used to reject concurrent global operations. */
   private final AtomicBoolean clearing = new AtomicBoolean(false);

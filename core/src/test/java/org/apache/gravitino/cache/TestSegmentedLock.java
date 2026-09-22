@@ -390,6 +390,7 @@ public class TestSegmentedLock {
     CountDownLatch releaseSegmentOp = new CountDownLatch(1);
     CountDownLatch globalActionDone = new CountDownLatch(1);
     AtomicBoolean overlapped = new AtomicBoolean(false);
+    AtomicBoolean segmentOpActive = new AtomicBoolean(false);
 
     Thread segmentOpThread =
         new Thread(
@@ -397,12 +398,14 @@ public class TestSegmentedLock {
                 lock.withLock(
                     "key1",
                     () -> {
+                      segmentOpActive.set(true);
                       insideSegmentOp.countDown();
                       try {
                         releaseSegmentOp.await();
                       } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                       }
+                      segmentOpActive.set(false);
                     }));
     segmentOpThread.start();
     assertTrue(insideSegmentOp.await(5, TimeUnit.SECONDS), "segment operation never started");
@@ -412,9 +415,11 @@ public class TestSegmentedLock {
             () ->
                 lock.withGlobalLock(
                     () -> {
-                      // The global action must never observe the in-flight segment
-                      // operation still holding its critical section.
-                      if (releaseSegmentOp.getCount() > 0) {
+                      // The global action must never overlap the segment operation's critical
+                      // section. segmentOpActive stays true from the first to the last statement of
+                      // the segment action, and the write lock is granted only after the read lock
+                      // is released, so a correct gate always observes it false here.
+                      if (segmentOpActive.get()) {
                         overlapped.set(true);
                       }
                       globalActionDone.countDown();
