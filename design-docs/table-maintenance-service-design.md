@@ -106,7 +106,8 @@ Register Table Maintenance as a Jersey 2 `Feature` through
 `gravitino.server.rest.extensionPackages` (same pattern as IdP) so it runs inside the main server
 process. The commit path does **not** use HTTP. After each Iceberg commit, the **colocated** IRC hook
 INSERTs the commit row and invokes a main-server-registered **in-process** callback that upserts
-state, takes an **atomic per-policy claim**, runs gates, `Recommender` trigger, and job submit.
+state for Active **combined** maintenance policies (§5.5), takes an **atomic per-policy claim**,
+runs gates, builds the `ops` subset, and submits the combined job.
 
 **Pros:** No extra process or port; no remote event hop on the commit path; reuses Policy + Jobs on
 the same server; matches plugin packaging.
@@ -155,17 +156,18 @@ Gravitino Iceberg REST (IRC, typically :9001)
                         v
                  IcebergCommitEventHandler
                         │
-                        ├─ upsert state rows per Active policy
-                        ├─ for each policy: atomic DB claim on that policy row (multi-node — §6)
-                        ├─ claim lost for a policy → leave that policy for another node
+                        ├─ resolve Active system_iceberg_table_maintenance policies only (§5.5)
+                        ├─ upsert state row per such policy
+                        ├─ for each: atomic DB claim on that policy row (multi-node — §6)
+                        ├─ claim lost → leave that policy for another node
                         v
                  MaintenanceEvaluateSubmitPipeline
                         │
-                        +--> per-policy gates (in-flight / min-interval)
-                        +--> Recommender.submitForStrategyName(...) → submit when trigger passes
+                        +--> gates (in-flight / table-maintenance min-interval)
+                        +--> pick ops subset (per-op interval / trigger) → submit combined job
                         │
                         v
-                 Gravitino Job framework (rewrite / cleanup / …)
+                 Gravitino Job framework (builtin-iceberg-table-maintenance)
 ```
 
 #### 5.1.1 In-process commit event
@@ -176,11 +178,11 @@ post-commit hook** INSERTs one `table_maintenance_event` row, then invokes a
 `IcebergCommitEventHandler` → `MaintenanceEvaluateSubmitPipeline` + `table_maintenance_state` claim.
 TMS does not write the event row, and the row is not updated.
 
-| Requirement | Detail                                                                                                    |
-| ----------- | --------------------------------------------------------------------------------------------------------- |
-| Deployment  | IRC (`iceberg-rest`) and the main Gravitino server share **one JVM**.                                     |
-| Transport   | In-process callback / SPI only — **no** HTTP `POST …/events/iceberg-commit`, **no** Kafka.                |
-| Payload     | Normalized `table_identifier` (`catalog.schema.table`). Policy selection uses Active policies + triggers. |
+| Requirement | Detail                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Deployment  | IRC (`iceberg-rest`) and the main Gravitino server share **one JVM**.                                                          |
+| Transport   | In-process callback / SPI only — **no** HTTP `POST …/events/iceberg-commit`, **no** Kafka.                                     |
+| Payload     | Normalized `table_identifier` (`catalog.schema.table`). Event path selects only combined maintenance policies (§5.5).          |
 
 ### 5.2 Internal structure
 
@@ -188,25 +190,25 @@ TMS does not write the event row, and the row is not updated.
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TableMaintenanceRESTFeature`       | Jersey 2 `Feature` registered via `extensionPackages`; registers the in-process callback and the ops resources (§7). No health or commit-event resource. |
 | `IcebergCommitEventHandler`         | TMS in-process entry after the IRC hook has inserted the event; upserts state; claims; runs pipeline.                                                    |
-| `MaintenanceEvaluateSubmitPipeline` | Per-policy claim → gates → `Recommender` → `JobSubmitter`.                                                                                               |
+| `MaintenanceEvaluateSubmitPipeline` | Claim → gates → ops subset → submit combined job (§5.5). Event path ignores single-op policies. |
 | `TableMaintenanceStateStore`        | Shared DB access for `table_maintenance_state` upsert / claim / release / rename (§6.1–§6.2, §6.4).                                                      |
 | `TableMaintenanceEventStore`        | Shared DB access for `table_maintenance_event` insert / rename / drop (§6.3–§6.4).                                                                       |
 | `IcebergTableLifecycleHook`         | In-process IRC rename/drop hook: rewrite or purge TMS rows keyed by `table_identifier` (§6.4).                                                           |
-| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — unchanged contracts for event path.                                                                |
+| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — reused for ops APIs / single-op jobs; event path uses the combined job (§5.5).                      |
 
 ### 5.3 User process (event-driven)
 
 1. Operator enables the TMS REST plugin (`extensionPackages`) and `iceberg-rest` **in the same JVM**, and turns on in-process commit events (§5.1.1 / §8.2).
-2. Operator creates / enables a maintenance policy and associates it to tables (or parents) via
-   metalake Policy APIs, for example:
+2. Operator creates / enables a **combined** maintenance policy (`system_iceberg_table_maintenance`,
+   §5.5) and associates it to tables (or parents) via metalake Policy APIs, for example:
 
    ```bash
    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
      -d '{
-       "name": "iceberg_compaction_default",
-       "comment": "Built-in Iceberg compaction policy",
-       "policyType": "system_iceberg_compaction",
+       "name": "iceberg_table_maintenance_default",
+       "comment": "Combined Iceberg table maintenance policy",
+       "policyType": "system_iceberg_table_maintenance",
        "enabled": true,
        "content": {}
      }' \
@@ -214,17 +216,18 @@ TMS does not write the event row, and the row is not updated.
 
    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
-     -d '{"policiesToAdd": ["iceberg_compaction_default"]}' \
+     -d '{"policiesToAdd": ["iceberg_table_maintenance_default"]}' \
      http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies
    ```
 
 3. Engines write through Gravitino Iceberg REST. On commit success, the **IRC hook** INSERTs one
    `table_maintenance_event` row (`table_identifier`, `created_at`) and does not update it (§5.1.1,
    §6.3).
-4. The hook then invokes TMS **in-process**. TMS resolves Active policies, upserts one state row per
-   `(table_identifier, policy)`, and for each policy claims that row, runs gates → trigger →
-   submits when thresholds are met.
-5. Operators observe runs in the Gravitino **Jobs** UI / APIs.
+4. The hook then invokes TMS **in-process**. TMS resolves Active **combined** maintenance policies
+   only (§5.5), upserts one state row per such policy, claims, applies gates, builds the `ops`
+   subset, and submits at most one combined job.
+5. Operators observe runs in the Gravitino **Jobs** UI / APIs. Single-operation jobs remain available
+   through the ops APIs (§7) and manual `runJob`, not through the commit event path.
 
 ### 5.4 Implementation process (event path)
 
@@ -238,19 +241,20 @@ IRC commit succeeded (same JVM)
               v
         IcebergCommitEventHandler
               │
-              ├─ resolve Active policies (StrategyProvider / listPolicies)
-              ├─ upsert one state row per policy (§6.2)
+              ├─ resolve Active system_iceberg_table_maintenance only (§5.5)
+              ├─ ignore single-op / custom maintenance policies on this path
+              ├─ upsert one state row per such combined policy (§6.2)
               v
         MaintenanceEvaluateSubmitPipeline
-              ├─ for each Active policy:
+              ├─ for each combined policy above:
               │     atomic claim: that policy row IDLE → RUNNING (§6.1)
               │       └─ claim failed → skip this policy (another node holds it)
               │     if job_id is set and that job has finished:
               │       last_job_id = job_id; clear job_id
               │     if job_id is still QUEUED/STARTED → release claim; skip
-              │     else apply min-interval using last_job_id → job_finished_at
-              │     Recommender.submitForStrategyName(...)
-              │       └── JobSubmitter → rewrite / … when trigger passes
+              │     else apply table-maintenance min-interval via last_job_id → job_finished_at
+              │     pick ops subset (per-op interval / trigger) → JobSubmitter
+              │       └── builtin-iceberg-table-maintenance when ops non-empty
               │       └── set job_id to this submission; do not change last_job_id
               │     release claim (state → IDLE on that policy row; do not DELETE)
 ```
@@ -258,21 +262,26 @@ IRC commit succeeded (same JVM)
 The in-process handler runs the gate + submit path on the calling thread (or a bounded executor
 owned by the plugin — implementation detail). Maintenance Spark jobs are **submitted asynchronously**
 via the job framework; the event path does not block on Spark completion. **The IRC hook INSERTs
-one event row per commit; TMS does not update it.** Per-policy claim keeps evaluate → submit single-flight for each
-`(table, policy)` across nodes. A non-null `job_id` is the in-flight submission and blocks another
-submit. When that job has finished, the pipeline moves it to `last_job_id` and clears `job_id`.
-`last_job_id` → `job_run_meta.job_finished_at` is the previous end time used with `minIntervalMs`
-(§6.3). Stale `RUNNING` claims are released after
-`claimTimeoutMs` (§6.2).
+one event row per commit; TMS does not update it.** The commit event path drives **only** Active
+`system_iceberg_table_maintenance` policies (§5.5). Single-operation and custom maintenance policies
+are not evaluated here; use ops APIs (§7) or manual `runJob` for those. Per-policy claim keeps
+evaluate → submit single-flight for each `(table, combined policy)` across nodes. A non-null
+`job_id` is the in-flight submission and blocks another submit. When that job has finished, the
+pipeline moves it to `last_job_id` and clears `job_id`. `last_job_id` →
+`job_run_meta.job_finished_at` is the previous end time used with `table-maintenance`
+`minIntervalMs` (§6.3 / §8.3). Stale `RUNNING` claims are released after `claimTimeoutMs` (§6.2).
 
-**Gate order:**
+**Gate order (event path, combined policy):**
 
 1. If `job_id` is set and that job has finished: `last_job_id = job_id`, then clear `job_id`.
 2. If `job_id` is still in flight (`QUEUED` / `STARTED`): skip this policy.
-3. Otherwise apply min-interval using `last_job_id` → `job_run_meta.job_finished_at` and the resolved
-   `minIntervalMs` (table prop → global conf → code default; §8.3).
-4. Policy trigger (`Recommender`) for each remaining Active policy.
-5. On submit: set `job_id` to this submission. Do not change `last_job_id`.
+3. Otherwise apply **`table-maintenance`** min-interval using `last_job_id` →
+   `job_run_meta.job_finished_at` and the resolved `minIntervalMs` (table prop → global conf → code
+   default; §8.3).
+4. Build the `ops` subset from per-operation intervals / triggers (order:
+   `compact → manifests → expire → orphan`).
+5. If `ops` is non-empty: submit `builtin-iceberg-table-maintenance` and set `job_id` to this
+   submission. Do not change `last_job_id`.
 
 ### 5.5 Combined maintenance policy and ordered builtin job
 
@@ -288,11 +297,14 @@ ordered Spark job**, TMS adds:
 
 Operators create one policy instance of that type under the metalake and attach it (directly or via
 tag) to catalogs / schemas / tables. That instance has one real `policy_meta.policy_id`. TMS keeps
-one `table_maintenance_state` row for `(table_identifier, policy_id)` and submits **one** job when
-gates pass. A separate table-level sentinel such as `policy_id = 0` is **not** required for this
-model: the per-policy claim already serializes maintenance for that attachment. Do not also attach
-the older single-operation maintenance policies on the same table unless an extra table-level mutex
-is introduced.
+one `table_maintenance_state` row for `(table_identifier, policy_id)` and submits **one** combined
+job when gates pass. A separate table-level sentinel such as `policy_id = 0` is **not** required:
+the per-policy claim already serializes maintenance for that attachment.
+
+**Event path scope:** IRC commit events select **only** this combined policy type. Older
+single-operation built-ins (for example `system_iceberg_compaction`) and custom maintenance policies
+are ignored on the event path even if Active and attached. Attach the combined type for
+commit-driven maintenance; use ops APIs (§7) or manual `runJob` for single-op runs.
 
 **In-job execution order** (skip any operation that is disabled or whose own interval / trigger did
 not pass; keep relative order):
@@ -327,8 +339,9 @@ separate batch package; the default combined job for TMS uses the compact-first 
   orphan may still be 7 days even when the combined job is eligible hourly). The job receives the
   selected `ops` subset in `jobConf`.
 
-Custom maintenance policies remain supported as separate `policy_id` rows. The combined type is an
-additional built-in option, not a replacement for the Policy API.
+Custom and single-op maintenance policies remain supported as separate `policy_id` rows for ops APIs
+and manual jobs. They are **not** driven by the IRC commit event path. The combined type is the
+built-in option for event-driven table maintenance.
 
 ---
 
@@ -351,37 +364,37 @@ Iceberg REST / optimizer tables often have **no** row in `table_meta` (same reas
 | `table_maintenance_state` | Multi-node **claim** + in-flight `job_id` and finished `last_job_id` per policy (§6.1–§6.2) |
 
 `table_maintenance_state` primary key is `(metalake_id, table_identifier, policy_id)` — **one row
-per attached maintenance policy**. Claim is **per policy row**: each `(table, policy)` is claimed
-independently.
+per attached combined maintenance policy** on the event path (§5.5). Claim is **per policy row**:
+each `(table, policy)` is claimed independently.
 
 Policy attachment remains in `policy_relation_meta` (resolved via `listPolicies()` / object
-identifier APIs); the state table stores multi-node claim state, the in-flight `job_id`, and the
-last finished `last_job_id` per policy.
-The event table stores one row per commit. `metalake_id` and
+identifier APIs); the event path keeps only Active `system_iceberg_table_maintenance` instances.
+The state table stores multi-node claim state, the in-flight `job_id`, and the last finished
+`last_job_id` per such policy. The event table stores one row per commit. `metalake_id` and
 `policy_id` still come from Gravitino Policy / metalake metadata; only **table** identity avoids
 `table_meta`.
 
 ### 6.1 Claim flow
 
 ```text
-Node A / Node B — both receive an event for same table + same policy
+Node A / Node B — both receive an event for same table + same combined policy
         │
         ├─ both IRC hooks INSERT table_maintenance_event   ← one row per commit (§6.3)
-        ├─ both resolve Active policies; upsert one row per policy
+        ├─ both resolve Active system_iceberg_table_maintenance only; upsert one row each
         ├─ both attempt per-policy claim:
         │     UPDATE … SET state=RUNNING
         │     WHERE metalake_id=? AND table_identifier=? AND policy_id=? AND state=IDLE
         │     ├─ Node A: rows_affected = 1 → runs that policy → release to IDLE
         │     └─ Node B: 0 rows → skip that policy (another node / reclaim)
         v
-Different policies on the same table may be claimed by different nodes concurrently
+Multiple combined policy instances on the same table may be claimed by different nodes concurrently
 ```
 
 Gate checks alone are insufficient (read race). **Claim is the write lock** for that policy row;
-gates for a policy run only after its claim succeeds. Each attached policy is unique for a table, so
-per-policy claim prevents double-submit of the same job without locking unrelated policies.
-**Event insert is not the lock.** It records the commit. The claim on `table_maintenance_state` is
-the lock.
+gates for a policy run only after its claim succeeds. Each attached combined policy is unique for a
+table row key, so per-policy claim prevents double-submit of the same combined job without locking
+unrelated policies. **Event insert is not the lock.** It records the commit. The claim on
+`table_maintenance_state` is the lock.
 
 ### 6.2 State table (shared store)
 
@@ -408,8 +421,9 @@ Table keying follows optimizer **`table_metrics.table_identifier`** (string iden
 
 **Lifecycle:**
 
-1. On each event: resolve Active policies → `INSERT` each missing `(table_identifier, policy)` row
-   as `state=IDLE`. On duplicate key, **do not** change `state` (a live `RUNNING` claim must stay).
+1. On each event: resolve Active `system_iceberg_table_maintenance` policies → `INSERT` each missing
+   `(table_identifier, policy)` row as `state=IDLE`. On duplicate key, **do not** change `state` (a
+   live `RUNNING` claim must stay).
 2. Claim: conditional `UPDATE … SET state=RUNNING WHERE metalake_id=? AND table_identifier=? AND
    policy_id=? AND state=IDLE` (and reclaim stale `RUNNING` after `claimTimeoutMs` by setting it
    back to `IDLE`). `rows_affected = 1` owns the lock.
@@ -599,9 +613,10 @@ HTTP `tableMaintenance.uri` / Kafka produce-consume keys are **not** in scope (N
 
 ### 8.3 Task types and minimum interval (global default + table override)
 
-TMS recognizes maintenance **task types**. Single-operation types remain available for dedicated
-policies / jobs. The combined policy in §5.5 also introduces a **job-level** type that gates how
-often the ordered builtin job may be submitted.
+TMS recognizes maintenance **task types**. The commit event path uses only the combined policy's
+**job-level** `table-maintenance` interval plus per-operation intervals inside that job (§5.5).
+Single-operation types remain available for dedicated policies / jobs via ops APIs and manual
+`runJob`.
 
 | Task type           | Typical job / policy                                     | Code default `minIntervalMs` |
 | ------------------- | -------------------------------------------------------- | ---------------------------- |
@@ -692,9 +707,9 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 
 #### Phase 2 checklist
 
-- [ ] Implement `MaintenanceEvaluateSubmitPipeline` calling `Recommender.submitForStrategyName`.
-- [ ] Enforce per-policy gates: in-flight / min-interval.
-- [ ] Resolve Active attached policies via existing Policy / `StrategyProvider` (no new policy store).
+- [ ] Implement `MaintenanceEvaluateSubmitPipeline` for the combined job (ops subset → submit).
+- [ ] Enforce gates: in-flight / `table-maintenance` min-interval; per-op intervals for `ops`.
+- [ ] Resolve Active `system_iceberg_table_maintenance` only on the event path (ignore single-op).
 - [ ] Add unit tests for skip / noop / submit / deferred outcomes.
 
 #### Phase 3 checklist
@@ -747,13 +762,13 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 | ------------ | ---------------------------------------------------------------------------------------------------------------- |
 | Deployment   | Enabled via `gravitino.server.rest.extensionPackages`; IRC colocated in the same JVM. Ops APIs on **8090** (§7). |
 | Classpath    | TMS plugin on main server classpath; **not** an aux isolated listener.                                           |
-| Event        | **In-process only** (§5.1.1); IRC hook inserts the commit row; TMS claims and evaluates; no HTTP/Kafka.          |
+| Event        | **In-process only** (§5.1.1); IRC hook inserts the commit row; TMS drives combined policy only (§5.5); no HTTP/Kafka. |
 | Ops API      | Seven routes replace `gravitino-optimizer` (§7). Not used by the commit path. Table WRITE required.              |
-| Pipeline     | Inline on event: per-policy claim → gates → `Recommender` → Jobs; no metrics/monitor on event path.              |
+| Pipeline     | Inline on event: combined policy only → claim → gates → ops subset → combined job; no metrics/monitor on event path. |
 | Durability   | IRC hook INSERTs one `table_maintenance_event` row per commit; TMS does not update it (§6.3).                    |
 | Rename/drop  | In-process lifecycle hook rewrites / purges string-keyed TMS rows (§6.4).                                        |
 | Multi-node   | Shared `table_maintenance_state` + DB **claim** (§6.1–§6.2); no CronJob.                                         |
-| Policy       | Reuses metalake Policy APIs + `policy_meta`; no TMS policy CRUD.                                                 |
+| Policy       | Event path: Active `system_iceberg_table_maintenance` via metalake Policy APIs; no TMS policy CRUD.              |
 | Job boundary | Spark work stays in Gravitino job framework; stats land in `statistic_meta` (main DB).                           |
 | Security     | Ops APIs require table WRITE. No commit-event or health endpoint.                                                |
 
