@@ -62,7 +62,7 @@ execution core.
 6. **Multi-node safe event processing**: Use a shared DB claim on `table_maintenance_state` so only
    one TMS replica runs the evaluate → submit pipeline for a given `(table, policy)` at a time (§6).
 7. **Commit log**: The **IRC post-commit hook** **INSERTs** one `table_maintenance_event` row per
-   successful Iceberg commit (`snapshot_id`, `created_at`). TMS does not write this table, and the
+   successful Iceberg commit (`table_identifier`, `created_at`). TMS does not write this table, and the
    row is not updated. A policy that has not finished another run is read by joining that row to
    `table_maintenance_state.last_job_id` and `job_run_meta.job_finished_at`, compared with
    `minIntervalMs` (§6.3).
@@ -176,11 +176,11 @@ post-commit hook** INSERTs one `table_maintenance_event` row, then invokes a
 `IcebergCommitEventHandler` → `MaintenanceEvaluateSubmitPipeline` + `table_maintenance_state` claim.
 TMS does not write the event row, and the row is not updated.
 
-| Requirement | Detail                                                                                                                                    |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployment  | IRC (`iceberg-rest`) and the main Gravitino server share **one JVM**.                                                                     |
-| Transport   | In-process callback / SPI only — **no** HTTP `POST …/events/iceberg-commit`, **no** Kafka.                                                |
-| Payload     | Normalized `table_identifier` (`catalog.schema.table`) and the committed `snapshot_id`. Policy selection uses Active policies + triggers. |
+| Requirement | Detail                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| Deployment  | IRC (`iceberg-rest`) and the main Gravitino server share **one JVM**.                                     |
+| Transport   | In-process callback / SPI only — **no** HTTP `POST …/events/iceberg-commit`, **no** Kafka.                |
+| Payload     | Normalized `table_identifier` (`catalog.schema.table`). Policy selection uses Active policies + triggers. |
 
 ### 5.2 Internal structure
 
@@ -219,7 +219,7 @@ TMS does not write the event row, and the row is not updated.
    ```
 
 3. Engines write through Gravitino Iceberg REST. On commit success, the **IRC hook** INSERTs one
-   `table_maintenance_event` row (`table_identifier`, `snapshot_id`) and does not update it (§5.1.1,
+   `table_maintenance_event` row (`table_identifier`, `created_at`) and does not update it (§5.1.1,
    §6.3).
 4. The hook then invokes TMS **in-process**. TMS resolves Active policies, upserts one state row per
    `(table_identifier, policy)`, and for each policy claims that row, runs gates → trigger →
@@ -442,7 +442,8 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_state` (
 The **IRC post-commit hook** INSERTs one row for each successful Iceberg commit. TMS does not write
 or update that row. Like
 `table_metrics`, rows key by **`table_identifier`** string — **not** `table_meta.table_id` — so IRC
-tables without Gravitino table metadata still persist. `snapshot_id` comes from the commit.
+tables without Gravitino table metadata still persist. The row records that a commit happened for
+that table; it does not store `snapshot_id`.
 
 ```text
 IRC post-commit hook
@@ -459,13 +460,13 @@ in-process callback → TMS upsert + claim (table_maintenance_state) → pipelin
 | `event_id`         | `BIGINT UNSIGNED NOT NULL` | Surrogate PK (auto-increment)            |
 | `metalake_id`      | `BIGINT UNSIGNED NOT NULL` | Metalake from config / policy resolution |
 | `table_identifier` | `VARCHAR(512) NOT NULL`    | Normalized `catalog.schema.table`        |
-| `snapshot_id`      | `BIGINT NOT NULL`          | Snapshot of this commit                  |
 | `created_at`       | `BIGINT NOT NULL`          | Epoch millis when the row was inserted   |
 
 **Primary key:** (`event_id`). **Index:** (`metalake_id`, `table_identifier`, `created_at`).
 
-There is **no** unique key on `snapshot_id`. Every commit INSERTs, including a repeated callback for
-the same snapshot. Claim, in-flight `job_id`, and `last_job_id` still prevent double-submit (§6.1–§6.2).
+Every commit INSERTs a new row, including a repeated callback for the same Iceberg commit. Claim,
+in-flight `job_id`, and `last_job_id` still prevent double-submit (§6.1–§6.2). Interval checks use
+`created_at`, not a snapshot id.
 
 **Which policy has not finished another run**
 
@@ -493,7 +494,6 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_event` (
     `event_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'commit event id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `table_identifier` VARCHAR(512) NOT NULL COMMENT 'normalized catalog.schema.table',
-    `snapshot_id` BIGINT(20) NOT NULL COMMENT 'snapshot id of this commit',
     `created_at` BIGINT(20) NOT NULL COMMENT 'insert time epoch millis',
     PRIMARY KEY (`event_id`),
     KEY `idx_table_created` (`metalake_id`, `table_identifier`, `created_at`)
