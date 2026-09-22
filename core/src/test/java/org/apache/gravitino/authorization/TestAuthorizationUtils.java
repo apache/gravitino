@@ -40,6 +40,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -55,6 +56,24 @@ import org.mockito.Mockito;
 class TestAuthorizationUtils {
 
   String metalake = "metalake";
+
+  @Test
+  void testCheckCurrentUserUsesNeutralMembershipMessage() {
+    try (MockedStatic<GravitinoEnv> envMock = Mockito.mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+      GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
+      Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+
+      ForbiddenException exception =
+          Assertions.assertThrows(
+              ForbiddenException.class,
+              () -> AuthorizationUtils.checkCurrentUser(metalake, "tester"));
+      Assertions.assertEquals(
+          "Current user tester is not a member of metalake metalake, or the metalake does not exist",
+          exception.getMessage());
+    }
+  }
 
   @Test
   void testCreateNameIdentifier() {

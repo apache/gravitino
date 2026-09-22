@@ -770,7 +770,7 @@ public class GravitinoMetalake extends MetalakeDTO
         .map(
             association ->
                 new GenericPolicyTagAssociation(
-                    new GenericPolicy(association.getPolicy(), restClient, this.name()),
+                    new GenericPolicy(association.getPolicy()),
                     tag,
                     association.getSelector().toSelector()))
         .toArray(PolicyTagAssociation[]::new);
@@ -848,9 +848,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return Arrays.stream(resp.getPolicies())
-        .map(p -> new GenericPolicy(p, restClient, this.name()))
-        .toArray(Policy[]::new);
+    return Arrays.stream(resp.getPolicies()).map(p -> new GenericPolicy(p)).toArray(Policy[]::new);
   }
 
   /**
@@ -875,7 +873,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -905,7 +903,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -964,7 +962,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
 
-    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+    return new GenericPolicy(resp.getPolicy());
   }
 
   /**
@@ -1818,13 +1816,21 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public JobHandle getJob(String jobId) throws NoSuchJobException {
+    return getJob(jobId, false);
+  }
+
+  @Override
+  public JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
     Preconditions.checkArgument(StringUtils.isNotBlank(jobId), "job id must not be null or empty");
 
+    Map<String, String> params =
+        includeOutput ? ImmutableMap.of("includeOutput", "true") : Collections.emptyMap();
     JobResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name()))
                 + "/"
                 + RESTUtils.encodeString(jobId),
+            params,
             JobResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());

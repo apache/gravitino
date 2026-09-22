@@ -39,7 +39,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.policy.PolicyDTO;
@@ -49,12 +48,10 @@ import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
-import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagForPolicyAssociationDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
@@ -321,45 +318,6 @@ public class PolicyOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.DELETE, name, metalake, e);
-    }
-  }
-
-  @GET
-  @Path("{policy}/objects")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-objects-for-policy", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
-  public Response listMetadataObjectsForPolicy(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
-          String policyName) {
-    LOG.info("Received list objects for policy: {} under metalake: {}", policyName, metalake);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            MetadataObject[] objects =
-                policyDispatcher.listMetadataObjectsForPolicy(metalake, policyName);
-            objects = objects == null ? new MetadataObject[0] : objects;
-            objects = MetadataAuthzHelper.filterMetadataObject(metalake, objects);
-            LOG.info(
-                "List {} objects for policy: {} under metalake: {}",
-                objects.length,
-                policyName,
-                metalake);
-
-            MetadataObjectDTO[] objectDTOs =
-                Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
-
-            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", metalake, e);
     }
   }
 

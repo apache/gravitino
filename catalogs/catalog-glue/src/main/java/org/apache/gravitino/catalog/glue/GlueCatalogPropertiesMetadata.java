@@ -33,6 +33,7 @@ import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropert
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -57,24 +58,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   true /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
-          .put(
-              AWS_ACCESS_KEY_ID,
-              stringOptionalPropertyEntry(
-                  AWS_ACCESS_KEY_ID,
-                  "AWS access key ID for static credential authentication."
-                      + " When omitted the default credential chain is used.",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              AWS_SECRET_ACCESS_KEY,
-              stringOptionalPropertyEntry(
-                  AWS_SECRET_ACCESS_KEY,
-                  "AWS secret access key paired with aws-access-key-id."
-                      + " When omitted the default credential chain is used.",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  true /* hidden */))
+          .put(AWS_ACCESS_KEY_ID, AWSPropertiesMetadata.AWS_ACCESS_KEY_ID)
+          .put(AWS_SECRET_ACCESS_KEY, AWSPropertiesMetadata.AWS_SECRET_ACCESS_KEY)
           .put(
               AWS_GLUE_ENDPOINT,
               stringOptionalPropertyEntry(
