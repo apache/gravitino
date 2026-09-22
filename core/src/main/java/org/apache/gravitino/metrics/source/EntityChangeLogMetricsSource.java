@@ -30,6 +30,7 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   private final AtomicLong cursorId = new AtomicLong();
   private final AtomicLong lastSuccessfulPollMs = new AtomicLong();
   private final Counter pollFailures = getCounter("poll-failures-total");
+  private final Counter tailSampleFailures = getCounter("tail-sample-failures-total");
   private final Counter listenerFailures = getCounter("listener-failures-total");
   private final Counter recordsFetched = getCounter("records-fetched-total");
   private final Counter recordsDelivered = getCounter("records-delivered-total");
@@ -74,6 +75,11 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   /** Records a failed poll query or cycle. */
   public void pollFailed() {
     pollFailures.inc();
+  }
+
+  /** Records a failed database-tail sample while allowing an already fetched batch to proceed. */
+  public void tailSampleFailed() {
+    tailSampleFailures.inc();
   }
 
   /** Records a listener delivery that failed, attributed by its stable class name. */

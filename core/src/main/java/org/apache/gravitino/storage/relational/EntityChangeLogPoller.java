@@ -231,6 +231,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
       if (handleInterruptIfAny(e, "Entity change log tail sample")) {
         throw e;
       }
+      metrics.tailSampleFailed();
       LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
     }
     metrics.pollSucceeded(changes.size());

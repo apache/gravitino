@@ -35,6 +35,7 @@ public class TestEntityChangeLogMetricsSource {
     metrics.recordsDelivered("org.apache.gravitino.CacheListener", 6);
     metrics.recordsApplied(6);
     metrics.pollFailed();
+    metrics.tailSampleFailed();
     metrics.listenerFailed("org.apache.gravitino.CacheListener");
     metrics.invalidationFailed();
     metrics.fallbackCleared();
@@ -57,6 +58,8 @@ public class TestEntityChangeLogMetricsSource {
         6, metrics.getMetricRegistry().counter("records-applied-total").getCount());
     Assertions.assertEquals(
         1, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("tail-sample-failures-total").getCount());
     Assertions.assertEquals(
         1, metrics.getMetricRegistry().counter("listener-failures-total").getCount());
     Assertions.assertEquals(
