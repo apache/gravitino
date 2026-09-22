@@ -107,7 +107,7 @@ Register Table Maintenance as a Jersey 2 `Feature` through
 process. The commit path does **not** use HTTP. After each Iceberg commit, the **colocated** IRC hook
 INSERTs the commit row and invokes a main-server-registered **in-process** callback that upserts
 state for Active **combined** maintenance policies (§5.5), takes an **atomic per-policy claim**,
-runs gates, builds the `ops` subset, and submits the combined job.
+runs the interval gate once, and submits the combined job (per-op Recommender then SQL inside).
 
 **Pros:** No extra process or port; no remote event hop on the commit path; reuses Policy + Jobs on
 the same server; matches plugin packaging.
@@ -163,8 +163,9 @@ Gravitino Iceberg REST (IRC, typically :9001)
                         v
                  MaintenanceEvaluateSubmitPipeline
                         │
-                        +--> gates (in-flight / table-maintenance min-interval)
-                        +--> pick ops subset (per-op interval / trigger) → submit combined job
+                        +--> gate once: in-flight / table-maintenance min-interval
+                        +--> submit combined job; inside job, for each enabled op in order:
+                        │      Recommender (if that op has a StrategyHandler) → SQL
                         │
                         v
                  Gravitino Job framework (builtin-iceberg-table-maintenance)
@@ -190,11 +191,11 @@ TMS does not write the event row, and the row is not updated.
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TableMaintenanceRESTFeature`       | Jersey 2 `Feature` registered via `extensionPackages`; registers the in-process callback and the ops resources (§7). No health or commit-event resource. |
 | `IcebergCommitEventHandler`         | TMS in-process entry after the IRC hook has inserted the event; upserts state; claims; runs pipeline.                                                    |
-| `MaintenanceEvaluateSubmitPipeline` | Claim → gates → ops subset → submit combined job (§5.5). Event path ignores single-op policies. |
+| `MaintenanceEvaluateSubmitPipeline` | Claim → one interval gate → submit combined job (§5.5). Event path ignores single-op policies.                                                           |
 | `TableMaintenanceStateStore`        | Shared DB access for `table_maintenance_state` upsert / claim / release / rename (§6.1–§6.2, §6.4).                                                      |
 | `TableMaintenanceEventStore`        | Shared DB access for `table_maintenance_event` insert / rename / drop (§6.3–§6.4).                                                                       |
 | `IcebergTableLifecycleHook`         | In-process IRC rename/drop hook: rewrite or purge TMS rows keyed by `table_identifier` (§6.4).                                                           |
-| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — reused for ops APIs / single-op jobs; event path uses the combined job (§5.5).                      |
+| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — combined job reuses per-op `Recommender` when a `StrategyHandler` exists; otherwise SQL only.     |
 
 ### 5.3 User process (event-driven)
 
@@ -224,8 +225,9 @@ TMS does not write the event row, and the row is not updated.
    `table_maintenance_event` row (`table_identifier`, `created_at`) and does not update it (§5.1.1,
    §6.3).
 4. The hook then invokes TMS **in-process**. TMS resolves Active **combined** maintenance policies
-   only (§5.5), upserts one state row per such policy, claims, applies gates, builds the `ops`
-   subset, and submits at most one combined job.
+   only (§5.5), upserts one state row per such policy, claims, applies the **one** interval gate,
+   and submits at most one combined job. Inside that job, each enabled op runs
+   `Recommender` (if any) then SQL (§5.5).
 5. Operators observe runs in the Gravitino **Jobs** UI / APIs. Single-operation jobs remain available
    through the ops APIs (§7) and manual `runJob`, not through the commit event path.
 
@@ -253,8 +255,7 @@ IRC commit succeeded (same JVM)
               │       last_job_id = job_id; clear job_id
               │     if job_id is still QUEUED/STARTED → release claim; skip
               │     else apply table-maintenance min-interval via last_job_id → job_finished_at
-              │     pick ops subset (per-op interval / trigger) → JobSubmitter
-              │       └── builtin-iceberg-table-maintenance when ops non-empty
+              │     submit builtin-iceberg-table-maintenance
               │       └── set job_id to this submission; do not change last_job_id
               │     release claim (state → IDLE on that policy row; do not DELETE)
 ```
@@ -271,17 +272,22 @@ pipeline moves it to `last_job_id` and clears `job_id`. `last_job_id` →
 `job_run_meta.job_finished_at` is the previous end time used with `table-maintenance`
 `minIntervalMs` (§6.3 / §8.3). Stale `RUNNING` claims are released after `claimTimeoutMs` (§6.2).
 
-**Gate order (event path, combined policy):**
+**Gate + in-job step order (event path, combined policy):**
 
 1. If `job_id` is set and that job has finished: `last_job_id = job_id`, then clear `job_id`.
 2. If `job_id` is still in flight (`QUEUED` / `STARTED`): skip this policy.
 3. Otherwise apply **`table-maintenance`** min-interval using `last_job_id` →
    `job_run_meta.job_finished_at` and the resolved `minIntervalMs` (table prop → global conf → code
-   default; §8.3).
-4. Build the `ops` subset from per-operation intervals / triggers (order:
-   `compact → manifests → expire → orphan`).
-5. If `ops` is non-empty: submit `builtin-iceberg-table-maintenance` and set `job_id` to this
-   submission. Do not change `last_job_id`.
+   default; §8.3). Compare **once** at the start — not per step.
+4. If at least one operation is enabled: submit `builtin-iceberg-table-maintenance` and set
+   `job_id`. Do not change `last_job_id`.
+5. Inside that job, for each enabled op in order
+   (`compact → manifests → expire → orphan`):
+   - If this op has a `StrategyHandler` / `Recommender` path: run it. If it does not trigger, skip
+     this op's SQL and continue to the next op.
+   - Run this op's SQL (Iceberg Spark procedure / equivalent).
+   - Today only **compact** has a Recommender; manifests / expire / orphan go straight to SQL unless
+     a handler is added later.
 
 ### 5.5 Combined maintenance policy and ordered builtin job
 
@@ -290,10 +296,9 @@ orchestration. To run compaction, manifest rewrite, snapshot expiry, and orphan 
 ordered Spark job**, TMS adds:
 
 1. A new built-in **policy type** (illustrative name: `system_iceberg_table_maintenance`) whose
-   content configures the four operations (enable flags, thresholds, and optional per-operation
-   intervals).
+   content configures the four operations (enable flags and per-op thresholds / options).
 2. A matching built-in **job template** (illustrative name: `builtin-iceberg-table-maintenance`)
-   that executes the selected operations **inside that one Spark job**.
+   that walks enabled operations **inside that one Spark job**.
 
 Operators create one policy instance of that type under the metalake and attach it (directly or via
 tag) to catalogs / schemas / tables.
@@ -303,34 +308,40 @@ single-operation built-ins (for example `system_iceberg_compaction`) and custom 
 are ignored on the event path even if Active and attached. Attach the combined type for
 commit-driven maintenance; use ops APIs (§7) or manual `runJob` for single-op runs.
 
-**In-job execution order** (skip any operation that is disabled or whose own interval / trigger did
-not pass; keep relative order):
+**Recommender vs SQL:** they are separate. `Recommender` decides whether an op should run (when a
+`StrategyHandler` exists). SQL is the actual maintenance work. Not every op has a Recommender —
+compaction does today; expire / orphan / manifests typically do not.
+
+**In-job loop** (enabled ops only; relative order fixed):
 
 ```text
-1. compact           (rewrite data files)
-2. manifests         (rewrite manifests)
-3. expire            (expire snapshots)
-4. orphan            (remove orphan files)
+for each op in [compact, manifests, expire, orphan] if enabled:
+  1. Recommender / StrategyHandler   (skip if this op has none)
+       └─ not triggered → skip this op's SQL; continue
+  2. SQL                             (Spark procedure for this op)
 ```
 
-This order matches a commit-driven / query-first path (typical for TMS and streaming-heavy tables):
+```text
+1. compact           Recommender (yes today) → rewrite data files SQL
+2. manifests         Recommender (no today)  → rewrite manifests SQL
+3. expire            Recommender (no today)  → expire snapshots SQL
+4. orphan            Recommender (no today)  → remove orphan files SQL
+```
+
+Why this order (when steps run):
 
 - Compact first so readers stop paying for small files.
-- Rewrite manifests after compact so the index matches the post-compaction file set (rewriting
-  manifests before compact is wasted when compact immediately fragments them again).
+- Rewrite manifests after compact so the index matches the post-compaction file set.
 - Expire next so old snapshots that still referenced the pre-compaction small files can drop those
   files from metadata.
 - Orphan last to delete physical leftovers after expiry (and failed-write debris), behind a safety
   retention window.
 
-**Minimum intervals:** yes — add a **job-level** interval for the combined policy, and keep
-**per-operation** intervals for steps inside the job (§8.3).
-
-- Job-level `table-maintenance` `minIntervalMs` gates how often TMS may submit the combined job
-  (same resolve order as other task types; default aligned with compaction, 1 hour).
-- Per-operation intervals decide which of the four steps run in **this** submission (for example
-  orphan may still be 7 days even when the combined job is eligible hourly). The job receives the
-  selected `ops` subset in `jobConf`.
+**Minimum interval:** only a **job-level** `table-maintenance` `minIntervalMs` (§8.3), compared once
+before submit against `last_job_id` → `job_finished_at`. Do **not** apply per-operation
+`minIntervalMs` inside the combined job. Per-operation interval keys remain for single-op jobs via
+ops APIs / manual `runJob`. Whether a step's SQL runs after the gate is decided by enable flags and
+(optional) Recommender, not by a second interval.
 
 Custom and single-op maintenance policies remain supported as separate `policy_id` rows for ops APIs
 and manual jobs. They are **not** driven by the IRC commit event path. The combined type is the
@@ -606,26 +617,24 @@ HTTP `tableMaintenance.uri` / Kafka produce-consume keys are **not** in scope (N
 
 ### 8.3 Task types and minimum interval (global default + table override)
 
-TMS recognizes maintenance **task types**. The commit event path uses only the combined policy's
-**job-level** `table-maintenance` interval plus per-operation intervals inside that job (§5.5).
-Single-operation types remain available for dedicated policies / jobs via ops APIs and manual
+TMS recognizes maintenance **task types**. The commit event path uses **only** the combined
+policy's job-level `table-maintenance` interval (§5.5), compared **once** before submit. Inside the
+job, each enabled op may run `Recommender` then SQL; per-operation intervals do **not** filter
+steps. Single-operation types remain for dedicated policies / jobs via ops APIs and manual
 `runJob`.
 
 | Task type           | Typical job / policy                                     | Code default `minIntervalMs` |
 | ------------------- | -------------------------------------------------------- | ---------------------------- |
-| `compaction`        | rewrite data files                                       | `3600000` (1 hour)           |
-| `snapshot-expiry`   | expire snapshots                                         | `86400000` (1 day)           |
-| `manifest-rewrite`  | rewrite manifests                                        | `86400000` (1 day)           |
-| `orphan-cleanup`    | orphan file cleanup                                      | `604800000` (7 days)         |
+| `compaction`        | rewrite data files (single-op path)                      | `3600000` (1 hour)           |
+| `snapshot-expiry`   | expire snapshots (single-op path)                        | `86400000` (1 day)           |
+| `manifest-rewrite`  | rewrite manifests (single-op path)                       | `86400000` (1 day)           |
+| `orphan-cleanup`    | orphan file cleanup (single-op path)                     | `604800000` (7 days)         |
 | `table-maintenance` | combined job (`builtin-iceberg-table-maintenance`, §5.5) | `3600000` (1 hour)           |
 
-For `system_iceberg_table_maintenance`:
-
-1. Resolve **`table-maintenance`** `minIntervalMs` against the policy row's `last_job_id` to decide
-   whether TMS may submit the combined job.
-2. Resolve each selected operation's task-type interval (and policy content overrides) to build the
-   `ops` subset for this run. An operation whose interval has not elapsed is omitted; relative order
-   stays `compact → manifests → expire → orphan`.
+For `system_iceberg_table_maintenance` on the event path: resolve **`table-maintenance`**
+`minIntervalMs` against the policy row's `last_job_id`. If the interval has elapsed and at least one
+op is enabled, submit the combined job. Inside the job, for each enabled op in order
+`compact → manifests → expire → orphan`: optional `Recommender`, then SQL (§5.5).
 
 **Resolution order** (first hit wins), same idea as Amoro table props + AMS defaults:
 
@@ -639,33 +648,32 @@ For `system_iceberg_table_maintenance`:
 
 | Key                                    | Description                                           |
 | -------------------------------------- | ----------------------------------------------------- |
-| `task.compaction.minIntervalMs`        | Default min interval for compaction                   |
-| `task.snapshot-expiry.minIntervalMs`   | Default min interval for snapshot expiry              |
-| `task.manifest-rewrite.minIntervalMs`  | Default min interval for manifest rewrite             |
-| `task.orphan-cleanup.minIntervalMs`    | Default min interval for orphan cleanup               |
+| `task.compaction.minIntervalMs`        | Default min interval for single-op compaction         |
+| `task.snapshot-expiry.minIntervalMs`   | Default min interval for single-op snapshot expiry    |
+| `task.manifest-rewrite.minIntervalMs`  | Default min interval for single-op manifest rewrite   |
+| `task.orphan-cleanup.minIntervalMs`    | Default min interval for single-op orphan cleanup     |
 | `task.table-maintenance.minIntervalMs` | Default min interval for the combined maintenance job |
 
 **Table-level overrides** (Iceberg / Gravitino table properties):
 
-| Property                                      | Overrides                                            |
-| --------------------------------------------- | ---------------------------------------------------- |
-| `maintenance.compaction.minIntervalMs`        | Compaction min interval for this table               |
-| `maintenance.snapshot-expiry.minIntervalMs`   | Snapshot expiry min interval for this table          |
-| `maintenance.manifest-rewrite.minIntervalMs`  | Manifest rewrite min interval for this table         |
-| `maintenance.orphan-cleanup.minIntervalMs`    | Orphan cleanup min interval for this table           |
-| `maintenance.table-maintenance.minIntervalMs` | Combined maintenance job min interval for this table |
+| Property                                      | Overrides                                                  |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `maintenance.compaction.minIntervalMs`        | Single-op compaction min interval for this table           |
+| `maintenance.snapshot-expiry.minIntervalMs`   | Single-op snapshot expiry min interval for this table      |
+| `maintenance.manifest-rewrite.minIntervalMs`  | Single-op manifest rewrite min interval for this table     |
+| `maintenance.orphan-cleanup.minIntervalMs`    | Single-op orphan cleanup min interval for this table       |
+| `maintenance.table-maintenance.minIntervalMs` | Combined maintenance job min interval for this table       |
 
 The event path uses per-policy `last_job_id` → `job_run_meta.job_finished_at` and the resolved
-`minIntervalMs` for that policy's task type (§5.4 / §5.5 / §6.2). `job_id` is only the in-flight
-submission. Policy content still owns **trigger thresholds** (e.g. MSE); interval only caps how
-often a successful submit may repeat.
+`table-maintenance` `minIntervalMs` (§5.4 / §5.5 / §6.2). `job_id` is only the in-flight
+submission. Policy content owns enable flags and per-op options; `Recommender` (when present) owns
+whether that step's SQL runs; interval only caps how often the combined job may be submitted again.
 
 Example table override:
 
 ```sql
 ALTER TABLE rest_catalog.db.orders SET TBLPROPERTIES (
-  'maintenance.table-maintenance.minIntervalMs' = '7200000',
-  'maintenance.orphan-cleanup.minIntervalMs' = '604800000'
+  'maintenance.table-maintenance.minIntervalMs' = '7200000'
 );
 ```
 
@@ -700,8 +708,8 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 
 #### Phase 2 checklist
 
-- [ ] Implement `MaintenanceEvaluateSubmitPipeline` for the combined job (ops subset → submit).
-- [ ] Enforce gates: in-flight / `table-maintenance` min-interval; per-op intervals for `ops`.
+- [ ] Implement `MaintenanceEvaluateSubmitPipeline` (one interval gate → submit combined job).
+- [ ] Enforce gates: in-flight / `table-maintenance` min-interval (once; no per-op interval filter).
 - [ ] Resolve Active `system_iceberg_table_maintenance` only on the event path (ignore single-op).
 - [ ] Add unit tests for skip / noop / submit / deferred outcomes.
 
@@ -743,10 +751,11 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 
 - [ ] Add built-in policy type `system_iceberg_table_maintenance` and job template
       `builtin-iceberg-table-maintenance` (§5.5).
-- [ ] Execute selected ops in order: `compact → manifests → expire → orphan`.
-- [ ] Gate submit with `table-maintenance` `minIntervalMs`; select `ops` with per-operation
-      intervals (§8.3).
-- [ ] Tests: subset ops skip correctly; order preserved; job-level and per-op intervals apply.
+- [ ] For each enabled op in order: optional `Recommender` → SQL
+      (`compact → manifests → expire → orphan`).
+- [ ] Gate submit with `table-maintenance` `minIntervalMs` once; do not skip steps by per-op
+      interval (§8.3).
+- [ ] Tests: disabled ops skipped; Recommender no-trigger skips SQL; order preserved.
 
 ### 9.2 Review Checklist
 
@@ -756,7 +765,7 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 | Classpath    | TMS plugin on main server classpath; **not** an aux isolated listener.                                           |
 | Event        | **In-process only** (§5.1.1); IRC hook inserts the commit row; TMS drives combined policy only (§5.5); no HTTP/Kafka. |
 | Ops API      | Seven routes replace `gravitino-optimizer` (§7). Not used by the commit path. Table WRITE required.              |
-| Pipeline     | Inline on event: combined policy only → claim → gates → ops subset → combined job; no metrics/monitor on event path. |
+| Pipeline     | Inline on event: combined policy → claim → one interval gate → combined job (per op: Recommender? → SQL). |
 | Durability   | IRC hook INSERTs one `table_maintenance_event` row per commit; TMS does not update it (§6.3).                    |
 | Rename/drop  | In-process lifecycle hook rewrites / purges string-keyed TMS rows (§6.4).                                        |
 | Multi-node   | Shared `table_maintenance_state` + DB **claim** (§6.1–§6.2); no CronJob.                                         |
