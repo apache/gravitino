@@ -450,6 +450,25 @@ public abstract class BaseGVFSOperations implements Closeable {
   public abstract Token<?>[] addDelegationTokens(String renewer, Credentials credentials);
 
   /**
+   * Resolve the given fileset path so that its actual file system is created before delegation
+   * tokens are collected.
+   *
+   * <p>The file system cache is only populated when a file is read, but Spark collects tokens
+   * before the job starts. Without this step no token is returned for a fileset that lives outside
+   * the default file system.
+   *
+   * @param filesetPath the virtual path this file system was initialized with.
+   */
+  public void prepareDelegationTokens(Path filesetPath) {
+    try {
+      getActualFileSystem(filesetPath, currentLocationName());
+    } catch (Exception e) {
+      // Never fail token collection: an unresolvable fileset simply yields no token.
+      LOG.warn("Failed to resolve {} while preparing delegation tokens", filesetPath, e);
+    }
+  }
+
+  /**
    * Add delegation tokens for all file systems in the cache.
    *
    * @param renewer the renewer.

@@ -301,6 +301,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) {
+    operations.prepareDelegationTokens(workingDirectory);
     return operations.addDelegationTokens(renewer, credentials);
   }
 
