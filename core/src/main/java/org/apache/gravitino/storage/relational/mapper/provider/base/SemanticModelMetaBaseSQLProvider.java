@@ -100,8 +100,11 @@ public class SemanticModelMetaBaseSQLProvider {
   /** Returns SQL for selecting and locking a Semantic Model identity by stable ID. */
   public String selectSemanticModelMetaByIdForUpdate(
       @Param("semanticModelId") Long semanticModelId) {
-    return "SELECT semantic_model_id, semantic_model_name, metalake_id, catalog_id, schema_id,"
-        + " current_version, last_version, audit_info, deleted_at FROM "
+    return "SELECT semantic_model_id as semanticModelId,"
+        + " semantic_model_name as semanticModelName, metalake_id as metalakeId,"
+        + " catalog_id as catalogId, schema_id as schemaId,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " audit_info as auditInfo, deleted_at as deletedAt FROM "
         + TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId} AND deleted_at = 0 FOR UPDATE";
   }

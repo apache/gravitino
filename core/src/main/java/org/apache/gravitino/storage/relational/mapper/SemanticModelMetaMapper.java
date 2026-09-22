@@ -110,7 +110,6 @@ public interface SemanticModelMetaMapper {
   SemanticModelPO selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId);
 
   /** Selects and locks a Semantic Model identity by stable ID. */
-  @ResultMap("semanticModelPOResultMap")
   @SelectProvider(
       type = SemanticModelMetaSQLProviderFactory.class,
       method = "selectSemanticModelMetaByIdForUpdate")

@@ -279,6 +279,23 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
             ImmutableMap.of("domain", "sales"));
     backend.insert(semanticModel, false);
 
+    SemanticModelPO persisted = getSemanticModelPO(semanticModel.id());
+    SemanticModelPO lockedById =
+        SessionUtils.getWithoutCommit(
+            SemanticModelMetaMapper.class,
+            mapper -> mapper.selectSemanticModelMetaByIdForUpdate(semanticModel.id()));
+    assertNotNull(lockedById);
+    assertEquals(persisted.getSemanticModelId(), lockedById.getSemanticModelId());
+    assertEquals(persisted.getSemanticModelName(), lockedById.getSemanticModelName());
+    assertEquals(persisted.getMetalakeId(), lockedById.getMetalakeId());
+    assertEquals(persisted.getCatalogId(), lockedById.getCatalogId());
+    assertEquals(persisted.getSchemaId(), lockedById.getSchemaId());
+    assertEquals(persisted.getAuditInfo(), lockedById.getAuditInfo());
+    assertEquals(persisted.getCurrentVersion(), lockedById.getCurrentVersion());
+    assertEquals(persisted.getLastVersion(), lockedById.getLastVersion());
+    assertEquals(persisted.getDeletedAt(), lockedById.getDeletedAt());
+    assertNull(lockedById.getSemanticModelVersionInfoPO());
+
     SemanticModelPO byParentId = readSemanticModelPO(semanticModel.nameIdentifier(), true);
     SemanticModelPO byFullName = readSemanticModelPO(semanticModel.nameIdentifier(), false);
     assertEquals(semanticModel.id(), byParentId.getSemanticModelId());
