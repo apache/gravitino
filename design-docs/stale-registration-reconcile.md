@@ -61,9 +61,10 @@ removal behaves exactly like an explicit drop.
 
 1. Define what "stale" means per entity type and how to confirm absence in the
    source safely.
-2. Add a server-side reconcile task for schemas in non-managed catalogs that
-   removes stale registrations through `SchemaDispatcher`, with events,
-   secret cleanup, authorization-plugin privilege removal and orphan cleanup.
+2. Add a server-side reconcile task for the `SCHEMA` and `TOPIC` entity
+   types in non-managed catalogs that removes stale registrations through
+   `SchemaDispatcher`/`TopicDispatcher`, with events, secret cleanup,
+   authorization-plugin privilege removal and orphan cleanup.
 3. Provide both a periodic trigger and an on-demand REST API, with a policy
    switch between report-only and auto-remove.
 4. Expose stale registrations via REST so administrators can inspect them
@@ -73,14 +74,21 @@ removal behaves exactly like an explicit drop.
 
 ## 3. Non-Goals
 
-- Tables, views, topics and filesets: the mechanism is designed to extend to
-  them, but the first implementation covers schemas only.
+- Tables, views and filesets: the mechanism is designed to extend to them,
+  but the first implementation covers the `SCHEMA` and `TOPIC` entity types
+  only. Tables and views first need a probe-absent force-delete path in
+  their dispatchers: their drop path deliberately preserves the registration
+  when the source reports `false`, and there is no cascade/force entry point
+  today. Topics are in scope because Kafka topics cannot be renamed (no
+  "renamed vs dropped" ambiguity) and `TopicOperationDispatcher.dropTopic`
+  already deletes the store registration unconditionally for non-managed
+  topics, so reconcile can reuse the existing removal path as-is.
 - UI surfacing: the REST response carries everything a UI needs, but no web
   page is added in this phase.
 - Changing `list*` behavior for non-managed catalogs (tracked separately in
   the epic).
 - The reverse direction (object exists in source but is not registered):
-  already handled by lazy import on `loadSchema`/`loadTable`.
+  already handled by lazy import on `loadSchema`/`loadTable`/`loadTopic`.
 - Managed catalogs (fileset, model, generic-lakehouse): Gravitino owns the
   storage there, no source drift is possible.
 
@@ -122,9 +130,9 @@ stale schema is a cascading drop where the source side is already gone.
 ### 4.3 Existence probes
 
 Connectors expose explicit per-object existence probes
-(`SupportsSchemas.schemaExists`, `TableCatalog.tableExists`, ...). These are
-single-object probes, not listings, so they are not affected by listing
-permission filters.
+(`SupportsSchemas.schemaExists`, `TableCatalog.tableExists`,
+`TopicCatalog.topicExists`, ...). These are single-object probes, not
+listings, so they are not affected by listing permission filters.
 
 ### 4.4 Background task pattern
 
@@ -142,30 +150,42 @@ There is no central scheduler. Server subsystems each own a
 A registration is stale for a given entity when all of the following hold:
 
 1. The owning catalog does not manage storage for that entity scope
-   (`catalog.capabilities().managedStorage(Capability.Scope.SCHEMA).supported()`
-   is false; same pattern as `CatalogManager.isManagedStorageCatalog`).
-2. An explicit existence probe against the source reports the object absent
-   (`NoSuch*Exception` from the probe, never a missing entry in a listing).
+   (`catalog.capabilities().managedStorage(scope).supported()` is false for
+   the entity's `Capability.Scope`, e.g. `SCHEMA` or `TOPIC`; same pattern
+   as `CatalogManager.isManagedStorageCatalog`).
+2. An explicit existence probe against the source reports the object absent:
+   the probe returns `false` (`schemaExists`/`topicExists` are load-and-catch
+   probes that swallow only `NoSuch*Exception` internally, so a `false` is
+   unambiguous absence). A missing entry in a listing is never evidence.
 3. The probe did not fail for infrastructural reasons (connection failure,
    timeout, authentication): those mark the catalog "unreachable" and skip
    all removals for that catalog in this round.
 
-### 5.2 StaleSchemaReconciler
+### 5.2 StaleRegistrationReconciler
 
-New class `StaleSchemaReconciler` in `core`, following the
+New class `StaleRegistrationReconciler` in `core`, following the
 `RelationalGarbageCollector` pattern:
 
 ```
 every reconcileIntervalSecs (default: disabled):
   for each non-managed catalog in each metalake:
+    sleep(random(0, catalogJitterSecs))  // spread probe load across the round
     try to initialize/probe the catalog:
       on connection failure -> log, mark unreachable, skip catalog
     for each schema registration in the catalog (from the entity store):
       if schemaExists(name) reports absent:
         record as stale
         if policy == AUTO_REMOVE:
-          dispatcher.dropSchema(ident, cascade = true)
+          schemaDispatcher.dropSchema(ident, cascade = true)
+    for each topic registration in the catalog (from the entity store):
+      if topicExists(name) reports absent:
+        record as stale
+        if policy == AUTO_REMOVE:
+          topicDispatcher.dropTopic(ident)
 ```
+
+The random per-catalog jitter avoids a hot CPU & IO burst where every
+catalog is probed at once at the start of each round.
 
 For catalogs with hierarchical namespaces (e.g. Iceberg), the store is
 enumerated per namespace level, and each registered name is expanded to its
@@ -174,16 +194,22 @@ every level are probed. When a parent and its children are all stale, the
 removal follows `SchemaEntityCleaner`'s approach: locate the outermost stale
 schema and drop it with cascade = true, carrying the descendants with it.
 
+Topics have no "renamed vs dropped" ambiguity because Kafka topics cannot be
+renamed, and `TopicOperationDispatcher.dropTopic` already deletes the store
+registration unconditionally for non-managed topics. Reconciling a stale
+topic is therefore a plain `TopicDispatcher.dropTopic` call through the full
+dispatcher chain — no new removal semantics are needed.
+
 The periodic task will run removals under a dedicated system identity (e.g.
-`reconciler`), so `DropSchemaEvent` audit records are distinguishable from
+`reconciler`), so `Drop*Event` audit records are distinguishable from
 user-initiated drops (today the event user comes from
 `PrincipalUtils.getCurrentUserName()`, which has no login context on a
-background thread). See Open Question #3.
+background thread). See Open Question #2.
 
-Removal goes through `SchemaDispatcher` (the full chain in 4.1), inside the
-server JVM, so tree locking, events, secret cleanup, authorization-plugin
-privilege removal and orphan cleanup behave exactly as an explicit cascading
-drop.
+Removal goes through `SchemaDispatcher`/`TopicDispatcher` (the full chain in
+4.1), inside the server JVM, so tree locking, events, secret cleanup,
+authorization-plugin privilege removal and orphan cleanup behave exactly as
+an explicit drop.
 
 Per-catalog error isolation: a failing catalog never blocks or aborts
 reconcile of other catalogs.
@@ -194,10 +220,13 @@ reconcile of other catalogs.
 | --- | ------- | ------- |
 | `gravitino.reconcile.enabled` | `false` | Master switch for the periodic task |
 | `gravitino.reconcile.intervalSecs` | `3600` | Period between reconcile rounds |
+| `gravitino.reconcile.catalogJitterSecs` | `60` | Max random delay before probing each catalog, to spread CPU/IO load across the round |
 | `gravitino.reconcile.policy` | `report-only` | `report-only` or `auto-remove` |
 
 The on-demand API is always available regardless of `enabled`; the policy
-applies to both triggers.
+applies to both triggers. The policy is global-only in the first version;
+per-catalog overrides (e.g. auto-remove for a dev catalog, report-only for
+production) are a possible future extension if operators ask for them.
 
 ### 5.4 REST API
 
@@ -212,13 +241,14 @@ Runs reconcile for one catalog synchronously. Request body carries an optional
 `dryRun` (default: follow server policy). Returns the stale report.
 
 ```
-GET /api/metalakes/{metalake}/catalogs/{catalog}/stale-schemas
+GET /api/metalakes/{metalake}/catalogs/{catalog}/stale-entities
 ```
 
 Returns the stale report for one catalog. The endpoint runs a live
 report-only scan on each call — there is no server-side report cache, so the
-result is correct on multi-node deployments. Caching may be added later as an
-optimization.
+result is correct on multi-node deployments. If probing cost becomes a
+problem on large catalogs, enlarge `intervalSecs` first; only if that is not
+enough should a cached report be considered as a later optimization.
 
 Response DTO (`common/.../dto/responses/StaleEntitiesResponse`):
 
@@ -228,6 +258,9 @@ Response DTO (`common/.../dto/responses/StaleEntitiesResponse`):
   "catalogUnreachable": false,
   "staleSchemas": [
     { "name": "db1", "detectedAt": 1727000000000, "removed": false }
+  ],
+  "staleTopics": [
+    { "name": "topic1", "detectedAt": 1727000000000, "removed": false }
   ]
 }
 ```
@@ -240,9 +273,9 @@ accessMetadataType = MetadataObject.Type.CATALOG)` on both endpoints.
 ## 6. Safety Considerations
 
 1. **Never delete on doubt.** Absence must come from an explicit probe
-   returning `NoSuch*Exception`. Connection errors, timeouts and auth failures
-   skip the whole catalog for that round. Listings are never used as absence
-   evidence.
+   returning `false`, never from a listing. Connection errors, timeouts and
+   auth failures surface as thrown exceptions — not as `false` — and skip the
+   whole catalog for that round.
 2. **Renames are not removals.** An object renamed in the source keeps its
    `gravitino.identifier` property in the renamed object, and the
    rename-recovery half of this mechanism already exists:
@@ -258,17 +291,18 @@ accessMetadataType = MetadataObject.Type.CATALOG)` on both endpoints.
    an extension of the existing recovery path, left to a follow-up (see Open
    Questions).
 3. **Tree locking.** All removals run inside the server JVM through the
-   dispatcher, which acquires the WRITE tree lock on the catalog node, so
-   reconcile removals cannot race with concurrent creates. Note this lock is
-   catalog-scoped: each removal acquires the catalog WRITE lock individually,
-   so a reconcile round removing many schemas repeatedly blocks other writes
-   to that catalog — which is one motivation for the rate limiting in Open
-   Question #5.
+   dispatcher, which acquires a WRITE tree lock on the parent node (the
+   catalog node for schemas, the schema node for topics), so reconcile
+   removals cannot race with concurrent creates. Note these locks are
+   parent-scoped: each removal acquires the WRITE lock individually, so a
+   reconcile round removing many registrations under one catalog repeatedly
+   blocks other writes there — which is one motivation for the rate limiting
+   in Open Question #3.
 4. **Default posture is safe.** Reconcile is disabled by default; when
    enabled, the default policy is report-only. Auto-removal is an explicit
    operator choice.
 5. **Observability.** Each round logs: catalogs scanned, catalogs skipped as
-   unreachable, stale schemas found, removals attempted/succeeded. A metric
+   unreachable, stale entities found, removals attempted/succeeded. A metric
    for stale-count per catalog can be added once the shape settles.
 
 ---
@@ -281,16 +315,9 @@ accessMetadataType = MetadataObject.Type.CATALOG)` on both endpoints.
    identifier — see Safety #2 for the existing lazy-import recovery), and
    re-point the registration instead of deleting it? This preserves
    tags/owners across renames but requires a listing scan per catalog.
-2. **Report caching.** The GET endpoint runs a live report-only scan per
-   call. If probing cost becomes a problem on large catalogs, should a
-   short-lived cached report be added, and where (memory is wrong on
-   multi-node)?
-3. **System identity.** The periodic task needs a principal for the event
+2. **System identity.** The periodic task needs a principal for the event
    chain (today a background thread has no login user). Introduce a dedicated
    system identity (e.g. `reconciler`), and should it be visible/excluded in
    authorization audit?
-4. **Per-catalog overrides.** Is a global policy enough, or do operators need
-   per-catalog policy (e.g. auto-remove for a dev catalog, report-only for
-   production)?
-5. **Rate limiting.** Should a reconcile round cap the number of removals per
+3. **Rate limiting.** Should a reconcile round cap the number of removals per
    run to bound blast radius of a misbehaving probe?
