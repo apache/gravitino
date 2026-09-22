@@ -828,6 +828,39 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCreateRuntimeJobTemplateRejectsArtifactsWithSameBasename() throws IOException {
+    File stagingDir = Files.createTempDirectory("gravitino-test-job-collision").toFile();
+    try {
+      // The executable and a script share the basename "task.sh" in different directories; the
+      // staging directory is keyed by basename, so staging would silently overwrite one of them.
+      ShellJobTemplate shellJobTemplate =
+          ShellJobTemplate.builder()
+              .withName("collision")
+              .withComment("Two artifacts sharing a basename")
+              .withExecutable("file:/first/task.sh")
+              .withScripts(Lists.newArrayList("file:/second/task.sh"))
+              .build();
+      JobTemplateEntity jobTemplateEntity =
+          JobTemplateEntity.builder()
+              .withId(1L)
+              .withName("collision-entity")
+              .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+              .withTemplateContent(
+                  JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              JobManager.createRuntimeJobTemplate(
+                  jobTemplateEntity, Collections.emptyMap(), stagingDir));
+    } finally {
+      FileUtils.deleteDirectory(stagingDir);
+    }
+  }
+
+  @Test
   public void testRunJobPopulatesResolvedRuntimeJobTemplate() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
