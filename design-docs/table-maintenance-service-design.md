@@ -182,15 +182,6 @@ TMS does not write the event row, and the row is not updated.
 | Transport   | In-process callback / SPI only — **no** HTTP `POST …/events/iceberg-commit`, **no** Kafka.                                                |
 | Payload     | Normalized `table_identifier` (`catalog.schema.table`) and the committed `snapshot_id`. Policy selection uses Active policies + triggers. |
 
-Deployment:
-
-1. Package the TMS plugin jars with the main Gravitino server and set
-   `gravitino.server.rest.extensionPackages` to include the TMS Feature package (see §8.1).
-2. Enable `iceberg-rest` in `gravitino.auxService.names` (same process as the main server).
-3. Enable in-process commit events (`tableMaintenance.inProcess` — §8.2).
-4. Attach Govern maintenance policies (e.g. `system_iceberg_compaction`) to catalogs/schemas/tables
-   via existing Policy APIs on the main server (**8090**).
-
 ### 5.2 Internal structure
 
 | Part                                | Responsibility                                                                                                                                           |
