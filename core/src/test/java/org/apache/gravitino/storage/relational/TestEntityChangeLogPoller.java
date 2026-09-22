@@ -61,12 +61,17 @@ public class TestEntityChangeLogPoller {
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
 
-      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, metrics);
       poller.registerListener(firstListenerRecords::addAll);
       poller.registerListener(secondListenerRecords::addAll);
 
       poller.pollChanges();
       poller.pollChanges();
+      Assertions.assertEquals(
+          4, metrics.getMetricRegistry().counter("records-delivered-total").getCount());
+      Assertions.assertEquals(
+          4, metrics.getMetricRegistry().counter("records-delivered.anonymous-total").getCount());
     }
 
     Assertions.assertEquals(List.of(first, second), firstListenerRecords);
@@ -214,6 +219,78 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
+  void testTailSampleFailureDoesNotSuppressFetchedBatch() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
+    when(mapper.selectEntityChanges(0L, MAX_ROWS)).thenReturn(List.of(change));
+    when(mapper.selectMaxChangeId()).thenThrow(new RuntimeException("tail query failed"));
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    metrics.setDbTailId(9L);
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, metrics);
+      poller.registerListener(received::addAll);
+      poller.pollChanges();
+    }
+
+    Assertions.assertEquals(List.of(change), received);
+    Assertions.assertEquals(
+        1L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    Assertions.assertEquals(
+        9L, metrics.getMetricRegistry().getGauges().get("db-tail-id").getValue());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
+    Assertions.assertEquals(
+        0, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+  }
+
+  @Test
+  void testInterruptedPollIsNotCountedAsFailure() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, MAX_ROWS))
+        .thenThrow(new RuntimeException(new InterruptedException("shutdown")));
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      new EntityChangeLogPoller(1, metrics).pollChanges();
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+      Assertions.assertEquals(
+          0, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void testInterruptedTailSampleStopsDeliveryWithoutCountingFailure() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, MAX_ROWS))
+        .thenReturn(List.of(change(1L, "CATALOG", "ml1.cat1")));
+    when(mapper.selectMaxChangeId())
+        .thenThrow(new RuntimeException(new InterruptedException("shutdown")));
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, metrics);
+      poller.registerListener(received::addAll);
+      poller.pollChanges();
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+      Assertions.assertTrue(received.isEmpty());
+      Assertions.assertEquals(
+          0L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+      Assertions.assertEquals(
+          0, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
   void testSuccessfulEmptyPollSamplesTailAndUpdatesMetrics() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     when(mapper.selectEntityChanges(0L, MAX_ROWS)).thenReturn(List.of());
@@ -266,6 +343,8 @@ public class TestEntityChangeLogPoller {
         1L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
     Assertions.assertEquals(
         1, metrics.getMetricRegistry().counter("listener-failures-total").getCount());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("listener-failures.anonymous-total").getCount());
     Assertions.assertEquals(
         0, metrics.getMetricRegistry().counter("records-applied-total").getCount());
   }

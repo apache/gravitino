@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.EntityCache;
@@ -65,28 +64,28 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheChangeLogListener.class);
 
   private final EntityCache cache;
-  @Nullable private final EntityChangeLogMetricsSource metrics;
+  private final EntityChangeLogMetricsSource metrics;
 
   /**
-   * Creates a listener that invalidates the given entity store cache.
+   * Creates a listener that invalidates the given entity store cache. Metrics from this legacy
+   * constructor are local to the listener and are not exported by the server metrics system.
    *
    * @param cache the per-node entity store cache to keep coherent
    */
   public EntityCacheChangeLogListener(EntityCache cache) {
-    this(cache, null);
+    this(cache, new EntityChangeLogMetricsSource());
   }
 
   /**
    * Creates a listener with metrics shared with the poller.
    *
    * @param cache the per-node entity store cache
-   * @param metrics process-local change log metrics, or null when metrics are unavailable
+   * @param metrics process-local change log metrics
    */
-  public EntityCacheChangeLogListener(
-      EntityCache cache, @Nullable EntityChangeLogMetricsSource metrics) {
+  public EntityCacheChangeLogListener(EntityCache cache, EntityChangeLogMetricsSource metrics) {
     Preconditions.checkArgument(cache != null, "cache cannot be null");
     this.cache = cache;
-    this.metrics = metrics;
+    this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
   }
 
   @Override
@@ -114,13 +113,9 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
             change.getFullName());
         cache.invalidate(ident, type);
         applied++;
-        if (metrics != null) {
-          metrics.recordsApplied(1);
-        }
+        metrics.recordsApplied(1);
       } catch (RuntimeException e) {
-        if (metrics != null) {
-          metrics.invalidationFailed();
-        }
+        metrics.invalidationFailed();
         // Dropping a single invalidation would leave this node serving that entity stale until it
         // expires. Clearing the whole cache is the safe superset, and it also covers the rest of
         // this batch, so there is nothing left to replay.
@@ -134,9 +129,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
             change.getFullName(),
             e);
         cache.clear();
-        if (metrics != null) {
-          metrics.fallbackCleared();
-        }
+        metrics.fallbackCleared();
         LOG.debug(
             "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=true durationMs={}",
             changes.size(),

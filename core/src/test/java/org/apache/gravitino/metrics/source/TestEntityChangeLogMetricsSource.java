@@ -32,7 +32,7 @@ public class TestEntityChangeLogMetricsSource {
     metrics.setCursorId(5);
     metrics.setDbTailId(8);
     metrics.pollSucceeded(3);
-    metrics.recordsDelivered(6);
+    metrics.recordsDelivered("org.apache.gravitino.CacheListener", 6);
     metrics.recordsApplied(6);
     metrics.pollFailed();
     metrics.listenerFailed("org.apache.gravitino.CacheListener");
@@ -47,6 +47,12 @@ public class TestEntityChangeLogMetricsSource {
         3, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
     Assertions.assertEquals(
         6, metrics.getMetricRegistry().counter("records-delivered-total").getCount());
+    Assertions.assertEquals(
+        6,
+        metrics
+            .getMetricRegistry()
+            .counter("records-delivered.org_apache_gravitino_CacheListener-total")
+            .getCount());
     Assertions.assertEquals(
         6, metrics.getMetricRegistry().counter("records-applied-total").getCount());
     Assertions.assertEquals(

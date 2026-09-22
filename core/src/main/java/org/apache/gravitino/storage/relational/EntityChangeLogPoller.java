@@ -83,7 +83,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private volatile long entityPollHighWaterId = 0;
 
   /**
-   * Creates an {@link EntityChangeLogPoller}.
+   * Creates an {@link EntityChangeLogPoller} with an unregistered metrics source for callers that
+   * do not use the server metrics system.
    *
    * @param pollIntervalSecs interval between successive polling cycles
    */
@@ -193,7 +194,6 @@ public class EntityChangeLogPoller implements AutoCloseable {
     try (Timer.Context ignored = metrics.timePoll()) {
       doPollChanges();
     } catch (Throwable e) {
-      metrics.pollFailed();
       // Catch Throwable, not Exception: this method is the task handed to
       // scheduleWithFixedDelay(), and anything that escapes it cancels all future runs for good,
       // silently. A listener or its recovery path can throw an Error as well as an Exception.
@@ -202,6 +202,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
       if (handleInterruptIfAny(e, "Entity change poll")) {
         return;
       }
+      metrics.pollFailed();
       LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
     }
   }
@@ -217,11 +218,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private BatchDelivery fetchNextDelivery() {
     long fetchStartNanos = System.nanoTime();
     List<EntityChangeRecord> changes = fetchEntityChanges();
-    long dbTailId =
-        getOrDefault(
-            SessionUtils.getWithoutCommit(
-                EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
-    metrics.setDbTailId(dbTailId);
+    // The tail is for observability only. A failed sample must not suppress delivery of rows
+    // already fetched successfully or hold the cursor back.
+    @Nullable Long dbTailId = null;
+    try {
+      dbTailId =
+          getOrDefault(
+              SessionUtils.getWithoutCommit(
+                  EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+      metrics.setDbTailId(dbTailId);
+    } catch (RuntimeException e) {
+      if (handleInterruptIfAny(e, "Entity change log tail sample")) {
+        throw e;
+      }
+      LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
+    }
     metrics.pollSucceeded(changes.size());
     long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - fetchStartNanos);
     if (changes.isEmpty()) {
@@ -348,14 +359,14 @@ public class EntityChangeLogPoller implements AutoCloseable {
             delivery.lastChangeId,
             delivery.changes.size());
         listener.onEntityChange(delivery.changes);
-        metrics.recordsDelivered(delivery.changes.size());
+        metrics.recordsDelivered(listenerMetricName(listener), delivery.changes.size());
         LOG.debug(
             "Entity change log listener {} consumed batch id range [{}, {}]",
             listener.getClass().getName(),
             delivery.firstChangeId(),
             delivery.lastChangeId);
       } catch (Throwable e) {
-        metrics.listenerFailed(listener.getClass().getName());
+        metrics.listenerFailed(listenerMetricName(listener));
         // Throwable, not Exception: one faulty listener must not take down the whole poller, even
         // if it fails with an Error rather than an Exception.
         LOG.error(
@@ -367,6 +378,14 @@ public class EntityChangeLogPoller implements AutoCloseable {
             e);
       }
     }
+  }
+
+  /** Uses a bounded, stable metric bucket for lambda and anonymous listener implementations. */
+  private static String listenerMetricName(EntityChangeLogListener listener) {
+    Class<?> listenerClass = listener.getClass();
+    return listenerClass.isSynthetic() || listenerClass.isAnonymousClass()
+        ? "anonymous"
+        : listenerClass.getName();
   }
 
   private static class BatchDelivery {

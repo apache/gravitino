@@ -77,7 +77,8 @@ gravitino_catalog_datasource_max_connections{provider="jdbc",metalake="test_meta
 The `entity-change-log` source exposes each server's change-log processing state through JMX and
 `/prometheus/metrics`. For example, `entity-change-log.record-lag` in the metrics registry becomes
 `entity_change_log_record_lag` in Prometheus. Gauges read only in-memory values; the poller samples
-the database tail once per cycle.
+the database tail once per cycle. If only the tail sample fails, delivery continues and the tail
+value remains at its last successful sample.
 
 | Metric suffix                                                | Type and unit            | Meaning                                                                                                                  |
 | ------------------------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
@@ -87,6 +88,7 @@ the database tail once per cycle.
 | `poll-failures-total`                                        | counter, failures        | Failed poll cycles.                                                                                                      |
 | `listener-failures-total`, `listener-failures.<class>-total` | counter, failures        | Total failures and failures by registered listener class.                                                                |
 | `records-fetched-total`, `records-delivered-total`           | counter, records         | Rows fetched and rows delivered successfully to listeners; one row delivered to two listeners counts twice as delivered. |
+| `records-delivered.<class>-total`                             | counter, records         | Successful deliveries by listener class. Lambda and anonymous listeners share the `anonymous` bucket.                   |
 | `records-applied-total`                                      | counter, invalidations   | Targeted entity-cache invalidations completed successfully; malformed rows and fallback clears do not count.             |
 | `batch-size-records`                                         | histogram, records       | Number of rows fetched per successful poll, including empty polls.                                                       |
 | `poll-duration`                                              | timer, duration          | End-to-end poll-cycle duration.                                                                                          |
@@ -99,7 +101,7 @@ row was added to the current transaction, not that the transaction committed.
 
 For an incident, compare `db-tail-id` with `cursor-id` on the affected server. A growing
 `record-lag` together with an increasing poll age or `poll-failures-total` points to polling trouble.
-If the cursor advances but data remains stale, inspect `listener-failures-total`,
+If the cursor advances but data remains stale, inspect `listener-failures-total`, `records-delivered.<class>-total`,
 `invalidation-failures-total`, and `fallback-clears-total`, then correlate the debug logs by
 encoded `fullName` and change ID. The sampled tail and cursor are process-local; each server has
 its own values.

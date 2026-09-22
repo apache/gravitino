@@ -83,8 +83,9 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   }
 
   /** Records the rows delivered to one listener without an exception. */
-  public void recordsDelivered(int count) {
+  public void recordsDelivered(String listenerName, int count) {
     recordsDelivered.inc(count);
+    getCounter("records-delivered." + listenerName.replace('.', '_') + "-total").inc(count);
   }
 
   /** Records targeted entity-cache invalidations that completed successfully. */
