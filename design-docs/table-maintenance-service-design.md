@@ -165,7 +165,7 @@ Gravitino Iceberg REST (IRC, typically :9001)
                         │
                         +--> gate once: in-flight / table-maintenance min-interval
                         +--> submit combined job; inside job, for each enabled op in order:
-                        │      Recommender (if that op has a StrategyHandler) → SQL
+                        │      Recommender → SQL
                         │
                         v
                  Gravitino Job framework (builtin-iceberg-table-maintenance)
@@ -195,7 +195,7 @@ TMS does not write the event row, and the row is not updated.
 | `TableMaintenanceStateStore`        | Shared DB access for `table_maintenance_state` upsert / claim / release / rename (§6.1–§6.2, §6.4).                                                      |
 | `TableMaintenanceEventStore`        | Shared DB access for `table_maintenance_event` insert / rename / drop (§6.3–§6.4).                                                                       |
 | `IcebergTableLifecycleHook`         | In-process IRC rename/drop hook: rewrite or purge TMS rows keyed by `table_identifier` (§6.4).                                                           |
-| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — combined job reuses per-op `Recommender` when a `StrategyHandler` exists; otherwise SQL only.     |
+| Existing optimizer classes          | `Updater`, `Recommender`, providers, `JobSubmitter` — combined job runs per-op `Recommender` then SQL for each enabled op (§5.5).                          |
 
 ### 5.3 User process (event-driven)
 
@@ -227,7 +227,7 @@ TMS does not write the event row, and the row is not updated.
 4. The hook then invokes TMS **in-process**. TMS resolves Active **combined** maintenance policies
    only (§5.5), upserts one state row per such policy, claims, applies the **one** interval gate,
    and submits at most one combined job. Inside that job, each enabled op runs
-   `Recommender` (if any) then SQL (§5.5).
+   `Recommender` then SQL (§5.5).
 5. Operators observe runs in the Gravitino **Jobs** UI / APIs. Single-operation jobs remain available
    through the ops APIs (§7) and manual `runJob`, not through the commit event path.
 
@@ -283,11 +283,11 @@ pipeline moves it to `last_job_id` and clears `job_id`. `last_job_id` →
    `job_id`. Do not change `last_job_id`.
 5. Inside that job, for each enabled op in order
    (`compact → manifests → expire → orphan`):
-   - If this op has a `StrategyHandler` / `Recommender` path: run it. If it does not trigger, skip
-     this op's SQL and continue to the next op.
+   - Run that op's `StrategyHandler` / `Recommender`. If it does not trigger, skip this op's SQL
+     and continue to the next op.
    - Run this op's SQL (Iceberg Spark procedure / equivalent).
-   - Today only **compact** has a Recommender; manifests / expire / orphan go straight to SQL unless
-     a handler is added later.
+   - All four ops have a designed Recommender path (compaction, rewrite-manifests, snapshot-expiry,
+     orphan-removal).
 
 ### 5.5 Combined maintenance policy and ordered builtin job
 
@@ -308,24 +308,25 @@ single-operation built-ins (for example `system_iceberg_compaction`) and custom 
 are ignored on the event path even if Active and attached. Attach the combined type for
 commit-driven maintenance; use ops APIs (§7) or manual `runJob` for single-op runs.
 
-**Recommender vs SQL:** they are separate. `Recommender` decides whether an op should run (when a
-`StrategyHandler` exists). SQL is the actual maintenance work. Not every op has a Recommender —
-compaction does today; expire / orphan / manifests typically do not.
+**Recommender vs SQL:** they are separate. `Recommender` / `StrategyHandler` decides whether an op
+should run; SQL is the actual maintenance work. All four ops have a designed handler path
+(compaction, rewrite-manifests, snapshot-expiry, orphan-removal — see those job/policy design
+docs). If Recommender does not trigger, skip that op's SQL only.
 
 **In-job loop** (enabled ops only; relative order fixed):
 
 ```text
 for each op in [compact, manifests, expire, orphan] if enabled:
-  1. Recommender / StrategyHandler   (skip if this op has none)
+  1. Recommender / StrategyHandler
        └─ not triggered → skip this op's SQL; continue
   2. SQL                             (Spark procedure for this op)
 ```
 
 ```text
-1. compact           Recommender (yes today) → rewrite data files SQL
-2. manifests         Recommender (no today)  → rewrite manifests SQL
-3. expire            Recommender (no today)  → expire snapshots SQL
-4. orphan            Recommender (no today)  → remove orphan files SQL
+1. compact           Recommender → rewrite data files SQL
+2. manifests         Recommender → rewrite manifests SQL
+3. expire            Recommender → expire snapshots SQL
+4. orphan            Recommender → remove orphan files SQL
 ```
 
 Why this order (when steps run):
@@ -634,7 +635,7 @@ steps. Single-operation types remain for dedicated policies / jobs via ops APIs 
 For `system_iceberg_table_maintenance` on the event path: resolve **`table-maintenance`**
 `minIntervalMs` against the policy row's `last_job_id`. If the interval has elapsed and at least one
 op is enabled, submit the combined job. Inside the job, for each enabled op in order
-`compact → manifests → expire → orphan`: optional `Recommender`, then SQL (§5.5).
+`compact → manifests → expire → orphan`: `Recommender` then SQL (§5.5).
 
 **Resolution order** (first hit wins), same idea as Amoro table props + AMS defaults:
 
@@ -666,7 +667,7 @@ op is enabled, submit the combined job. Inside the job, for each enabled op in o
 
 The event path uses per-policy `last_job_id` → `job_run_meta.job_finished_at` and the resolved
 `table-maintenance` `minIntervalMs` (§5.4 / §5.5 / §6.2). `job_id` is only the in-flight
-submission. Policy content owns enable flags and per-op options; `Recommender` (when present) owns
+submission. Policy content owns enable flags and per-op options; each step's `Recommender` owns
 whether that step's SQL runs; interval only caps how often the combined job may be submitted again.
 
 Example table override:
@@ -751,7 +752,7 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 
 - [ ] Add built-in policy type `system_iceberg_table_maintenance` and job template
       `builtin-iceberg-table-maintenance` (§5.5).
-- [ ] For each enabled op in order: optional `Recommender` → SQL
+- [ ] For each enabled op in order: `Recommender` → SQL
       (`compact → manifests → expire → orphan`).
 - [ ] Gate submit with `table-maintenance` `minIntervalMs` once; do not skip steps by per-op
       interval (§8.3).
@@ -765,7 +766,7 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 | Classpath    | TMS plugin on main server classpath; **not** an aux isolated listener.                                           |
 | Event        | **In-process only** (§5.1.1); IRC hook inserts the commit row; TMS drives combined policy only (§5.5); no HTTP/Kafka. |
 | Ops API      | Seven routes replace `gravitino-optimizer` (§7). Not used by the commit path. Table WRITE required.              |
-| Pipeline     | Inline on event: combined policy → claim → one interval gate → combined job (per op: Recommender? → SQL). |
+| Pipeline     | Inline on event: combined policy → claim → one interval gate → combined job (per op: Recommender → SQL). |
 | Durability   | IRC hook INSERTs one `table_maintenance_event` row per commit; TMS does not update it (§6.3).                    |
 | Rename/drop  | In-process lifecycle hook rewrites / purges string-keyed TMS rows (§6.4).                                        |
 | Multi-node   | Shared `table_maintenance_state` + DB **claim** (§6.1–§6.2); no CronJob.                                         |
