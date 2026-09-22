@@ -292,6 +292,9 @@ The local job executor finds a job's output through a small index file it writes
   yet, have no index file and return empty output.
 - Deleting this directory makes the output of existing jobs unavailable. After downgrading to an
   earlier version, it isn't used anymore and can be removed.
+- A missing index returns empty output, but an index that exists and can't be read, for example
+  while the shared storage is unavailable, fails the request with an error rather than returning
+  empty output that looks like the job printed nothing.
 
 ### Job System Configuration
 
@@ -318,6 +321,9 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+
+The local job executor always uses `gravitino.job.stagingDir` as its staging directory, the same one
+the job system stages jobs in. A `gravitino.jobExecutor.local.stagingDir` setting is ignored.
 
 The local job executor runs up to `gravitino.jobExecutor.local.maxRunningJobs` jobs at the same
 time, each in its own process on the Gravitino server host, and queues the others. Make sure the

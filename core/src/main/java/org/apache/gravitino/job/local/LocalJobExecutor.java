@@ -83,6 +83,9 @@ import org.slf4j.LoggerFactory;
  * a small, write-once index file per job under {@code <stagingDir>/.job-output-index}. In a
  * multi-node deployment the staging directory must be shared by all Gravitino servers, otherwise a
  * job's output can only be retrieved from the server that ran it.
+ *
+ * <p>{@link #initialize(Map)} requires {@link LocalJobExecutorConfigs#STAGING_DIR}, which {@code
+ * JobExecutorFactory} sets from {@code gravitino.job.stagingDir}.
  */
 public class LocalJobExecutor implements JobExecutor {
 
