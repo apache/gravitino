@@ -558,11 +558,11 @@ The natural alternative is adding `updated_at` to each entity table (metalake_me
 catalog_meta, schema_meta, table_meta, …) and polling them directly. This has three
 fundamental problems:
 
-| Problem                                        | Explanation                                                                                                                                                                                                   |
-|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Old name unavailable after rename**          | Entity tables store the **current** name only. After `table1 → table2`, the row holds `table2`. The poller can detect *a* change happened but cannot reconstruct the old cache key to invalidate it.          |
+| Problem                                        | Explanation                                                                                                                                                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Old name unavailable after rename**          | Entity tables store the **current** name only. After `table1 → table2`, the row holds `table2`. The poller can detect *a* change happened but cannot reconstruct the old cache key to invalidate it.                             |
 | **JOIN cost to reconstruct full path**         | Nested tables (schema, table, fileset, …) store only their simple name. Rebuilding the full `catalog.schema.table` path requires multi-level JOINs per entity type — eight separate queries or a complex UNION every poll cycle. |
-| **Cascade requires scanning all child tables** | Dropping `cat1` means also polling schema_meta, table_meta, … for all rows under `cat1`. With `entity_change_log`, **one row** for the catalog + `invalidateByPrefix("lake::cat1::")` evicts the entire subtree. |
+| **Cascade requires scanning all child tables** | Dropping `cat1` means also polling schema_meta, table_meta, … for all rows under `cat1`. With `entity_change_log`, **one row** for the catalog + `invalidateByPrefix("lake::cat1::")` evicts the entire subtree.                 |
 
 `entity_change_log` solves all three: `(metalake_name, entity_type, full_name)` gives the
 poller exactly what it needs to call `buildCacheKey + invalidateByPrefix`, and `operate_type`
@@ -821,7 +821,7 @@ authorize(metalakeName, username, resource, operation)
 ### 4.8 Properties
 
 | Dimension                              | Value                                                                                                                             |
-|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Staleness — privilege / role changes   | **0** — version-validated on every request (Steps 1 + 3)                                                                          |
 | Staleness — name→id, ownership (local) | **Immediate** — write-path hook fires after transaction commit                                                                    |
 | Staleness — name→id, ownership (HA)    | **≤ poll interval** (default **1 s**) — mutation poller detects version advance, invalidates cache                                |
@@ -832,7 +832,7 @@ authorize(metalakeName, username, resource, operation)
 | Background threads                     | **1** lightweight mutation poller (single scheduled thread, 1 s interval, one tiny DB query — distinct from the removed executor) |
 | Failure mode                           | DB unavailable → auth blocked (same as today); poller retries silently                                                            |
 | HA correctness — privilege / role      | **Fixed** — Step 1 version check detects any GRANT/REVOKE on all nodes immediately                                                |
-| HA correctness — name→id, ownership   | **Near real-time** — mutation poller bounds staleness to ≤ poll interval (~1 s)                                                   |
+| HA correctness — name→id, ownership    | **Near real-time** — mutation poller bounds staleness to ≤ poll interval (~1 s)                                                   |
 
 ---
 

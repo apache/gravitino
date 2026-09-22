@@ -231,17 +231,17 @@ Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), cre
 
 The writer policy is centralized in `JDBCBackend`, after dispatch to the type-specific MetaService. This avoids fragmented coverage in which some services emitted only on rename or drop while ordinary alters, overwrite/import paths, enable/disable operations, and repair updates were missed. No new column or operate type is required:
 
-| Entity-store mutation                                 | Cached? | Change-log action                                        |
-| ----------------------------------------------------- | ------- | -------------------------------------------------------- |
-| create (`insert` with `overwritten = false`)          | yes     | none; there is no negative caching and `list` skips cache |
-| overwrite/import (`insert` with `overwritten = true`) | yes     | `ALTER` for the entity key                               |
-| update, including enable/disable and repair           | yes     | `ALTER` for the identifier passed to `update`            |
-| rename                                                | yes     | `ALTER` for the old identifier only                      |
-| successful drop                                       | yes     | `DROP` for the dropped identifier                        |
+| Entity-store mutation                                 | Cached? | Change-log action                                               |
+| ----------------------------------------------------- | ------- | --------------------------------------------------------------- |
+| create (`insert` with `overwritten = false`)          | yes     | none; there is no negative caching and `list` skips cache       |
+| overwrite/import (`insert` with `overwritten = true`) | yes     | `ALTER` for the entity key                                      |
+| update, including enable/disable and repair           | yes     | `ALTER` for the identifier passed to `update`                   |
+| rename                                                | yes     | `ALTER` for the old identifier only                             |
+| successful drop                                       | yes     | `DROP` for the dropped identifier                               |
 | cascade drop                                          | yes     | one `DROP` for the root; prefix invalidation clears descendants |
-| failed mutation or rollback                           | yes     | none                                                     |
-| mutation of a non-cacheable type                      | no      | no cache-specific row                                    |
-| relation change (grant, set owner, attach tag/policy) | no      | none; relations are not cached                           |
+| failed mutation or rollback                           | yes     | none                                                            |
+| mutation of a non-cacheable type                      | no      | no cache-specific row                                           |
+| relation change (grant, set owner, attach tag/policy) | no      | none; relations are not cached                                  |
 
 The entity mutation and its cache change-log row are enclosed by the same outer transaction. A MetaService failure, a change-log failure, or a caller rollback therefore leaves neither side committed. The cacheability allowlist is also the writer policy, so adding a new cacheable type cannot silently omit its standard overwrite, update, and drop events.
 
@@ -415,11 +415,11 @@ Both are chosen through the same SPI, so a user picks by environment with a sing
 <!-- diagram source: diagrams/roadmap.mmd (regenerate with mermaid-cli) -->
 ![Roadmap](images/roadmap.png)
 
-| Phase | Deliverable                                                                                                                                                                                                                                                         | Why                                                           |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Phase | Deliverable                                                                                                                                                                                                                                       | Why                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | 1     | cache self-contained metadata objects (incl. tag/policy/job); drop relation, user/group/role, model, and function caching; add the entity store `EntityChangeLogListener`; centralize cache mutation events for every cacheable type — `caffeine` | multi-node works, no schema change, complete mutation coverage |
-| 2     | `redis` `SHARED` implementation behind the same SPI                                                                                                                                                                                                                 | strong consistency, reuse user's Redis                        |
-| 3     | (later, if metrics show hot relation reads) add precise relation caching back, per relation type                                                                                                                                                                    | heavy tag/policy workloads                                    |
+| 2     | `redis` `SHARED` implementation behind the same SPI                                                                                                                                                                                               | strong consistency, reuse user's Redis                         |
+| 3     | (later, if metrics show hot relation reads) add precise relation caching back, per relation type                                                                                                                                                  | heavy tag/policy workloads                                     |
 
 ## Test Plan
 
