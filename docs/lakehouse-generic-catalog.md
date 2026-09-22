@@ -49,7 +49,27 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `provider`                  | Catalog provider type                                                                                                                                                                                                                                                                                                     | `lakehouse-generic`     | Yes      |
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                                                                                                                              | `s3://bucket/lakehouse` | No       |
 | `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
-| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
+
+#### Lance table loads
+
+Loading a Lance table through Gravitino's table API opens the Lance dataset, compares its version
+with the `lance.version` Gravitino stored, and re-reads the schema when the two differ. The schema
+returned is therefore always current.
+
+If the dataset cannot be read -- the object store is unreachable, credentials have expired, the
+table has no `location` -- the load fails with `ConnectionFailedException` (error code 1007, HTTP
+503 on the Lance REST endpoints) instead of returning the stored metadata. A load that promises a
+fresh schema cannot silently return an unverified one.
+
+Requests that do not need the schema do not pay this cost and do not fail this way. On the Lance
+REST service, `DescribeTable` without detailed metadata, `TableExists`, `DropTable` and
+`DeregisterTable` read Gravitino's stored metadata only, and keep working while the storage does
+not. A table declared but not yet written (`lance.declared=true`) is also exempt: its dataset is
+not expected to exist yet, so its declared metadata is returned as-is.
+
+This applies to a Lance REST service running inside the Gravitino server. A standalone service
+reaches Gravitino over REST, which exposes only the full load, so its requests always take the
+full path.
 
 #### Pluggable table location provider
 

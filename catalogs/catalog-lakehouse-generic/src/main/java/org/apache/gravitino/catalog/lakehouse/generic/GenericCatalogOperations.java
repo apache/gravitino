@@ -48,6 +48,7 @@ import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.SupportsLightTableLoad;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -71,7 +72,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
-public class GenericCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class GenericCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, SupportsLightTableLoad {
 
   private static final Logger LOG = LoggerFactory.getLogger(GenericCatalogOperations.class);
 
@@ -242,8 +244,24 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    Table loadedTable = tableOps(ident).loadTable(ident);
+    return cacheTableFormat(ident, tableOps(ident).loadTable(ident));
+  }
 
+  @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    ManagedTableOperations tableOps = tableOps(ident);
+    // A format whose loadTable already reads nothing but the entity store needs no light variant:
+    // its full load is a light load. Only formats that reach out to the table's storage on load,
+    // such as Lance, implement SupportsLightTableLoad.
+    Table loadedTable =
+        tableOps instanceof SupportsLightTableLoad
+            ? ((SupportsLightTableLoad) tableOps).loadTableLight(ident)
+            : tableOps.loadTable(ident);
+
+    return cacheTableFormat(ident, loadedTable);
+  }
+
+  private Table cacheTableFormat(NameIdentifier ident, Table loadedTable) {
     Optional<String> tableFormat =
         Optional.ofNullable(
                 loadedTable.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null))

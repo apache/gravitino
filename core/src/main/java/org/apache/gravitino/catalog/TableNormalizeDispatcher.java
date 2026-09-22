@@ -66,6 +66,13 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   }
 
   @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    // Normalized exactly like loadTable: the two serve the same identifiers, so a name that
+    // resolves through one has to resolve through the other.
+    return dispatcher.loadTableLight(normalizeCaseSensitive(ident));
+  }
+
+  @Override
   public Table createTable(
       NameIdentifier ident,
       Column[] columns,

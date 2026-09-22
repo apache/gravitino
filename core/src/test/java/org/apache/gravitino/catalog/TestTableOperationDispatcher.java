@@ -74,8 +74,11 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -192,6 +195,91 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", table2.auditInfo().creator());
+  }
+
+  @Test
+  public void testLoadTableLightRoutesToTheConnectorLightLoad() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaLight");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "tableLight");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    Table created =
+        tableOperationDispatcher.createTable(
+            tableIdent, columns, "comment", props, new Transform[0]);
+
+    TestCatalogOperations ops =
+        (TestCatalogOperations)
+            ((TestCatalog)
+                    catalogManager
+                        .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                        .catalog())
+                .ops();
+
+    Table light = tableOperationDispatcher.loadTableLight(tableIdent);
+    Assertions.assertTrue(ops.lastLoadWasLight(), "the light load should reach the connector");
+    Assertions.assertEquals(created.name(), light.name());
+    Assertions.assertArrayEquals(created.columns(), light.columns());
+    // The light load goes through the same dispatch as the full one, so the properties it returns
+    // have been through the same hidden-property masking.
+    testProperties(created.properties(), light.properties());
+
+    // And the full load still takes the full path, so the two stay distinguishable.
+    tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertFalse(ops.lastLoadWasLight());
+  }
+
+  @Test
+  public void testLoadTableLightDefaultsToTheFullLoad() {
+    // A TableDispatcher that knows nothing about light loads must still answer one: returning the
+    // full load is always correct, because a light load may return everything a full load returns.
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "table");
+    Table full = mock(Table.class);
+    TableDispatcher plain =
+        new TableDispatcher() {
+          @Override
+          public NameIdentifier[] listTables(Namespace namespace) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Table loadTable(NameIdentifier tableIdent) {
+            return full;
+          }
+
+          @Override
+          public Table createTable(
+              NameIdentifier tableIdent,
+              Column[] columns,
+              String comment,
+              Map<String, String> properties,
+              Transform[] partitions,
+              Distribution distribution,
+              SortOrder[] sortOrders,
+              Index[] indexes) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Table alterTable(NameIdentifier tableIdent, TableChange... changes) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public boolean dropTable(NameIdentifier tableIdent) {
+            throw new UnsupportedOperationException();
+          }
+        };
+
+    Assertions.assertSame(full, plain.loadTableLight(ident));
   }
 
   @Test

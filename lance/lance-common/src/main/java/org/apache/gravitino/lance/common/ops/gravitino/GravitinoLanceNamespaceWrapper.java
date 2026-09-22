@@ -281,6 +281,29 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalog.asTableCatalog();
   }
 
+  /**
+   * Loads a table without contacting the storage that holds it, for callers that do not need a
+   * fresh schema. See {@link org.apache.gravitino.connector.SupportsLightTableLoad} for what the
+   * light load trades away.
+   *
+   * <p>Only the in-process path has a light load to reach. In standalone mode the Gravitino REST
+   * client exposes nothing but the full {@link TableCatalog}, so the call degrades to a full load
+   * and carries its cost and its failure mode. A standalone Lance REST service therefore still
+   * opens the Lance dataset on the requests this routing was meant to keep cheap.
+   *
+   * @param catalog the catalog holding the table.
+   * @param ident the schema-qualified identifier of the table.
+   * @return the table as Gravitino has it stored.
+   */
+  Table loadTableLight(Catalog catalog, NameIdentifier ident) {
+    TableDispatcher tableDispatcher = currentTableDispatcher();
+    if (tableDispatcher != null) {
+      return tableDispatcher.loadTableLight(tableIdent(catalog.name(), ident));
+    }
+
+    return catalog.asTableCatalog().loadTable(ident);
+  }
+
   private NameIdentifier schemaIdent(String catalogName, String schemaName) {
     return NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName);
   }

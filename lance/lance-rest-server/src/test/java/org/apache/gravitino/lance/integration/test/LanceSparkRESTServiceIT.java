@@ -94,7 +94,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     this.metalake = createMetalake(getLanceRESTServerMetalakeName());
     this.tempDir = Files.createTempDirectory("lance_spark_rest_service_it_");
     this.catalog = createCatalog(CATALOG_NAME);
-    this.historyCatalog = createCatalog(HISTORY_CATALOG_NAME, true);
+    this.historyCatalog = createCatalog(HISTORY_CATALOG_NAME);
     this.sparkSession = createSparkSession();
   }
 
@@ -428,15 +428,8 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
-    return createCatalog(catalogName, false);
-  }
-
-  private Catalog createCatalog(String catalogName, boolean versionCheck) {
     ImmutableMap.Builder<String, String> properties =
         ImmutableMap.<String, String>builder().put(Catalog.PROPERTY_LOCATION, tempDir.toString());
-    if (versionCheck) {
-      properties.put(LanceConstants.LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK");
-    }
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,

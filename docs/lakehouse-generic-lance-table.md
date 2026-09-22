@@ -137,23 +137,37 @@ Also set additional properties specific to your lakehouse format or custom requi
 ### Schema Refresh
 
 For Lance tables, Gravitino stores table columns in its metadata store. Some Lance writers can also
-update the dataset directly at the Lance location. To keep Gravitino metadata in sync, the Generic
-Lakehouse catalog supports catalog-level schema refresh modes:
+update the dataset directly at the Lance location, so stored columns can fall behind the dataset.
+Which of the two a request sees is decided by the request, not by configuration.
 
-| Mode                 | Behavior                                                                                                                                                                                                                                                                         |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `DECLARED_AND_EMPTY` | Default. Refreshes schema from the Lance dataset for two cases: (1) declared tables (`lance.declared=true`) whose schema has not yet been written to Gravitino; (2) tables whose Gravitino column list is empty, for example tables registered before their schema was captured. |
-| `VERSION_CHECK`      | Opens the Lance dataset on every `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version has changed.                                                                                                                             |
+A **full load** -- `loadTable` through Gravitino's table API, and `DescribeTable` with detailed
+metadata on the Lance REST service -- opens the Lance dataset, compares its version with the stored
+`lance.version`, and re-reads the columns when the two differ. Its schema is therefore always
+current. If the dataset cannot be read, the load fails with `ConnectionFailedException` (error code
+1007, HTTP 503 on the Lance REST endpoints) rather than returning the stored columns: a load that
+promises a fresh schema cannot silently return an unverified one.
 
-Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
-Gravitino. It adds a dataset version check to every `loadTable` call.
+A **light load** reads Gravitino's stored metadata and nothing else. It never opens the dataset,
+never checks the version and never writes anything back, so it stays available while the Lance
+storage does not -- at the price of a schema that may be stale. The Lance REST service routes
+`DescribeTable` without detailed metadata, `TableExists`, `DropTable` and `DeregisterTable` this
+way, because none of them returns a schema.
+
+A declared table (`lance.declared=true`) is exempt from the full load's failure: its dataset is not
+written until something else creates it, so an unreadable dataset is its normal state and the
+declared metadata is returned as-is. Once the dataset exists, the next full load hydrates the
+columns from it and clears the flag.
 
 :::note Zero-column Lance dataset
-If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
-version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
-as long as the stored version is unchanged. Before recording a new version, Lance table
-alterations recheck an empty stored schema and abort if it cannot be loaded, so incomplete column
-metadata is not associated with the latest dataset version.
+If a Lance dataset genuinely has no columns, the first full load records the checked dataset
+version (`lance.version`) with an empty column list. Later full loads still open the dataset to
+compare versions, but skip the schema read while the version is unchanged.
+:::
+
+:::note Standalone Lance REST service
+The routing above applies to a Lance REST service running inside the Gravitino server. A standalone
+service reaches Gravitino over REST, which exposes only the full load, so all of its requests take
+the full path.
 :::
 
 ### Table Operations
