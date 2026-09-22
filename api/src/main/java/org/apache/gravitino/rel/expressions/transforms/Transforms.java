@@ -63,6 +63,18 @@ public class Transforms {
   public static final String NAME_OF_RANGE = "range";
 
   /**
+   * The name of the ClickHouse {@code toStartOfWeek} partition transform. It truncates a date or
+   * datetime column to the start of its week.
+   */
+  public static final String NAME_OF_TO_START_OF_WEEK = "toStartOfWeek";
+
+  /**
+   * The name of the ClickHouse {@code toStartOfMonth} partition transform. It truncates a date or
+   * datetime column to the first day of its month.
+   */
+  public static final String NAME_OF_TO_START_OF_MONTH = "toStartOfMonth";
+
+  /**
    * Create a transform that returns the input value.
    *
    * @param fieldName The field name to transform
@@ -120,6 +132,49 @@ public class Transforms {
    */
   public static MonthTransform month(String columnName) {
     return month(new String[] {columnName});
+  }
+
+  /**
+   * Create a ClickHouse {@code toStartOfWeek(column)} transform from a column name. Only the
+   * one-argument form is representable: ClickHouse's default week mode (0, Sunday start) and the
+   * server timezone apply.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static ToStartOfWeekTransform toStartOfWeek(String columnName) {
+    return toStartOfWeek(new String[] {columnName});
+  }
+
+  /**
+   * Create a ClickHouse {@code toStartOfWeek(column)} transform from a field name.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static ToStartOfWeekTransform toStartOfWeek(String[] fieldName) {
+    return new ToStartOfWeekTransform(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a ClickHouse {@code toStartOfMonth(column)} transform from a column name. Only the
+   * one-argument form is representable.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static ToStartOfMonthTransform toStartOfMonth(String columnName) {
+    return toStartOfMonth(new String[] {columnName});
+  }
+
+  /**
+   * Create a ClickHouse {@code toStartOfMonth(column)} transform from a field name.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static ToStartOfMonthTransform toStartOfMonth(String[] fieldName) {
+    return new ToStartOfMonthTransform(NamedReference.field(fieldName));
   }
 
   /**
@@ -314,6 +369,63 @@ public class Transforms {
     @Override
     public String name() {
       return NAME_OF_IDENTITY;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
+  }
+
+  /**
+   * A transform that truncates the input value to the start of its week. This models ClickHouse's
+   * one-argument {@code toStartOfWeek(column)} partition expression (default week mode 0, Sunday
+   * start, server timezone).
+   */
+  public static final class ToStartOfWeekTransform extends Transform.SingleFieldTransform {
+    private ToStartOfWeekTransform(NamedReference ref) {
+      this.ref = ref;
+    }
+
+    /**
+     * @return The name of the transform.
+     */
+    @Override
+    public String name() {
+      return NAME_OF_TO_START_OF_WEEK;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
+  }
+
+  /**
+   * A transform that truncates the input value to the first day of its month. This models
+   * ClickHouse's one-argument {@code toStartOfMonth(column)} partition expression.
+   */
+  public static final class ToStartOfMonthTransform extends Transform.SingleFieldTransform {
+    private ToStartOfMonthTransform(NamedReference ref) {
+      this.ref = ref;
+    }
+
+    /**
+     * @return The name of the transform.
+     */
+    @Override
+    public String name() {
+      return NAME_OF_TO_START_OF_MONTH;
     }
 
     @Override
