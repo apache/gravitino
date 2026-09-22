@@ -332,6 +332,55 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   @Test
+  public void testRenameTableViaSpark() {
+    String sourceSchema = createSchema("spark_rename_source");
+    String targetSchema = createSchema("spark_rename_target");
+    String originalName = newTableName("orders");
+    String sameSchemaName = newTableName("same_schema_renamed_orders");
+    String crossSchemaName = newTableName("cross_schema_renamed_orders");
+
+    createLanceTable(sourceSchema, originalName);
+    sql(
+        "INSERT INTO %s.%s VALUES (1, CAST(1.1 AS FLOAT)), (2, CAST(2.2 AS FLOAT))",
+        sourceSchema, originalName);
+    Table originalTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(sourceSchema, originalName));
+    String originalLocation = originalTable.properties().get(Table.PROPERTY_LOCATION);
+    long originalVersion = loadLanceVersion(catalog, sourceSchema, originalName);
+
+    sql(
+        "ALTER TABLE %s.%s RENAME TO %s.%s",
+        sourceSchema, originalName, sourceSchema, sameSchemaName);
+    Assertions.assertFalse(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(sourceSchema, originalName)));
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(sourceSchema, sameSchemaName)));
+    Assertions.assertEquals(
+        originalVersion, loadLanceVersion(catalog, sourceSchema, sameSchemaName));
+
+    sql(
+        "ALTER TABLE %s.%s RENAME TO %s.%s",
+        sourceSchema, sameSchemaName, targetSchema, crossSchemaName);
+    Assertions.assertFalse(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(sourceSchema, sameSchemaName)));
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(targetSchema, crossSchemaName)));
+    Table renamedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(targetSchema, crossSchemaName));
+    Assertions.assertEquals(
+        originalLocation, renamedTable.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertEquals(
+        originalVersion, loadLanceVersion(catalog, targetSchema, crossSchemaName));
+    Assertions.assertTrue(Files.exists(Path.of(originalLocation)));
+    List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", targetSchema, crossSchemaName);
+    Assertions.assertEquals(2, rows.size());
+    assertRow(rows.get(0), 1, 1.1f);
+    assertRow(rows.get(1), 2, 2.2f);
+    Assertions.assertTrue(
+        hasTable(sql("SHOW TABLES IN %s", targetSchema), targetSchema, crossSchemaName));
+  }
+
+  @Test
   public void testDropDatabaseViaSpark() {
     String schemaName = createSchema("spark_drop_ns");
     String tableName = newTableName("orders");
