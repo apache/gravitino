@@ -47,6 +47,7 @@ import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
@@ -76,9 +77,9 @@ public class RelationalEntityStore
   private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
 
-  // Advanced before every cache invalidation and clear, whether local or replayed from the change
-  // log, so that batchGet() can tell that an invalidation happened while its backend read was in
-  // flight. Every invalidation must go through invalidateCache() / clearCache() for this to hold.
+  // Advanced before every invalidation observed by this store, whether local or replayed from the
+  // change log. A shared cache without a local change-log listener needs its own distributed
+  // version check: this counter cannot detect changes made on another node.
   private final AtomicLong cacheInvalidationEpoch = new AtomicLong();
 
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
@@ -259,11 +260,25 @@ public class RelationalEntityStore
     long epochBeforeRead = cacheInvalidationEpoch.get();
     List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
     for (E entity : fetchEntities) {
+      if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
+        // BaseEntityCache.put may invalidate a related entry even when it does not cache this
+        // entity. Keep that hook, but avoid taking a key lock for a value that cannot be cached.
+        if (cacheInvalidationEpoch.get() == epochBeforeRead) {
+          cache.put(entity);
+        }
+        allEntities.add(entity);
+        continue;
+      }
       cache.withCacheLock(
           EntityCacheKey.of(entity.nameIdentifier(), entity.type()),
           () -> {
             if (cacheInvalidationEpoch.get() == epochBeforeRead) {
               cache.put(entity);
+              // A whole-cache clear can run while this key lock is held. If it happened during
+              // put, remove the value we may have written after the clear.
+              if (cacheInvalidationEpoch.get() != epochBeforeRead) {
+                cache.invalidate(entity.nameIdentifier(), entity.type());
+              }
             }
           });
       allEntities.add(entity);
@@ -556,7 +571,8 @@ public class RelationalEntityStore
     cache.invalidate(ident, type);
   }
 
-  private void clearCache() {
+  @VisibleForTesting
+  void clearCache() {
     cacheInvalidationEpoch.incrementAndGet();
     cache.clear();
   }

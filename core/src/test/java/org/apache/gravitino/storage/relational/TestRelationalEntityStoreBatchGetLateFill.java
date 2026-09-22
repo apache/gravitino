@@ -21,13 +21,19 @@ package org.apache.gravitino.storage.relational;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
+import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -41,9 +47,8 @@ import org.mockito.Mockito;
  * Verifies that {@link RelationalEntityStore#batchGet} cannot write an entity back into the cache
  * after that entity was invalidated while the backend read was in flight (the late-fill race).
  *
- * <p>Each race is modelled deterministically by running the invalidation inside the backend stub:
- * the backend has already produced its (now stale) result, and the invalidation lands before {@code
- * batchGet} writes it back.
+ * <p>The tests trigger invalidation during the backend read or during the cache write, so both
+ * sides of the write-back check are covered without relying on thread timing.
  */
 public class TestRelationalEntityStoreBatchGetLateFill {
 
@@ -122,6 +127,61 @@ public class TestRelationalEntityStoreBatchGetLateFill {
   }
 
   @Test
+  void testBatchGetDirectClearDuringBackendRead() {
+    TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    NameIdentifier ident = table.nameIdentifier();
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE)))
+        .thenAnswer(
+            invocation -> {
+              store.clearCache();
+              return List.of(table);
+            });
+
+    store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
+
+    Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testBatchGetRemovesValueWrittenAfterClear() throws IllegalAccessException {
+    TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    RecordingCache recordingCache = new RecordingCache();
+    recordingCache.beforePut = store::clearCache;
+    FieldUtils.writeField(store, "cache", recordingCache, true);
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE))).thenReturn(List.of(table));
+
+    List<TableEntity> result =
+        store.batchGet(List.of(table.nameIdentifier()), Entity.EntityType.TABLE, TableEntity.class);
+
+    Assertions.assertEquals(List.of(table), result);
+    Assertions.assertTrue(recordingCache.beforePutRan);
+    Assertions.assertFalse(
+        recordingCache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testBatchGetDoesNotLockNonCacheableRole() throws IllegalAccessException {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withNamespace(Namespace.of("metalake"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
+            .build();
+    RecordingCache recordingCache = new RecordingCache();
+    FieldUtils.writeField(store, "cache", recordingCache, true);
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.ROLE))).thenReturn(List.of(role));
+
+    List<RoleEntity> result =
+        store.batchGet(List.of(role.nameIdentifier()), Entity.EntityType.ROLE, RoleEntity.class);
+
+    Assertions.assertEquals(List.of(role), result);
+    Assertions.assertFalse(recordingCache.cacheLockUsed);
+    Assertions.assertTrue(recordingCache.keyChangeHookCalled);
+  }
+
+  @Test
   void testBatchGetSkipsWriteBackWhenListenerFallsBackToClearDuringBackendRead() {
     TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
     NameIdentifier ident = table.nameIdentifier();
@@ -142,5 +202,43 @@ public class TestRelationalEntityStoreBatchGetLateFill {
 
     Mockito.verify(cache).clear();
     Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  private static class RecordingCache extends CaffeineEntityCache {
+    private boolean cacheLockUsed;
+    private boolean keyChangeHookCalled;
+    private boolean beforePutRan;
+    private Runnable beforePut;
+
+    RecordingCache() {
+      super(new Config() {});
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public <E extends Exception> void withCacheLock(
+        EntityCacheKey key, EntityCache.ThrowingRunnable<E> action) throws E {
+      cacheLockUsed = true;
+      super.withCacheLock(key, action);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
+      keyChangeHookCalled = true;
+      super.invalidateOnKeyChange(entity);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected <E extends Entity & HasIdentifier> void doPut(E entity) {
+      if (beforePut != null) {
+        Runnable action = beforePut;
+        beforePut = null;
+        action.run();
+        beforePutRan = true;
+      }
+      super.doPut(entity);
+    }
   }
 }
