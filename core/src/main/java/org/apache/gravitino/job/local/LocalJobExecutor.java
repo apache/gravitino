@@ -45,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -91,8 +92,9 @@ public class LocalJobExecutor implements JobExecutor {
 
   private static final long UNEXPIRED_TIME_IN_MS = -1L;
 
-  // Contains '.' and '-', which a metalake name can't, so it never collides with a metalake's
-  // staging directory.
+  // Contains '.' and '-', which MetalakeNormalizeDispatcher rejects in metalake names on create and
+  // rename, so it doesn't collide with a metalake's staging directory. A metalake created before
+  // that check could still collide: the cleanup then skips its directories rather than failing.
   private static final String OUTPUT_INDEX_DIR_NAME = ".job-output-index";
 
   private static final String OUTPUT_INDEX_FILE_SUFFIX = ".json";
@@ -140,6 +142,10 @@ public class LocalJobExecutor implements JobExecutor {
 
   private long jobStatusKeepTimeInMs;
   private ScheduledExecutorService jobStatusCleanupExecutor;
+
+  // Separate from jobStatusCleanupExecutor, so a long scan of the index directory on shared storage
+  // never delays the job status cleanup.
+  private ScheduledExecutorService outputIndexCleanupExecutor;
 
   private volatile boolean finished = false;
 
@@ -259,7 +265,15 @@ public class LocalJobExecutor implements JobExecutor {
         jobStatusCleanupIntervalInMs,
         jobStatusCleanupIntervalInMs,
         TimeUnit.MILLISECONDS);
-    jobStatusCleanupExecutor.scheduleWithFixedDelay(
+    this.outputIndexCleanupExecutor =
+        Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable);
+              thread.setName("LocalJobOutputIndexCleanup-" + thread.getId());
+              thread.setDaemon(true);
+              return thread;
+            });
+    outputIndexCleanupExecutor.scheduleWithFixedDelay(
         this::cleanupOutputIndexes,
         OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS,
         OUTPUT_INDEX_CLEANUP_INTERVAL_IN_MS,
@@ -401,8 +415,9 @@ public class LocalJobExecutor implements JobExecutor {
 
     jobExecutorService.shutdownNow();
 
-    // Stop the job status cleanup executor
+    // Stop the job status and output index cleanup executors
     jobStatusCleanupExecutor.shutdownNow();
+    outputIndexCleanupExecutor.shutdownNow();
     jobStatus.clear();
   }
 
@@ -513,6 +528,10 @@ public class LocalJobExecutor implements JobExecutor {
           return;
         }
         try {
+          // Anything but an index file, e.g. a directory of a colliding legacy metalake name.
+          if (!Files.isRegularFile(indexFile, LinkOption.NOFOLLOW_LINKS)) {
+            continue;
+          }
           if (now - Files.getLastModifiedTime(indexFile).toMillis() < OUTPUT_INDEX_MIN_AGE_IN_MS) {
             continue;
           }

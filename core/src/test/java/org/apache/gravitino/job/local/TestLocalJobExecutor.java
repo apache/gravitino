@@ -1034,6 +1034,22 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testCleanupOutputIndexesSkipsDirectories() throws Throwable {
+    // E.g. the staging directory of a metalake created before metalake names were checked.
+    File directory = outputIndexFile("local-job-00000000-" + UUID.randomUUID());
+    Assertions.assertTrue(directory.mkdirs());
+    ageOutputIndex(directory);
+    try {
+      List<String> warnings =
+          captureWarnings(() -> ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes());
+      Assertions.assertEquals(Collections.emptyList(), warnings);
+      Assertions.assertTrue(directory.isDirectory());
+    } finally {
+      FileUtils.deleteDirectory(directory);
+    }
+  }
+
+  @Test
   public void testCleanupOutputIndexesWithoutIndexDir() throws IOException {
     FileUtils.deleteDirectory(new File(stagingRoot, OUTPUT_INDEX_DIR_NAME));
     Assertions.assertDoesNotThrow(() -> ((LocalJobExecutor) jobExecutor).cleanupOutputIndexes());
