@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.sun.net.httpserver.HttpServer;
 import java.io.File;
@@ -45,6 +46,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -76,6 +78,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
+import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1570,15 +1573,19 @@ public class TestJobManager {
   public void testPullJobStatusAcrossServersWithLocalJobExecutors() throws Exception {
     // Reproduces the multi-node deployment: two servers share the same metadata store, and each
     // has its own local job executor. The server that didn't run the job must not mark it FAILED.
+    File stagingRoot = Files.createTempDirectory("gravitino-test-multi-node-job").toFile();
+    File jobStagingDir = new File(stagingRoot, "job");
+    Assertions.assertTrue(jobStagingDir.mkdirs());
+    Map<String, String> executorConfigs =
+        ImmutableMap.of(LocalJobExecutorConfigs.STAGING_DIR, stagingRoot.getAbsolutePath());
     LocalJobExecutor ownerExecutor = new LocalJobExecutor();
     LocalJobExecutor otherExecutor = new LocalJobExecutor();
-    ownerExecutor.initialize(Collections.emptyMap());
-    otherExecutor.initialize(Collections.emptyMap());
+    ownerExecutor.initialize(executorConfigs);
+    otherExecutor.initialize(executorConfigs);
     JobManager ownerManager =
         Mockito.spy(new JobManager(config, entityStore, idGenerator, ownerExecutor));
     JobManager otherManager =
         Mockito.spy(new JobManager(config, entityStore, idGenerator, otherExecutor));
-    File jobStagingDir = Files.createTempDirectory("gravitino-test-multi-node-job").toFile();
 
     try {
       JobTemplate jobTemplate =
@@ -1610,7 +1617,7 @@ public class TestJobManager {
     } finally {
       ownerManager.close();
       otherManager.close();
-      FileUtils.deleteDirectory(jobStagingDir);
+      FileUtils.deleteDirectory(stagingRoot);
     }
   }
 

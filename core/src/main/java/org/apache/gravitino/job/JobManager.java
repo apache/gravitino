@@ -461,9 +461,9 @@ public class JobManager implements JobOperationDispatcher {
 
     // The job entity's existence was already confirmed above via the entity store, which is the
     // durable source of truth. The executor's own bookkeeping for a job's output is best-effort
-    // and can legitimately expire or be lost independently of the entity (e.g. LocalJobExecutor
-    // only retains in-memory output location for a limited time, and loses it entirely across a
-    // restart), so JobExecutor#getJobStdout/getJobStderr report a job unknown to the executor as
+    // and can legitimately be unavailable while the entity still exists (e.g. LocalJobExecutor
+    // can't reach the output of a job that ran on a server not sharing its staging directory),
+    // so JobExecutor#getJobStdout/getJobStderr report a job unknown to the executor as
     // empty output rather than an error - it never means "job does not exist" at this point.
     List<String> stdout =
         jobExecutor.getJobStdout(entity.jobExecutionId(), effectiveMaxLines, effectiveMaxBytes);
@@ -957,7 +957,7 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
         matcher.appendReplacement(result, matcher.group(0));
