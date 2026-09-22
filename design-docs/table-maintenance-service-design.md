@@ -339,10 +339,10 @@ Why this order (when steps run):
   retention window.
 
 **Minimum interval:** only a **job-level** `table-maintenance` `minIntervalMs` (§8.3), compared once
-before submit against `last_job_id` → `job_finished_at`. Do **not** apply per-operation
-`minIntervalMs` inside the combined job. Per-operation interval keys remain for single-op jobs via
-ops APIs / manual `runJob`. Whether a step's SQL runs after the gate is decided by enable flags and
-(optional) Recommender, not by a second interval.
+before submit against `last_job_id` → `job_finished_at` (code default **24 hours**). Do **not**
+apply per-operation `minIntervalMs` inside the combined job. Per-operation interval keys remain for
+single-op jobs via ops APIs / manual `runJob`. Whether a step's SQL runs after the gate is decided
+by enable flags and that step's Recommender, not by a second interval.
 
 Custom and single-op maintenance policies remain supported as separate `policy_id` rows for ops APIs
 and manual jobs. They are **not** driven by the IRC commit event path. The combined type is the
@@ -630,12 +630,22 @@ steps. Single-operation types remain for dedicated policies / jobs via ops APIs 
 | `snapshot-expiry`   | expire snapshots (single-op path)                        | `86400000` (1 day)           |
 | `manifest-rewrite`  | rewrite manifests (single-op path)                       | `86400000` (1 day)           |
 | `orphan-cleanup`    | orphan file cleanup (single-op path)                     | `604800000` (7 days)         |
-| `table-maintenance` | combined job (`builtin-iceberg-table-maintenance`, §5.5) | `3600000` (1 hour)           |
+| `table-maintenance` | combined job (`builtin-iceberg-table-maintenance`, §5.5) | `86400000` (24 hours)        |
 
 For `system_iceberg_table_maintenance` on the event path: resolve **`table-maintenance`**
 `minIntervalMs` against the policy row's `last_job_id`. If the interval has elapsed and at least one
 op is enabled, submit the combined job. Inside the job, for each enabled op in order
 `compact → manifests → expire → orphan`: `Recommender` then SQL (§5.5).
+
+**Why 24 hours for the combined job (not 1 hour):** industry practice splits *frequent*
+compaction from *full* maintenance. Amoro's minor self-optimizing defaults to **1 hour** (compact /
+small-file oriented); snapshot expire often runs hourly but orphan clean is typically **days**
+(Amoro: every 7 days when enabled). LakeOps / production Iceberg guidance uses **1–4 hours** for
+streaming compaction and **daily** for batch compact, manifest rewrite, and expire/orphan-style
+cleanup. Databricks recommends starting `OPTIMIZE` **daily**. A four-op combined job is closer to a
+full pass than to Amoro minor, so the code default is **24 hours**. Streaming tables that need
+tighter compact cadence should lower `maintenance.table-maintenance.minIntervalMs` (for example to
+1 hour) or use the single-op compaction path.
 
 **Resolution order** (first hit wins), same idea as Amoro table props + AMS defaults:
 
@@ -674,7 +684,7 @@ Example table override:
 
 ```sql
 ALTER TABLE rest_catalog.db.orders SET TBLPROPERTIES (
-  'maintenance.table-maintenance.minIntervalMs' = '7200000'
+  'maintenance.table-maintenance.minIntervalMs' = '3600000'
 );
 ```
 
