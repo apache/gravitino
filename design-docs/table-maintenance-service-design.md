@@ -296,10 +296,7 @@ ordered Spark job**, TMS adds:
    that executes the selected operations **inside that one Spark job**.
 
 Operators create one policy instance of that type under the metalake and attach it (directly or via
-tag) to catalogs / schemas / tables. That instance has one real `policy_meta.policy_id`. TMS keeps
-one `table_maintenance_state` row for `(table_identifier, policy_id)` and submits **one** combined
-job when gates pass. A separate table-level sentinel such as `policy_id = 0` is **not** required:
-the per-policy claim already serializes maintenance for that attachment.
+tag) to catalogs / schemas / tables.
 
 **Event path scope:** IRC commit events select **only** this combined policy type. Older
 single-operation built-ins (for example `system_iceberg_compaction`) and custom maintenance policies
@@ -753,7 +750,6 @@ This design delivers the in-process plugin, IRC commit hook, `table_maintenance_
 - [ ] Execute selected ops in order: `compact → manifests → expire → orphan`.
 - [ ] Gate submit with `table-maintenance` `minIntervalMs`; select `ops` with per-operation
       intervals (§8.3).
-- [ ] One state row and one `job_id` per attached combined policy; no `policy_id = 0` sentinel.
 - [ ] Tests: subset ops skip correctly; order preserved; job-level and per-op intervals apply.
 
 ### 9.2 Review Checklist
