@@ -84,6 +84,21 @@ public class ClickHouseConstants {
     /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
     public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
 
+    /** The current name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_TEXT = "text";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_GIN = "gin";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_FULL_TEXT = "full_text";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_INVERTED = "inverted";
+
+    /** Property key for the ClickHouse full-text tokenizer mode. */
+    public static final String TOKENIZER = "tokenizer";
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
@@ -95,5 +110,11 @@ public class ClickHouseConstants {
 
     /** Property key for the n-gram size in ngrambf_v1 index properties. */
     public static final String NGRAM_SIZE = "ngram_size";
+
+    /** Gravitino tokenizer property value for ClickHouse word-token mode. */
+    public static final String TEXT_INDEX_TOKENS = "tokens";
+
+    /** Gravitino tokenizer property value for ClickHouse n-gram mode. */
+    public static final String TEXT_INDEX_NGRAMS = "ngrams";
   }
 }

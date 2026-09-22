@@ -1160,6 +1160,169 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testGetClickHouseTextIndexTypeAliases() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    for (String type :
+        List.of(
+            "text",
+            "gin",
+            "full_text",
+            "inverted",
+            "inverted(0)",
+            "full_text(3)",
+            "text(tokenizer = ngrams(3))")) {
+      Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, ops.getClickHouseIndexType(type));
+    }
+  }
+
+  @Test
+  void testParseTextIndexProperties() {
+    Assertions.assertEquals(
+        Map.of("tokenizer", "tokens"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("inverted(0)", "idx_tokens"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "tokens"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("gin(0)", "idx_tokens"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "tokens"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = 'default')", "idx_tokens"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "tokens"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = splitByNonAlpha)", "idx_tokens"));
+
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "2"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("full_text(2)", "idx_ngrams"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "5"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("gin(5)", "idx_ngrams"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "8"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = ngrams(8))", "idx_ngrams"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "4"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = 'ngram', ngram_size = 4, "
+                + "preprocessor = lower(concat(body, ', ')))",
+            "idx_ngrams"));
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams"),
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+            "text(tokenizer = ngrams)", "idx_ngrams_incomplete"));
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery(
+                "text(tokenizer = sparseGrams(3, 100))", "idx_unsupported")
+            .isEmpty());
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseTextIndexPropertiesForQuery("inverted", "idx_legacy_bare")
+            .isEmpty());
+  }
+
+  @Test
+  void testParseTextIndexPropertiesRejectsMalformedNgramSize() {
+    for (String typeFull :
+        List.of(
+            "inverted(1)",
+            "text(tokenizer = ngrams(1))",
+            "text(tokenizer = 'ngram', ngram_size = 9)",
+            "text(tokenizer = ngrams(abc))")) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseTextIndexPropertiesForQuery(typeFull, "idx_bad"));
+      Assertions.assertTrue(exception.getMessage().contains("idx_bad"));
+    }
+  }
+
+  @Test
+  void testGetIndexesReadsTextIndexPropertiesFromTypeFull() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn(
+            "idx_inverted_tokens", "idx_full_text_ngrams", "idx_text_tokens", "idx_text_ngrams");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("inverted", "full_text", "text", "text");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "inverted(0)",
+            "full_text(3)",
+            "text(tokenizer = 'default')",
+            "text(tokenizer = 'ngram', ngram_size = 4, "
+                + "preprocessor = lower(concat(body, ', ')))");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("body", "body", "body", "body");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(4, indexes.size());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, indexes.get(0).type());
+    Assertions.assertArrayEquals(new String[][] {{"body"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals(Map.of("tokenizer", "tokens"), indexes.get(0).properties());
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "3"), indexes.get(1).properties());
+    Assertions.assertEquals(Map.of("tokenizer", "tokens"), indexes.get(2).properties());
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "4"), indexes.get(3).properties());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndReadsLegacyTextMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_ngrams", "idx_legacy_bare");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("inverted(3)", "inverted");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("body", "body");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, indexes.get(0).type());
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "3"), indexes.get(0).properties());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, indexes.get(1).type());
+    Assertions.assertTrue(indexes.get(1).properties().isEmpty());
+  }
+
+  @Test
   void testGetIndexesFallsBackAndReadsLegacySetParameters() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
 

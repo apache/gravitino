@@ -3691,6 +3691,46 @@ public class CatalogClickHouseIT extends BaseIT {
 
   @Test
   @Tag("gravitino-docker-test")
+  void testLoadNativeTextDataSkippingIndexes() {
+    String tableName = GravitinoITUtils.genRandomName("ch_text_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    // ClickHouse 24.8 requires the experimental text-index setting for this table creation.
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64,\n"
+                + "  `token_text` String,\n"
+                + "  `ngram_text` String,\n"
+                + "  INDEX `idx_tokens` `token_text` TYPE full_text(0) GRANULARITY 1,\n"
+                + "  INDEX `idx_ngrams` `ngram_text` TYPE full_text(3) GRANULARITY 1\n"
+                + ") ENGINE = MergeTree ORDER BY `id` COMMENT 'text index IT' "
+                + "SETTINGS allow_experimental_full_text_index = 1",
+            schemaName, tableName));
+
+    Table loaded = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Index loadedTokens =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_tokens"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, loadedTokens.type());
+    Assertions.assertArrayEquals(new String[][] {{"token_text"}}, loadedTokens.fieldNames());
+    Assertions.assertEquals(Map.of("tokenizer", "tokens"), loadedTokens.properties());
+
+    Index loadedNgrams =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_ngrams"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, loadedNgrams.type());
+    Assertions.assertArrayEquals(new String[][] {{"ngram_text"}}, loadedNgrams.fieldNames());
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "3"), loadedNgrams.properties());
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
   void testCreateAndLoadTableWithNgrambfAndTokenbfIndexes() {
     String tableName = GravitinoITUtils.genRandomName("ch_ngram_tokenbf_idx_");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
