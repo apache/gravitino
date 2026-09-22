@@ -108,7 +108,7 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 ## Copied-source provenance
 
 Root `LICENSE` records copied-source paths; root `NOTICE` and the module mappings
-identify applicable notices. The Glue provider in `catalog-common` derives from
+identify applicable notices. The Glue providers in `catalog-glue` and `spark-common` derive from
 [Doris's provider](https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java),
 with provenance recorded in [the original attribution](https://github.com/apache/gravitino/commit/d81dd65d1c9159dbb67d5ff18bac62c24e9ba39c).
 The Ranger reference classes use the attribution from [Ranger 2.4.0](https://github.com/apache/ranger/blob/release-ranger-2.4.0/NOTICE.txt).

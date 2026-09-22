@@ -794,12 +794,11 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
-    ":catalogs:catalog-common" to listOf("doris"),
+    ":catalogs:catalog-glue" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
-    ":spark-connector:spark-3.5" to listOf("iceberg"),
-    ":spark-connector:spark-4.0" to listOf("iceberg"),
+    ":spark-connector:spark-common" to listOf("iceberg", "doris"),
     ":server-common" to listOf("hadoop"),
     ":iceberg:iceberg-common" to listOf("iceberg"),
     ":iceberg:iceberg-rest-server" to listOf("iceberg"),
@@ -816,7 +815,7 @@ subprojects {
     // SparkTransformConverter's Iceberg-derived findWidth method is private and absent from Javadoc.
     sourceNotices.set(
       when (project.path) {
-        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        ":spark-connector:spark-common" -> sourceNoticeNames.filterNot { it == "iceberg" }
         else -> sourceNoticeNames
       }
     )
