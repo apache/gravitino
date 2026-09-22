@@ -85,6 +85,7 @@ value remains at its last successful sample.
 | `db-tail-id`, `cursor-id`                                    | gauge, change ID         | Latest sampled database ID and last delivered ID on this server.                                                         |
 | `record-lag`                                                 | gauge, records           | Sampled tail minus cursor, clamped at zero. Interpret only while tail sampling succeeds.                                 |
 | `seconds-since-last-successful-poll`                         | gauge, seconds           | Time since a successful database poll, including an empty result; `-1` before the first poll.                            |
+| `seconds-since-last-successful-tail-sample`                  | gauge, seconds           | Time since `db-tail-id` was last refreshed; `-1` before the first sample. Trust `db-tail-id` and `record-lag` only while this stays near the poll interval. |
 | `poll-failures-total`                                        | counter, failures        | Failed poll cycles.                                                                                                      |
 | `tail-sample-failures-total`                                 | counter, failures        | Failed database-tail samples; fetched batches can still be delivered.                                                    |
 | `listener-failures-total`, `listener-failures.<class>-total` | counter, failures        | Total failures and failures by registered listener class.                                                                |
@@ -100,11 +101,12 @@ recover locally; its failure counter and log identify the affected listener. The
 `entityChangeLog` fields to trace an append, poll, delivery, and invalidation. Append logs mean the
 row was added to the current transaction, not that the transaction committed.
 
-For an incident, check `tail-sample-failures-total` before comparing `db-tail-id` with `cursor-id`
-on the affected server. If tail sampling fails, the tail gauge can fall below an advancing cursor
-and `record-lag` can read zero despite an unknown database tail. With a fresh tail sample, a
-growing `record-lag` together with an increasing poll age or `poll-failures-total` points to polling
-trouble.
+For an incident, check `seconds-since-last-successful-tail-sample` before comparing `db-tail-id`
+with `cursor-id` on the affected server. If it exceeds the poll interval, the tail sample itself is
+failing: the retained tail can fall below an advancing cursor and `record-lag` can read zero despite
+an unknown database tail. `tail-sample-failures-total` counts those failures for alerting. With a
+fresh tail sample, a growing `record-lag` together with an increasing poll age or
+`poll-failures-total` points to polling trouble.
 If the cursor advances but data remains stale, inspect `listener-failures-total`, `records-delivered.<class>-total`,
 `invalidation-failures-total`, and `fallback-clears-total`, then correlate the debug logs by
 encoded `fullName` and change ID. The sampled tail and cursor are process-local; each server has

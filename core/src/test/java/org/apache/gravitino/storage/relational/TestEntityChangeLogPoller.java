@@ -225,7 +225,6 @@ public class TestEntityChangeLogPoller {
     when(mapper.selectEntityChanges(0L, MAX_ROWS)).thenReturn(List.of(change));
     when(mapper.selectMaxChangeId()).thenThrow(new RuntimeException("tail query failed"));
     EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
-    metrics.setDbTailId(0L);
     List<EntityChangeRecord> received = new ArrayList<>();
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
@@ -238,14 +237,47 @@ public class TestEntityChangeLogPoller {
     Assertions.assertEquals(List.of(change), received);
     Assertions.assertEquals(
         1L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    // The tail was never sampled: the gauge stays at its initial value and the cursor moves past
+    // it, which clamps record-lag to zero. The freshness gauge is what reveals that state.
     Assertions.assertEquals(
         0L, metrics.getMetricRegistry().getGauges().get("db-tail-id").getValue());
     Assertions.assertEquals(
         0L, metrics.getMetricRegistry().getGauges().get("record-lag").getValue());
     Assertions.assertEquals(
+        -1L,
+        metrics
+            .getMetricRegistry()
+            .getGauges()
+            .get("seconds-since-last-successful-tail-sample")
+            .getValue());
+    Assertions.assertEquals(
         1, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
     Assertions.assertEquals(
         0, metrics.getMetricRegistry().counter("poll-failures-total").getCount());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("tail-sample-failures-total").getCount());
+  }
+
+  @Test
+  void testTailSampleFailureRetainsPreviousTail() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, MAX_ROWS))
+        .thenReturn(List.of(change(1L, "CATALOG", "ml1.cat1")));
+    when(mapper.selectMaxChangeId()).thenThrow(new RuntimeException("tail query failed"));
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    metrics.setDbTailId(9L);
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+      new EntityChangeLogPoller(1, metrics).pollChanges();
+    }
+
+    Assertions.assertEquals(
+        9L, metrics.getMetricRegistry().getGauges().get("db-tail-id").getValue());
+    Assertions.assertEquals(
+        1L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    Assertions.assertEquals(
+        8L, metrics.getMetricRegistry().getGauges().get("record-lag").getValue());
     Assertions.assertEquals(
         1, metrics.getMetricRegistry().counter("tail-sample-failures-total").getCount());
   }

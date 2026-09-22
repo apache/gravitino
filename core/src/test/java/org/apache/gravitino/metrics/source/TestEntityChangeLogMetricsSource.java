@@ -28,6 +28,7 @@ public class TestEntityChangeLogMetricsSource {
   void testPollAndFailureMetrics() {
     EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
     Assertions.assertEquals(-1L, gauge(metrics, "seconds-since-last-successful-poll"));
+    Assertions.assertEquals(-1L, gauge(metrics, "seconds-since-last-successful-tail-sample"));
 
     metrics.setCursorId(5);
     metrics.setDbTailId(8);
@@ -44,6 +45,7 @@ public class TestEntityChangeLogMetricsSource {
     Assertions.assertEquals(8L, gauge(metrics, "db-tail-id"));
     Assertions.assertEquals(3L, gauge(metrics, "record-lag"));
     Assertions.assertTrue(gauge(metrics, "seconds-since-last-successful-poll") >= 0);
+    Assertions.assertTrue(gauge(metrics, "seconds-since-last-successful-tail-sample") >= 0);
     Assertions.assertEquals(
         3, metrics.getMetricRegistry().counter("records-fetched-total").getCount());
     Assertions.assertEquals(

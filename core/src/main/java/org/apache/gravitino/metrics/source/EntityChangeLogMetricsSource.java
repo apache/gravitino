@@ -29,6 +29,7 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   private final AtomicLong dbTailId = new AtomicLong();
   private final AtomicLong cursorId = new AtomicLong();
   private final AtomicLong lastSuccessfulPollMs = new AtomicLong();
+  private final AtomicLong lastSuccessfulTailSampleMs = new AtomicLong();
   private final Counter pollFailures = getCounter("poll-failures-total");
   private final Counter tailSampleFailures = getCounter("tail-sample-failures-total");
   private final Counter listenerFailures = getCounter("listener-failures-total");
@@ -48,16 +49,18 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
     registerGauge("record-lag", (Gauge<Long>) () -> Math.max(0, dbTailId.get() - cursorId.get()));
     registerGauge(
         "seconds-since-last-successful-poll",
-        (Gauge<Long>)
-            () -> {
-              long last = lastSuccessfulPollMs.get();
-              return last == 0 ? -1 : Math.max(0, (System.currentTimeMillis() - last) / 1000);
-            });
+        (Gauge<Long>) () -> secondsSince(lastSuccessfulPollMs.get()));
+    // A failed tail sample keeps the previous db-tail-id, so this gauge is what says whether that
+    // value, and record-lag derived from it, still describe the database.
+    registerGauge(
+        "seconds-since-last-successful-tail-sample",
+        (Gauge<Long>) () -> secondsSince(lastSuccessfulTailSampleMs.get()));
   }
 
   /** Records the database tail sampled by a poll, without querying from the gauge. */
   public void setDbTailId(long id) {
     dbTailId.set(id);
+    lastSuccessfulTailSampleMs.set(System.currentTimeMillis());
   }
 
   /** Records the cursor after a successful delivery. */
@@ -112,5 +115,9 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   /** Starts a poll duration measurement. */
   public Timer.Context timePoll() {
     return pollDuration.time();
+  }
+
+  private static long secondsSince(long epochMs) {
+    return epochMs == 0 ? -1 : Math.max(0, (System.currentTimeMillis() - epochMs) / 1000);
   }
 }
