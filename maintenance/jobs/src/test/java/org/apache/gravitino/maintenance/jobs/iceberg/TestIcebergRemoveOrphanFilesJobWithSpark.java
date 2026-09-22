@@ -39,7 +39,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class TestIcebergRemoveOrphanFilesJobWithSpark {
+/** Tests orphan cleanup against real Iceberg tables in local Spark. */
+public class TestIcebergRemoveOrphanFilesJobWithSpark {
   @TempDir static Path tempDir;
   private static SparkSession spark;
 
@@ -68,8 +69,9 @@ class TestIcebergRemoveOrphanFilesJobWithSpark {
     }
   }
 
+  /** Verifies dry run and deletion preserve live and recent files. */
   @Test
-  void testDryRunAndDeletionPreserveLiveAndRecentFiles() throws Exception {
+  public void testDryRunAndDeletionPreserveLiveAndRecentFiles() throws Exception {
     spark.sql("CREATE TABLE test_catalog.db.cleanup (id INT) USING iceberg");
     spark.sql("INSERT INTO test_catalog.db.cleanup VALUES (1), (2)");
     Path data = tempDir.resolve("db/cleanup/data");
@@ -94,8 +96,9 @@ class TestIcebergRemoveOrphanFilesJobWithSpark {
     assertEquals(0, IcebergRemoveOrphanFilesJob.execute(spark, args));
   }
 
+  /** Verifies custom location and outside rejection. */
   @Test
-  void testCustomLocationAndOutsideRejection() throws Exception {
+  public void testCustomLocationAndOutsideRejection() throws Exception {
     spark.sql("CREATE TABLE test_catalog.db.scoped (id INT) USING iceberg");
     Path root = tempDir.resolve("db/scoped");
     Path sub = Files.createDirectories(root.resolve("staged"));
@@ -120,8 +123,9 @@ class TestIcebergRemoveOrphanFilesJobWithSpark {
         IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, args));
   }
 
+  /** Verifies invalid inputs fail before deletion. */
   @Test
-  void testInvalidInputsFailBeforeDeletion() throws Exception {
+  public void testInvalidInputsFailBeforeDeletion() throws Exception {
     spark.sql("CREATE TABLE test_catalog.db.invalid (id INT) USING iceberg");
     Map<String, String> options = args("invalid");
     options.put("dry-run", "yes");
@@ -159,8 +163,9 @@ class TestIcebergRemoveOrphanFilesJobWithSpark {
             }));
   }
 
+  /** Verifies explicit cutoff and quoted table name. */
   @Test
-  void testExplicitCutoffAndQuotedTableName() throws Exception {
+  public void testExplicitCutoffAndQuotedTableName() throws Exception {
     Path location = tempDir.resolve("db/quo'te");
     spark.sql("CREATE TABLE test_catalog.db.`quo'te` (id INT) USING iceberg");
     Path old = Files.write(location.resolve("old"), new byte[] {1});

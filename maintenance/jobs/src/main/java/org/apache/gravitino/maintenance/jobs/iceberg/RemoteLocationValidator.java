@@ -44,12 +44,20 @@ final class RemoteLocationValidator {
     if (!fs.supportsSymlinks()) {
       return;
     }
-    Path root = fs.resolvePath(tableLocation);
+    Path lexicalRoot = new Path(tableLocation.toUri().normalize());
+    scan = new Path(scan.toUri().normalize());
+    IcebergRemoveOrphanFilesJob.validateLocation(lexicalRoot.toString(), scan.toString());
+    Path root = fs.resolvePath(lexicalRoot);
     IcebergRemoveOrphanFilesJob.validateLocation(root.toString(), fs.resolvePath(scan).toString());
+    // Inspect the table root itself, but not warehouse parents outside this table. Use the
+    // lexical boundary because a warehouse parent symlink can change the resolved root.
     for (Path ancestor = scan; ancestor != null; ancestor = ancestor.getParent()) {
       Preconditions.checkArgument(
           !fs.getFileLinkStatus(ancestor).isSymlink(),
           "Symlinks are not allowed in the scan location");
+      if (ancestor.equals(lexicalRoot)) {
+        break;
+      }
     }
     Deque<Path> pending = new ArrayDeque<>();
     pending.add(scan);

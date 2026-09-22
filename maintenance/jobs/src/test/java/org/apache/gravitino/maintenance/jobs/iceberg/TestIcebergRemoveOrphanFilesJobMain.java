@@ -44,11 +44,13 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class TestIcebergRemoveOrphanFilesJobMain {
+/** Tests orphan cleanup CLI behavior and process exit status. */
+public class TestIcebergRemoveOrphanFilesJobMain {
   @TempDir Path tempDir;
 
+  /** Verifies template arguments run preview and cleanup. */
   @Test
-  void testTemplateArgumentsRunPreviewAndCleanup() throws Exception {
+  public void testTemplateArgumentsRunPreviewAndCleanup() throws Exception {
     Path table = tempDir.resolve("db/cli");
     new HadoopTables(new Configuration())
         .create(
@@ -82,15 +84,17 @@ class TestIcebergRemoveOrphanFilesJobMain {
     assertFalse(Files.exists(orphan));
   }
 
+  /** Verifies cli failure exit and usage. */
   @Test
-  void testCliFailureExitAndUsage() throws Exception {
+  public void testCliFailureExitAndUsage() throws Exception {
     String output = runFailure(false, new String[] {"--catalog", "cli"});
     assertTrue(output.contains("Usage: IcebergRemoveOrphanFilesJob"), output);
     assertTrue(output.contains("--table is required"), output);
   }
 
+  /** Verifies missing runtime has actionable error. */
   @Test
-  void testMissingRuntimeHasActionableError() throws Exception {
+  public void testMissingRuntimeHasActionableError() throws Exception {
     String output =
         runFailure(
             true,

@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -50,6 +51,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
+  private static final String VERSION = "v1";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -58,22 +60,10 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
         .withComment("Built-in Iceberg orphan file cleanup job template")
         .withExecutable(resolveExecutable(IcebergRemoveOrphanFilesJob.class))
         .withClassName(IcebergRemoveOrphanFilesJob.class.getName())
-        .withArguments(
-            Arrays.asList(
-                "--catalog",
-                "{{catalog_name}}",
-                "--table",
-                "{{table_identifier}}",
-                "--older-than",
-                "{{older_than}}",
-                "--location",
-                "{{location}}",
-                "--dry-run",
-                "{{dry_run}}",
-                "--spark-conf",
-                "{{spark_conf}}"))
-        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
-        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
+        .withArguments(buildArguments())
+        .withConfigs(buildSparkConfigs())
+        .withCustomFields(
+            Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
   }
 
@@ -95,34 +85,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   }
 
   static int run(String[] args) {
-    Map<String, String> options = IcebergJobUtils.parseArguments(args);
-    SparkSession.Builder builder =
-        SparkSession.builder().appName("Gravitino Built-in Iceberg Remove Orphan Files");
-    try {
-      requireOption(options, "catalog");
-      requireOption(options, "table");
-      parseDryRun(options.get("dry-run"));
-      IcebergJobUtils.parseCustomSparkConfigs(options.get("spark-conf")).forEach(builder::config);
-    } catch (IllegalArgumentException e) {
-      LOG.error("Invalid remove orphan files job arguments: {}", e.getMessage());
-      printUsage();
-      return 1;
-    }
-
-    SparkSession spark = null;
-    try {
-      spark = builder.getOrCreate();
-      IcebergJobUtils.requireIcebergSparkRuntime();
-      execute(spark, options);
-      return 0;
-    } catch (IOException | AnalysisException | RuntimeException e) {
-      LOG.error("Error executing remove orphan files job", e);
-      return 1;
-    } finally {
-      if (spark != null) {
-        spark.stop();
-      }
-    }
+    return Runner.run(args);
   }
 
   static long execute(SparkSession spark, Map<String, String> options)
@@ -210,6 +173,26 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
         tableLocation);
   }
 
+  private static List<String> buildArguments() {
+    return Arrays.asList(
+        "--catalog",
+        "{{catalog_name}}",
+        "--table",
+        "{{table_identifier}}",
+        "--older-than",
+        "{{older_than}}",
+        "--location",
+        "{{location}}",
+        "--dry-run",
+        "{{dry_run}}",
+        "--spark-conf",
+        "{{spark_conf}}");
+  }
+
+  private static Map<String, String> buildSparkConfigs() {
+    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
   private static void printUsage() {
     LOG.error(
         "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
@@ -276,5 +259,40 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     String value = options.get(key);
     Preconditions.checkArgument(value != null && !value.trim().isEmpty(), "--%s is required", key);
     return value;
+  }
+
+  // Defer verification of Spark-specific exception handlers until job execution. The server
+  // loads this job's template without Spark or Iceberg on its classpath.
+  private static final class Runner {
+    private static int run(String[] args) {
+      Map<String, String> options = IcebergJobUtils.parseArguments(args);
+      SparkSession.Builder builder =
+          SparkSession.builder().appName("Gravitino Built-in Iceberg Remove Orphan Files");
+      try {
+        requireOption(options, "catalog");
+        requireOption(options, "table");
+        parseDryRun(options.get("dry-run"));
+        IcebergJobUtils.parseCustomSparkConfigs(options.get("spark-conf")).forEach(builder::config);
+      } catch (IllegalArgumentException e) {
+        LOG.error("Invalid remove orphan files job arguments: {}", e.getMessage());
+        printUsage();
+        return 1;
+      }
+
+      SparkSession spark = null;
+      try {
+        spark = builder.getOrCreate();
+        IcebergJobUtils.requireIcebergSparkRuntime();
+        execute(spark, options);
+        return 0;
+      } catch (IOException | AnalysisException | RuntimeException e) {
+        LOG.error("Error executing remove orphan files job", e);
+        return 1;
+      } finally {
+        if (spark != null) {
+          spark.stop();
+        }
+      }
+    }
   }
 }
