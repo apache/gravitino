@@ -278,7 +278,9 @@ pipeline moves it to `last_job_id` and clears `job_id`. `last_job_id` →
 2. If `job_id` is still in flight (`QUEUED` / `STARTED`): skip this policy.
 3. Otherwise apply **`table-maintenance`** min-interval using `last_job_id` →
    `job_run_meta.job_finished_at` and the resolved `minIntervalMs` (table prop → global conf → code
-   default; §8.3). Compare **once** at the start — not per step.
+   default; §8.3). Compare **once** at the start — not per step. If `last_job_id` is **null**
+   (never finished a run for this policy), the interval gate **passes** — do not wait 24 hours
+   after attach or table create.
 4. If at least one operation is enabled: submit `builtin-iceberg-table-maintenance` and set
    `job_id`. Do not change `last_job_id`.
 5. Inside that job, for each enabled op in order
@@ -339,10 +341,11 @@ Why this order (when steps run):
   retention window.
 
 **Minimum interval:** only a **job-level** `table-maintenance` `minIntervalMs` (§8.3), compared once
-before submit against `last_job_id` → `job_finished_at` (code default **24 hours**). Do **not**
-apply per-operation `minIntervalMs` inside the combined job. Per-operation interval keys remain for
-single-op jobs via ops APIs / manual `runJob`. Whether a step's SQL runs after the gate is decided
-by enable flags and that step's Recommender, not by a second interval.
+before submit against `last_job_id` → `job_finished_at` (code default **24 hours**). If
+`last_job_id` is null, treat the interval as satisfied and allow submit (first run after attach).
+Do **not** apply per-operation `minIntervalMs` inside the combined job. Per-operation interval keys
+remain for single-op jobs via ops APIs / manual `runJob`. Whether a step's SQL runs after the gate
+is decided by enable flags and that step's Recommender, not by a second interval.
 
 Custom and single-op maintenance policies remain supported as separate `policy_id` rows for ops APIs
 and manual jobs. They are **not** driven by the IRC commit event path. The combined type is the
@@ -501,7 +504,8 @@ table_maintenance_event e
 ```
 
 `j.job_finished_at` is the end time of that policy's previous finished job. Resolve `minIntervalMs`
-for the policy's task type (§8.3). When `s.job_id` is null and
+for the policy's task type (§8.3). When `s.last_job_id` is **null**, there is no previous run — the
+interval gate passes. When `s.job_id` is null, `s.last_job_id` is set, and
 `e.created_at - j.job_finished_at > minIntervalMs`, the policy has not completed another run after
 the interval elapsed. A non-null `s.job_id` means a job is still in flight, so this commit is not a
 missed run.
@@ -633,8 +637,10 @@ steps. Single-operation types remain for dedicated policies / jobs via ops APIs 
 | `table-maintenance` | combined job (`builtin-iceberg-table-maintenance`, §5.5) | `86400000` (24 hours)        |
 
 For `system_iceberg_table_maintenance` on the event path: resolve **`table-maintenance`**
-`minIntervalMs` against the policy row's `last_job_id`. If the interval has elapsed and at least one
-op is enabled, submit the combined job. Inside the job, for each enabled op in order
+`minIntervalMs` against the policy row's `last_job_id`. If `last_job_id` is **null**, the interval
+gate passes (first run). If it is set, require
+`now - last_job_id.job_finished_at >= minIntervalMs`. When the gate passes and at least one op is
+enabled, submit the combined job. Inside the job, for each enabled op in order
 `compact → manifests → expire → orphan`: `Recommender` then SQL (§5.5).
 
 **Why 24 hours for the combined job (not 1 hour):** industry practice splits *frequent*
@@ -676,9 +682,10 @@ tighter compact cadence should lower `maintenance.table-maintenance.minIntervalM
 | `maintenance.table-maintenance.minIntervalMs` | Combined maintenance job min interval for this table       |
 
 The event path uses per-policy `last_job_id` → `job_run_meta.job_finished_at` and the resolved
-`table-maintenance` `minIntervalMs` (§5.4 / §5.5 / §6.2). `job_id` is only the in-flight
-submission. Policy content owns enable flags and per-op options; each step's `Recommender` owns
-whether that step's SQL runs; interval only caps how often the combined job may be submitted again.
+`table-maintenance` `minIntervalMs` (§5.4 / §5.5 / §6.2). **Null `last_job_id` → interval gate
+passes** (run on the next commit event). `job_id` is only the in-flight submission. Policy content
+owns enable flags and per-op options; each step's `Recommender` owns whether that step's SQL runs;
+interval only caps how often the combined job may be submitted again after a finished run.
 
 Example table override:
 
