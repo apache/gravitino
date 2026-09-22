@@ -35,8 +35,8 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * static factory. The properties map contains the {@code client.credentials-provider.*} entries
  * with their prefix stripped, i.e. {@code access-key-id} and {@code secret-access-key}.
  *
- * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
- * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
+ * <p>Adapted from Apache Doris's <a
+ * href="https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java">CustomAwsCredentialsProvider</a>.
  */
 public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
 
