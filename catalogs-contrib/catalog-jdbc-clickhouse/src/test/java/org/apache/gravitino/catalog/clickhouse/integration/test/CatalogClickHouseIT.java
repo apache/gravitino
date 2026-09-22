@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
@@ -34,7 +36,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
@@ -857,6 +863,117 @@ public class CatalogClickHouseIT extends BaseIT {
             schemaName, nativeTableName));
     Table nativeLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, nativeTableName));
     assertSetIndexMetadata(nativeLoaded, "idx_native_set", setProperties);
+  }
+
+  @Test
+  void testLoadLegacyUsearchIndexMetadata() throws Exception {
+    String legacyCatalogName = GravitinoITUtils.genRandomName("clickhouse_legacy_catalog");
+    String legacySchemaName = GravitinoITUtils.genRandomName("clickhouse_legacy_schema");
+    String legacyTableName = GravitinoITUtils.genRandomName("clickhouse_legacy_usearch");
+    ClickHouseContainer legacyContainer =
+        ClickHouseContainer.builder()
+            .withImage("clickhouse/clickhouse-server:23.8.16.16")
+            .withHostName("gravitino-ci-clickhouse-legacy")
+            .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
+            .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
+            .withNetwork(containerSuite.getNetwork())
+            .build();
+    Catalog legacyCatalog = null;
+    try {
+      legacyContainer.start();
+      legacyContainer.createDatabase(TEST_DB_NAME);
+
+      Map<String, String> catalogProperties = Maps.newHashMap();
+      String jdbcUrl = legacyContainer.getJdbcUrl(TEST_DB_NAME);
+      String baseJdbcUrl = jdbcUrl.substring(0, jdbcUrl.lastIndexOf("/"));
+      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), baseJdbcUrl);
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(), legacyContainer.getDriverClassName(TEST_DB_NAME));
+      catalogProperties.put(JdbcConfig.USERNAME.getKey(), legacyContainer.getUsername());
+      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), legacyContainer.getPassword());
+      legacyCatalog =
+          metalake.createCatalog(
+              legacyCatalogName,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "legacy ClickHouse index metadata fixture",
+              catalogProperties);
+      legacyCatalog = metalake.loadCatalog(legacyCatalogName);
+      legacyCatalog.asSchemas().createSchema(legacySchemaName, "legacy index metadata", Map.of());
+
+      // This official 23.8 image exposes USearch but not Annoy; Annoy metadata parsing is covered
+      // by the catalog unit tests.
+      String usearchTypeFull;
+      String legacyJdbcUrl = baseJdbcUrl + "?custom_settings=allow_experimental_usearch_index%3D1";
+      try (Connection legacyConnection =
+              DriverManager.getConnection(
+                  legacyJdbcUrl, legacyContainer.getUsername(), legacyContainer.getPassword());
+          Statement legacyStatement = legacyConnection.createStatement()) {
+        legacyStatement.execute(
+            String.format(
+                "CREATE TABLE `%s`.`%s` ("
+                    + "`id` UInt64, `usearch_embedding` Array(Float32), "
+                    + "INDEX `idx_legacy_usearch` `usearch_embedding` TYPE usearch('cosineDistance') GRANULARITY 1"
+                    + ") ENGINE = MergeTree ORDER BY `id`",
+                legacySchemaName, legacyTableName));
+
+        try (ResultSet resultSet =
+            legacyStatement.executeQuery(
+                String.format(
+                    "SELECT type_full FROM system.data_skipping_indices WHERE database = '%s' "
+                        + "AND table = '%s' AND name = 'idx_legacy_usearch'",
+                    legacySchemaName, legacyTableName))) {
+          Assertions.assertTrue(resultSet.next(), "Expected to find the legacy USearch index");
+          usearchTypeFull = resultSet.getString("type_full");
+        }
+      }
+      Assertions.assertEquals("usearch('cosineDistance')", usearchTypeFull);
+
+      Table loaded =
+          legacyCatalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(legacySchemaName, legacyTableName));
+      assertLegacyIndexMetadata(
+          loaded,
+          "idx_legacy_usearch",
+          Index.IndexType.DATA_SKIPPING_USEARCH,
+          "usearch_embedding",
+          Map.of(
+              USEARCH_DISTANCE_FUNCTION,
+              "cosineDistance",
+              CLICKHOUSE_TYPE_FULL,
+              usearchTypeFull,
+              GRANULARITY,
+              "1"));
+    } finally {
+      if (legacyCatalog != null) {
+        try {
+          legacyCatalog.asSchemas().dropSchema(legacySchemaName, true);
+        } catch (Exception ignored) {
+          // The historical container is discarded below; cleanup failures must not hide test
+          // errors.
+        }
+        metalake.disableCatalog(legacyCatalogName);
+        metalake.dropCatalog(legacyCatalogName, true);
+      }
+      legacyContainer.close();
+    }
+  }
+
+  private void assertLegacyIndexMetadata(
+      Table table,
+      String indexName,
+      Index.IndexType indexType,
+      String fieldName,
+      Map<String, String> properties) {
+    Index index =
+        Arrays.stream(table.index())
+            .filter(candidate -> Objects.equals(indexName, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + indexName));
+    Assertions.assertEquals(indexType, index.type());
+    Assertions.assertArrayEquals(new String[][] {{fieldName}}, index.fieldNames());
+    Assertions.assertEquals(properties, index.properties());
   }
 
   private void assertSetIndexMetadata(
