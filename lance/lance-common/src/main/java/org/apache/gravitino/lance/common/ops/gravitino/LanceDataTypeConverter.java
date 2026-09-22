@@ -203,6 +203,10 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   @Override
   public Type toGravitino(Field arrowField) {
+    if (arrowField.getMetadata() != null && !arrowField.getMetadata().isEmpty()) {
+      return toExternalType(arrowField);
+    }
+
     FieldType fieldType = arrowField.getFieldType();
     switch (fieldType.getType().getTypeID()) {
       case Map:
@@ -315,6 +319,10 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
         // fallthrough
     }
 
+    return toExternalType(arrowField);
+  }
+
+  private Type toExternalType(Field arrowField) {
     String typeString;
     try {
       typeString = mapper.writeValueAsString(arrowField);

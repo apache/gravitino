@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
@@ -255,6 +256,52 @@ public class TestLanceDataTypeConverter {
     assertEquals(expectedNullable, arrowField.isNullable());
     assertInstanceOf(ArrowType.FixedSizeList.class, arrowField.getFieldType().getType());
     assertEquals(10, ((ArrowType.FixedSizeList) arrowField.getFieldType().getType()).getListSize());
+  }
+
+  @Test
+  void testFieldWithMetadataConvertsToExternalTypeAndRoundTrips() {
+    Field blobField =
+        new Field(
+            "blob",
+            new FieldType(
+                true,
+                ArrowType.Struct.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name", "lance.blob.v2",
+                    "lance-encoding:blob-inline-size-threshold", "4096",
+                    "lance-encoding:blob-dedicated-size-threshold", "1048576")),
+            Arrays.asList(
+                new Field("data", new FieldType(true, ArrowType.LargeBinary.INSTANCE, null), null),
+                new Field("uri", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null),
+                new Field(
+                    "position", new FieldType(true, new ArrowType.Int(64, false), null), null),
+                new Field("size", new FieldType(true, new ArrowType.Int(64, false), null), null)));
+
+    Type type = CONVERTER.toGravitino(blobField);
+
+    assertInstanceOf(Types.ExternalType.class, type);
+    assertEquals(blobField, CONVERTER.toArrowField("blob", type, true));
+  }
+
+  @Test
+  void testNestedFieldWithMetadataRoundTrips() {
+    Field nestedField =
+        new Field(
+            "record",
+            new FieldType(true, ArrowType.Struct.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "tagged_value",
+                    new FieldType(
+                        true, ArrowType.Utf8.INSTANCE, null, Map.of("vendor:type", "tagged")),
+                    null)));
+
+    Type type = CONVERTER.toGravitino(nestedField);
+
+    assertInstanceOf(Types.StructType.class, type);
+    assertInstanceOf(Types.ExternalType.class, ((Types.StructType) type).fields()[0].type());
+    assertEquals(nestedField, CONVERTER.toArrowField("record", type, true));
   }
 
   @ParameterizedTest(name = "[{index}] name={0}, type={1}, nullable={2}")
