@@ -267,28 +267,60 @@ public class FunctionMetaService {
     try {
       FunctionPO newFunctionPO =
           updateFunctionPO(oldFunctionPO, newEntity, newSchemaId, newCatalogId, newMetalakeId);
-      SchemaMetaService.getInstance()
-          .doWithSchemaWriteLock(
-              newEntity.nameIdentifier(),
-              newSchemaId,
-              newCatalogId,
-              newMetalakeId,
-              () -> {
-                // function_current_version is the sole OCC token. The root CAS is the transaction's
-                // decision point and must run before the unguarded version-row insert below.
-                int updated =
-                    SessionUtils.getWithoutCommit(
-                        FunctionMetaMapper.class,
-                        mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
-                if (updated == 0) {
-                  throw functionWriteFailure(identifier, oldFunctionPO);
-                }
-              },
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FunctionVersionMetaMapper.class,
-                      mapper ->
-                          mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
+      if (isSchemaChanged) {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockCatalogForEntityWrite(
+                        oldFunctionEntity.nameIdentifier(),
+                        oldFunctionPO.catalogId(),
+                        oldFunctionPO.metalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldFunctionEntity.nameIdentifier(),
+                        oldFunctionPO.schemaId(),
+                        oldFunctionPO.catalogId(),
+                        oldFunctionPO.metalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId),
+            () -> {
+              int updated =
+                  SessionUtils.getWithoutCommit(
+                      FunctionMetaMapper.class,
+                      mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
+              if (updated == 0) {
+                throw functionWriteFailure(identifier, oldFunctionPO);
+              }
+            },
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FunctionVersionMetaMapper.class,
+                    mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
+      } else {
+        SchemaMetaService.getInstance()
+            .doWithSchemaWriteLock(
+                newEntity.nameIdentifier(),
+                newSchemaId,
+                newCatalogId,
+                newMetalakeId,
+                () -> {
+                  int updated =
+                      SessionUtils.getWithoutCommit(
+                          FunctionMetaMapper.class,
+                          mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
+                  if (updated == 0) {
+                    throw functionWriteFailure(identifier, oldFunctionPO);
+                  }
+                },
+                () ->
+                    SessionUtils.doWithoutCommit(
+                        FunctionVersionMetaMapper.class,
+                        mapper ->
+                            mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
+      }
 
       return newEntity;
     } catch (RuntimeException re) {

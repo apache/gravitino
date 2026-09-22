@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -47,6 +48,7 @@ import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
@@ -77,7 +79,14 @@ public class RelationalEntityStore
   private EntityChangeLogPoller entityChangeLogPoller;
   private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
-  private EntityChangeLogMetricsSource changeLogMetrics;
+  // Created with the store rather than in initialize(), so that a listener built before or without
+  // initialization still has somewhere to record. initialize() only registers it for export.
+  private final EntityChangeLogMetricsSource changeLogMetrics = new EntityChangeLogMetricsSource();
+
+  // Advanced before every invalidation observed by this store, whether local or replayed from the
+  // change log. A shared cache without a local change-log listener needs its own distributed
+  // version check: this counter cannot detect changes made on another node.
+  private final AtomicLong cacheInvalidationEpoch = new AtomicLong();
 
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
   // caches have no per-node copy to invalidate, so no listener is registered.
@@ -105,7 +114,6 @@ public class RelationalEntityStore
 
     // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
     // to local listeners, while cleanup independently removes records beyond the retention period.
-    this.changeLogMetrics = new EntityChangeLogMetricsSource();
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.register(changeLogMetrics);
@@ -137,8 +145,31 @@ public class RelationalEntityStore
       return;
     }
 
-    this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache, changeLogMetrics);
+    this.entityCacheChangeLogListener = newCacheChangeLogListener();
     this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
+  }
+
+  /**
+   * Creates the change-log listener that keeps this store's cache coherent with changes made on
+   * other nodes.
+   *
+   * @return a listener whose invalidations go through this store, see {@link #batchGet}
+   */
+  @VisibleForTesting
+  EntityCacheChangeLogListener newCacheChangeLogListener() {
+    return new EntityCacheChangeLogListener(
+        new EntityCacheChangeLogListener.Target() {
+          @Override
+          public void invalidate(NameIdentifier ident, Entity.EntityType type) {
+            invalidateCache(ident, type);
+          }
+
+          @Override
+          public void clear() {
+            clearCache();
+          }
+        },
+        changeLogMetrics);
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -187,7 +218,7 @@ public class RelationalEntityStore
       // An overwrite is resolved by the database, which may keep the identity and version of the
       // row it already had. Caching the copy handed in here would publish values the stored row
       // does not carry, so the next read is served from the backend instead.
-      cache.invalidate(e.nameIdentifier(), e.type());
+      invalidateCache(e.nameIdentifier(), e.type());
     } else {
       cache.put(e);
     }
@@ -198,7 +229,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
-    cache.invalidate(ident, entityType);
+    invalidateCache(ident, entityType);
     return updatedEntity;
   }
 
@@ -233,9 +264,35 @@ public class RelationalEntityStore
                   return entity.isEmpty();
                 })
             .toList();
+    // Unlike get(), the backend read is not done under the entries' cache locks: holding one lock
+    // per key across a batch DB round trip would stall unrelated reads on the same segments. So an
+    // invalidation can land between the read and the write-back. The epoch sampled here detects
+    // that and skips the write-back, otherwise the stale copy would survive until the TTL. The
+    // per-key lock makes the check and the put atomic against an invalidation of the same key.
+    long epochBeforeRead = cacheInvalidationEpoch.get();
     List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
     for (E entity : fetchEntities) {
-      cache.put(entity);
+      if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
+        // BaseEntityCache.put may invalidate a related entry even when it does not cache this
+        // entity. Keep that hook, but avoid taking a key lock for a value that cannot be cached.
+        if (cacheInvalidationEpoch.get() == epochBeforeRead) {
+          cache.put(entity);
+        }
+        allEntities.add(entity);
+        continue;
+      }
+      cache.withCacheLock(
+          EntityCacheKey.of(entity.nameIdentifier(), entity.type()),
+          () -> {
+            if (cacheInvalidationEpoch.get() == epochBeforeRead) {
+              cache.put(entity);
+              // A whole-cache clear can run while this key lock is held. If it happened during
+              // put, remove the value we may have written after the clear.
+              if (cacheInvalidationEpoch.get() != epochBeforeRead) {
+                cache.invalidate(entity.nameIdentifier(), entity.type());
+              }
+            }
+          });
       allEntities.add(entity);
     }
     return allEntities;
@@ -250,7 +307,7 @@ public class RelationalEntityStore
     } catch (NoSuchEntityException e) {
       return false;
     } finally {
-      cache.invalidate(ident, entityType);
+      invalidateCache(ident, entityType);
     }
   }
 
@@ -264,7 +321,7 @@ public class RelationalEntityStore
     try {
       return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } finally {
-      cache.invalidate(ident, entityType);
+      invalidateCache(ident, entityType);
     }
   }
 
@@ -294,7 +351,7 @@ public class RelationalEntityStore
     failure = closeComponent(failure, "relational garbage collector", garbageCollector);
     failure = closeComponent(failure, "relational backend", backend);
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    if (metricsSystem != null && changeLogMetrics != null) {
+    if (metricsSystem != null) {
       metricsSystem.unregister(changeLogMetrics);
     }
 
@@ -372,8 +429,8 @@ public class RelationalEntityStore
     // relation write can change data materialized into the endpoint entity. Note this is not free —
     // EntityCache#invalidate cascades over the identifier hierarchy, so invalidating a catalog also
     // drops every cached schema and table beneath it.
-    cache.invalidate(srcIdentifier, srcType);
-    cache.invalidate(dstIdentifier, dstType);
+    invalidateCache(srcIdentifier, srcType);
+    invalidateCache(dstIdentifier, dstType);
   }
 
   @Override
@@ -393,9 +450,9 @@ public class RelationalEntityStore
     // Invalidate both endpoints for the same reason as insertRelation, including the hierarchy
     // cascade noted there.
     for (NameIdentifier ident : srcIdentifiers) {
-      cache.invalidate(ident, srcType);
+      invalidateCache(ident, srcType);
     }
-    cache.invalidate(dstIdentifier, dstType);
+    invalidateCache(dstIdentifier, dstType);
   }
 
   @Override
@@ -421,7 +478,7 @@ public class RelationalEntityStore
         backend.updateEntityRelations(
             relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
     Entity.EntityType targetEntityType = relationUpdateTargetType(relType);
-    cache.invalidate(srcEntityIdent, srcEntityType);
+    invalidateCache(srcEntityIdent, srcEntityType);
     invalidateRelationTargetCache(targetEntityType, update.targetsToAdd());
     invalidateRelationTargetCache(targetEntityType, update.targetsToRemove());
 
@@ -454,7 +511,7 @@ public class RelationalEntityStore
     // Invalidate after the backend write, not before: invalidating first opens a window where a
     // concurrent read could repopulate the cache with stale pre-commit data.
     Entity.EntityType targetEntityType = relationUpdateTargetType(update.relationType());
-    cache.invalidate(update.sourceIdentifier(), update.sourceEntityType());
+    invalidateCache(update.sourceIdentifier(), update.sourceEntityType());
     invalidateRelationTargetCache(targetEntityType, targetsToAdd);
     invalidateRelationTargetCache(targetEntityType, targetsToRemove);
 
@@ -477,7 +534,7 @@ public class RelationalEntityStore
   private void invalidateRelationTargetCache(
       Entity.EntityType targetEntityType, RelationEdgeTarget[] relationTargets) {
     for (RelationEdgeTarget relationTarget : relationTargets) {
-      cache.invalidate(relationTarget.nameIdentifier(), targetEntityType);
+      invalidateCache(relationTarget.nameIdentifier(), targetEntityType);
     }
   }
 
@@ -521,5 +578,18 @@ public class RelationalEntityStore
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  private void invalidateCache(NameIdentifier ident, Entity.EntityType type) {
+    // Advance before removing, so a batchGet() that samples the epoch after this point reads the
+    // backend after the change that triggered the invalidation is visible.
+    cacheInvalidationEpoch.incrementAndGet();
+    cache.invalidate(ident, type);
+  }
+
+  @VisibleForTesting
+  void clearCache() {
+    cacheInvalidationEpoch.incrementAndGet();
+    cache.clear();
   }
 }

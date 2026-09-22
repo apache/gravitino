@@ -63,29 +63,84 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheChangeLogListener.class);
 
-  private final EntityCache cache;
+  /**
+   * The two invalidation entry points this listener needs from the cache it keeps coherent. The
+   * entity store hands in its own implementation so that it observes every invalidation, including
+   * the ones replayed from other nodes (see {@code RelationalEntityStore#batchGet}).
+   */
+  public interface Target {
+    /**
+     * Invalidates the cache entry of the given entity, see {@link EntityCache#invalidate}.
+     *
+     * @param ident the identifier of the changed entity
+     * @param type the type of the changed entity
+     */
+    void invalidate(NameIdentifier ident, EntityType type);
+
+    /** Clears the whole cache, see {@link EntityCache#clear()}. */
+    void clear();
+  }
+
+  private final Target target;
   private final EntityChangeLogMetricsSource metrics;
 
   /**
-   * Creates a listener that invalidates the given entity store cache. Metrics from this legacy
+   * Creates a listener that invalidates the given entity store cache directly. Metrics from this
    * constructor are local to the listener and are not exported by the server metrics system.
    *
    * @param cache the per-node entity store cache to keep coherent
    */
   public EntityCacheChangeLogListener(EntityCache cache) {
-    this(cache, new EntityChangeLogMetricsSource());
+    this(asTarget(cache), new EntityChangeLogMetricsSource());
   }
 
   /**
-   * Creates a listener with metrics shared with the poller.
+   * Creates a listener that invalidates the given entity store cache directly, with metrics shared
+   * with the poller.
    *
-   * @param cache the per-node entity store cache
+   * @param cache the per-node entity store cache to keep coherent
    * @param metrics process-local change log metrics
    */
   public EntityCacheChangeLogListener(EntityCache cache, EntityChangeLogMetricsSource metrics) {
-    Preconditions.checkArgument(cache != null, "cache cannot be null");
-    this.cache = cache;
+    this(asTarget(cache), metrics);
+  }
+
+  /**
+   * Creates a listener that invalidates through the given target. Metrics from this constructor are
+   * local to the listener and are not exported by the server metrics system.
+   *
+   * @param target the invalidation entry points of the per-node cache to keep coherent
+   */
+  public EntityCacheChangeLogListener(Target target) {
+    this(target, new EntityChangeLogMetricsSource());
+  }
+
+  /**
+   * Creates a listener that invalidates through the given target, with metrics shared with the
+   * poller.
+   *
+   * @param target the invalidation entry points of the per-node cache to keep coherent
+   * @param metrics process-local change log metrics
+   */
+  public EntityCacheChangeLogListener(Target target, EntityChangeLogMetricsSource metrics) {
+    Preconditions.checkArgument(target != null, "target cannot be null");
+    this.target = target;
     this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
+  }
+
+  private static Target asTarget(EntityCache cache) {
+    Preconditions.checkArgument(cache != null, "cache cannot be null");
+    return new Target() {
+      @Override
+      public void invalidate(NameIdentifier ident, EntityType type) {
+        cache.invalidate(ident, type);
+      }
+
+      @Override
+      public void clear() {
+        cache.clear();
+      }
+    };
   }
 
   @Override
@@ -111,7 +166,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
             change.getOperateType(),
             ident,
             change.getFullName());
-        cache.invalidate(ident, type);
+        target.invalidate(ident, type);
         applied++;
         metrics.recordsApplied(1);
       } catch (RuntimeException e) {
@@ -128,7 +183,7 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
             ident,
             change.getFullName(),
             e);
-        cache.clear();
+        target.clear();
         metrics.fallbackCleared();
         LOG.debug(
             "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=true durationMs={}",

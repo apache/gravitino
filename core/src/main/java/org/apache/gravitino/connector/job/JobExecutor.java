@@ -122,8 +122,9 @@ public interface JobExecutor extends Closeable {
    * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
    * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
    * know about - the job entity itself may still exist even after the executor's own bookkeeping
-   * for its output has expired or been lost (e.g. across a restart), so "unknown to this executor"
-   * is reported as empty output, not as an error.
+   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
+   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
+   * reported as empty output, not as an error.
    *
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
@@ -144,8 +145,9 @@ public interface JobExecutor extends Closeable {
    * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
    * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
    * know about - the job entity itself may still exist even after the executor's own bookkeeping
-   * for its output has expired or been lost (e.g. across a restart), so "unknown to this executor"
-   * is reported as empty output, not as an error.
+   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
+   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
+   * reported as empty output, not as an error.
    *
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
