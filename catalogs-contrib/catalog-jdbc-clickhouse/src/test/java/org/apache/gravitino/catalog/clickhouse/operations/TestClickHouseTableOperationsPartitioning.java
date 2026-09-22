@@ -78,6 +78,70 @@ public class TestClickHouseTableOperationsPartitioning {
     assertSingleFieldTransform(identityPartitions[0], Transforms.NAME_OF_IDENTITY, "event-time");
   }
 
+  @Test
+  public void testParseOneColumnToStartOfWeekAndToStartOfMonth() {
+    Transform[] weekPartitions = operations.parsePartitioning("toStartOfWeek(event_time)");
+    Assertions.assertEquals(1, weekPartitions.length);
+    assertSingleFieldTransform(
+        weekPartitions[0], Transforms.NAME_OF_TO_START_OF_WEEK, "event_time");
+
+    Transform[] monthPartitions = operations.parsePartitioning("toStartOfMonth(`event_time`)");
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(
+        monthPartitions[0], Transforms.NAME_OF_TO_START_OF_MONTH, "event_time");
+
+    // Mixed tuple forms preserve each transform independently.
+    Transform[] tuplePartitions =
+        operations.parsePartitioning("(toStartOfWeek(ts), toStartOfMonth(ts))");
+    Assertions.assertEquals(2, tuplePartitions.length);
+    assertSingleFieldTransform(tuplePartitions[0], Transforms.NAME_OF_TO_START_OF_WEEK, "ts");
+    assertSingleFieldTransform(tuplePartitions[1], Transforms.NAME_OF_TO_START_OF_MONTH, "ts");
+
+    // Case-insensitive function names still map to the ClickHouse transform names.
+    assertSingleFieldTransform(
+        operations.parsePartitioning("TOSTARTOFWEEK(ts)")[0],
+        Transforms.NAME_OF_TO_START_OF_WEEK,
+        "ts");
+  }
+
+  @Test
+  public void testOutOfScopeToStartOfFormsRemainUnsupported() {
+    // Multi-argument, nested and other toStartOf* forms stay out of scope: load leaves
+    // Table.partitioning() unstructured and the canonical expression stays in the read-only
+    // partition-key property. They must not be silently mapped to a structured transform, so
+    // parsing yields no transforms.
+    assertPartitioningUnstructured("toStartOfWeek(event_time, 1)");
+    assertPartitioningUnstructured("toStartOfWeek(event_time, 1, 'UTC')");
+    assertPartitioningUnstructured("toStartOfWeek(toDate(event_time))");
+    assertPartitioningUnstructured("toStartOfDay(event_time)");
+    assertPartitioningUnstructured("toStartOfMonth(event_time, 'UTC')");
+  }
+
+  private void assertPartitioningUnstructured(String partitionKey) {
+    Assertions.assertEquals(0, operations.parsePartitioning(partitionKey).length);
+  }
+
+  @Test
+  public void testCreateEmitsToStartOfFunctionExpressions() {
+    Assertions.assertEquals(
+        "toStartOfWeek(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(Transforms.toStartOfWeek("event_time")));
+    Assertions.assertEquals(
+        "toStartOfMonth(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(Transforms.toStartOfMonth("event_time")));
+  }
+
+  @Test
+  public void testRoundTripToStartOfFunctionExpressions() {
+    Transform week = operations.parsePartitioning("toStartOfWeek(event_time)")[0];
+    Assertions.assertEquals(
+        "toStartOfWeek(`event_time`)", ClickHouseTableSqlUtils.toPartitionExpression(week));
+
+    Transform month = operations.parsePartitioning("toStartOfMonth(event_time)")[0];
+    Assertions.assertEquals(
+        "toStartOfMonth(`event_time`)", ClickHouseTableSqlUtils.toPartitionExpression(month));
+  }
+
   private void assertSingleFieldTransform(
       Transform transform, String expectedName, String expectedColumn) {
     Assertions.assertEquals(expectedName, transform.name());

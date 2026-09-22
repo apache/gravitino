@@ -40,6 +40,13 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_MONTH_PATTERN =
       Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  // Strictly one-column forms: toStartOfWeek(column) / toStartOfMonth(column). The two- and
+  // three-argument forms (mode/timezone), nested expressions and other toStartOf* functions stay
+  // out of scope and must not be recognized here.
+  private static final Pattern TO_START_OF_WEEK_PATTERN =
+      Pattern.compile("toStartOfWeek\\(\\s*([^(),]+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_START_OF_MONTH_PATTERN =
+      Pattern.compile("toStartOfMonth\\(\\s*([^(),]+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
@@ -77,6 +84,16 @@ final class ClickHouseTableSqlUtils {
   static String toPartitionExpression(Transform transform) {
     Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
     String name = transform.name().toLowerCase(Locale.ROOT);
+    // The ClickHouse toStartOf* transform names are camel-cased in the public API, unlike the
+    // lower-case Transforms.NAME_OF_* constants, so compare them against the lower-cased name.
+    String lowerToStartOfWeek = Transforms.NAME_OF_TO_START_OF_WEEK.toLowerCase(Locale.ROOT);
+    String lowerToStartOfMonth = Transforms.NAME_OF_TO_START_OF_MONTH.toLowerCase(Locale.ROOT);
+    if (lowerToStartOfWeek.equals(name)) {
+      return "toStartOfWeek(%s)".formatted(quoteIdentifier(partitionFieldName(transform)));
+    }
+    if (lowerToStartOfMonth.equals(name)) {
+      return "toStartOfMonth(%s)".formatted(quoteIdentifier(partitionFieldName(transform)));
+    }
     return switch (name) {
       case Transforms.NAME_OF_IDENTITY -> quoteIdentifier(partitionFieldName(transform));
       case Transforms.NAME_OF_YEAR -> "toYear(%s)"
@@ -205,6 +222,20 @@ final class ClickHouseTableSqlUtils {
     if (toDateMatcher.matches()) {
       String identifier = extractPartitionIdentifier(toDateMatcher.group(1));
       return identifier == null ? null : Transforms.day(identifier);
+    }
+
+    Matcher toStartOfWeekMatcher = TO_START_OF_WEEK_PATTERN.matcher(trimmedExpression);
+    if (toStartOfWeekMatcher.matches()) {
+      // Only a simple column reference is structured; any other form is left unsupported so the
+      // caller keeps the canonical expression in the read-only partition-key property.
+      String identifier = extractPartitionIdentifier(toStartOfWeekMatcher.group(1));
+      return identifier == null ? null : Transforms.toStartOfWeek(identifier);
+    }
+
+    Matcher toStartOfMonthMatcher = TO_START_OF_MONTH_PATTERN.matcher(trimmedExpression);
+    if (toStartOfMonthMatcher.matches()) {
+      String identifier = extractPartitionIdentifier(toStartOfMonthMatcher.group(1));
+      return identifier == null ? null : Transforms.toStartOfMonth(identifier);
     }
 
     String identifier = extractPartitionIdentifier(trimmedExpression);
