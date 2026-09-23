@@ -327,7 +327,7 @@ public class RelationalEntityStore
     try {
       return backend.delete(ident, entityType, cascade, expected);
     } finally {
-      cache.invalidate(ident, entityType);
+      invalidateCache(ident, entityType);
     }
   }
 

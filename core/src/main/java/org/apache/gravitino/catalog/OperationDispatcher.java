@@ -278,14 +278,14 @@ public abstract class OperationDispatcher {
    *
    * @param ident the entity identifier
    * @param type the entity type
-   * @return the observed id and version, or null when nothing is registered under the name or the
-   *     store cannot read versions
+   * @return the observed id and version, or null when nothing is registered under the name
+   * @throws UnsupportedOperationException if the store cannot read versions
    */
   @Nullable
   protected EntityVersion observeRegistration(NameIdentifier ident, Entity.EntityType type) {
     try {
       return store.getVersion(ident, type);
-    } catch (NoSuchEntityException | UnsupportedOperationException e) {
+    } catch (NoSuchEntityException e) {
       return null;
     } catch (IOException e) {
       throw new RuntimeException("Failed to read the registration of " + ident, e);
@@ -307,6 +307,7 @@ public abstract class OperationDispatcher {
    *     registration to delete
    * @return true if the observed registration was deleted
    * @throws OptimisticLockException if the registration under the name is not the observed one
+   * @throws UnsupportedOperationException if the store cannot delete with a version check
    */
   protected boolean deleteObservedRegistration(
       NameIdentifier ident,
@@ -321,11 +322,7 @@ public abstract class OperationDispatcher {
       return false;
     }
     try {
-      try {
-        return store.delete(ident, type, cascade, observed);
-      } catch (UnsupportedOperationException e) {
-        return store.delete(ident, type, cascade);
-      }
+      return store.delete(ident, type, cascade, observed);
     } catch (OptimisticLockException e) {
       // The row under the name is not the one this drop started with: a newer incarnation, or a
       // concurrent write. It stays in the store and the caller learns that the registration was

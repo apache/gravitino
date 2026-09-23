@@ -32,7 +32,9 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -734,6 +736,54 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+  }
+
+  @Test
+  void testDropTableFailsBeforeExternalDropWhenStoreCannotReadVersion() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version");
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version", "t");
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    createTable(tableIdent);
+
+    reset(entityStore);
+    doThrow(new UnsupportedOperationException("version reads unsupported"))
+        .when(entityStore)
+        .getVersion(tableIdent, TABLE);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations operations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> operations.loadTable(tableIdent));
+          return null;
+        });
+  }
+
+  @Test
+  void testUnsupportedVersionCheckedDeleteDoesNotFallBackToDeleteByName() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_cas");
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_cas", "t");
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    createTable(tableIdent);
+    EntityVersion observed = tableOperationDispatcher.observeRegistration(tableIdent, TABLE);
+
+    reset(entityStore);
+    doThrow(new UnsupportedOperationException("versioned delete unsupported"))
+        .when(entityStore)
+        .delete(tableIdent, TABLE, false, observed);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableOperationDispatcher.deleteObservedRegistration(
+                tableIdent, TABLE, false, observed));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    verify(entityStore, never()).delete(tableIdent, TABLE, false);
   }
 
   @Test

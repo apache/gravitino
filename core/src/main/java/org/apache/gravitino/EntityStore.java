@@ -237,6 +237,7 @@ public interface EntityStore extends Closeable {
    * @return the entity's id and store version
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the read fails
+   * @throws UnsupportedOperationException if the store cannot read entity versions
    */
   default EntityVersion getVersion(NameIdentifier ident, EntityType entityType)
       throws NoSuchEntityException, IOException {
@@ -275,6 +276,7 @@ public interface EntityStore extends Closeable {
    * @throws NoSuchEntityException if no entity exists under {@code ident}
    * @throws OptimisticLockException if the entity under {@code ident} is not the expected one
    * @throws IOException if the delete operation fails
+   * @throws UnsupportedOperationException if the store cannot delete with a version check
    */
   default boolean delete(
       NameIdentifier ident, EntityType entityType, boolean cascade, EntityVersion expected)

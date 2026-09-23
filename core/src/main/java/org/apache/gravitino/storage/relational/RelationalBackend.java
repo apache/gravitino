@@ -150,6 +150,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @return the entity's id and version
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the store operation fails
+   * @throws UnsupportedOperationException if the backend cannot read entity versions
    */
   default EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType)
       throws IOException {
@@ -168,6 +169,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @throws NoSuchEntityException if no entity exists under the identifier
    * @throws OptimisticLockException if the entity is not the expected one
    * @throws IOException if the store operation fails
+   * @throws UnsupportedOperationException if the backend cannot delete with a version check
    */
   default boolean delete(
       NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
