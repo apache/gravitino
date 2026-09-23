@@ -960,6 +960,112 @@ public class CatalogClickHouseIT extends BaseIT {
     }
   }
 
+  @Test
+  void testLoadLegacyAnnoyIndexMetadata() throws Exception {
+    String legacyCatalogName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_catalog");
+    String legacySchemaName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_schema");
+    String legacyTableName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_table");
+    ClickHouseContainer legacyContainer =
+        ClickHouseContainer.builder()
+            .withImage("clickhouse/clickhouse-server:24.8.14.39")
+            .withHostName("gravitino-ci-clickhouse-legacy-annoy")
+            .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
+            .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
+            .withNetwork(containerSuite.getNetwork())
+            .build();
+    Catalog legacyCatalog = null;
+    try {
+      legacyContainer.start();
+      legacyContainer.createDatabase(TEST_DB_NAME);
+
+      Map<String, String> catalogProperties = Maps.newHashMap();
+      String jdbcUrl = legacyContainer.getJdbcUrl(TEST_DB_NAME);
+      String baseJdbcUrl = jdbcUrl.substring(0, jdbcUrl.lastIndexOf("/"));
+      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), baseJdbcUrl);
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(), legacyContainer.getDriverClassName(TEST_DB_NAME));
+      catalogProperties.put(JdbcConfig.USERNAME.getKey(), legacyContainer.getUsername());
+      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), legacyContainer.getPassword());
+      legacyCatalog =
+          metalake.createCatalog(
+              legacyCatalogName,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "legacy Annoy index metadata fixture",
+              catalogProperties);
+      legacyCatalog = metalake.loadCatalog(legacyCatalogName);
+      legacyCatalog.asSchemas().createSchema(legacySchemaName, "legacy Annoy metadata", Map.of());
+
+      String nativeType;
+      String nativeTypeFull;
+      long nativeGranularity;
+      String legacyJdbcUrl =
+          baseJdbcUrl + "?custom_settings=allow_experimental_vector_similarity_index%3D1";
+      try (Connection legacyConnection =
+              DriverManager.getConnection(
+                  legacyJdbcUrl, legacyContainer.getUsername(), legacyContainer.getPassword());
+          Statement legacyStatement = legacyConnection.createStatement()) {
+        // ClickHouse 24.8 retains the legacy Annoy metadata-load compatibility path. Do not insert
+        // or search: legacy index operations are intentionally unsupported by this contribution.
+        legacyStatement.execute(
+            String.format(
+                "CREATE TABLE `%s`.`%s` ("
+                    + "`id` Int32, `embedding` Array(Float32), "
+                    + "INDEX `idx_legacy_annoy` `embedding` TYPE annoy()"
+                    + ") ENGINE = MergeTree ORDER BY `id`",
+                legacySchemaName, legacyTableName));
+
+        try (ResultSet resultSet =
+            legacyStatement.executeQuery(
+                String.format(
+                    "SELECT type, type_full, granularity FROM system.data_skipping_indices "
+                        + "WHERE database = '%s' AND table = '%s' AND name = 'idx_legacy_annoy'",
+                    legacySchemaName, legacyTableName))) {
+          Assertions.assertTrue(resultSet.next(), "Expected to find the legacy Annoy index");
+          nativeType = resultSet.getString("type");
+          nativeTypeFull = resultSet.getString("type_full");
+          nativeGranularity = resultSet.getLong("granularity");
+        }
+      }
+
+      Assertions.assertEquals("annoy", nativeType);
+      Assertions.assertTrue(
+          StringUtils.startsWithIgnoreCase(nativeTypeFull, "annoy"),
+          "Expected ClickHouse to preserve the Annoy type expression, but got: " + nativeTypeFull);
+      Assertions.assertTrue(nativeGranularity > 0);
+
+      Table loaded =
+          legacyCatalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(legacySchemaName, legacyTableName));
+      Index loadedAnnoy =
+          Arrays.stream(loaded.index())
+              .filter(index -> Objects.equals(index.name(), "idx_legacy_annoy"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Missing legacy Annoy index"));
+      Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, loadedAnnoy.type());
+      Assertions.assertArrayEquals(new String[][] {{"embedding"}}, loadedAnnoy.fieldNames());
+      Assertions.assertEquals(nativeTypeFull, loadedAnnoy.properties().get(CLICKHOUSE_TYPE_FULL));
+      Assertions.assertEquals(
+          String.valueOf(nativeGranularity), loadedAnnoy.properties().get(GRANULARITY));
+    } finally {
+      try {
+        if (legacyCatalog != null) {
+          try {
+            legacyCatalog.asSchemas().dropSchema(legacySchemaName, true);
+          } catch (Exception ignored) {
+            // The historical container is discarded below; cleanup failures must not hide test
+            // errors.
+          }
+          metalake.disableCatalog(legacyCatalogName);
+          metalake.dropCatalog(legacyCatalogName, true);
+        }
+      } finally {
+        legacyContainer.close();
+      }
+    }
+  }
+
   private void assertLegacyIndexMetadata(
       Table table,
       String indexName,
