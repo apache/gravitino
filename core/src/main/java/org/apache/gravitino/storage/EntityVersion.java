@@ -24,9 +24,10 @@ import java.util.Objects;
  * The identity and store version of an entity registration, as read at one moment.
  *
  * <p>A dispatcher reads this before it calls the external catalog and hands it back to the store
- * afterwards, so a delete or an update only touches the registration the operation started with.
- * Without it, a store write that resolves the name again after the external call can land on an
- * entity that was re-created under the same name in between.
+ * afterwards, so a delete only touches the registration the operation started with. The id fences
+ * the external call; the store checks the current version when committing the delete. Without it, a
+ * store write that resolves the name again after the external call can land on an entity that was
+ * re-created under the same name in between.
  */
 public final class EntityVersion {
 

@@ -247,13 +247,14 @@ public interface EntityStore extends Closeable {
   /**
    * Deletes an entity only if it is still the one described by {@code expected}.
    *
-   * <p>The row under {@code ident} must carry the same id and store version as {@code expected}.
-   * When it does not, another operation re-created or changed the entity in between and this delete
-   * must not remove it.
+   * <p>The row under {@code ident} must carry the same id as {@code expected}. An update to that
+   * same entity may change its version during the external operation. Implementations must still
+   * compare the row's current version when committing the delete to protect against concurrent
+   * store writes.
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @param expected the id and version read before the operation started
+   * @param expected the identity and version read before the operation started
    * @return true if the entity was deleted
    * @throws NoSuchEntityException if no entity exists under {@code ident}
    * @throws OptimisticLockException if the entity under {@code ident} is not the expected one
@@ -271,7 +272,7 @@ public interface EntityStore extends Closeable {
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
    * @param cascade support cascade delete or not
-   * @param expected the id and version read before the operation started
+   * @param expected the identity and version read before the operation started
    * @return true if the entity was deleted
    * @throws NoSuchEntityException if no entity exists under {@code ident}
    * @throws OptimisticLockException if the entity under {@code ident} is not the expected one

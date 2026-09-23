@@ -25,6 +25,7 @@ import java.util.function.Predicate;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.EntityVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,8 @@ public final class SchemaEntityCleaner {
    * <p>Candidates are checked from the starting schema toward the outermost ancestor. The first
    * candidate that still exists in the catalog stops the walk; every more-specific candidate
    * checked before that point is stale. A single cascade delete on the outermost stale schema
-   * removes it and all descendant schema entities.
+   * removes it and all descendant schema entities, but only if its registration is still the one
+   * observed before the existence probe.
    *
    * <p>This is best-effort: callers invoke it after the primary drop has already succeeded, so any
    * failure (a store error or a catalog existence probe failure) is logged and swallowed rather
@@ -70,19 +72,29 @@ public final class SchemaEntityCleaner {
       }
 
       NameIdentifier outermostOrphan = null;
+      EntityVersion outermostObserved = null;
       for (String schemaName : schemaNames) {
         NameIdentifier candidate = NameIdentifier.of(schemaIdent.namespace(), schemaName);
+        // The source may be re-created while schemaExists runs. Observe the store row first so
+        // cleanup cannot delete that new incarnation or its children by name.
+        EntityVersion observed;
+        try {
+          observed = store.getVersion(candidate, SCHEMA);
+        } catch (NoSuchEntityException e) {
+          observed = null;
+        }
         if (schemaExists.test(candidate)) {
           break;
         }
         outermostOrphan = candidate;
+        outermostObserved = observed;
       }
 
-      if (outermostOrphan == null) {
+      if (outermostOrphan == null || outermostObserved == null) {
         return;
       }
 
-      store.delete(outermostOrphan, SCHEMA, true);
+      store.delete(outermostOrphan, SCHEMA, true, outermostObserved);
     } catch (NoSuchEntityException e) {
       LOG.debug("The orphaned schema entity was already removed from the store", e);
     } catch (Exception e) {

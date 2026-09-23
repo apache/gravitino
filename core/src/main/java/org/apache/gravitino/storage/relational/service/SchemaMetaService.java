@@ -305,12 +305,8 @@ public class SchemaMetaService {
 
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
     if (expected != null) {
-      OccWriteSupport.checkExpectedVersion(
-          identifier,
-          Entity.EntityType.SCHEMA,
-          schemaPO.getSchemaId(),
-          schemaPO.getCurrentVersion(),
-          expected);
+      OccWriteSupport.checkExpectedIdentity(
+          identifier, Entity.EntityType.SCHEMA, schemaPO.getSchemaId(), expected);
     }
     Long schemaId = schemaPO.getSchemaId();
 

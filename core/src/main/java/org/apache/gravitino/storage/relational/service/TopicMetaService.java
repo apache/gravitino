@@ -310,12 +310,8 @@ public class TopicMetaService {
   public boolean deleteTopic(NameIdentifier identifier, @Nullable EntityVersion expected) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
     if (expected != null) {
-      OccWriteSupport.checkExpectedVersion(
-          identifier,
-          Entity.EntityType.TOPIC,
-          topicPO.getTopicId(),
-          topicPO.getCurrentVersion(),
-          expected);
+      OccWriteSupport.checkExpectedIdentity(
+          identifier, Entity.EntityType.TOPIC, topicPO.getTopicId(), expected);
     }
     deleteTopicWithVersion(identifier, topicPO);
     return true;

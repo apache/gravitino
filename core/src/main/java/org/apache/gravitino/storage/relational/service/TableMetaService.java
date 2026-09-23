@@ -335,12 +335,8 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier, @Nullable EntityVersion expected) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
     if (expected != null) {
-      OccWriteSupport.checkExpectedVersion(
-          identifier,
-          Entity.EntityType.TABLE,
-          tablePO.getTableId(),
-          tablePO.getCurrentVersion(),
-          expected);
+      OccWriteSupport.checkExpectedIdentity(
+          identifier, Entity.EntityType.TABLE, tablePO.getTableId(), expected);
     }
 
     // Delete the table row first and only if it still has the version we read. A stale drop stops

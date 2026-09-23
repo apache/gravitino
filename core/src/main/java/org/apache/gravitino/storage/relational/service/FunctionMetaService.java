@@ -174,12 +174,8 @@ public class FunctionMetaService {
   public boolean deleteFunction(NameIdentifier ident, @Nullable EntityVersion expected) {
     FunctionPO functionPO = getFunctionPOByIdentifier(ident);
     if (expected != null) {
-      OccWriteSupport.checkExpectedVersion(
-          ident,
-          Entity.EntityType.FUNCTION,
-          functionPO.functionId(),
-          functionPO.functionCurrentVersion(),
-          expected);
+      OccWriteSupport.checkExpectedIdentity(
+          ident, Entity.EntityType.FUNCTION, functionPO.functionId(), expected);
     }
 
     deleteFunctionWithVersion(ident, functionPO);

@@ -309,7 +309,7 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
@@ -334,15 +334,11 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         second.id(), service.getTableByIdentifier(second.nameIdentifier()).id());
 
-    // A stale version of the same incarnation is refused as well.
+    // An update to the same incarnation during the external call must not prevent deletion.
     EntityVersion current = service.getTableVersion(second.nameIdentifier());
-    assertThrows(
-        OptimisticLockException.class,
-        () ->
-            service.deleteTable(
-                second.nameIdentifier(), EntityVersion.of(current.id(), current.version() + 1)));
-
-    // The matching observation deletes.
+    service.insertTable(second, true);
+    Assertions.assertEquals(
+        current.version() + 1, service.getTableVersion(second.nameIdentifier()).version());
     long maxIdBeforeVersionedDelete = maxEntityChangeId();
     Assertions.assertTrue(
         backend.delete(second.nameIdentifier(), Entity.EntityType.TABLE, false, current));

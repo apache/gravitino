@@ -254,8 +254,8 @@ public class ViewMetaService {
   public boolean deleteView(NameIdentifier ident, @Nullable EntityVersion expected) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
     if (expected != null) {
-      OccWriteSupport.checkExpectedVersion(
-          ident, Entity.EntityType.VIEW, viewPO.getViewId(), viewPO.getCurrentVersion(), expected);
+      OccWriteSupport.checkExpectedIdentity(
+          ident, Entity.EntityType.VIEW, viewPO.getViewId(), expected);
     }
 
     deleteViewWithVersion(ident, viewPO);

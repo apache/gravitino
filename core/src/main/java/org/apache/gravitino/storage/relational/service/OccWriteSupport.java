@@ -74,23 +74,18 @@ public class OccWriteSupport {
    * Checks that the row a caller is about to delete is still the one it observed earlier.
    *
    * <p>The caller read {@code expected} before an external-catalog call; by now the name may point
-   * at a different entity (re-created under the same name) or at a newer version of the same one.
-   * Either way the delete must not proceed.
+   * at a different entity (re-created under the same name). An update of the same entity does not
+   * change its identity. The delete uses the current row's version for its own compare-and-swap.
    *
    * @param identifier the name identifier of the entity
    * @param type the entity type
    * @param actualId the id of the row currently under the name
-   * @param actualVersion the version of the row currently under the name
    * @param expected the id and version observed by the caller
-   * @throws OptimisticLockException if the row is not the observed one
+   * @throws OptimisticLockException if the row has a different id
    */
-  public static void checkExpectedVersion(
-      NameIdentifier identifier,
-      Entity.EntityType type,
-      long actualId,
-      long actualVersion,
-      EntityVersion expected) {
-    if (actualId != expected.id() || actualVersion != expected.version()) {
+  public static void checkExpectedIdentity(
+      NameIdentifier identifier, Entity.EntityType type, long actualId, EntityVersion expected) {
+    if (actualId != expected.id()) {
       throw ExceptionUtils.concurrentModification(type, identifier);
     }
   }
