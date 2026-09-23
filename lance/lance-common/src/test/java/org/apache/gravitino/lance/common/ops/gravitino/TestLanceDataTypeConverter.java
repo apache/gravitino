@@ -363,19 +363,85 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
-  void testListWithBlobChildRoundTrips() {
+  void testListWithBlobChildConvertsToNativeList() {
+    String blobType = "lance.blob.v2(inline_size_threshold=16)";
+    // Lance and pyarrow name list children "item"; Gravitino writes them back as "element".
+    Field listField =
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(LanceBlobTypes.toArrowField("item", true, blobType)));
+
+    Type type = CONVERTER.toGravitino(listField);
+
+    assertEquals(Types.ListType.of(Types.ExternalType.of(blobType), true), type);
+    assertEquals(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(LanceBlobTypes.toArrowField("element", true, blobType))),
+        CONVERTER.toArrowField("images", type, true));
+  }
+
+  @Test
+  void testListWithNonCanonicalBlobChildKeepsBlobMetadata() {
+    Map<String, String> blobMetadata = Map.of("lance-encoding:blob", "true");
     Field listField =
         new Field(
             "images",
             new FieldType(true, ArrowType.List.INSTANCE, null),
             Collections.singletonList(
-                LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.V1)));
+                new Field(
+                    "item",
+                    new FieldType(true, ArrowType.Binary.INSTANCE, null, blobMetadata),
+                    null)));
 
-    assertJsonExternalTypeRoundTrips(listField);
+    Type type = CONVERTER.toGravitino(listField);
+
+    Types.ListType listType = assertInstanceOf(Types.ListType.class, type);
+    Types.ExternalType elementType =
+        assertInstanceOf(Types.ExternalType.class, listType.elementType());
+    assertTrue(elementType.catalogString().startsWith("{"));
+    assertEquals(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "element",
+                    new FieldType(true, ArrowType.Binary.INSTANCE, null, blobMetadata),
+                    null))),
+        CONVERTER.toArrowField("images", type, true));
   }
 
   @Test
-  void testMapWithBlobValueRoundTrips() {
+  void testStructWithBlobListConvertsToNativeTypes() {
+    Field structField =
+        new Field(
+            "record",
+            new FieldType(true, ArrowType.Struct.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "images",
+                    new FieldType(true, ArrowType.List.INSTANCE, null),
+                    Collections.singletonList(
+                        LanceBlobTypes.toArrowField("element", true, LanceBlobTypes.V2)))));
+
+    Type type = CONVERTER.toGravitino(structField);
+
+    assertEquals(
+        Types.StructType.of(
+            Types.StructType.Field.of(
+                "images",
+                Types.ListType.of(Types.ExternalType.of(LanceBlobTypes.V2), true),
+                true,
+                null)),
+        type);
+    assertEquals(structField, CONVERTER.toArrowField("record", type, true));
+  }
+
+  @Test
+  void testMapWithBlobValueConvertsToNativeMap() {
     Field mapField =
         new Field(
             "images",
@@ -392,11 +458,16 @@ public class TestLanceDataTypeConverter {
                         LanceBlobTypes.toArrowField(
                             MapVector.VALUE_NAME, true, LanceBlobTypes.V1)))));
 
-    assertJsonExternalTypeRoundTrips(mapField);
+    Type type = CONVERTER.toGravitino(mapField);
+
+    assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.ExternalType.of(LanceBlobTypes.V1), true),
+        type);
+    assertEquals(mapField, CONVERTER.toArrowField("images", type, true));
   }
 
   @Test
-  void testUnionWithBlobChildRoundTrips() {
+  void testUnionWithBlobChildConvertsToNativeUnion() {
     Field unionField =
         new Field(
             "value",
@@ -413,7 +484,14 @@ public class TestLanceDataTypeConverter {
                 LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.V1),
                 new Field("number", new FieldType(true, new ArrowType.Int(32, true), null), null)));
 
-    assertJsonExternalTypeRoundTrips(unionField);
+    Type type = CONVERTER.toGravitino(unionField);
+
+    assertEquals(
+        Types.UnionType.of(Types.ExternalType.of(LanceBlobTypes.V1), Types.IntegerType.get()),
+        type);
+    Field blobChild = CONVERTER.toArrowField("value", type, true).getChildren().get(0);
+    assertEquals(ArrowType.LargeBinary.INSTANCE, blobChild.getType());
+    assertEquals(Map.of("lance-encoding:blob", "true"), blobChild.getMetadata());
   }
 
   @Test

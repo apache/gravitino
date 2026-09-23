@@ -217,16 +217,6 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
     }
 
     FieldType fieldType = arrowField.getFieldType();
-    // List, map and union children are rebuilt with fixed names and without metadata, so a blob
-    // below them can only be preserved by keeping the whole subtree as Arrow JSON. Struct children
-    // keep their names and are converted recursively.
-    ArrowType.ArrowTypeID typeId = fieldType.getType().getTypeID();
-    if ((typeId == ArrowType.ArrowTypeID.List
-            || typeId == ArrowType.ArrowTypeID.Map
-            || typeId == ArrowType.ArrowTypeID.Union)
-        && arrowField.getChildren().stream().anyMatch(LanceDataTypeConverter::hasBlobInTree)) {
-      return toExternalType(arrowField);
-    }
 
     switch (fieldType.getType().getTypeID()) {
       case Map:
@@ -350,10 +340,5 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       throw new RuntimeException("Failed to serialize Arrow field to string.", e);
     }
     return Types.ExternalType.of(typeString);
-  }
-
-  private static boolean hasBlobInTree(Field field) {
-    return LanceBlobTypes.isBlob(field)
-        || field.getChildren().stream().anyMatch(LanceDataTypeConverter::hasBlobInTree);
   }
 }

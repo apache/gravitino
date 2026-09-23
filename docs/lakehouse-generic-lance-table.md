@@ -100,9 +100,10 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
 
 Gravitino types cannot carry Arrow field metadata. When loading a Lance table, only Lance blob metadata
-is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. If a blob field appears
-anywhere inside a `List`, `Map` or `Union` field, the whole field is returned as
-`External(arrow_field_json_str)`.
+is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. Blob fields nested in a
+`Struct`, `List`, `Map` or `Union` keep the container as a native Gravitino type, for example
+`List(External("lance.blob.v2"))`. As with other list columns, the list child is written back as
+`element`, whatever name it had in the Lance dataset (Lance and pyarrow use `item`).
 
 ### Blob Types
 
