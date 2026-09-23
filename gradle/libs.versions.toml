@@ -17,6 +17,7 @@
 # under the License.
 #
 [versions]
+antlr = "4.13.2"
 awssdk = "2.31.73"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
@@ -172,6 +173,8 @@ aspectj = "1.9.24"
 ql-expression = "4.0.3"
 
 [libraries]
+antlr4 = { group = "org.antlr", name = "antlr4", version.ref = "antlr" }
+antlr4-runtime = { group = "org.antlr", name = "antlr4-runtime", version.ref = "antlr" }
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
 aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
