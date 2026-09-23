@@ -109,6 +109,10 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
+  private final int jobOutputMaxLines;
+
+  private final int jobOutputMaxBytes;
+
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
   @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
@@ -154,6 +158,9 @@ public class JobManager implements JobOperationDispatcher {
           jobStagingDirKeepTimeInMs,
           JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS);
     }
+
+    this.jobOutputMaxLines = config.get(Configs.JOB_OUTPUT_MAX_LINES);
+    this.jobOutputMaxBytes = config.get(Configs.JOB_OUTPUT_MAX_BYTES);
 
     this.cleanUpExecutor =
         Executors.newSingleThreadScheduledExecutor(
@@ -414,23 +421,69 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, jobId);
-    return TreeLockUtils.doWithTreeLock(
-        jobIdent,
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchJobException(
-                "Job with ID %s under metalake %s does not exist", jobId, metalake);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    JobEntity entity =
+        TreeLockUtils.doWithTreeLock(
+            jobIdent,
+            LockType.READ,
+            () -> {
+              try {
+                return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
+              } catch (NoSuchEntityException e) {
+                throw new NoSuchJobException(
+                    "Job with ID %s under metalake %s does not exist", jobId, metalake);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+
+    if (!includeOutput) {
+      return entity;
+    }
+
+    // maxLines/maxBytes are only meaningful (and only validated) when output is actually
+    // requested - per the documented contract, they're ignored entirely when includeOutput is
+    // false, so an invalid value must not fail a plain getJob call that never uses them.
+    Preconditions.checkArgument(
+        maxLines == null || maxLines > 0, "maxLines must be positive if specified");
+    Preconditions.checkArgument(
+        maxBytes == null || maxBytes > 0, "maxBytes must be positive if specified");
+
+    // A caller-specified maxLines/maxBytes can only narrow the globally configured cap, never
+    // widen it - the global configuration remains a hard upper bound on read cost/response size.
+    int effectiveMaxLines = clampToGlobalMax(maxLines, jobOutputMaxLines);
+    int effectiveMaxBytes = clampToGlobalMax(maxBytes, jobOutputMaxBytes);
+
+    // The job entity's existence was already confirmed above via the entity store, which is the
+    // durable source of truth. The executor's own bookkeeping for a job's output is best-effort
+    // and can legitimately be unavailable while the entity still exists (e.g. LocalJobExecutor
+    // can't reach the output of a job that ran on a server not sharing its staging directory),
+    // so JobExecutor#getJobStdout/getJobStderr report a job unknown to the executor as
+    // empty output rather than an error - it never means "job does not exist" at this point.
+    List<String> stdout =
+        jobExecutor.getJobStdout(entity.jobExecutionId(), effectiveMaxLines, effectiveMaxBytes);
+    List<String> stderr =
+        jobExecutor.getJobStderr(entity.jobExecutionId(), effectiveMaxLines, effectiveMaxBytes);
+    if (stdout.isEmpty() && stderr.isEmpty() && LOG.isDebugEnabled()) {
+      LOG.debug(
+          "No output available for job {} under metalake {} - either it produced none, or the "
+              + "job executor no longer has a record of it",
+          jobId,
+          metalake);
+    }
+    return entity.withOutput(stdout, stderr);
+  }
+
+  // A caller-specified value can only narrow the globally configured cap, never widen it -
+  // null means "use the global default", and any non-null value is clamped to at most that
+  // default so the global configuration always remains a hard upper bound.
+  private static int clampToGlobalMax(Integer requested, int globalMax) {
+    return requested == null ? globalMax : Math.min(requested, globalMax);
   }
 
   @Override
@@ -534,7 +587,7 @@ public class JobManager implements JobOperationDispatcher {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
-    JobEntity jobEntity = getJob(metalake, jobId);
+    JobEntity jobEntity = getJob(metalake, jobId, false);
 
     if (jobEntity.status() == JobHandle.Status.CANCELLING
         || jobEntity.status() == JobHandle.Status.CANCELLED
@@ -904,7 +957,7 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
         matcher.appendReplacement(result, matcher.group(0));

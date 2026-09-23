@@ -494,7 +494,7 @@ public class Configs {
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
-              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds. "
                   + "Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_1_0_0)
           .longConf()
@@ -548,7 +548,11 @@ public class Configs {
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
-          .doc("Directory for managing staging files when running jobs.")
+          .doc(
+              "Directory for managing staging files when running jobs. When multiple Gravitino "
+                  + "servers share the same metadata store, it must be on storage shared by all "
+                  + "servers, otherwise the output of a job run by the local job executor can "
+                  + "only be retrieved from the server that ran it.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -584,6 +588,31 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_LINES =
+      new ConfigBuilder("gravitino.job.outputMaxLines")
+          .doc(
+              "The maximum number of lines returned by JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr. This is resolved by JobManager and passed as an "
+                  + "argument to those two APIs, so all executors honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
+      new ConfigBuilder("gravitino.job.outputMaxBytes")
+          .doc(
+              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
+                  + "when retrieving its output. Bounds both the read cost and the response size "
+                  + "regardless of how the content is shaped (e.g. a single very long line). "
+                  + "This is resolved by JobManager and passed as an argument to "
+                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
+                  + "honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(256 * 1024); // 256KB
 
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
       new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)

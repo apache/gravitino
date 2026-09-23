@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
@@ -88,5 +89,18 @@ public class TestFilesetCloudPropertiesMetadata {
     assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         response.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testAwsAccessKeyIsDeclaredOnlyOnTheFilesetCatalog() {
+    assertTrue(
+        new FilesetCatalogPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(
+        new FilesetSchemaPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(
+        new FilesetPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
   }
 }

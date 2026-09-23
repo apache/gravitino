@@ -182,13 +182,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             authorizationMetalake = Optional.of(metalakeIdent.name());
             Optional<Response> validationFailure =
                 validateCurrentUserAndActiveRoles(
-                    metalakeIdent,
-                    authorizationRequestContext,
-                    expressionAnnotation,
-                    metadataContext,
-                    method,
-                    expression,
-                    false);
+                    metalakeIdent, authorizationRequestContext, method, expression);
             if (validationFailure.isPresent()) {
               return validationFailure.get();
             }
@@ -234,11 +228,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                   validateCurrentUserAndActiveRoles(
                       NameIdentifier.of(dynamicMetalake.get()),
                       authorizationRequestContext,
-                      expressionAnnotation,
-                      metadataContext,
                       method,
-                      expression,
-                      true);
+                      expression);
               if (validationFailure.isPresent()) {
                 return validationFailure.get();
               }
@@ -298,28 +289,19 @@ public class GravitinoInterceptionService implements InterceptionService {
     private Optional<Response> validateCurrentUserAndActiveRoles(
         NameIdentifier metalakeIdent,
         AuthorizationRequestContext authorizationRequestContext,
-        AuthorizationExpression expressionAnnotation,
-        Map<Entity.EntityType, NameIdentifier> metadataContext,
         Method method,
-        String expression,
-        boolean dynamicMetalake) {
+        String expression) {
       String currentUser = PrincipalUtils.getCurrentUserName();
       try {
         AuthorizationUtils.checkCurrentUser(
             metalakeIdent.name(), currentUser, authorizationRequestContext);
       } catch (NoSuchMetalakeException e) {
+        // A custom authorizer may report a missing metalake directly; JCasbin reports it as
+        // non-membership instead.
         LOG.warn("Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
-        if (dynamicMetalake) {
-          return Optional.of(
-              Utils.illegalArguments(
-                  String.format(
-                      "job.namespace must identify an existing metalake: %s", metalakeIdent.name()),
-                  e));
-        }
-        // Not a real authz denial — metalake is absent, not forbidden. Skip event dispatch;
-        // HttpAuditFilter will emit a generic HttpRequestFailureEvent for this 403.
-        return Optional.of(
-            buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression));
+        // A missing metalake is not an authorization denial, so skip the denial event. Return the
+        // same client-visible response as a failed membership check to avoid exposing existence.
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
       } catch (ForbiddenException ex) {
         LOG.warn(
             "User validation failed - User: {}, Metalake: {}, Reason: {}",
@@ -328,7 +310,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             ex.getMessage(),
             ex);
         dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
-        return Optional.of(Utils.forbidden(ex.getMessage(), ex));
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
       } catch (Exception ex) {
         LOG.error(
             "Unexpected error during user validation - User: {}, Metalake: {}",
@@ -361,6 +343,11 @@ public class GravitinoInterceptionService implements InterceptionService {
         }
       }
       return Optional.empty();
+    }
+
+    private Response metalakeMembershipFailure(String user, String metalake) {
+      return Utils.forbidden(
+          AuthorizationUtils.metalakeMembershipFailureMessage(metalake, user), null);
     }
 
     private Response buildNoAuthResponse(

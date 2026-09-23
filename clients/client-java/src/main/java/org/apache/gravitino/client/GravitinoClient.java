@@ -707,6 +707,11 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
+    return getMetalake().getJob(jobId, includeOutput);
+  }
+
+  @Override
   public JobHandle cancelJob(String jobId) throws NoSuchJobException {
     return getMetalake().cancelJob(jobId);
   }

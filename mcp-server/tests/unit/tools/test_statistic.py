@@ -80,10 +80,7 @@ class TestStatisticTool(unittest.TestCase):
                     "associate_tag_with_metadata",
                     "disassociate_tag_from_metadata",
                     "list_tags_for_metadata",
-                    "associate_policy_with_metadata",
-                    "disassociate_policy_from_metadata",
                     "list_policies_for_metadata",
-                    "get_policy_for_metadata",
                 ):
                     with self.subTest(tool=name):
                         schema = tools[name].inputSchema

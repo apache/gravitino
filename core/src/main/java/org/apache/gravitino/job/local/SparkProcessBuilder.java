@@ -140,8 +140,8 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.directory(workingDirectory);
     builder.environment().putAll(sparkJobTemplate.environments());
 
-    File outputFile = new File(workingDirectory, "output.log");
-    File errorFile = new File(workingDirectory, "error.log");
+    File outputFile = new File(workingDirectory, STDOUT_FILE_NAME);
+    File errorFile = new File(workingDirectory, STDERR_FILE_NAME);
 
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);

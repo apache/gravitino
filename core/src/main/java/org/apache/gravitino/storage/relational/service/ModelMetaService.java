@@ -38,13 +38,13 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -151,6 +151,8 @@ public class ModelMetaService {
                         Entity.EntityType.MODEL.name(),
                         modelFullName,
                         OperateType.DROP));
+            EntityChangeLogDiagnostics.logAppended(
+                metalakeName, Entity.EntityType.MODEL.name(), OperateType.DROP, modelFullName);
           });
     } catch (NoSuchEntityException e) {
       // Another writer dropped the model between the read above and this transaction. A drop that
@@ -374,6 +376,8 @@ public class ModelMetaService {
                               Entity.EntityType.MODEL.name(),
                               oldFullName,
                               OperateType.ALTER));
+                  EntityChangeLogDiagnostics.logAppended(
+                      metalakeName, Entity.EntityType.MODEL.name(), OperateType.ALTER, oldFullName);
                 }
               });
     } catch (RuntimeException re) {
@@ -517,10 +521,5 @@ public class ModelMetaService {
                 modelId, MetadataObject.Type.MODEL.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(modelId));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper ->
-            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                modelId, MetadataObject.Type.MODEL.name()));
   }
 }
