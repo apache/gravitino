@@ -491,8 +491,10 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable.auditInfo(), retrievedTable.auditInfo());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
+    List<EntityChangeRecord> renameChanges = listEntityChanges(maxIdBeforeRename);
+    Assertions.assertEquals(1, renameChanges.size());
     Assertions.assertTrue(
-        listEntityChanges(maxIdBeforeRename).stream()
+        renameChanges.stream()
             .anyMatch(
                 record ->
                     record.getMetalakeName().equals(metalakeName)
@@ -504,15 +506,6 @@ public class TestTableMetaService extends TestJDBCBackend {
                                         metalakeName, catalogName, schemaName, "table1")
                                     .toString())
                         && record.getOperateType() == OperateType.ALTER));
-    Assertions.assertTrue(
-        listEntityChanges(maxIdBeforeRename).stream()
-            .anyMatch(
-                record ->
-                    record.getMetalakeName().equals(metalakeName)
-                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
-                        && record.getFullName().equals(updatedTable.nameIdentifier().toString())
-                        && record.getOperateType() == OperateType.ALTER));
-
     // test update table with changing schema name to a non-existing schema
     String newSchemaName = "schema2";
     TableEntity updatedTable2 =
