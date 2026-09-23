@@ -197,12 +197,14 @@ that env var on every pod.
 connector.name=gravitino
 gravitino.uri=http://gravitino.example.svc.cluster.local:8090
 # Optional: omit gravitino.metalake to load every metalake
-gravitino.use-single-metalake=true
+gravitino.catalog-name-with-metalake=true
 gravitino.client.authType=basic
 gravitino.client.basic.username=admin
 gravitino.client.basic.password={password}
 gravitino.dynamic-catalog.environment-variable.gravitino.client.basic.password=GRAVITINO_BASIC_PASSWORD
 gravitino.iceberg.rest-uri=http://gravitino.example.svc.cluster.local:9001/iceberg/
+# Required with authType=basic when Iceberg REST routing is enabled (default).
+gravitino.iceberg.rest-catalog.security=NONE
 ```
 
 ### OAuth2
@@ -216,7 +218,7 @@ to env vars as shown.
 connector.name=gravitino
 gravitino.uri=http://gravitino.example.svc.cluster.local:8090
 # Optional: omit gravitino.metalake to load every metalake
-gravitino.use-single-metalake=true
+gravitino.catalog-name-with-metalake=true
 gravitino.client.authType=oauth2
 gravitino.client.oauth2.serverUri=https://login.microsoftonline.com
 gravitino.client.oauth2.credential={client_id}:{client_secret}
@@ -315,7 +317,7 @@ service identity, forward the Trino session user:
 | `connector.name`                                                         | Yes      | Must be `gravitino`.                                      |
 | `gravitino.metalake`                                                     | No       | One metalake. Omit to load every metalake.                |
 | `gravitino.uri`                                                          | Yes      | Server REST URL.                                          |
-| `gravitino.use-single-metalake`                                          | No       | Default `true`. See catalog names.                        |
+| `gravitino.catalog-name-with-metalake`                                   | No       | Default `false`. See catalog names.                       |
 | `gravitino.client.authType`                                              | Yes      | `simple`, `basic`, `oauth2`, or `kerberos`.               |
 | `gravitino.client.basic.username` / `.password`                          | Basic    | Basic credentials.                                        |
 | `gravitino.client.oauth2.serverUri` / `.path` / `.credential` / `.scope` | OAuth2   | OAuth2 client-credentials settings.                       |
@@ -341,10 +343,10 @@ interval (`gravitino.metadata.refresh-interval-seconds`, default `10`).
 
 ## Catalog names
 
-- `gravitino.use-single-metalake=true` (default): `<catalog_name>`, for
-  example `hive`.
-- `gravitino.use-single-metalake=false`: `<metalake_name>.<catalog_name>`,
-  for example `test.hive`.
+- `gravitino.catalog-name-with-metalake=false` (default): `<catalog_name>`,
+  for example `hive`.
+- `gravitino.catalog-name-with-metalake=true`:
+  `<metalake_name>.<catalog_name>`, for example `test.hive`.
 
 `gravitino` is the connector catalog. Metalake catalogs are registered
 separately.
