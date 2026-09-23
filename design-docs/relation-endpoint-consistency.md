@@ -4,9 +4,8 @@ Metadata relations and statistics use database IDs rather than foreign keys. A w
 resolves an ID before its transaction can otherwise commit a new relation after another server
 deletes that object. The existing garbage collector repairs such orphan rows, but a successful
 write can be immediately unobservable to the caller. We therefore require synchronous endpoint
-liveness for new tag assignments and role privileges. Statistic writes will use the same endpoint
-fence in #13177. Garbage collection remains the recovery mechanism for historical rows and
-failures outside these write paths.
+liveness for new tag assignments, role privileges, and statistic writes. Garbage collection
+remains the recovery mechanism for historical rows and failures outside these write paths.
 
 `LiveEndpointService.lockLiveEndpoint` must run inside the same transaction as its dependent
 write. It locks the observed metalake, catalog, schema, and target IDs in hierarchy order using
@@ -20,9 +19,10 @@ commits: a later delete may remove the object and its relations normally.
 Lock ordering is ancestor to descendant, followed by relation rows. Tag-to-policy updates already
 lock tag rows before policy rows; tag assignments to policies preserve that order after locking
 the metalake. Role privilege writes lock their endpoints before inserting securable-object rows.
-In #13177, statistic writers will use the shared endpoint lock rather than taking a schema lock
-first, which would invert the hierarchy order. Sequential statistic value replacement remains
-allowed, while concurrent updates will use `current_version` CAS.
+Statistic writers use the shared endpoint lock rather than taking a schema lock first, which
+would invert the hierarchy order. Statistic values still accept sequential replacement by name;
+an update that races with another update of the same statistic row must match its observed
+`current_version` or fail. Direct statistic deletion uses the same endpoint and version checks.
 
 Owner assignment already has its own metalake, target-row, and principal-row fencing. Its
 single-owner semantics and any remaining name/parent identity checks belong to #13002.
@@ -34,4 +34,5 @@ The endpoint helper is tested against deletion, rename, and same-name replacemen
 schema-scoped table. Controlled tag-assignment and role-privilege tests pause behind a concurrent
 catalog deletion and verify that the dependent write fails without leaving a relation. The
 policy-to-tag suite covers its existing lock protocol on H2, MySQL, and PostgreSQL. Statistic
-tests belong to #13177.
+tests cover stale-version rejection, version advancement, and a write blocked behind a concurrent
+schema deletion before the target check.
