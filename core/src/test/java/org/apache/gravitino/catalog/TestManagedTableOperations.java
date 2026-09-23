@@ -366,7 +366,14 @@ public class TestManagedTableOperations {
             TableChange.updateColumnComment(new String[] {"col3"}, "updated"));
     Assertions.assertArrayEquals(
         new String[] {"col2", "col3"},
-        Arrays.stream(updated.columns()).map(Column::name).toArray());
+        Arrays.stream(updated.columns()).map(Column::name).toArray(String[]::new));
+    Assertions.assertEquals(
+        "updated",
+        Arrays.stream(updated.columns())
+            .filter(c -> c.name().equals("col3"))
+            .findFirst()
+            .orElseThrow()
+            .comment());
 
     // An add at first() followed by an update of a later column must keep order.
     Table updated2 =
@@ -379,7 +386,14 @@ public class TestManagedTableOperations {
             TableChange.updateColumnComment(new String[] {"col3"}, "updated again"));
     Assertions.assertArrayEquals(
         new String[] {"colNew", "col2", "col3"},
-        Arrays.stream(updated2.columns()).map(Column::name).toArray());
+        Arrays.stream(updated2.columns()).map(Column::name).toArray(String[]::new));
+    Assertions.assertEquals(
+        "updated again",
+        Arrays.stream(updated2.columns())
+            .filter(c -> c.name().equals("col3"))
+            .findFirst()
+            .orElseThrow()
+            .comment());
   }
 
   @Test
