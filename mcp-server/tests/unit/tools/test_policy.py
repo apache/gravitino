@@ -71,6 +71,89 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_list_policies_for_metadata(self.mcp))
 
+    def test_list_policies_for_tag(self):
+        async def _test():
+            async with Client(self.mcp) as client:
+                result = await client.call_tool(
+                    "list_policies_for_tag", {"tag_name": "data_domain"}
+                )
+                self.assertEqual(
+                    "list_policies_for_tag: data_domain",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test())
+
+    def test_associate_policy_with_tag(self):
+        async def _test():
+            async with Client(self.mcp) as client:
+                result = await client.call_tool(
+                    "associate_policy_with_tag",
+                    {
+                        "tag_name": "data_domain",
+                        "policy_name": "retention_policy",
+                        "selector": {
+                            "type": "TAG_VALUE",
+                            "value": "finance",
+                        },
+                    },
+                )
+                self.assertEqual(
+                    "associate_policy_with_tag: data_domain, "
+                    "retention_policy, {'type': 'TAG_VALUE', "
+                    "'value': 'finance'}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test())
+
+    def test_disassociate_policy_from_tag(self):
+        async def _test():
+            async with Client(self.mcp) as client:
+                result = await client.call_tool(
+                    "disassociate_policy_from_tag",
+                    {
+                        "tag_name": "data_domain",
+                        "policy_name": "retention_policy",
+                    },
+                )
+                self.assertEqual(
+                    "disassociate_policy_from_tag: data_domain, "
+                    "retention_policy",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test())
+
+    def test_list_tags_for_policy(self):
+        async def _test():
+            async with Client(self.mcp) as client:
+                result = await client.call_tool(
+                    "list_tags_for_policy",
+                    {"policy_name": "retention_policy"},
+                )
+                self.assertEqual(
+                    "list_tags_for_policy: retention_policy",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test())
+
+    def test_policy_tag_tools_are_exposed(self):
+        async def _test():
+            async with Client(self.mcp) as client:
+                names = {tool.name for tool in await client.list_tools()}
+                self.assertTrue(
+                    {
+                        "list_policies_for_tag",
+                        "associate_policy_with_tag",
+                        "disassociate_policy_from_tag",
+                        "list_tags_for_policy",
+                    }.issubset(names)
+                )
+
+        asyncio.run(_test())
+
     def test_removed_object_policy_tools_are_not_exposed(self):
         async def _test():
             async with Client(self.mcp) as client:

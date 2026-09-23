@@ -47,6 +47,61 @@ class PolicyOperation(ABC):
         pass
 
     @abstractmethod
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        """List all policies directly associated with a tag.
+
+        Args:
+            tag_name: Name of the tag
+
+        Returns:
+            str: JSON-formatted list of policy-tag associations, including selectors
+        """
+        pass
+
+    @abstractmethod
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
+    ) -> str:
+        """Associate one policy with a tag.
+
+        Args:
+            tag_name: Name of the tag
+            policy_name: Name of the policy
+            selector: Selector controlling which tag assignments match the policy
+
+        Returns:
+            str: JSON-formatted policy-tag association
+        """
+        pass
+
+    @abstractmethod
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
+    ) -> str:
+        """Remove one policy association from a tag.
+
+        Args:
+            tag_name: Name of the tag
+            policy_name: Name of the policy
+
+        Returns:
+            str: JSON-formatted removal confirmation
+        """
+        pass
+
+    @abstractmethod
+    async def list_tags_for_policy(self, policy_name: str) -> str:
+        """List all tags directly associated with a policy.
+
+        Args:
+            policy_name: Name of the policy
+
+        Returns:
+            str: JSON-formatted list of policy-tag associations, including selectors
+        """
+        pass
+
+    @abstractmethod
     async def list_policies_for_metadata(
         self, metadata_full_name: str, metadata_type: str
     ) -> str:

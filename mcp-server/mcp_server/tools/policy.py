@@ -132,6 +132,137 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().load_policy(policy_name)
 
+    @mcp.tool(tags={"policy", "tag"})
+    async def list_policies_for_tag(ctx: Context, tag_name: str) -> str:
+        """List the policies directly associated with a tag.
+
+        The result includes each policy and the selector on its association.
+        ALL_VALUES selectors match any assignment of the tag, while TAG_VALUE
+        selectors match only the specified assignment value.
+
+        Args:
+            ctx (Context): The request context containing the REST client.
+            tag_name (str): Name of the tag.
+
+        Returns:
+            str: JSON-formatted policy-tag associations.
+
+        Example Return Value:
+            [
+              {
+                "policy": {
+                  "name": "retention_policy",
+                  "policyType": "custom",
+                  "enabled": true
+                },
+                "selector": {
+                  "type": "TAG_VALUE",
+                  "value": "finance"
+                }
+              }
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().list_policies_for_tag(
+            tag_name
+        )
+
+    @mcp.tool(tags={"policy", "tag"})
+    async def associate_policy_with_tag(
+        ctx: Context,
+        tag_name: str,
+        policy_name: str,
+        selector: dict,
+    ) -> str:
+        """Associate one policy with a tag and a selector.
+
+        Use {"type": "ALL_VALUES"} to select the policy whenever the tag is
+        present. Use {"type": "TAG_VALUE", "value": "finance"} to select it
+        only when the tag is assigned with that value.
+
+        Args:
+            ctx (Context): The request context containing the REST client.
+            tag_name (str): Name of the tag.
+            policy_name (str): Name of the policy.
+            selector (dict): Required association selector.
+
+        Returns:
+            str: JSON-formatted policy-tag association.
+
+        Example Return Value:
+            {
+              "code": 0,
+              "policy": "retention_policy",
+              "tag": "data_domain",
+              "selector": {
+                "type": "TAG_VALUE",
+                "value": "finance"
+              }
+            }
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().associate_policy_with_tag(
+            tag_name, policy_name, selector
+        )
+
+    @mcp.tool(tags={"policy", "tag"})
+    async def disassociate_policy_from_tag(
+        ctx: Context, tag_name: str, policy_name: str
+    ) -> str:
+        """Remove one direct policy association from a tag.
+
+        Args:
+            ctx (Context): The request context containing the REST client.
+            tag_name (str): Name of the tag.
+            policy_name (str): Name of the policy.
+
+        Returns:
+            str: JSON-formatted removal confirmation.
+
+        Example Return Value:
+            {
+              "policy": "retention_policy",
+              "tag": "data_domain",
+              "removed": true
+            }
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().disassociate_policy_from_tag(
+            tag_name, policy_name
+        )
+
+    @mcp.tool(tags={"policy", "tag"})
+    async def list_tags_for_policy(ctx: Context, policy_name: str) -> str:
+        """List the tags directly associated with a policy.
+
+        The result includes each tag and the selector on its association.
+
+        Args:
+            ctx (Context): The request context containing the REST client.
+            policy_name (str): Name of the policy.
+
+        Returns:
+            str: JSON-formatted policy-tag associations.
+
+        Example Return Value:
+            [
+              {
+                "tag": {
+                  "name": "data_domain",
+                  "comment": "Business data domain"
+                },
+                "selector": {
+                  "type": "TAG_VALUE",
+                  "value": "finance"
+                }
+              }
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().list_tags_for_policy(
+            policy_name
+        )
+
     @mcp.tool(tags={"policy"})
     async def list_policies_for_metadata(
         ctx: Context, metadata_full_name: str, metadata_type: str
