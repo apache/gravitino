@@ -268,7 +268,7 @@ def load_policy_tools(mcp: FastMCP):
         ctx: Context, metadata_full_name: str, metadata_type: str
     ) -> str:
         """
-        List all policies associated with a specific metadata item.
+        List the effective policies derived from a metadata item's effective tags.
 
         Args:
             ctx (Context): The request context object containing lifespan context
@@ -283,7 +283,7 @@ def load_policy_tools(mcp: FastMCP):
             metadata_type: "table"
 
         Returns:
-            str: JSON-formatted string containing the list of policies associated with the metadata.
+            str: JSON-formatted list of effective policies derived from the metadata's tags.
 
         Example Return Value:
             [
