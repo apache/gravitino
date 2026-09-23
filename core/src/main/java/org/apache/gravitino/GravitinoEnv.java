@@ -1010,13 +1010,7 @@ public class GravitinoEnv {
     // TODO(#12594): Add Semantic Model ownership and privilege hooks.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
-            catalogManager,
-            schemaOperationDispatcher,
-            internalTableDispatcher,
-            internalViewDispatcher,
-            entityStore,
-            idGenerator,
-            secretManager);
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
     this.semanticModelDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
   }

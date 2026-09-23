@@ -48,8 +48,6 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
    *
    * @param catalogManager The catalog manager.
    * @param schemaDispatcher The schema operation dispatcher used for parent validation.
-   * @param tableDispatcher The internal table dispatcher used for source validation.
-   * @param viewDispatcher The internal view dispatcher used for source validation.
    * @param store The EntityStore used for Semantic Model persistence.
    * @param idGenerator The stable entity ID generator.
    * @param secretManager The secret manager required by the operation dispatcher base class.
@@ -57,18 +55,17 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   public SemanticModelOperationDispatcher(
       CatalogManager catalogManager,
       SchemaDispatcher schemaDispatcher,
-      TableDispatcher tableDispatcher,
-      ViewDispatcher viewDispatcher,
       EntityStore store,
       IdGenerator idGenerator,
       SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
     this.catalogManager = catalogManager;
     this.schemaDispatcher = schemaDispatcher;
-    SemanticModelValidator validator =
-        new SemanticModelValidator(catalogManager, tableDispatcher, viewDispatcher);
     this.managedOperations =
-        new ManagedSemanticModelOperations(store, idGenerator, validator::validateForWrite);
+        new ManagedSemanticModelOperations(
+            store,
+            idGenerator,
+            (ident, definition) -> SemanticModelValidator.validateDefinition(definition));
   }
 
   @Override

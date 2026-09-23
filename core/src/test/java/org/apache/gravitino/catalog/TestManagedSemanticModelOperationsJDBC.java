@@ -59,6 +59,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
   @BeforeAll
   public void captureEnvironmentConfig() {
+    // BackendTestExtension replaces GravitinoEnv.config before each backend invocation.
     previousConfig = GravitinoEnv.getInstance().config();
   }
 

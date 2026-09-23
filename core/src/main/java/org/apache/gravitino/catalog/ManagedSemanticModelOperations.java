@@ -55,7 +55,7 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
    *
    * @param store The EntityStore used for persistence.
    * @param idGenerator The stable entity ID generator.
-   * @param writeValidator The complete definition and source validator for write operations.
+   * @param writeValidator The definition validator for write operations.
    */
   public ManagedSemanticModelOperations(
       EntityStore store,
