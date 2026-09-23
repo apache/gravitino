@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -433,7 +434,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testMetadataOnlyPolicyAlterCreatesCompleteSnapshot() throws IOException {
+  public void testMetadataOnlyPolicyAlterAdvancesOnlyTheOccVersion() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -452,14 +453,20 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataOnlyUpdate);
 
     PolicyPO updatedPO = getPolicyPO(policy.nameIdentifier());
-    assertEquals(initialPO.getCurrentVersion() + 1, updatedPO.getCurrentVersion().longValue());
-    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getLastVersion());
+    // The audit info is the only thing that changed, and policy_version_info does not store it, so
+    // the alter advances the OCC token alone and writes no snapshot.
+    assertEquals(initialPO.getOccVersion() + 1, updatedPO.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), updatedPO.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), updatedPO.getLastVersion());
+    assertNotEquals(initialPO.getAuditInfo(), updatedPO.getAuditInfo());
+
+    // The row still points at the snapshot it already had, and reads still resolve it.
     assertEquals(updatedPO.getCurrentVersion(), updatedPO.getPolicyVersionPO().getVersion());
     assertEquals(policy.comment(), updatedPO.getPolicyVersionPO().getPolicyComment());
     assertEquals(policy.enabled(), updatedPO.getPolicyVersionPO().isEnabled());
     assertEquals(
         initialPO.getPolicyVersionPO().getContent(), updatedPO.getPolicyVersionPO().getContent());
-    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate

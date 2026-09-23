@@ -31,6 +31,7 @@ public class PolicyPO {
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
+  private Long occVersion;
   private Long deletedAt;
   private PolicyVersionPO policyVersionPO;
 
@@ -54,6 +55,7 @@ public class PolicyPO {
         && Objects.equal(auditInfo, policyPO.auditInfo)
         && Objects.equal(currentVersion, policyPO.currentVersion)
         && Objects.equal(lastVersion, policyPO.lastVersion)
+        && Objects.equal(occVersion, policyPO.occVersion)
         && Objects.equal(policyVersionPO, policyPO.policyVersionPO)
         && Objects.equal(deletedAt, policyPO.deletedAt);
   }
@@ -68,6 +70,7 @@ public class PolicyPO {
         auditInfo,
         currentVersion,
         lastVersion,
+        occVersion,
         policyVersionPO,
         deletedAt);
   }
@@ -80,6 +83,7 @@ public class PolicyPO {
     private String auditInfo;
     private Long currentVersion;
     private Long lastVersion;
+    private Long occVersion;
     private Long deletedAt;
     private PolicyVersionPO policyVersionPO;
 
@@ -118,6 +122,11 @@ public class PolicyPO {
       return this;
     }
 
+    public Builder withOccVersion(Long occVersion) {
+      this.occVersion = occVersion;
+      return this;
+    }
+
     public Builder withDeletedAt(Long deletedAt) {
       this.deletedAt = deletedAt;
       return this;
@@ -143,6 +152,7 @@ public class PolicyPO {
       policyPO.auditInfo = auditInfo;
       policyPO.currentVersion = currentVersion;
       policyPO.lastVersion = lastVersion;
+      policyPO.occVersion = occVersion;
       policyPO.deletedAt = deletedAt;
       policyPO.policyVersionPO = policyVersionPO;
       return policyPO;
@@ -155,6 +165,7 @@ public class PolicyPO {
       Preconditions.checkArgument(policyType != null, "Policy type is required");
       Preconditions.checkArgument(currentVersion != null, "Current version is required");
       Preconditions.checkArgument(lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(occVersion != null, "OCC version is required");
       Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
       Preconditions.checkArgument(auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(policyVersionPO != null, "Policy version is required");

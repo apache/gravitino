@@ -55,6 +55,8 @@ public interface PolicyMetaMapper {
         @Result(property = "auditInfo", column = "audit_info"),
         @Result(property = "currentVersion", column = "current_version"),
         @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "occVersion", column = "occ_version"),
+        @Result(property = "occVersion", column = "occ_version"),
         @Result(property = "deletedAt", column = "deleted_at"),
         @Result(property = "policyVersionPO.id", column = "id"),
         @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
@@ -94,14 +96,14 @@ public interface PolicyMetaMapper {
    * Soft-deletes an active policy when its OCC version still matches.
    *
    * @param policyId The policy ID.
-   * @param currentVersion The version observed by the caller.
+   * @param occVersion The OCC version observed by the caller.
    * @return The number of affected rows.
    */
   @UpdateProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "softDeletePolicyByIdAndVersion")
   Integer softDeletePolicyByIdAndVersion(
-      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion);
+      @Param("policyId") Long policyId, @Param("occVersion") Long occVersion);
 
   @UpdateProvider(
       type = PolicyMetaSQLProviderFactory.class,
@@ -124,6 +126,8 @@ public interface PolicyMetaMapper {
         @Result(property = "auditInfo", column = "audit_info"),
         @Result(property = "currentVersion", column = "current_version"),
         @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "occVersion", column = "occ_version"),
+        @Result(property = "occVersion", column = "occ_version"),
         @Result(property = "deletedAt", column = "deleted_at")
       })
   @SelectProvider(

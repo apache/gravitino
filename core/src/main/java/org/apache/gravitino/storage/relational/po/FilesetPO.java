@@ -32,6 +32,7 @@ public class FilesetPO {
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
+  private Long occVersion;
   private Long deletedAt;
   private List<FilesetVersionPO> filesetVersionPOs;
 
@@ -71,6 +72,10 @@ public class FilesetPO {
     return lastVersion;
   }
 
+  public Long getOccVersion() {
+    return occVersion;
+  }
+
   public Long getDeletedAt() {
     return deletedAt;
   }
@@ -97,6 +102,7 @@ public class FilesetPO {
         && Objects.equal(getAuditInfo(), filesetPO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), filesetPO.getCurrentVersion())
         && Objects.equal(getLastVersion(), filesetPO.getLastVersion())
+        && Objects.equal(getOccVersion(), filesetPO.getOccVersion())
         && Objects.equal(getDeletedAt(), filesetPO.getDeletedAt())
         && Objects.equal(getFilesetVersionPOs(), filesetPO.getFilesetVersionPOs());
   }
@@ -113,6 +119,7 @@ public class FilesetPO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
+        getOccVersion(),
         getDeletedAt(),
         getFilesetVersionPOs());
   }
@@ -169,6 +176,11 @@ public class FilesetPO {
       return this;
     }
 
+    public FilesetPO.Builder withOccVersion(Long occVersion) {
+      filesetPO.occVersion = occVersion;
+      return this;
+    }
+
     public FilesetPO.Builder withDeletedAt(Long deletedAt) {
       filesetPO.deletedAt = deletedAt;
       return this;
@@ -203,10 +215,12 @@ public class FilesetPO {
       Preconditions.checkArgument(filesetPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(filesetPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(filesetPO.lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(filesetPO.occVersion != null, "OCC version is required");
       Preconditions.checkArgument(filesetPO.deletedAt != null, "Deleted at is required");
+      // An alter that leaves every stored field untouched allocates no snapshot and keeps
+      // current_version pointing at the one already stored, so the list is empty rather than null.
       Preconditions.checkArgument(
-          filesetPO.filesetVersionPOs != null && !filesetPO.filesetVersionPOs.isEmpty(),
-          "Fileset version is required");
+          filesetPO.filesetVersionPOs != null, "Fileset version is required");
     }
 
     public FilesetPO build() {

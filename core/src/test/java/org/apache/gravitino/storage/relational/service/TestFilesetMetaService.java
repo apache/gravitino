@@ -402,6 +402,89 @@ public class TestFilesetMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testAlterWritesASnapshotOnlyWhenStoredContentChanges() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_snapshot_cost");
+    NameIdentifier filesetIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
+    // Two storage locations, because a snapshot costs one row per location: that multiplier is
+    // what made a no-op alter expensive.
+    FilesetEntity fileset =
+        FilesetEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(filesetName)
+            .withNamespace(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName))
+            .withFilesetType(Fileset.Type.MANAGED)
+            .withStorageLocations(ImmutableMap.of("first", "/tmp-a", "second", "/tmp-b"))
+            .withComment("comment-v1")
+            .withProperties(ImmutableMap.of("k", "v1"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    FilesetPO initialPO = getFilesetPO(fileset.id());
+    assertEquals(1, listFilesetVersions(fileset.id()).size());
+    assertEquals(2, countFilesetVersionRows(fileset.id()));
+
+    // A rename touches nothing fileset_version_info stores.
+    String renamed = filesetName + "_renamed";
+    FilesetMetaService.getInstance()
+        .updateFileset(
+            filesetIdent,
+            entity -> {
+              FilesetEntity current = (FilesetEntity) entity;
+              return FilesetEntity.builder()
+                  .withId(current.id())
+                  .withName(renamed)
+                  .withNamespace(current.namespace())
+                  .withFilesetType(current.filesetType())
+                  .withStorageLocations(current.storageLocations())
+                  .withComment(current.comment())
+                  .withProperties(current.properties())
+                  .withAuditInfo(current.auditInfo())
+                  .build();
+            });
+
+    FilesetPO afterRename = getFilesetPO(fileset.id());
+    assertEquals(renamed, afterRename.getFilesetName());
+    assertEquals(initialPO.getOccVersion() + 1, afterRename.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterRename.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterRename.getLastVersion());
+    assertEquals(1, listFilesetVersions(fileset.id()).size());
+    assertEquals(2, countFilesetVersionRows(fileset.id()));
+
+    // Changing the comment does change stored content, so it allocates a snapshot per location.
+    NameIdentifier renamedIdent = NameIdentifier.of(metalakeName, catalogName, schemaName, renamed);
+    FilesetMetaService.getInstance()
+        .updateFileset(
+            renamedIdent,
+            entity -> {
+              FilesetEntity current = (FilesetEntity) entity;
+              return FilesetEntity.builder()
+                  .withId(current.id())
+                  .withName(current.name())
+                  .withNamespace(current.namespace())
+                  .withFilesetType(current.filesetType())
+                  .withStorageLocations(current.storageLocations())
+                  .withComment("comment-v2")
+                  .withProperties(current.properties())
+                  .withAuditInfo(current.auditInfo())
+                  .build();
+            });
+
+    FilesetPO afterComment = getFilesetPO(fileset.id());
+    assertEquals(afterRename.getOccVersion() + 1, afterComment.getOccVersion().longValue());
+    assertEquals(afterRename.getCurrentVersion() + 1, afterComment.getCurrentVersion().longValue());
+    assertEquals(afterComment.getCurrentVersion(), afterComment.getLastVersion());
+    assertEquals(2, listFilesetVersions(fileset.id()).size());
+    assertEquals(4, countFilesetVersionRows(fileset.id()));
+
+    // Whatever the mix of alters, the row still resolves to exactly one active snapshot.
+    FilesetEntity readBack = FilesetMetaService.getInstance().getFilesetByIdentifier(renamedIdent);
+    assertEquals("comment-v2", readBack.comment());
+    assertEquals("/tmp-a", readBack.storageLocations().get("first"));
+    assertEquals("/tmp-b", readBack.storageLocations().get("second"));
+  }
+
+  @TestTemplate
   public void testAlterReportsOptimisticLockConflictAndKeepsWinnerVersion() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_conflict");
     NameIdentifier filesetIdent =
@@ -445,7 +528,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                     filesetIdent,
                     e -> {
                       // Commit another alter after the outer call has read its snapshot. The
-                      // outer write must then lose the current_version comparison.
+                      // outer write must then lose the occ_version comparison.
                       updateFilesetUnchecked(
                           filesetIdent,
                           entity ->
@@ -466,10 +549,12 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     Assertions.assertEquals("/tmp", persistedEntity.storageLocations().get(LOCATION_NAME_UNKNOWN));
     Assertions.assertNotEquals(updatedFilesetEntity, persistedEntity);
     FilesetPO currentPO = getFilesetPO(filesetEntity.id());
-    Assertions.assertEquals(
-        initialPO.getCurrentVersion() + 1, currentPO.getCurrentVersion().longValue());
+    // The alter that won changed only the audit info, which fileset_version_info does not store,
+    // so it advanced the OCC token alone and the row still points at its original snapshot.
+    Assertions.assertEquals(initialPO.getOccVersion() + 1, currentPO.getOccVersion().longValue());
+    Assertions.assertEquals(initialPO.getCurrentVersion(), currentPO.getCurrentVersion());
     Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
-    Assertions.assertEquals(2, listFilesetVersions(filesetEntity.id()).size());
+    Assertions.assertEquals(1, listFilesetVersions(filesetEntity.id()).size());
   }
 
   @TestTemplate

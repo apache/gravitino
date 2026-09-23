@@ -31,21 +31,21 @@ class TestFilesetMetaPostgreSQLProvider {
 
     Assertions.assertTrue(
         conflictClause.startsWith(" ON CONFLICT(schema_id, fileset_name, deleted_at)"));
+    // The overwrite advances the OCC token only. The history version is the join key into
+    // fileset_version_info and this statement writes no snapshot to move it to.
     Assertions.assertTrue(
         conflictClause.contains(
-            "current_version = " + FilesetMetaMapper.META_TABLE_NAME + ".current_version + 1"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "last_version = " + FilesetMetaMapper.META_TABLE_NAME + ".current_version + 1"));
-    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.currentVersion}"));
-    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.lastVersion}"));
+            "occ_version = " + FilesetMetaMapper.META_TABLE_NAME + ".occ_version + 1"));
+    Assertions.assertFalse(conflictClause.contains("current_version ="));
+    Assertions.assertFalse(conflictClause.contains("last_version ="));
+    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.occVersion}"));
   }
 
   @Test
   void testDirectDeleteUsesVersionCas() {
     String sql = new FilesetMetaPostgreSQLProvider().softDeleteFilesetMetasByFilesetId(null, null);
 
-    Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
+    Assertions.assertTrue(sql.contains("AND occ_version = #{occVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
   }
 }

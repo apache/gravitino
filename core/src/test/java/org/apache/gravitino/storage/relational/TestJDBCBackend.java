@@ -291,6 +291,32 @@ public abstract class TestJDBCBackend {
     return versionDeletedTime;
   }
 
+  /**
+   * Counts the rows a fileset holds in {@code fileset_version_info}.
+   *
+   * <p>A snapshot is one row per storage location, so the row count, unlike the number of distinct
+   * versions, shows what an alter that allocates a version actually costs.
+   *
+   * @param filesetId the fileset ID
+   * @return the number of active and deleted version rows
+   */
+  protected int countFilesetVersionRows(Long filesetId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT COUNT(*) AS row_count FROM fileset_version_info WHERE fileset_id = %d",
+                    filesetId))) {
+      rs.next();
+      return rs.getInt("row_count");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
   protected Map<Integer, Long> listPolicyVersions(Long policyId) {
     Map<Integer, Long> versionDeletedTime = new HashMap<>();
     try (SqlSession sqlSession =

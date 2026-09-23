@@ -74,8 +74,8 @@ public class PolicyMetaSQLProviderFactory {
 
   /** Delegates a version-checked policy soft delete. */
   public static String softDeletePolicyByIdAndVersion(
-      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeletePolicyByIdAndVersion(policyId, currentVersion);
+      @Param("policyId") Long policyId, @Param("occVersion") Long occVersion) {
+    return getProvider().softDeletePolicyByIdAndVersion(policyId, occVersion);
   }
 
   public static String deletePolicyMetasByLegacyTimeline(

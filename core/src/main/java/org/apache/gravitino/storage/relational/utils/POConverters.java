@@ -687,6 +687,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
+          .withOccVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withFilesetVersionPOs(filesetVersionPOs)
           .build();
@@ -708,11 +709,23 @@ public class POConverters {
   public static FilesetPO updateFilesetPOWithVersion(
       FilesetPO oldFilesetPO, FilesetEntity newFileset, @Nullable Long maxStoredVersion) {
     try {
-      // Every successful fileset alter advances the OCC token. The current version is also the
-      // value used by reads to find the fileset details, so even a rename or audit-only change
-      // needs a complete snapshot at the new version. Alters that change nothing therefore still
-      // write one row per storage location; the version retention job is what removes them again.
-      //
+      // Every successful fileset alter advances the OCC token, which is the value the CAS compares.
+      Long occVersion = oldFilesetPO.getOccVersion() + 1;
+      String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
+
+      // The current version is a different thing: it is the join key reads use to find the fileset
+      // details, so it may only ever point at a version that has a stored snapshot. An alter that
+      // leaves every stored field untouched, such as a rename or an audit-only change, therefore
+      // keeps it where it is and writes no snapshot at all.
+      if (filesetSnapshotUnchanged(oldFilesetPO, newFileset, props)) {
+        return newFilesetPOBuilder(oldFilesetPO, newFileset)
+            .withCurrentVersion(oldFilesetPO.getCurrentVersion())
+            .withLastVersion(oldFilesetPO.getLastVersion())
+            .withOccVersion(occVersion)
+            .withFilesetVersionPOs(Collections.emptyList())
+            .build();
+      }
+
       // The stored snapshots are taken into account as well, because a fileset written before the
       // version reset was fixed can carry snapshots newer than the version its metadata row
       // records. Starting from the metadata row alone would rebuild a version that already exists
@@ -723,7 +736,6 @@ public class POConverters {
         previousVersion = Math.max(previousVersion, maxStoredVersion);
       }
       Long currentVersion = previousVersion + 1;
-      String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
       List<FilesetVersionPO> newFilesetVersionPOs =
           newFileset.storageLocations().entrySet().stream()
               .map(
@@ -741,22 +753,65 @@ public class POConverters {
                           .withDeletedAt(DEFAULT_DELETED_AT)
                           .build())
               .collect(Collectors.toList());
-      return FilesetPO.builder()
-          .withFilesetId(newFileset.id())
-          .withFilesetName(newFileset.name())
-          .withMetalakeId(oldFilesetPO.getMetalakeId())
-          .withCatalogId(oldFilesetPO.getCatalogId())
-          .withSchemaId(oldFilesetPO.getSchemaId())
-          .withType(newFileset.filesetType().name())
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
+      return newFilesetPOBuilder(oldFilesetPO, newFileset)
           .withCurrentVersion(currentVersion)
           .withLastVersion(currentVersion)
-          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withOccVersion(occVersion)
           .withFilesetVersionPOs(newFilesetVersionPOs)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  private static FilesetPO.Builder newFilesetPOBuilder(
+      FilesetPO oldFilesetPO, FilesetEntity newFileset) throws JsonProcessingException {
+    return FilesetPO.builder()
+        .withFilesetId(newFileset.id())
+        .withFilesetName(newFileset.name())
+        .withMetalakeId(oldFilesetPO.getMetalakeId())
+        .withCatalogId(oldFilesetPO.getCatalogId())
+        .withSchemaId(oldFilesetPO.getSchemaId())
+        .withType(newFileset.filesetType().name())
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
+        .withDeletedAt(DEFAULT_DELETED_AT);
+  }
+
+  /**
+   * Tells whether an alter leaves every field {@code fileset_version_info} stores untouched.
+   *
+   * <p>Compares exactly the persisted columns: comment, the serialized properties, and the storage
+   * locations. Comparing the serialized properties rather than the map keeps the answer aligned
+   * with what a snapshot would actually hold, so a map that serializes identically is correctly
+   * reported as unchanged. This decides only whether to write a snapshot, never whether a
+   * concurrent write happened, which is what the OCC version is for; a wrong {@code false} costs
+   * one redundant snapshot, the behaviour every alter used to have.
+   *
+   * @param oldFilesetPO the row being replaced, carrying the snapshot its current version points at
+   * @param newFileset the updated fileset
+   * @param newProperties the updated properties, already serialized
+   * @return true when no stored field changed and no new snapshot is needed
+   */
+  private static boolean filesetSnapshotUnchanged(
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, String newProperties) {
+    List<FilesetVersionPO> storedVersions = oldFilesetPO.getFilesetVersionPOs();
+    if (storedVersions == null || storedVersions.isEmpty()) {
+      // Nothing to point at, so the alter has to write a snapshot whatever it changed.
+      return false;
+    }
+    Map<String, String> storedLocations =
+        storedVersions.stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
+    if (!storedLocations.equals(newFileset.storageLocations())) {
+      return false;
+    }
+    return storedVersions.stream()
+        .allMatch(
+            version ->
+                Objects.equals(version.getFilesetComment(), newFileset.comment())
+                    && Objects.equals(version.getProperties(), newProperties));
   }
 
   /**
@@ -1529,6 +1584,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
+          .withOccVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withPolicyVersionPO(policyVersionPO)
           .build();
@@ -1794,6 +1850,32 @@ public class POConverters {
       String policyComment,
       boolean enabled,
       String content) {
+    // Every successful policy alter advances the OCC token, which is the value the CAS compares.
+    Long occVersion = oldPolicyPO.getOccVersion() + 1;
+
+    // The current version is the join key reads use to find the policy content, so it may only
+    // point at a version that has a stored snapshot. An alter that leaves comment, enabled and
+    // content untouched keeps it where it is and writes no snapshot, so the row keeps pointing at
+    // the one it already has.
+    PolicyVersionPO storedVersionPO = oldPolicyPO.getPolicyVersionPO();
+    if (storedVersionPO != null
+        && Objects.equals(storedVersionPO.getPolicyComment(), policyComment)
+        && storedVersionPO.isEnabled() == enabled
+        && Objects.equals(storedVersionPO.getContent(), content)) {
+      return PolicyPO.builder()
+          .withPolicyId(oldPolicyPO.getPolicyId())
+          .withPolicyName(policyName)
+          .withPolicyType(policyType)
+          .withMetalakeId(oldPolicyPO.getMetalakeId())
+          .withAuditInfo(auditInfo)
+          .withCurrentVersion(oldPolicyPO.getCurrentVersion())
+          .withLastVersion(oldPolicyPO.getLastVersion())
+          .withOccVersion(occVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(storedVersionPO)
+          .build();
+    }
+
     Long nextVersion = Math.max(oldPolicyPO.getCurrentVersion(), oldPolicyPO.getLastVersion()) + 1;
     PolicyVersionPO newPolicyVersionPO =
         PolicyVersionPO.builder()
@@ -1813,6 +1895,7 @@ public class POConverters {
         .withAuditInfo(auditInfo)
         .withCurrentVersion(nextVersion)
         .withLastVersion(nextVersion)
+        .withOccVersion(occVersion)
         .withDeletedAt(DEFAULT_DELETED_AT)
         .withPolicyVersionPO(newPolicyVersionPO)
         .build();

@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class TestFilesetMetaBaseSQLProvider {
 
@@ -30,13 +32,12 @@ class TestFilesetMetaBaseSQLProvider {
     String sql = PROVIDER.insertFilesetMetaOnDuplicateKeyUpdate(null);
     String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
 
-    Assertions.assertTrue(updateClause.contains("last_version = current_version + 1"));
-    Assertions.assertTrue(updateClause.contains("current_version = current_version + 1"));
-    Assertions.assertTrue(
-        updateClause.indexOf("last_version =") < updateClause.indexOf("current_version ="));
-    Assertions.assertFalse(
-        updateClause.contains("current_version = #{filesetMeta.currentVersion}"));
-    Assertions.assertFalse(updateClause.contains("last_version = #{filesetMeta.lastVersion}"));
+    // The overwrite advances the OCC token only. The history version is the join key into
+    // fileset_version_info and this statement writes no snapshot to move it to.
+    Assertions.assertTrue(updateClause.contains("occ_version = occ_version + 1"));
+    Assertions.assertFalse(updateClause.contains("current_version ="));
+    Assertions.assertFalse(updateClause.contains("last_version ="));
+    Assertions.assertFalse(updateClause.contains("occ_version = #{filesetMeta.occVersion}"));
   }
 
   @Test
@@ -46,7 +47,7 @@ class TestFilesetMetaBaseSQLProvider {
 
     Assertions.assertEquals(
         " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
-            + " AND current_version = #{oldFilesetMeta.currentVersion}"
+            + " AND occ_version = #{oldFilesetMeta.occVersion}"
             + " AND deleted_at = 0"
             + " AND NOT EXISTS (SELECT 1 FROM fileset_version_info fv"
             + " WHERE fv.fileset_id = #{oldFilesetMeta.filesetId}"
@@ -56,10 +57,30 @@ class TestFilesetMetaBaseSQLProvider {
   }
 
   @Test
+  void testUpdateDropsTheSnapshotCheckWhenNoVersionIsAllocated() {
+    // An alter that changes nothing the version table stores keeps current_version where it is,
+    // and the snapshot it points at is supposed to exist, so the check would reject every such
+    // alter.
+    FilesetPO unchanged = Mockito.mock(FilesetPO.class);
+    Mockito.when(unchanged.getCurrentVersion()).thenReturn(3L);
+    FilesetPO stored = Mockito.mock(FilesetPO.class);
+    Mockito.when(stored.getCurrentVersion()).thenReturn(3L);
+
+    String sql = PROVIDER.updateFilesetMeta(unchanged, stored);
+
+    Assertions.assertFalse(sql.contains("NOT EXISTS"));
+    Assertions.assertTrue(
+        sql.endsWith(
+            " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
+                + " AND occ_version = #{oldFilesetMeta.occVersion}"
+                + " AND deleted_at = 0"));
+  }
+
+  @Test
   void testDirectDeleteUsesVersionCas() {
     String sql = PROVIDER.softDeleteFilesetMetasByFilesetId(null, null);
 
-    Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
+    Assertions.assertTrue(sql.contains("AND occ_version = #{occVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
   }
 
