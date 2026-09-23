@@ -25,6 +25,7 @@ import java.util.function.Predicate;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.EntityVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +98,11 @@ public final class SchemaEntityCleaner {
       store.delete(outermostOrphan, SCHEMA, true, outermostObserved);
     } catch (NoSuchEntityException e) {
       LOG.debug("The orphaned schema entity was already removed from the store", e);
+    } catch (OptimisticLockException e) {
+      LOG.debug(
+          "Skipped orphaned schema cleanup starting from {} because the registration changed",
+          schemaIdent,
+          e);
     } catch (Exception e) {
       // Best-effort: the primary drop already succeeded, so swallow and log rather than fail it.
       LOG.warn("Failed to clean up orphaned schema entities starting from {}", schemaIdent, e);
