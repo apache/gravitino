@@ -164,10 +164,9 @@ public class TestRelationalEntityStoreBatchGetLateFill {
   void testBatchGetRemovesValueWrittenAfterInvalidationDuringPut() throws IllegalAccessException {
     TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
     RecordingCache recordingCache = new RecordingCache();
-    // Advance the epoch from inside the write-back, while this key's cache lock is held. It has to
-    // be an invalidation that does not take this key's lock: a whole-cache clear waits for every
-    // in-flight segment operation, so from this thread it would deadlock and from another thread
-    // it could never land here at all.
+    // Advance the epoch from inside the write-back, while this key's cache lock is held. Invalidate
+    // an unrelated entity so this entry is removed only by the post-put epoch check. A whole-cache
+    // clear cannot run from inside the segment operation.
     NameIdentifier unrelatedIdent = NameIdentifier.of(SCHEMA_NS, "t2");
     recordingCache.beforePut =
         () -> {
