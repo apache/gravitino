@@ -48,12 +48,12 @@ def check_non_empty_string_elements(name: str, values: Optional[Sequence[str]]) 
         values (Sequence[str], optional): The sequence to check, `None` is allowed.
 
     Raises:
-        IllegalArgumentException: If any element is `None` or empty.
+        IllegalArgumentException: If any element is not a string or is empty.
     """
     if values is None:
         return
     for index, value in enumerate(values):
         Precondition.check_argument(
-            value is not None and value != "",
+            isinstance(value, str) and value != "",
             f"{name}[{index}] must not be null or empty",
         )

@@ -19,7 +19,6 @@ import copy
 import math
 from typing import Any, Final, Optional
 
-from gravitino.api.semantic.semantic_utils import check_no_none_elements
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
 
@@ -44,8 +43,8 @@ class AIContextObject:
         examples: Optional[list[str]] = None,
         additional_properties: Optional[dict[str, Any]] = None,
     ):
-        check_no_none_elements("synonyms", synonyms)
-        check_no_none_elements("examples", examples)
+        _check_string_elements("synonyms", synonyms)
+        _check_string_elements("examples", examples)
 
         self._instructions = instructions
         self._synonyms = None if synonyms is None else list(synonyms)
@@ -77,7 +76,8 @@ class AIContextObject:
             self._instructions == other.instructions()
             and self._synonyms == other.synonyms()
             and self._examples == other.examples()
-            and self._additional_properties == other.additional_properties()
+            and _freeze_json_value(self._additional_properties)
+            == _freeze_json_value(other.additional_properties())
         )
 
     def __hash__(self) -> int:
@@ -86,7 +86,7 @@ class AIContextObject:
                 self._instructions,
                 None if self._synonyms is None else tuple(self._synonyms),
                 None if self._examples is None else tuple(self._examples),
-                tuple(sorted(self._additional_properties)),
+                _freeze_json_value(self._additional_properties),
             )
         )
 
@@ -187,3 +187,23 @@ def _enter_container(
         f"Additional property {path} contains a cyclic value",
     )
     visiting.add(id(value))
+
+
+def _check_string_elements(name: str, values: Optional[list[str]]) -> None:
+    if values is not None:
+        for index, value in enumerate(values):
+            Precondition.check_argument(
+                isinstance(value, str), f"{name}[{index}] must be a string"
+            )
+
+
+def _freeze_json_value(value: Any) -> tuple:
+    """Return an order-independent, type-aware key for normalized JSON values."""
+    if isinstance(value, dict):
+        return (
+            dict,
+            frozenset((key, _freeze_json_value(item)) for key, item in value.items()),
+        )
+    if isinstance(value, list):
+        return (list, tuple(_freeze_json_value(item) for item in value))
+    return (type(value), value)

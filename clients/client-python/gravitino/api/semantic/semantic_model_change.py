@@ -104,7 +104,7 @@ class UpdateComment(SemanticModelChange):
         return hash(self._new_comment)
 
     def __str__(self) -> str:
-        return f"UPDATECOMMENT {self._new_comment}"
+        return f"UPDATECOMMENT {'null' if self._new_comment is None else self._new_comment}"
 
 
 @dataclass(frozen=True)

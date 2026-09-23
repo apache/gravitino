@@ -177,7 +177,8 @@ class Catalog(Auditable):
             Model operations.
 
         Returns:
-            the {@link SemanticModelCatalog} if the catalog supports Semantic Model
+            the :class:`~gravitino.api.semantic.semantic_model_catalog.SemanticModelCatalog`
+            if the catalog supports Semantic Model
             operations.
         """
         raise UnsupportedOperationException(

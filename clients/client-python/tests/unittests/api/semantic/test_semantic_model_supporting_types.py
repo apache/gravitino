@@ -259,7 +259,7 @@ class TestSemanticModelSupportingTypes(unittest.TestCase):
             AIContextObject(additional_properties={"nested": value})
 
     def test_ai_context_object_rejects_none_elements(self):
-        with self.assertRaisesRegex(ValueError, r"synonyms\[1\] must not be null"):
+        with self.assertRaisesRegex(ValueError, r"synonyms\[1\] must be a string"):
             AIContextObject(synonyms=["sales", None])
-        with self.assertRaisesRegex(ValueError, r"examples\[0\] must not be null"):
+        with self.assertRaisesRegex(ValueError, r"examples\[0\] must be a string"):
             AIContextObject(examples=[None])

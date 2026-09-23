@@ -57,7 +57,7 @@ class Dataset:  # pylint: disable=too-many-instance-attributes
         check_no_none_elements("customExtensions", custom_extensions)
 
         self._name = name
-        self._source = source
+        self._source = NameIdentifier.of(*source.namespace().levels(), source.name())
         self._primary_key = None if primary_key is None else list(primary_key)
         self._unique_keys = _copy_unique_keys(unique_keys)
         self._description = description
@@ -73,7 +73,9 @@ class Dataset:  # pylint: disable=too-many-instance-attributes
 
     def source(self) -> NameIdentifier:
         """Returns the identifier of the table or view backing the dataset."""
-        return self._source
+        return NameIdentifier.of(
+            *self._source.namespace().levels(), self._source.name()
+        )
 
     def primary_key(self) -> Optional[list[str]]:
         """Returns the primary key columns, or `None` if they are not set."""
