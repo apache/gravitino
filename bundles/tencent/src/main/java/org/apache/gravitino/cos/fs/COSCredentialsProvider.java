@@ -20,19 +20,21 @@
 package org.apache.gravitino.cos.fs;
 
 import com.qcloud.cos.auth.BasicCOSCredentials;
+import com.qcloud.cos.auth.BasicSessionCredentials;
 import com.qcloud.cos.auth.COSCredentials;
 import java.net.URI;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.auth.AbstractCOSCredentialProvider;
 
 /**
  * Hadoop-COS credential provider that pulls vended credentials out of Gravitino and feeds them to
- * the underlying {@code com.qcloud.cos.auth.COSCredentialsProvider} contract. PR-A only handles
- * static secret-key credentials; STS / token credentials will be added by a follow-up PR.
+ * the underlying {@code com.qcloud.cos.auth.COSCredentialsProvider} contract. Handles both static
+ * secret-key credentials and dynamic STS session credentials.
  */
 public class COSCredentialsProvider extends AbstractCOSCredentialProvider {
 
@@ -71,11 +73,21 @@ public class COSCredentialsProvider extends AbstractCOSCredentialProvider {
       this.basicCredentials =
           new BasicCOSCredentials(
               cosSecretKeyCredential.accessKeyId(), cosSecretKeyCredential.secretAccessKey());
+    } else if (credential instanceof COSTokenCredential) {
+      COSTokenCredential cosTokenCredential = (COSTokenCredential) credential;
+      // hadoop-cos's BasicSessionCredentials models a temporary STS triple (TmpSecretId,
+      // TmpSecretKey, SessionToken). The companion BasicSessionCredentials(appId, ak, sk,
+      // token) constructor is only required when callers explicitly pin an AppId; here the
+      // AppId is already encoded in the bucket name, so the 3-arg form is sufficient.
+      this.basicCredentials =
+          new BasicSessionCredentials(
+              cosTokenCredential.accessKeyId(),
+              cosTokenCredential.secretAccessKey(),
+              cosTokenCredential.securityToken());
     } else {
-      // Defensive: COSUtils#getSuitableCredential currently only returns
-      // COSSecretKeyCredential, but a follow-up PR will add STS / token support. Failing fast
-      // here avoids silently leaving {@link #basicCredentials} stale (or null) if a new
-      // credential type is wired into the selector without updating this branch.
+      // Defensive: any new credential type wired into COSUtils#getSuitableCredential without
+      // a matching branch here would otherwise silently leave {@link #basicCredentials} stale
+      // (or null). Failing fast surfaces the wiring bug at refresh time.
       throw new RuntimeException(
           "Unsupported credential type for COS: " + credential.getClass().getName());
     }

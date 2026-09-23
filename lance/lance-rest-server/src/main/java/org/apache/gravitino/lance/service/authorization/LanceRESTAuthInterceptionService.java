@@ -30,6 +30,7 @@ import javax.inject.Named;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
+import org.apache.gravitino.lance.service.rest.LanceTableOperations;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
 import org.glassfish.hk2.api.InterceptionService;
@@ -40,8 +41,11 @@ public class LanceRESTAuthInterceptionService implements InterceptionService {
   /** HK2 binding name for the metalake passed to the authorization interceptor. */
   public static final String METALAKE_BINDING = "lanceAuthorizationMetalake";
 
+  // Membership here only routes a class through the interceptor; each method still opts in with
+  // @AuthorizationExpression. Endpoint coverage tests ensure no REST operation omits it.
   private static final Set<String> INTERCEPTED_CLASSES =
-      ImmutableSet.of(LanceNamespaceOperations.class.getName());
+      ImmutableSet.of(
+          LanceNamespaceOperations.class.getName(), LanceTableOperations.class.getName());
 
   private final MethodInterceptor authorizationInterceptor;
 

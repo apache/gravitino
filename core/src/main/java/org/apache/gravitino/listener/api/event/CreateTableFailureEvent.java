@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
@@ -45,7 +46,25 @@ public final class CreateTableFailureEvent extends TableFailureEvent {
    */
   public CreateTableFailureEvent(
       String user, NameIdentifier identifier, Exception exception, TableInfo createTableRequest) {
-    super(user, identifier, exception);
+    this(user, identifier, exception, createTableRequest, null);
+  }
+
+  /**
+   * Constructs a {@code CreateTableFailureEvent} with optional audit extras.
+   *
+   * @param user The user who initiated the table creation operation.
+   * @param identifier The identifier of the table that was attempted to be created.
+   * @param exception The exception that was thrown during the table creation operation.
+   * @param createTableRequest The original request information used to attempt to create the table.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public CreateTableFailureEvent(
+      String user,
+      NameIdentifier identifier,
+      Exception exception,
+      TableInfo createTableRequest,
+      Map<String, String> customInfo) {
+    super(user, identifier, exception, customInfo);
     this.createTableRequest = createTableRequest;
   }
 

@@ -42,6 +42,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -176,7 +177,7 @@ public class TestAccessControlManagerForPermissions {
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     Mockito.when(catalogManager.listCatalogs(Mockito.any()))
         .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);

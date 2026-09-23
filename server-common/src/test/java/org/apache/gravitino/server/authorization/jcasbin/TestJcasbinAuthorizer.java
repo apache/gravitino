@@ -23,6 +23,7 @@ import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -72,6 +73,7 @@ import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -83,6 +85,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -387,6 +390,17 @@ public class TestJcasbinAuthorizer {
   public void testIsMetalakeUserUsesUserInfoCache() {
     assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
     verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
+  public void testIsServiceAdminUsesInternalDispatcher() {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+
+    verify(dispatcher).isServiceAdmin(USERNAME);
   }
 
   @Test
@@ -877,6 +891,36 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  /** Reusing entry state avoids another SQL prefetch even for a different privilege check. */
+  @Test
+  public void testReadScopeReusesEntryRolePrefetch() throws Exception {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity role =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(role);
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext entryContext = new AuthorizationRequestContext();
+    assertTrue(
+        jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, entryContext));
+    Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
+
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      scope.bind(METALAKE, entryContext);
+      AuthorizationRequestContext filterContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+      assertSame(entryContext, filterContext);
+      assertFalse(
+          jcasbinAuthorizer.authorize(principal, METALAKE, catalog, SELECT_TABLE, filterContext));
+      verify(userMetaMapper, Mockito.never())
+          .batchGetAuthSubjectsForUser(anyString(), anyString(), anyList());
+      verify(roleMetaMapper, Mockito.never()).batchGetRoleUpdatedAt(any());
+    }
+
+    // A subsequent request must revalidate SQL versions, even with warm shared role caches.
+    AuthorizationRequestContext nextContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+    assertTrue(jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, nextContext));
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
   }
 
   @Test

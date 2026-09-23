@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -128,5 +129,39 @@ public class TestModelVersionEntity {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> ModelVersionEntity.builder().withVersion(1).withUris(Collections.emptyMap()).build());
+  }
+
+  @Test
+  public void testHashCodeConsistentWithBagEquality() {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator("a")
+            .withCreateTime(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "s3://b/m/1");
+    ModelVersionEntity v1 =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("metalake", "catalog", "schema", "model"))
+            .withVersion(1)
+            .withComment("c")
+            .withAuditInfo(audit)
+            .withUris(uris)
+            .withAliases(Lists.newArrayList("alias1", "alias2"))
+            .build();
+    ModelVersionEntity v2 =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(NameIdentifier.of("metalake", "catalog", "schema", "model"))
+            .withVersion(1)
+            .withComment("c")
+            .withAuditInfo(audit)
+            .withUris(uris)
+            .withAliases(Lists.newArrayList("alias2", "alias1"))
+            .build();
+
+    // equals() compares aliases as an unordered collection, so equal objects
+    // must hash equally — otherwise HashSet/HashMap drop them.
+    Assertions.assertEquals(v1, v2);
+    Assertions.assertEquals(v1.hashCode(), v2.hashCode());
+    Assertions.assertTrue(new HashSet<>(Collections.singletonList(v1)).contains(v2));
   }
 }

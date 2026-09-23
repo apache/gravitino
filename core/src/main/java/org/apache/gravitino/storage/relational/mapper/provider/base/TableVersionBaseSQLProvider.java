@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -80,9 +83,64 @@ public class TableVersionBaseSQLProvider {
       @Param("tableId") Long tableId, @Param("version") Long version) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
+  }
+
+  /**
+   * Soft-deletes all active table version rows whose parent table belongs to one of the given
+   * schema IDs. The table_version_info table has no schema_id column, so a sub-query joins
+   * table_meta to find the matching table_ids. The sub-query intentionally does not filter on
+   * table_meta.deleted_at because this method runs after softDeleteTableMetasBySchemaIds within the
+   * same transaction; at that point the table_meta rows already have deleted_at set.
+   */
+  public String softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ")) AND deleted_at = 0"
+        + "</script>";
+  }
+
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given catalog.
+   * table_version_info has no catalog_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByCatalogId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at.
+   */
+  public String softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
+  }
+
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given metalake.
+   * table_version_info has no metalake_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByMetalakeId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at.
+   */
+  public String softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
   }
 
   public String deleteTableVersionByLegacyTimeline(

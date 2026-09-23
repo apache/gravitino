@@ -17,20 +17,20 @@
 -- under the License.
 --
 
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
-ALTER TABLE user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
 
-ALTER TABLE group_meta ADD COLUMN IF NOT EXISTS external_id VARCHAR(256) DEFAULT NULL;
 
-COMMENT ON COLUMN user_meta.external_id IS 'external identifier from an upstream identity system';
-COMMENT ON COLUMN user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
-COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstream identity system';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_ueid_del ON user_meta (metalake_id, external_id, deleted_at);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, external_id, deleted_at);
+
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
+
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS current_version INT NOT NULL DEFAULT 1;
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS last_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN model_meta.current_version IS 'model current version';
+COMMENT ON COLUMN model_meta.last_version IS 'model last allocated version';
 
 ALTER TABLE tag_meta ADD COLUMN IF NOT EXISTS allowed_values TEXT DEFAULT NULL;
 COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
@@ -38,8 +38,20 @@ COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON strin
 ALTER TABLE tag_relation_meta ADD COLUMN IF NOT EXISTS tag_value VARCHAR(256) NOT NULL DEFAULT '';
 COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
 
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
+
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
+
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_meta.audit_info IS 'idp user audit info';
+
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_group_meta.audit_info IS 'idp group audit info';
+
+ALTER TABLE idp_user_group_rel ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_group_rel.audit_info IS 'idp user group relation audit info';
 
 ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;
 
@@ -72,6 +84,9 @@ COMMENT ON COLUMN policy_tag_relation_meta.audit_info IS 'policy tag relation au
 COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relation current version';
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
+
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
 CREATE TABLE IF NOT EXISTS semantic_model_meta (
     semantic_model_id BIGINT NOT NULL,
@@ -135,3 +150,16 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'stru
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE owner_meta
+    SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
+        updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    WHERE deleted_at = 0
+      AND id < (
+        SELECT MAX(d.id) FROM owner_meta d
+        WHERE d.deleted_at = 0
+          AND d.metadata_object_id = owner_meta.metadata_object_id
+          AND d.metadata_object_type = owner_meta.metadata_object_type
+      );

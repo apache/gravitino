@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.secret.SensitivePropertyKeyKeywords;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -420,8 +421,16 @@ public class Configs {
   public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
   public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
-          .doc("The seconds of Gravitino metrics time sliding window")
+          .doc(
+              "The seconds of Gravitino metrics time sliding window. No longer used: timers and "
+                  + "histograms use an ExponentiallyDecayingReservoir, which decays samples "
+                  + "instead of expiring them on a fixed window, so infrequently-invoked "
+                  + "operations keep reporting a real duration for far longer (on the order of "
+                  + "half a day with the default decay rate) instead of reading zero after 60 "
+                  + "seconds of inactivity. An operation idle for longer than that will still "
+                  + "eventually report a duration of zero.")
           .version(ConfigConstants.VERSION_0_5_1)
+          .deprecated()
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 
@@ -485,7 +494,7 @@ public class Configs {
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
-              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds. "
                   + "Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_1_0_0)
           .longConf()
@@ -539,7 +548,11 @@ public class Configs {
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
-          .doc("Directory for managing staging files when running jobs.")
+          .doc(
+              "Directory for managing staging files when running jobs. When multiple Gravitino "
+                  + "servers share the same metadata store, it must be on storage shared by all "
+                  + "servers, otherwise the output of a job run by the local job executor can "
+                  + "only be retrieved from the server that ran it.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -576,6 +589,31 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_LINES =
+      new ConfigBuilder("gravitino.job.outputMaxLines")
+          .doc(
+              "The maximum number of lines returned by JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr. This is resolved by JobManager and passed as an "
+                  + "argument to those two APIs, so all executors honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
+      new ConfigBuilder("gravitino.job.outputMaxBytes")
+          .doc(
+              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
+                  + "when retrieving its output. Bounds both the read cost and the response size "
+                  + "regardless of how the content is shaped (e.g. a single very long line). "
+                  + "This is resolved by JobManager and passed as an argument to "
+                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
+                  + "honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(256 * 1024); // 256KB
+
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
       new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
           .doc(
@@ -610,7 +648,7 @@ public class Configs {
   public static final ConfigEntry<Boolean> CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES =
       new ConfigBuilder("gravitino.catalog.credential.backfillToProperties")
           .doc(
-              "If true, the server exposes hidden catalog credentials (such as jdbc-user and "
+              "If true, the server exposes hidden catalog credentials (such as "
                   + "jdbc-password) in the catalog properties response. Enable only during a "
                   + "rolling upgrade while old connectors that do not support credential vending "
                   + "are still in use. Enabling this is a security risk because credentials "
@@ -628,4 +666,23 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<List<String>> SENSITIVE_KEY_KEYWORDS =
+      new ConfigBuilder("gravitino.secret.sensitiveKeyKeywords")
+          .doc(
+              "Comma-separated property key keywords treated as credential-like. Matching is "
+                  + "case-insensitive; each entry is a literal substring of the property key, "
+                  + "not a regular expression. This list replaces the default "
+                  + "(secret, password, token, credential, access, account). Set a shorter list "
+                  + "to stop masking keys that only match a default keyword, add words such as "
+                  + "private or passwrod, or set an empty value to disable name-based matching.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null
+                      && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
+              SensitivePropertyKeyKeywords.invalidKeywordMessage())
+          .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
 }

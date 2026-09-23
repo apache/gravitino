@@ -26,6 +26,7 @@ import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -40,13 +41,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the user entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the user entity.");
-
-  public static final Field EXTERNAL_ID =
-      Field.optional("external_id", String.class, "The external id of the user entity.");
-
-  public static final Field ENABLED =
-      Field.required("enabled", Boolean.class, "Whether the user entity is enabled.");
+      Field.required("name", "The name of the user entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
@@ -59,8 +54,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
 
   private Long id;
   private String name;
-  private String externalId;
-  private boolean enabled = true;
   private AuditInfo auditInfo;
   private List<String> roleNames;
   private List<Long> roleIds;
@@ -78,8 +71,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(EXTERNAL_ID, externalId);
-    fields.put(ENABLED, enabled);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ROLE_NAMES, roleNames);
     fields.put(ROLE_IDS, roleIds);
@@ -95,16 +86,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
-  }
-
-  @Override
-  public String externalId() {
-    return externalId;
-  }
-
-  @Override
-  public boolean enabled() {
-    return enabled;
   }
 
   /**
@@ -185,15 +166,18 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(externalId, that.externalId)
-        && enabled == that.enabled
         && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
         && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, externalId, enabled, roleNames, roleIds);
+    // roleNames/roleIds are compared as unordered collections in equals, so their
+    // hash contribution must not depend on element order either.
+    int hash = Objects.hash(id, name, namespace, auditInfo);
+    hash = 31 * hash + CollectionUtils.unorderedHashCode(roleNames);
+    hash = 31 * hash + CollectionUtils.unorderedHashCode(roleIds);
+    return hash;
   }
 
   public static Builder builder() {
@@ -226,28 +210,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withName(String name) {
       userEntity.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the external id of the user entity.
-     *
-     * @param externalId The external id of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withExternalId(String externalId) {
-      userEntity.externalId = externalId;
-      return this;
-    }
-
-    /**
-     * Sets whether the user entity is enabled.
-     *
-     * @param enabled Whether the user entity is enabled.
-     * @return The builder instance.
-     */
-    public Builder withEnabled(boolean enabled) {
-      userEntity.enabled = enabled;
       return this;
     }
 

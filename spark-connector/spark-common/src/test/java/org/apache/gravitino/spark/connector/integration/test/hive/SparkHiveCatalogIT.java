@@ -39,6 +39,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -185,13 +186,12 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, nullPartitionInfo.size());
     Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
 
-    Exception exception =
-        Assertions.assertThrows(
-            Exception.class,
-            () -> {
-              sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
-            });
-    Assertions.assertTrue(exception.getMessage().contains("Partition already exists"));
+    // Adding a partition that already exists must surface Spark's PARTITIONS_ALREADY_EXIST. Assert
+    // the type rather than the message: the connector builds the exception from (table, ident,
+    // schema), the only constructor Spark 3.5 and 4.x share, so the wording is Spark's own.
+    Assertions.assertThrows(
+        PartitionsAlreadyExistException.class,
+        () -> sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')"));
   }
 
   @ParameterizedTest

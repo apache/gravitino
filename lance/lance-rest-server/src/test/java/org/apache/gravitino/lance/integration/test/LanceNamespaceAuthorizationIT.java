@@ -18,15 +18,21 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
+import java.io.Writer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
@@ -34,12 +40,20 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.HttpUtils;
+import org.apache.gravitino.lance.server.GravitinoLanceRESTServer;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DropNamespaceRequest;
+import org.lance.namespace.model.ErrorResponse;
 import org.lance.namespace.model.ListNamespacesResponse;
 
 /** Verifies namespace authorization and list filtering through auxiliary-mode Lance REST. */
@@ -47,10 +61,15 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
 
   private static final String ADMIN = "lance_authz_admin";
   private static final String USER = "lance_authz_user";
+  private static final String WRITER = "lance_authz_writer";
   private static final String VISIBLE_CATALOG = "lance_authz_visible_catalog";
   private static final String HIDDEN_CATALOG = "lance_authz_hidden_catalog";
   private static final String VISIBLE_SCHEMA = "lance_authz_visible_schema";
   private static final String HIDDEN_SCHEMA = "lance_authz_hidden_schema";
+  private static final String WRITER_CATALOG = "lance_authz_writer_catalog";
+  private static final String WRITER_SCHEMA = "lance_authz_writer_schema";
+  private static final String MISSING_CATALOG = "lance_authz_missing_catalog";
+  private static final String MARKER_PROPERTY = "lance-authz-marker";
   private static final String DELIMITER = ".";
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -62,12 +81,14 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     customConfigs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
     customConfigs.put(Configs.AUTHENTICATORS.getKey(), "simple");
     customConfigs.put("SimpleAuthUserName", ADMIN);
+    customConfigs.put("gravitino.lance-rest.gravitino-simple.user-name", WRITER);
     super.startIntegrationTest();
 
     String metalakeName = getLanceRESTServerMetalakeName();
     client.createMetalake(metalakeName, "Lance authorization tests", null);
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     metalake.addUser(USER);
+    metalake.addUser(WRITER);
     createNamespace(ADMIN, VISIBLE_CATALOG);
     createNamespace(ADMIN, HIDDEN_CATALOG);
     createNamespace(ADMIN, id(VISIBLE_CATALOG, VISIBLE_SCHEMA));
@@ -85,6 +106,20 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
             SecurableObjects.ofCatalog(VISIBLE_CATALOG, new ArrayList<>()),
             VISIBLE_SCHEMA,
             new ArrayList<>(List.of(Privileges.UseSchema.allow()))));
+
+    // The writer is a separate user so that granting create privileges cannot change what the
+    // read-only user above is allowed to see.
+    metalake.createRole(
+        "lance_authz_writer_role",
+        new HashMap<>(),
+        List.of(
+            SecurableObjects.ofMetalake(
+                metalakeName, new ArrayList<>(List.of(Privileges.CreateCatalog.allow()))),
+            SecurableObjects.ofCatalog(
+                VISIBLE_CATALOG,
+                new ArrayList<>(
+                    List.of(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow())))));
+    metalake.grantRolesToUser(List.of("lance_authz_writer_role"), WRITER);
   }
 
   @AfterAll
@@ -114,6 +149,294 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
 
     Assertions.assertTrue(list(ADMIN, "").containsAll(List.of(VISIBLE_CATALOG, HIDDEN_CATALOG)));
     assertStatus(200, post(ADMIN, HIDDEN_CATALOG, "describe"));
+  }
+
+  @Test
+  public void testCreateNamespaceRequiresCreatePrivilege() throws Exception {
+    // The read-only user holds no create privilege at either level.
+    assertStatus(403, create(USER, "lance_authz_denied_catalog", null, Map.of()));
+    assertStatus(
+        403, create(USER, id(VISIBLE_CATALOG, "lance_authz_denied_schema"), null, Map.of()));
+
+    assertStatus(200, create(WRITER, WRITER_CATALOG, null, Map.of()));
+    assertStatus(200, create(WRITER, id(VISIBLE_CATALOG, WRITER_SCHEMA), null, Map.of()));
+
+    // Creating assigns ownership, so the creator can drop what it created.
+    assertStatus(200, drop(WRITER, id(VISIBLE_CATALOG, WRITER_SCHEMA), null, null));
+    assertStatus(200, drop(WRITER, WRITER_CATALOG, null, "cascade"));
+  }
+
+  @Test
+  public void testCreatePrivilegeCannotOverwriteOrDropAnotherOwnersNamespace() throws Exception {
+    Map<String, String> marker = Map.of(MARKER_PROPERTY, "overwritten");
+    assertStatus(403, create(WRITER, VISIBLE_CATALOG, "overwrite", marker));
+    assertStatus(403, create(WRITER, id(VISIBLE_CATALOG, VISIBLE_SCHEMA), "overwrite", marker));
+
+    // A denied overwrite must not have reached the metadata store.
+    Assertions.assertFalse(properties(ADMIN, VISIBLE_CATALOG).containsKey(MARKER_PROPERTY));
+    Assertions.assertFalse(
+        properties(ADMIN, id(VISIBLE_CATALOG, VISIBLE_SCHEMA)).containsKey(MARKER_PROPERTY));
+
+    // exist_ok is a create, not a modification, so the create privilege is enough for it.
+    assertStatus(200, create(WRITER, VISIBLE_CATALOG, "exist_ok", Map.of()));
+    Assertions.assertFalse(properties(ADMIN, VISIBLE_CATALOG).containsKey(MARKER_PROPERTY));
+
+    assertStatus(403, drop(WRITER, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), null, null));
+    assertStatus(200, post(ADMIN, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), "exists"));
+  }
+
+  @Test
+  public void testDropConcealsNamespacesTheCallerMayNotSee() throws Exception {
+    // A namespace the caller cannot drop is reported as forbidden whether or not it exists, so a
+    // caller cannot probe for existence through the drop endpoint.
+    assertStatus(403, drop(WRITER, MISSING_CATALOG, "skip", null));
+    assertStatus(403, drop(USER, HIDDEN_CATALOG, "skip", null));
+  }
+
+  /** Verifies that active roles survive authentication and reach namespace authorization. */
+  @Test
+  public void testActiveRolesReachAuthorizationAndListingFilters() throws Exception {
+    String schemaPath = "/v1/namespace/" + id(VISIBLE_CATALOG, VISIBLE_SCHEMA) + "/describe";
+    assertStatus(200, sendWithRoles(USER, schemaPath, "ALL"));
+    assertStatus(403, sendWithRoles(USER, schemaPath, "NONE"));
+    assertStatus(403, sendWithRoles(USER, schemaPath, "lance_authz_catalog_role"));
+    assertStatus(
+        200, sendWithRoles(USER, schemaPath, "lance_authz_catalog_role,lance_authz_schema_role"));
+    assertStatus(403, sendWithRoles(USER, schemaPath, "lance_authz_writer_role"));
+
+    HttpResponse<String> response =
+        httpClient.send(
+            request(USER, "/v1/namespace/" + VISIBLE_CATALOG + "/list")
+                .setHeader(
+                    AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, "lance_authz_catalog_role")
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertStatus(200, response);
+    Assertions.assertTrue(
+        ObjectMapperProvider.objectMapper()
+            .readValue(response.body(), ListNamespacesResponse.class)
+            .getNamespaces()
+            .isEmpty());
+    // Narrowing one request must not affect subsequent requests on the same server.
+    Assertions.assertEquals(List.of(VISIBLE_SCHEMA), list(USER, VISIBLE_CATALOG));
+  }
+
+  /** Verifies authentication failures stop before metadata writes or service identity fallback. */
+  @Test
+  public void testAuthenticationErrorsUseLanceJsonAndDoNotCreateMetadata() throws Exception {
+    String catalog = "lance_authz_rejected_auth_catalog";
+    CreateNamespaceRequest body = new CreateNamespaceRequest();
+    body.addIdItem(catalog);
+    String json = ObjectMapperProvider.objectMapper().writeValueAsString(body);
+    HttpResponse<String> unauthorized =
+        httpClient.send(
+            request(ADMIN, "/v1/namespace/" + catalog + "/create")
+                .setHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION, "Bearer unsupported-token")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertError(401, unauthorized);
+    HttpResponse<String> malformedRoles =
+        httpClient.send(
+            request(ADMIN, "/v1/namespace/" + catalog + "/create")
+                .setHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, "ALL,NONE")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertError(400, malformedRoles);
+    assertStatus(404, post(ADMIN, catalog, "exists"));
+  }
+
+  /** Verifies anonymous fallback uses the service user's privileges and records its ownership. */
+  @Test
+  public void testServiceIdentityFallbackIsAuthorized() throws Exception {
+    String catalog = "lance_authz_fallback_catalog";
+    CreateNamespaceRequest body = new CreateNamespaceRequest();
+    body.addIdItem(catalog);
+    HttpRequest.Builder anonymous =
+        HttpRequest.newBuilder()
+            .uri(
+                URI.create(
+                    String.format("http://localhost:%d/lance", getLanceRESTServerPort())
+                        + "/v1/namespace/"
+                        + catalog
+                        + "/create?delimiter=."))
+            .header("Content-Type", "application/json");
+    assertStatus(
+        200,
+        httpClient.send(
+            anonymous
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        ObjectMapperProvider.objectMapper().writeValueAsString(body)))
+                .build(),
+            HttpResponse.BodyHandlers.ofString()));
+    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
+    Assertions.assertEquals(WRITER, metalake.loadCatalog(catalog).auditInfo().creator());
+    // Ownership is usable by the real service user after creation through anonymous fallback.
+    assertStatus(200, drop(WRITER, catalog, null, "cascade"));
+
+    HttpRequest denied =
+        HttpRequest.newBuilder()
+            .uri(
+                URI.create(
+                    String.format("http://localhost:%d/lance", getLanceRESTServerPort())
+                        + "/v1/namespace/"
+                        + HIDDEN_CATALOG
+                        + "/describe?delimiter=."))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{}"))
+            .build();
+    assertStatus(403, httpClient.send(denied, HttpResponse.BodyHandlers.ofString()));
+    // An authenticated reader cannot borrow the fallback user's CREATE_CATALOG privilege.
+    assertStatus(403, create(USER, catalog, null, Map.of()));
+  }
+
+  /** Verifies standalone HTTP backend calls use service credentials rather than caller roles. */
+  @Test
+  public void testStandaloneUsesBackendServiceIdentity(@TempDir Path directory) throws Exception {
+    int port = RESTUtils.findAvailablePort(10000, 11000);
+    String catalog = "lance_authz_standalone_catalog";
+    String serviceUser = "lance_authz_standalone_user";
+    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
+    metalake.addUser(serviceUser);
+    metalake.createRole(
+        "lance_authz_standalone_role",
+        new HashMap<>(),
+        List.of(
+            SecurableObjects.ofMetalake(
+                metalake.name(),
+                new ArrayList<>(
+                    List.of(Privileges.UseCatalog.allow(), Privileges.CreateCatalog.allow())))));
+    metalake.grantRolesToUser(List.of("lance_authz_standalone_role"), serviceUser);
+    Properties config = new Properties();
+    config.setProperty(Configs.AUTHENTICATORS.getKey(), "simple");
+    config.setProperty("gravitino.lance-rest.httpPort", String.valueOf(port));
+    config.setProperty(
+        "gravitino.lance-rest.gravitino-uri", "http://localhost:" + getGravitinoServerPort());
+    config.setProperty("gravitino.lance-rest.gravitino-metalake", getLanceRESTServerMetalakeName());
+    config.setProperty("gravitino.lance-rest.gravitino-auth-type", "simple");
+    config.setProperty("gravitino.lance-rest.gravitino-simple.user-name", serviceUser);
+    Path configFile = directory.resolve("standalone.conf");
+    try (Writer writer = Files.newBufferedWriter(configFile)) {
+      config.store(writer, "Standalone Lance REST integration test");
+    }
+    Path logFile = directory.resolve("standalone.log");
+    // Use the production bootstrap in its own JVM: deploy mode has no local GravitinoEnv,
+    // while embedded mode must not share its backend environment with the standalone service.
+    ProcessBuilder builder =
+        new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "-cp",
+                System.getProperty("lance.test.runtimeClasspath"),
+                GravitinoLanceRESTServer.class.getName(),
+                configFile.toString())
+            .redirectErrorStream(true)
+            .redirectOutput(logFile.toFile());
+    builder.environment().put("GRAVITINO_TEST", "true");
+    Process standalone = builder.start();
+    try {
+      try {
+        Awaitility.await()
+            .atMost(60, TimeUnit.SECONDS)
+            .until(
+                () -> {
+                  Assertions.assertTrue(standalone.isAlive(), "Standalone process exited");
+                  // Namespace initialization is lazy and occurs on the first metadata request.
+                  return HttpUtils.isHttpServerUp(
+                      "http://localhost:" + port + "/lance/health/live");
+                });
+      } catch (Exception | AssertionError e) {
+        throw new AssertionError("Standalone startup failed:\n" + Files.readString(logFile), e);
+      }
+      CreateNamespaceRequest body = new CreateNamespaceRequest();
+      body.addIdItem(catalog);
+      HttpRequest request =
+          request(USER, "/v1/namespace/" + catalog + "/create")
+              .uri(
+                  URI.create(
+                      "http://localhost:"
+                          + port
+                          + "/lance/v1/namespace/"
+                          + catalog
+                          + "/create?delimiter=."))
+              .setHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, "NONE")
+              .POST(
+                  HttpRequest.BodyPublishers.ofString(
+                      ObjectMapperProvider.objectMapper().writeValueAsString(body)))
+              .build();
+      // USER cannot create catalogs in auxiliary mode. The backend receives the service user's
+      // credentials and roles, despite USER selecting NONE on this incoming request.
+      assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+      Assertions.assertEquals(
+          serviceUser,
+          client
+              .loadMetalake(getLanceRESTServerMetalakeName())
+              .loadCatalog(catalog)
+              .auditInfo()
+              .creator());
+      // The backend service user cannot read this admin-owned schema. Even an incoming admin
+      // must receive the backend's 403, rather than 500 or the incoming caller's privileges.
+      HttpRequest deniedRequest =
+          request(ADMIN, "/v1/namespace/" + id(VISIBLE_CATALOG, VISIBLE_SCHEMA) + "/describe")
+              .uri(
+                  URI.create(
+                      "http://localhost:"
+                          + port
+                          + "/lance/v1/namespace/"
+                          + id(VISIBLE_CATALOG, VISIBLE_SCHEMA)
+                          + "/describe?delimiter=."))
+              .POST(HttpRequest.BodyPublishers.ofString("{}"))
+              .build();
+      HttpResponse<String> deniedResponse =
+          httpClient.send(deniedRequest, HttpResponse.BodyHandlers.ofString());
+      assertStatus(403, deniedResponse);
+      ErrorResponse error =
+          ObjectMapperProvider.objectMapper().readValue(deniedResponse.body(), ErrorResponse.class);
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertTrue(error.getError().contains(serviceUser), error.getError());
+      assertStatus(200, drop(serviceUser, catalog, null, "cascade"));
+    } finally {
+      standalone.destroy();
+      if (!standalone.waitFor(10, TimeUnit.SECONDS)) {
+        standalone.destroyForcibly();
+        Assertions.assertTrue(
+            standalone.waitFor(10, TimeUnit.SECONDS), "Standalone process did not stop");
+      }
+    }
+  }
+
+  /** Verifies health endpoints remain reachable even when credentials would be rejected. */
+  @Test
+  public void testHealthBypassesAuthentication() throws Exception {
+    HttpRequest health =
+        request(USER, "/health")
+            .setHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION, "Bearer unsupported-token")
+            .GET()
+            .build();
+    assertStatus(200, httpClient.send(health, HttpResponse.BodyHandlers.ofString()));
+  }
+
+  private HttpResponse<String> sendWithRoles(String user, String path, String roles)
+      throws Exception {
+    return httpClient.send(
+        request(user, path)
+            .setHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER, roles)
+            .POST(HttpRequest.BodyPublishers.ofString("{}"))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private void assertError(int status, HttpResponse<String> response) throws Exception {
+    assertStatus(status, response);
+    Assertions.assertTrue(
+        response.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
+    ErrorResponse error =
+        ObjectMapperProvider.objectMapper().readValue(response.body(), ErrorResponse.class);
+    Assertions.assertEquals(status, error.getCode());
+    Assertions.assertFalse(error.getError().isEmpty());
   }
 
   private void grant(GravitinoMetalake metalake, String role, SecurableObject object) {
@@ -149,6 +472,46 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
                     ObjectMapperProvider.objectMapper().writeValueAsString(body)))
             .build();
     assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+  }
+
+  private HttpResponse<String> create(
+      String user, String namespaceId, String mode, Map<String, String> properties)
+      throws Exception {
+    CreateNamespaceRequest body = new CreateNamespaceRequest();
+    for (String level : namespaceId.split("\\" + DELIMITER)) {
+      body.addIdItem(level);
+    }
+    body.setMode(mode);
+    body.setProperties(new HashMap<>(properties));
+    return send(user, "/v1/namespace/" + namespaceId + "/create", body);
+  }
+
+  private HttpResponse<String> drop(String user, String namespaceId, String mode, String behavior)
+      throws Exception {
+    DropNamespaceRequest body = new DropNamespaceRequest();
+    body.setMode(mode);
+    body.setBehavior(behavior);
+    return send(user, "/v1/namespace/" + namespaceId + "/drop", body);
+  }
+
+  private Map<String, String> properties(String user, String namespaceId) throws Exception {
+    HttpResponse<String> response = post(user, namespaceId, "describe");
+    assertStatus(200, response);
+    Map<String, String> properties =
+        ObjectMapperProvider.objectMapper()
+            .readValue(response.body(), DescribeNamespaceResponse.class)
+            .getProperties();
+    return properties == null ? Map.of() : properties;
+  }
+
+  private HttpResponse<String> send(String user, String path, Object body) throws Exception {
+    HttpRequest request =
+        request(user, path)
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    ObjectMapperProvider.objectMapper().writeValueAsString(body)))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> post(String user, String namespaceId, String operation)

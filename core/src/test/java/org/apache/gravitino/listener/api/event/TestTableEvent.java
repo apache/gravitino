@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,8 +29,10 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -48,6 +51,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -72,6 +77,11 @@ public class TestTableEvent {
     this.failureDispatcher = new TableEventDispatcher(eventBus, tableExceptionDispatcher);
   }
 
+  @AfterEach
+  void clearRequestContext() {
+    RequestContext.clear();
+  }
+
   @Test
   void testCreateTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
@@ -92,6 +102,7 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertTrue(event.customInfo().isEmpty());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
@@ -100,6 +111,39 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(OperationType.CREATE_TABLE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testCreateTableOwnerFailureProducesCreateFailureEvent() {
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Arrays.asList(listener));
+    OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(ownerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    TableEventDispatcher dispatcherWithHook =
+        new TableEventDispatcher(
+            eventBus, new TableHookDispatcher(mockTableDispatcher(), () -> ownerDispatcher));
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", table.name());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                dispatcherWithHook.createTable(
+                    identifier,
+                    table.columns(),
+                    table.comment(),
+                    table.properties(),
+                    table.partitioning(),
+                    table.distribution(),
+                    table.sortOrder(),
+                    table.index()));
+
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
+    Event event = listener.popPostEvent();
+    Assertions.assertEquals(CreateTableFailureEvent.class, event.getClass());
+    Assertions.assertTrue(listener.getPostEvents().isEmpty());
   }
 
   @Test
@@ -114,6 +158,7 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertTrue(event.customInfo().isEmpty());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
@@ -137,6 +182,7 @@ public class TestTableEvent {
     Assertions.assertEquals(change, ((AlterTableEvent) event).tableChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertTrue(event.customInfo().isEmpty());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
@@ -204,6 +250,102 @@ public class TestTableEvent {
     Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_TABLE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  /**
+   * End-to-end check through the real dispatcher that a stashed fact lands on the success event and
+   * that the dispatcher consumed the stash. Pins the success half of the contract that {@code
+   * TestTableEventDispatcher} exercises against mocks.
+   */
+  @Test
+  void testCreateTableEventAttachesStashedExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    dispatcher.createTable(
+        identifier,
+        table.columns(),
+        table.comment(),
+        table.properties(),
+        table.partitioning(),
+        table.distribution(),
+        table.sortOrder(),
+        table.index());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CreateTableEvent.class, event.getClass());
+    Assertions.assertEquals("policy-applied", event.customInfo().get("audit.reason"));
+    dummyEventListener.popPreEvent();
+    Assertions.assertTrue(RequestContext.takeAuditExtras().isEmpty());
+  }
+
+  /**
+   * A contributor that rejected the operation is exactly the case where the reason matters most, so
+   * extras have to survive the exception path and reach the failure event. The success and failure
+   * paths read the stash in separate branches, so both need pinning.
+   */
+  @Test
+  void testCreateTableFailureEventAttachesStashedExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "validation-failed"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.createTable(
+                identifier,
+                table.columns(),
+                table.comment(),
+                table.properties(),
+                table.partitioning(),
+                table.distribution(),
+                table.sortOrder(),
+                table.index()));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CreateTableFailureEvent.class, event.getClass());
+    Assertions.assertEquals("validation-failed", event.customInfo().get("audit.reason"));
+  }
+
+  /**
+   * Each table operation reads the stash in its own hand-written branch, so create passing does not
+   * imply alter and load pass. Covers the two remaining operations and, by stashing a second fact
+   * between them, that consecutive operations on one thread get their own value.
+   */
+  @Test
+  void testAlterAndLoadEventsAttachStashedExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    dispatcher.alterTable(identifier, TableChange.setProperty("a", "b"));
+    Event alterEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterTableEvent.class, alterEvent.getClass());
+    Assertions.assertEquals("policy-applied", alterEvent.customInfo().get("audit.reason"));
+    dummyEventListener.popPreEvent();
+
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "cache-miss"));
+    dispatcher.loadTable(identifier);
+    Event loadEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(LoadTableEvent.class, loadEvent.getClass());
+    Assertions.assertEquals("cache-miss", loadEvent.customInfo().get("audit.reason"));
+    dummyEventListener.popPreEvent();
+  }
+
+  /**
+   * customInfo now has two contributors: the request's automatically captured query parameters
+   * (from {@code Event}) and this dispatcher's explicitly stashed extras. Pins that both are
+   * visible on the event and that an explicit key wins over an automatic one of the same name.
+   */
+  @Test
+  void testCustomInfoMergesAutomaticQueryParamsWithExplicitExtras() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
+    RequestContext.setRequestQueryParams(
+        ImmutableMap.of("details", "true", "audit.reason", "from-query-param"));
+    RequestContext.setAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    dispatcher.loadTable(identifier);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals("true", event.customInfo().get("details"));
+    Assertions.assertEquals(
+        "policy-applied",
+        event.customInfo().get("audit.reason"),
+        "explicit extras must override the automatically captured value for the same key");
   }
 
   @Test

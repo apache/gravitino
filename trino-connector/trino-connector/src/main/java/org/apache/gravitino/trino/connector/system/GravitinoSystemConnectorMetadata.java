@@ -38,6 +38,17 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 /** An implementation of Apache Gravitino System connector Metadata */
 public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
+  private final GravitinoSystemTableFactory systemTableFactory;
+
+  /**
+   * Constructs a new GravitinoSystemConnectorMetadata.
+   *
+   * @param systemTableFactory the registry of system tables to expose
+   */
+  public GravitinoSystemConnectorMetadata(GravitinoSystemTableFactory systemTableFactory) {
+    this.systemTableFactory = systemTableFactory;
+  }
+
   @Override
   public List<String> listSchemaNames(ConnectorSession session) {
     return List.of(GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME);
@@ -45,7 +56,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
   @Override
   public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName) {
-    return GravitinoSystemTableFactory.SYSTEM_TABLES.keySet().stream().toList();
+    return systemTableFactory.listTableNames();
   }
 
   @Override
@@ -54,16 +65,14 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
       SchemaTableName tableName,
       Optional<ConnectorTableVersion> startVersion,
       Optional<ConnectorTableVersion> endVersion) {
-    return GravitinoSystemTableFactory.SYSTEM_TABLES.get(tableName) != null
-        ? new SystemTableHandle(tableName)
-        : null;
+    return systemTableFactory.tableExists(tableName) ? new SystemTableHandle(tableName) : null;
   }
 
   @Override
   public ConnectorTableMetadata getTableMetadata(
       ConnectorSession session, ConnectorTableHandle table) {
     SchemaTableName tableName = ((SystemTableHandle) table).name;
-    return GravitinoSystemTableFactory.getTableMetaData(tableName);
+    return systemTableFactory.getTableMetaData(tableName);
   }
 
   @Override
@@ -71,8 +80,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
       ConnectorSession session, ConnectorTableHandle tableHandle) {
     SchemaTableName tableName = ((SystemTableHandle) tableHandle).name;
     Map<String, ColumnHandle> columnHandles = new HashMap<>();
-    List<ColumnMetadata> columns =
-        GravitinoSystemTableFactory.getTableMetaData(tableName).getColumns();
+    List<ColumnMetadata> columns = systemTableFactory.getTableMetaData(tableName).getColumns();
     for (int i = 0; i < columns.size(); i++) {
       columnHandles.put(columns.get(i).getName(), new SystemColumnHandle(i));
     }
@@ -83,7 +91,8 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
   public ColumnMetadata getColumnMetadata(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
     SchemaTableName tableName = ((SystemTableHandle) tableHandle).name;
-    return GravitinoSystemTableFactory.getTableMetaData(tableName)
+    return systemTableFactory
+        .getTableMetaData(tableName)
         .getColumns()
         .get(((SystemColumnHandle) columnHandle).index);
   }

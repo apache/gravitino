@@ -21,6 +21,8 @@ package org.apache.gravitino.audit;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -105,6 +107,8 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -339,6 +343,10 @@ public interface AuditLog {
     LIST_METADATA_OBJECTS_FOR_TAG,
 
     LIST_TAGS_INFO,
+
+    ADD_POLICY_FOR_TAG,
+
+    REMOVE_POLICY_FROM_TAG,
 
     CREATE_VIEW,
 
@@ -651,6 +659,12 @@ public interface AuditLog {
         return LOAD_FILESET;
       } else if (event instanceof ListFilesetEvent || event instanceof ListFilesetFailureEvent) {
         return LIST_FILESET;
+      } else if (event instanceof AddPolicyForTagEvent
+          || event instanceof AddPolicyForTagFailureEvent) {
+        return ADD_POLICY_FOR_TAG;
+      } else if (event instanceof RemovePolicyFromTagEvent
+          || event instanceof RemovePolicyFromTagFailureEvent) {
+        return REMOVE_POLICY_FROM_TAG;
       } else if (event instanceof AuthorizationDenialFailureEvent) {
         return AUTHORIZATION_DENIAL;
       } else {

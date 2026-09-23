@@ -18,10 +18,14 @@
 package org.apache.gravitino.server.web.rest;
 
 import java.io.IOException;
+import javax.ws.rs.core.Response;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 
 public abstract class BaseOperationsTest extends JerseyTest {
@@ -34,5 +38,14 @@ public abstract class BaseOperationsTest extends JerseyTest {
   @AfterAll
   public static void stop() throws IOException {
     GravitinoAuthorizerProvider.getInstance().close();
+  }
+
+  static void assertNullRequestBodyRejected(Response response) {
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
   }
 }

@@ -141,10 +141,18 @@ it recognizes.
 ### Running More Than One Server
 
 Servers behind a load balancer share the entity store but keep local caches. Each server polls the
-entity change log and invalidates entries that another server has modified. The defaults are safe:
-a three second poll, and a server that cannot keep its caches current exits rather than serving
-metadata it knows to be stale. Point the load balancer's health check at `GET /health/ready` so a
-server that has lost its database stops receiving traffic.
+entity change log and invalidates entries that another server has modified. The default poll
+interval is three seconds. The poller delivers each batch to every registered listener once and
+then advances its cursor; a listener that cannot invalidate a key must clear its local cache. The
+poller logs query and listener failures and continues polling. Monitor the
+[entity change log metrics](metrics.md#entity-change-log-metrics), especially record lag, time
+since the last successful poll, listener failures, and fallback clears. Point the load balancer's
+health check at `GET /health/ready` so a server that has lost its database stops receiving traffic.
+
+Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
+that directory on storage shared by all servers, for example an NFS mount, so that a request for a
+job's output can be served by any server. Otherwise only the server that ran the job can return
+it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
 
 ## Server Configuration
 
@@ -173,6 +181,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
+| `gravitino.server.webserver.includeErrorStackTrace`  | Whether HTTP error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. It remains `true` by default only to avoid breaking legacy clients that expect the `stack` field. See [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling) and [CWE-209](https://cwe.mitre.org/data/definitions/209.html). | `true`                                  |
 
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
@@ -180,9 +189,9 @@ filter with properties of the form
 
 `GET /configs` backs the Web UI, so it answers without authentication and always returns
 `gravitino.authenticators`, `gravitino.authorization.enable`, and `gravitino.schema.separator`.
-It adds `gravitino.authorization.serviceAdmins` when authorization is on, and the OAuth client
-settings when `oauth` is among the authenticators. Treat anything you add through
-`visibleConfigs` as public.
+It adds the OAuth client settings when `oauth` is among the authenticators. Treat anything you add
+through `visibleConfigs` as public, and only add properties that a client needs before it can
+authenticate.
 
 Two further groups of `gravitino.server.webserver.*` properties are documented elsewhere, because
 they belong to features rather than to the web server itself. TLS, key stores, trust stores, and
@@ -208,33 +217,39 @@ Gravitino exposes three health endpoints following
 of them are exempt from authentication, so Kubernetes probes, load balancers, and traffic managers
 reach them without credentials.
 
-| Endpoint                | Root Alias          | Description                                                                                                                                 | HTTP Status |
-|-------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 as long as an HTTP server thread can respond. Use it to decide whether to restart a pod.                              | 200         |
-| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when the entity store answers within the probe timeout, 503 when it is unavailable or slow. Use it to route traffic. | 200 or 503  |
-| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                     | 200 or 503  |
+| Endpoint                | Root Alias          | Description                                                                                                                                         | HTTP Status |
+|-------------------------|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /api/health/live`  | `GET /health/live`  | Liveness. Returns 200 if an HTTP thread can respond and no OOM has been observed; otherwise 503. Use it to decide whether to restart a pod.         | 200 or 503  |
+| `GET /api/health/ready` | `GET /health/ready` | Readiness. Returns 200 when no OOM has been observed and the entity store answers within the probe timeout; otherwise 503. Use it to route traffic. | 200 or 503  |
+| `GET /api/health`       | `GET /health`       | Aggregate. Returns 200 when both of the above pass. Also aliased as `GET /health.html`.                                                             | 200 or 503  |
 
 | Configuration Item                                   | Description                                                         | Default Value |
 |------------------------------------------------------|---------------------------------------------------------------------|---------------|
 | `gravitino.server.health.entityStore.probeTimeoutMs` | Timeout in milliseconds for the entity store probe behind `/ready`. | `2000`        |
 
 Every endpoint returns the same JSON shape, but not the same checks. `code` is always `0`,
-`status` is `UP` or `DOWN`, and `checks` carries one entry per component probed. `/live` reports
-`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both:
+`status` is `up` or `down`, and `checks` carries one entry per component probed. `/live` reports
+`httpServer` alone, `/ready` reports `entityStore` alone, and the aggregate endpoint reports both
+while no OOM has been observed:
 
 ```json
 {
   "code": 0,
-  "status": "DOWN",
+  "status": "down",
   "checks": [
-    { "name": "httpServer", "status": "UP", "details": {} },
-    { "name": "entityStore", "status": "DOWN", "details": { "reason": "timeout" } }
+    { "name": "httpServer", "status": "up", "details": {} },
+    { "name": "entityStore", "status": "down", "details": { "reason": "timeout" } }
   ]
 }
 ```
 
 A failing `entityStore` check reports `timeout`, `interrupted`, `probe-rejected`,
 `entity store not initialized`, or the simple class name of an unexpected exception.
+
+After an observed `OutOfMemoryError` (including Metaspace OOM), all three endpoints and their root
+aliases return 503 with a single `jvm: down` check and the reason `OutOfMemoryError; restart required`.
+This state persists until process restart; successful requests do not reset it. See
+[Out-of-memory failures](./health-and-readiness.md#out-of-memory-failures) for detection scope.
 
 #### JVM Memory
 
@@ -248,9 +263,9 @@ line with catalog count, plugin count, and query concurrency: `-Xms4g -Xmx4g
 
 #### Metrics
 
-| Configuration Item                        | Description                                          | Default Value |
-|-------------------------------------------|------------------------------------------------------|---------------|
-| `gravitino.metrics.timeSlidingWindowSecs` | Width in seconds of the metrics time sliding window. | `60`          |
+| Configuration Item                        | Description                                                                                                                                                                                                                                                                                                                                                                                    | Default Value |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.metrics.timeSlidingWindowSecs` | Deprecated, no longer used. Duration timers and histograms now use an exponentially-decaying reservoir instead of a fixed time window, so infrequently-invoked operations keep reporting a real duration for far longer (on the order of half a day) instead of reading zero after 60 seconds of inactivity. Operations idle longer than that will still eventually report a duration of zero. | `60`          |
 
 ### Storing Metadata
 
@@ -295,7 +310,10 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
 Two eviction limits apply at once. Time to live always applies: an entry older than
-`expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
+`expireTimeInMs` expires and is cleaned up asynchronously. The clock starts when the entry is
+written and is not reset by reads, so in a multi-node deployment `expireTimeInMs` is also the upper
+bound on how long a node can serve a stale entry if a cross-node invalidation is ever missed (see
+[Change Log Propagation](#change-log-propagation)). Alongside it, the cache bounds its size
 either by count or by weight. With `enableWeigher` disabled, Caffeine's W-TinyLFU policy evicts the
 least-used entries once `maxEntries` is reached. With `enableWeigher` enabled, each entity type
 carries a weight, larger for entities higher in the hierarchy, and eviction targets a total weight
@@ -339,7 +357,24 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.cache.evictionIntervalMs`        | Interval in milliseconds before an idle catalog is evicted from the catalog cache.                                                                                                                                                                                                                     | `3600000`     |
 | `gravitino.catalog.classloader.isolated`            | Whether to load each catalog's libraries and configuration in an isolated classloader rather than the application classloader.                                                                                                                                                                         | `true`        |
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
-| `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-user` and `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded. | `false`       |
+| `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
+
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. By default, a key matches when its name contains `secret`,
+`password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+`gravitino.secret.sensitiveKeyKeywords` **replaces** that default list. Use it to drop a default
+keyword that masks unrelated properties (for example omit `access` and `account`), to add a typo
+or extra word (for example `passwrod` or `private`), or set it to empty to disable name-based
+matching. The value is a comma-separated list. Each entry is a case-insensitive literal substring
+of the property key, not a regular expression. Keep entries specific; overly broad values such as
+`key` can mask unrelated properties.
+
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
 
 ### Securing the Server
 
@@ -402,23 +437,51 @@ pipeline can replace either.
 
 `SimpleFormatterV2` is the default formatter. `JsonAuditFormatter` is available where structured
 output is wanted: it emits one JSON object per line, serializes `customInfo`, and writes timestamps
-as ISO 8601 with millisecond precision and a zone offset. Both formatters replace the value of a
-sensitive `customInfo` key with `***`. The masked keys are `authorization`, `cookie`,
-`x-amz-security-token`, `s3.access-key-id`, and `jdbc-password`.
+as ISO 8601 with millisecond precision and a zone offset.
+
+`customInfo` always includes the request's query parameters, captured automatically for every
+event — not just the ones an operation dispatcher explicitly reports. For example, a listing
+endpoint's `?details=true` shows up in the audit entry for that request even though no dispatcher
+code added it. Both formatters redact a `customInfo` value, replacing it with `***`, when its key
+either exactly matches `authorization`, `cookie`, `x-amz-security-token`, `s3.access-key-id`, or
+`jdbc-password`, or contains (case-insensitively) `password`, `secret`, `token`, `credential`,
+`apikey`, `accesskey`, `privatekey`, `auth`, or `signature` — so a caller-named parameter like
+`?token=...` or `?myApiKey=...` is masked even though its exact name was never enumerated. A short,
+fixed list of keys the server itself always uses (e.g. `http.method`, `http.status`, `auth.method`)
+is exempt from that substring check, since otherwise `auth.method` would be masked for merely
+containing "auth".
+
+Every request that reaches the server produces at least one audit entry, even one whose operation
+has no dedicated `Event` subclass: `HttpAuditFilter` dispatches a generic fallback event (method,
+URI, status code, and the same auto-captured query parameters) for any request where no
+operation-layer event fired. On a server that sees a high rate of otherwise-unaudited calls to the
+same endpoint — for example an Iceberg REST catalog's `/v1/config`, which some clients poll
+frequently — this can measurably increase audit log volume; size log rotation and retention in
+`conf/log4j2.properties` (below) accordingly.
 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
-`gravitino_audit.log` under the log directory, rotates daily and at 256 MB, gzips what it rotates,
-and deletes anything older than 30 days. Change the path or the retention there:
+`gravitino_audit.log` under the log directory and rotates it daily and at 256 MB into numbered gzip
+archives. It deletes archives older than 30 days and, oldest first, archives beyond 10 GB in total.
+Change the retention or the path there:
 
 ```properties
 # conf/log4j2.properties
+property.auditLogMaxTotalSize = 30GB
+appender.audit_file.strategy.delete.ifFileName.ifAny.ifLastModified.age = 90d
+
 appender.audit_file.fileName    = /var/log/gravitino/my_audit.log
 appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
-
-appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 90d
+# Deletion must look in the new directory and match the new archive names.
+appender.audit_file.strategy.delete.basePath = /var/log/gravitino
+appender.audit_file.strategy.delete.ifFileName.glob = my_audit_*.log.gz
 ```
+
+Earlier releases set the audit retention with
+`appender.audit_file.strategy.delete.ifAll.ifLastModified.age`. That key no longer exists. Log4j2
+rejects a configuration file that still sets it, and the server then writes no log files. See
+[Log rotation and retention](./how-to-install.md#log-rotation-and-retention) for all logs.
 
 Earlier releases configured the writer directly through `gravitino.audit.writer.file.*`. Those
 properties now do nothing, and `FileAuditWriter` logs a warning at startup if it finds any of them.
@@ -456,6 +519,12 @@ package.
 Throwing a `ForbiddenException` from a pre-event handler stops the operation before it runs, which
 makes pre-events a veto point rather than a notification.
 
+`customInfo()` on every event includes the request's query parameters, and a custom listener
+receives them **unredacted** — the masking described under "Audit Logging" above is applied only by
+the two built-in audit-log formatters at format time, not to the event object itself. A listener
+that forwards `customInfo()` elsewhere (logs, a metrics pipeline, a downstream service) is
+responsible for its own redaction if that matters for its destination.
+
 A plugin declares how its events are dispatched:
 
 | Mode             | Behavior                                                                                                                         |
@@ -480,12 +549,14 @@ server, are documented with those services. See
 
 #### Jobs
 
-| Configuration Item                     | Description                                                                                                | Default Value                 |
-|----------------------------------------|------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                  | `local`                       |
-| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs.                                                          | `/tmp/gravitino/jobs/staging` |
-| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
-| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
+| Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
+| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
+| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |
+| `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
+| `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
 
 ### Key Management
 
@@ -615,6 +686,7 @@ means the property is left alone.
 | `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`         | `gravitino.server.webserver.requestHeaderSize`       | `131072`                                             |
 | `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`        | `gravitino.server.webserver.responseHeaderSize`      | `131072`                                             |
 | `GRAVITINO_SERVER_BULK_MAX_ITEMS`                        | `gravitino.server.bulk.maxItems`                     | `100`                                                |
+| `GRAVITINO_SERVER_WEBSERVER_INCLUDE_ERROR_STACK_TRACE`    | `gravitino.server.webserver.includeErrorStackTrace`  | `true`                                               |
 | `GRAVITINO_ENTITY_STORE`                                 | `gravitino.entity.store`                             | `relational`                                         |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL`                      | `gravitino.entity.store.relational`                  | `JDBCBackend`                                        |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            |

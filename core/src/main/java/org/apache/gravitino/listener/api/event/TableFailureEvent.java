@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
@@ -34,6 +36,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public abstract class TableFailureEvent extends FailureEvent {
+  private final Map<String, String> customInfo;
+
   /**
    * Constructs a new {@code TableFailureEvent} instance, capturing information about the failed
    * table operation.
@@ -44,6 +48,29 @@ public abstract class TableFailureEvent extends FailureEvent {
    *     of the failure.
    */
   protected TableFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    this(user, identifier, exception, ImmutableMap.of());
+  }
+
+  /**
+   * Constructs a new {@code TableFailureEvent} with optional audit extras.
+   *
+   * @param user The user associated with the failed table operation.
+   * @param identifier The identifier of the table that was involved in the failed operation.
+   * @param exception The exception that was thrown during the table operation.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  protected TableFailureEvent(
+      String user, NameIdentifier identifier, Exception exception, Map<String, String> customInfo) {
     super(user, identifier, exception);
+    this.customInfo =
+        customInfo == null || customInfo.isEmpty()
+            ? ImmutableMap.of()
+            : ImmutableMap.copyOf(customInfo);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return customInfo;
   }
 }

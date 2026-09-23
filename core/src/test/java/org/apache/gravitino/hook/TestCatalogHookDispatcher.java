@@ -38,7 +38,8 @@ public class TestCatalogHookDispatcher {
   @Test
   public void testCreateCatalogThrowsPostHookExceptionWhenRollbackSucceeds() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
     Object originalFutureGrantManager =
         FieldUtils.readField(gravitinoEnv, "futureGrantManager", true);
 
@@ -62,7 +63,7 @@ public class TestCatalogHookDispatcher {
                 Mockito.anyMap()))
         .thenReturn(catalog);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(gravitinoEnv, "futureGrantManager", null, true);
 
     try {
@@ -81,7 +82,7 @@ public class TestCatalogHookDispatcher {
 
       Mockito.verify(dispatcher).dropCatalog(ident, true);
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "futureGrantManager", originalFutureGrantManager, true);
     }
   }
@@ -89,7 +90,8 @@ public class TestCatalogHookDispatcher {
   @Test
   public void testCreateCatalogRollbackExceptionDoesNotMaskPostHookException() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
+    Object originalOwnerDispatcher =
+        FieldUtils.readField(gravitinoEnv, "internalOwnerDispatcher", true);
     Object originalFutureGrantManager =
         FieldUtils.readField(gravitinoEnv, "futureGrantManager", true);
 
@@ -115,7 +117,7 @@ public class TestCatalogHookDispatcher {
         .thenReturn(catalog);
     Mockito.doThrow(rollbackException).when(dispatcher).dropCatalog(ident, true);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(gravitinoEnv, "futureGrantManager", null, true);
 
     try {
@@ -135,7 +137,7 @@ public class TestCatalogHookDispatcher {
 
       Mockito.verify(dispatcher).dropCatalog(ident, true);
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "futureGrantManager", originalFutureGrantManager, true);
     }
   }

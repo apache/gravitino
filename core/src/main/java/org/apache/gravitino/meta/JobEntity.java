@@ -22,6 +22,7 @@ package org.apache.gravitino.meta;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -62,6 +63,13 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
           Long.class,
           "The time when the job finished execution, using the storage layer's "
               + "\"not finished\" sentinel (<= 0) when the job has not finished execution yet.");
+  public static final Field RUNTIME_JOB_TEMPLATE =
+      Field.optional(
+          "runtime_job_template",
+          String.class,
+          "The resolved job template that was actually submitted for execution, serialized as "
+              + "JSON, with placeholders replaced and referenced files downloaded. Null for jobs "
+              + "run before this field was introduced.");
 
   private Long id;
   private String jobExecutionId;
@@ -71,6 +79,14 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   private AuditInfo auditInfo;
   private Long startedAt;
   private Long finishedAt;
+  private String runtimeJobTemplate;
+
+  // The stdout/stderr of the job, fetched live from the JobExecutor on demand (e.g. via
+  // JobOperationDispatcher#getJob(String, String, boolean)). Deliberately not included in
+  // fields()/equals()/hashCode() - this is never persisted, it only exists on the in-memory copy
+  // returned when output was explicitly requested.
+  private List<String> stdout;
+  private List<String> stderr;
 
   private JobEntity() {}
 
@@ -84,6 +100,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(STARTED_AT, startedAt);
     fields.put(FINISHED_AT, finishedAt);
+    fields.put(RUNTIME_JOB_TEMPLATE, runtimeJobTemplate);
     return Collections.unmodifiableMap(fields);
   }
 
@@ -148,6 +165,64 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     return (finishedAt == null || finishedAt <= 0) ? null : Instant.ofEpochMilli(finishedAt);
   }
 
+  /**
+   * Returns the resolved job template that was actually submitted for execution, serialized as JSON
+   * (placeholders replaced, referenced files downloaded).
+   *
+   * @return the serialized runtime job template, or {@code null} for jobs run before this field was
+   *     introduced
+   */
+  @Nullable
+  public String runtimeJobTemplate() {
+    return runtimeJobTemplate;
+  }
+
+  /**
+   * Get the captured standard output of the job.
+   *
+   * @return the stdout lines of the job, or {@code null} if output was not requested for this
+   *     entity (see {@link #withOutput(List, List)}).
+   */
+  @Nullable
+  public List<String> stdout() {
+    return stdout;
+  }
+
+  /**
+   * Get the captured standard error output of the job.
+   *
+   * @return the stderr lines of the job, or {@code null} if output was not requested for this
+   *     entity (see {@link #withOutput(List, List)}).
+   */
+  @Nullable
+  public List<String> stderr() {
+    return stderr;
+  }
+
+  /**
+   * Returns a copy of this entity with the given stdout/stderr attached. This entity is left
+   * unmodified.
+   *
+   * @param stdout the stdout lines to attach
+   * @param stderr the stderr lines to attach
+   * @return a new {@link JobEntity} with the given output attached
+   */
+  public JobEntity withOutput(List<String> stdout, List<String> stderr) {
+    return JobEntity.builder()
+        .withId(id)
+        .withJobExecutionId(jobExecutionId)
+        .withNamespace(namespace)
+        .withStatus(status)
+        .withJobTemplateName(jobTemplateName)
+        .withAuditInfo(auditInfo)
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        .withRuntimeJobTemplate(runtimeJobTemplate)
+        .withStdout(stdout)
+        .withStderr(stderr)
+        .build();
+  }
+
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
@@ -175,13 +250,22 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(startedAt, that.startedAt)
-        && Objects.equals(finishedAt, that.finishedAt);
+        && Objects.equals(finishedAt, that.finishedAt)
+        && Objects.equals(runtimeJobTemplate, that.runtimeJobTemplate);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        id, jobExecutionId, namespace, status, jobTemplateName, auditInfo, startedAt, finishedAt);
+        id,
+        jobExecutionId,
+        namespace,
+        status,
+        jobTemplateName,
+        auditInfo,
+        startedAt,
+        finishedAt,
+        runtimeJobTemplate);
   }
 
   public static Builder builder() {
@@ -232,6 +316,21 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withFinishedAt(Long finishedAt) {
       jobEntity.finishedAt = finishedAt;
+      return this;
+    }
+
+    public Builder withRuntimeJobTemplate(String runtimeJobTemplate) {
+      jobEntity.runtimeJobTemplate = runtimeJobTemplate;
+      return this;
+    }
+
+    public Builder withStdout(List<String> stdout) {
+      jobEntity.stdout = stdout;
+      return this;
+    }
+
+    public Builder withStderr(List<String> stderr) {
+      jobEntity.stderr = stderr;
       return this;
     }
 

@@ -18,8 +18,14 @@
  */
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -75,5 +81,89 @@ public class TestJobInfo {
     Assertions.assertEquals(queuedAt, jobInfo.queuedAt());
     Assertions.assertEquals(Instant.ofEpochMilli(startedAt), jobInfo.startedAt());
     Assertions.assertEquals(Instant.ofEpochMilli(finishedAt), jobInfo.finishedAt());
+  }
+
+  @Test
+  public void testFromJobEntityWithoutRuntimeJobTemplate() {
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    JobInfo jobInfo = JobInfo.fromJobEntity(jobEntity);
+
+    // No runtime job template stored (e.g. a job run before this field was introduced) - must
+    // round-trip as null rather than failing to convert.
+    Assertions.assertNull(jobInfo.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testFromJobEntityWithRuntimeJobTemplate() throws Exception {
+    JobTemplate resolvedTemplate =
+        ShellJobTemplate.builder()
+            .withName("test-job-template")
+            .withComment("resolved")
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("resolved-arg"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR", "resolved-value"))
+            .build();
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    String runtimeJobTemplateJson =
+        JsonUtils.anyFieldMapper()
+            .writeValueAsString(
+                DTOConverters.toDTO(resolvedTemplate, DTOConverters.toDTO(auditInfo)));
+
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(auditInfo)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .build();
+
+    JobInfo jobInfo = JobInfo.fromJobEntity(jobEntity);
+
+    Assertions.assertEquals(resolvedTemplate, jobInfo.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testFromJobEntityWithMalformedRuntimeJobTemplateDoesNotThrow() {
+    // fromJobEntity() is called inside JobEventDispatcher's try block for getJob/runJob/
+    // cancelJob, after the underlying operation has already succeeded - a malformed or
+    // forward-incompatible stored runtime job template (e.g. a job type unknown to this server
+    // version) must not turn that already-completed operation into a failure. It should just be
+    // omitted from the built JobInfo.
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate("{not-valid-json")
+            .build();
+
+    JobInfo jobInfo = Assertions.assertDoesNotThrow(() -> JobInfo.fromJobEntity(jobEntity));
+
+    Assertions.assertNull(jobInfo.runtimeJobTemplate());
+    Assertions.assertEquals(jobEntity.name(), jobInfo.jobId());
   }
 }

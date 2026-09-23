@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Test source license-reference checker
+        run: bash dev/release/test-check-license.sh
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
@@ -133,8 +135,6 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
-          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
-          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
           ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload unit tests report

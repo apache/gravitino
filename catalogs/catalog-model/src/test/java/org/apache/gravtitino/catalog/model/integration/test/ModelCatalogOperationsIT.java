@@ -26,13 +26,13 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -1260,14 +1260,75 @@ public class ModelCatalogOperationsIT extends BaseIT {
         "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", null));
   }
 
+  @Test
+  public void testRenameModelWithIllegalName() {
+    String modelName = RandomNameUtils.genRandomName("model_rename_spec");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    String tooLongName = StringUtils.repeat("m", 129);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoCatalog
+                    .asModelCatalog()
+                    .alterModel(modelIdent, ModelChange.rename(tooLongName)));
+    Assertions.assertTrue(e.getMessage().contains("is illegal"), e.getMessage());
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelExists(modelIdent));
+  }
+
+  @Test
+  public void testModelVersionAliasLength() {
+    String modelName = RandomNameUtils.genRandomName("model_alias_length");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    String tooLongAlias = StringUtils.repeat("a", 129);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoCatalog
+                    .asModelCatalog()
+                    .linkModelVersion(
+                        modelIdent, "uri", new String[] {tooLongAlias}, "comment", null));
+    Assertions.assertTrue(
+        e.getMessage().contains("The alias of the model version must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(
+        0, gravitinoCatalog.asModelCatalog().listModelVersions(modelIdent).length);
+
+    String maxLengthAlias = StringUtils.repeat("a", 128);
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", new String[] {maxLengthAlias}, "comment", null);
+    Assertions.assertArrayEquals(
+        new String[] {maxLengthAlias},
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0).aliases());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoCatalog
+                    .asModelCatalog()
+                    .alterModelVersion(
+                        modelIdent,
+                        0,
+                        ModelVersionChange.updateAliases(new String[] {tooLongAlias}, null)));
+    Assertions.assertTrue(
+        e.getMessage().contains("The alias of the model version must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertArrayEquals(
+        new String[] {maxLengthAlias},
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0).aliases());
+  }
+
   private static void assertPropertiesEqual(
       Map<String, String> expectedUserProps, Map<String, String> actual) {
-    Assertions.assertTrue(
-        !actual.containsKey(StringIdentifier.ID_KEY)
-            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(actual.get(StringIdentifier.ID_KEY)));
-    Map<String, String> actualWithoutId = Maps.newHashMap(actual);
-    actualWithoutId.remove(StringIdentifier.ID_KEY);
-    Assertions.assertEquals(expectedUserProps, actualWithoutId);
+    Assertions.assertFalse(actual.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(expectedUserProps, actual);
   }
 
   private void createMetalake() {

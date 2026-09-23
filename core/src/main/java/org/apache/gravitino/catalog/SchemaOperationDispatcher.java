@@ -203,7 +203,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             if (isManagedSchema) {
               return EntityCombinedSchema.of(schema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           schema.properties()));
@@ -230,7 +230,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
               return EntityCombinedSchema.of(schema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           schema.properties()));
@@ -239,7 +239,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             // Merge both the metadata from catalog operation and the metadata from entity store.
             return EntityCombinedSchema.of(schema, schemaEntity)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::schemaPropertiesMetadata,
                         schema.properties()));
@@ -320,7 +320,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (isManagedSchema) {
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::schemaPropertiesMetadata,
                         alteredSchema.properties()));
@@ -334,7 +334,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             if (se == null) {
               return EntityCombinedSchema.of(alteredSchema)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::schemaPropertiesMetadata,
                           alteredSchema.properties()));
@@ -378,7 +378,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
           return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::schemaPropertiesMetadata,
                       alteredSchema.properties()));
@@ -572,13 +572,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result is ambiguous: the external schema may have been renamed or dropped out
-          // of band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
             try {
-              store.delete(ident, SCHEMA, true);
+              droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
             } catch (Exception e) {
@@ -595,10 +594,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          if (droppedFromCatalog) {
+          if (droppedFromCatalog || droppedFromStore) {
             secretManager.deleteSecretsFromProperties(schemaProperties);
           }
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 
@@ -688,7 +687,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
@@ -704,7 +703,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       if (schemaEntity == null) {
         return EntityCombinedSchema.of(schema)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdentifier,
                     HasPropertyMetadata::schemaPropertiesMetadata,
                     schema.properties()))
@@ -713,7 +712,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
       return EntityCombinedSchema.of(schema, schemaEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
@@ -732,7 +731,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     return EntityCombinedSchema.of(schema, schemaEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdentifier,
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))

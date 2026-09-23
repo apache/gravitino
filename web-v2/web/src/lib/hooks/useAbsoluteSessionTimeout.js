@@ -30,14 +30,8 @@ const SESSION_START_KEY = 'grtv-session-start'
 
 /**
  * Default maximum session duration: 5 hours in milliseconds.
- * Overridable via NEXT_PUBLIC_MAX_SESSION_DURATION_MS environment variable.
  */
-const DEFAULT_MAX_SESSION_DURATION_MS = (() => {
-  const envVal = process.env.NEXT_PUBLIC_MAX_SESSION_DURATION_MS
-  const parsed = envVal ? Number(envVal) : NaN
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 5 * 60 * 60 * 1000
-})()
+const DEFAULT_MAX_SESSION_DURATION_MS = 5 * 60 * 60 * 1000
 
 /**
  * Custom hook for absolute session duration enforcement.
@@ -54,7 +48,7 @@ const DEFAULT_MAX_SESSION_DURATION_MS = (() => {
  *   When true and no session start exists, the current time is recorded.
  *   When false, the session start is cleared.
  * @param {number} [options.maxDurationMs] - Maximum session duration in milliseconds.
- *   Defaults to NEXT_PUBLIC_MAX_SESSION_DURATION_MS env var or 5 hours.
+ *   Defaults to 5 hours.
  * @returns {{ isExpired: boolean, remainingMs: number, clearSession: () => void }}
  */
 export function useAbsoluteSessionTimeout({ isAuthenticated, maxDurationMs = DEFAULT_MAX_SESSION_DURATION_MS } = {}) {

@@ -232,6 +232,283 @@ public class TestJobMetaService extends TestJDBCBackend {
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
   }
 
+  @TestTemplate
+  public void testUpdateJob() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    JobEntity job =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+    JobMetaService.getInstance().insertJob(job, false);
+
+    // Update the job to STARTED, setting startedAt and a new audit info.
+    long startedAt = System.currentTimeMillis();
+    AuditInfo startedAuditInfo =
+        AuditInfo.builder()
+            .withCreator(job.auditInfo().creator())
+            .withCreateTime(job.auditInfo().createTime())
+            .withLastModifier("updater")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    JobEntity startedJob =
+        JobMetaService.getInstance()
+            .updateJob(
+                NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+                (JobEntity oldJob) ->
+                    JobEntity.builder()
+                        .withId(oldJob.id())
+                        .withJobExecutionId(oldJob.jobExecutionId())
+                        .withJobTemplateName(oldJob.jobTemplateName())
+                        .withNamespace(oldJob.namespace())
+                        .withStatus(JobHandle.Status.STARTED)
+                        .withAuditInfo(startedAuditInfo)
+                        .withStartedAt(startedAt)
+                        .withFinishedAt(oldJob.finishedAt())
+                        .build());
+
+    Assertions.assertEquals(JobHandle.Status.STARTED, startedJob.status());
+    Assertions.assertEquals(startedAt, startedJob.startedAt());
+    Assertions.assertEquals(startedAuditInfo, startedJob.auditInfo());
+    Assertions.assertEquals(0L, startedJob.finishedAt());
+
+    // The update must actually be persisted, not just returned.
+    JobEntity fetchedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(startedJob, fetchedJob);
+
+    // A second, independent update must keep working (e.g. an internal version counter bumped by
+    // the first update must not break a subsequent one).
+    long finishedAt = startedAt + 1000;
+    JobEntity finishedJob =
+        JobMetaService.getInstance()
+            .updateJob(
+                NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+                (JobEntity oldJob) ->
+                    JobEntity.builder()
+                        .withId(oldJob.id())
+                        .withJobExecutionId(oldJob.jobExecutionId())
+                        .withJobTemplateName(oldJob.jobTemplateName())
+                        .withNamespace(oldJob.namespace())
+                        .withStatus(JobHandle.Status.SUCCEEDED)
+                        .withAuditInfo(oldJob.auditInfo())
+                        .withStartedAt(oldJob.startedAt())
+                        .withFinishedAt(finishedAt)
+                        .build());
+
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, finishedJob.status());
+    Assertions.assertEquals(startedAt, finishedJob.startedAt());
+    Assertions.assertEquals(finishedAt, finishedJob.finishedAt());
+
+    fetchedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(finishedJob, fetchedJob);
+  }
+
+  @TestTemplate
+  public void testInsertAndGetJobWithRuntimeJobTemplate() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\"}";
+    JobEntity job =
+        JobEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withJobExecutionId("job-execution-runtime-template")
+            .withJobTemplateName(jobTemplate.name())
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .build();
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(job, false));
+
+    JobEntity retrievedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(runtimeJobTemplateJson, retrievedJob.runtimeJobTemplate());
+    Assertions.assertEquals(job, retrievedJob);
+
+    // A job inserted without a runtime job template (e.g. a row from before this field existed)
+    // must round-trip as null rather than failing to insert/select.
+    JobEntity jobWithoutTemplate =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+    Assertions.assertDoesNotThrow(
+        () -> JobMetaService.getInstance().insertJob(jobWithoutTemplate, false));
+    JobEntity retrievedJobWithoutTemplate =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobWithoutTemplate.name()));
+    Assertions.assertNull(retrievedJobWithoutTemplate.runtimeJobTemplate());
+
+    // Overwriting a job must also overwrite its stored runtime job template.
+    String updatedRuntimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\","
+            + "\"arguments\":[\"resolved\"]}";
+    JobEntity jobOverwrite =
+        JobEntity.builder()
+            .withId(job.id())
+            .withJobExecutionId(job.jobExecutionId())
+            .withStatus(JobHandle.Status.STARTED)
+            .withNamespace(job.namespace())
+            .withAuditInfo(job.auditInfo())
+            .withJobTemplateName(job.jobTemplateName())
+            .withStartedAt(System.currentTimeMillis())
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(updatedRuntimeJobTemplateJson)
+            .build();
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(jobOverwrite, true));
+
+    JobEntity retrievedOverwrittenJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
+    Assertions.assertEquals(
+        updatedRuntimeJobTemplateJson, retrievedOverwrittenJob.runtimeJobTemplate());
+  }
+
+  @TestTemplate
+  public void testUpdateJobPersistsRuntimeJobTemplateChange() throws IOException {
+    // Unlike jobTemplateName, this storage layer does not enforce that the runtime job template
+    // never changes - it persists whatever the updater lambda's returned entity says, the same
+    // way it persists status/timestamps/audit info. Keeping the resolved template unchanged
+    // across status transitions is JobManager's responsibility (its updater functions always
+    // carry the existing value forward), not something guarded here.
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    String originalRuntimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\"}";
+    JobEntity job =
+        JobEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withJobExecutionId("job-execution-update-changes-template")
+            .withJobTemplateName(jobTemplate.name())
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(originalRuntimeJobTemplateJson)
+            .build();
+    JobMetaService.getInstance().insertJob(job, false);
+
+    String newRuntimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\","
+            + "\"arguments\":[\"resolved\"]}";
+    JobEntity updatedJob =
+        JobMetaService.getInstance()
+            .updateJob(
+                NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+                (JobEntity oldJob) ->
+                    JobEntity.builder()
+                        .withId(oldJob.id())
+                        .withJobExecutionId(oldJob.jobExecutionId())
+                        .withJobTemplateName(oldJob.jobTemplateName())
+                        .withNamespace(oldJob.namespace())
+                        .withStatus(JobHandle.Status.STARTED)
+                        .withAuditInfo(oldJob.auditInfo())
+                        .withStartedAt(System.currentTimeMillis())
+                        .withFinishedAt(oldJob.finishedAt())
+                        .withRuntimeJobTemplate(newRuntimeJobTemplateJson)
+                        .build());
+    Assertions.assertEquals(newRuntimeJobTemplateJson, updatedJob.runtimeJobTemplate());
+
+    // The change must actually be persisted, not just returned.
+    JobEntity persistedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(JobHandle.Status.STARTED, persistedJob.status());
+    Assertions.assertEquals(newRuntimeJobTemplateJson, persistedJob.runtimeJobTemplate());
+  }
+
+  @TestTemplate
+  public void testUpdateNonExistentJobThrowsNoSuchEntityException() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "job-999999"), e -> e));
+  }
+
+  @TestTemplate
+  public void testUpdateJobWithMismatchedIdThrowsIllegalArgumentException() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    JobEntity job =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+    JobMetaService.getInstance().insertJob(job, false);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+                    (JobEntity oldJob) ->
+                        JobEntity.builder()
+                            .withId(oldJob.id() + 1)
+                            .withJobExecutionId(oldJob.jobExecutionId())
+                            .withJobTemplateName(oldJob.jobTemplateName())
+                            .withNamespace(oldJob.namespace())
+                            .withStatus(oldJob.status())
+                            .withAuditInfo(oldJob.auditInfo())
+                            .withStartedAt(oldJob.startedAt())
+                            .withFinishedAt(oldJob.finishedAt())
+                            .build()));
+  }
+
+  @Test
+  public void testUpdateJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid"), e -> e));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX), e -> e));
+  }
+
   @Test
   public void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
     Assertions.assertThrows(

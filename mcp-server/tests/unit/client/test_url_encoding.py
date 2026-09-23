@@ -31,6 +31,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
 )
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
+)
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
@@ -94,6 +97,36 @@ _ENCODED_QUERY_INJECTION = "name%3Fadmin%3Dtrue%23"
 _ENCODED_SLASH = "cat%2Fschema"
 
 METALAKE = "my_metalake"
+
+
+class TestMetalakeOperation(unittest.TestCase):
+    """The one operation that is not scoped to a metalake.
+
+    Everything else in the test suite reaches list_metalakes through
+    MockOperation, so without this the real endpoint path and the response key
+    the server actually returns are never executed.
+    """
+
+    def test_lists_metalakes_from_the_top_level_endpoint(self):
+        client = _make_mock_client(
+            {"metalakes": [{"name": "ml_a"}, {"name": "ml_b"}]}
+        )
+        op = PlainRESTClientMetalakeOperation(client)
+
+        result = asyncio.run(op.get_list_of_metalakes())
+
+        # Not under /api/metalakes/{metalake}/... - it must not be scoped.
+        self.assertEqual(_called_url(client.get), "/api/metalakes")
+        self.assertIn("ml_a", result)
+        self.assertIn("ml_b", result)
+
+    def test_returns_the_default_when_the_response_has_no_metalakes_key(self):
+        """Guards the response key: a typo here would silently return nothing
+        rather than failing, and every mock-based test would still pass."""
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientMetalakeOperation(client)
+
+        self.assertEqual(asyncio.run(op.get_list_of_metalakes()), "[]")
 
 
 class TestCatalogOperationUrlEncoding(unittest.TestCase):
@@ -463,43 +496,12 @@ class TestPolicyOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
-    def test_associate_policy_encodes_metadata_full_name_and_type(self):
-        client = _make_mock_client({"names": []})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.associate_policy_with_metadata(_QUERY_INJECTION, _SLASH, [], [])
-        )
-        url = _called_url(client.post)
-        self.assertIn(_ENCODED_QUERY_INJECTION, url)
-        self.assertIn(_ENCODED_SLASH, url)
-        self.assertNotIn("?admin=true", url)
-
-    def test_get_policy_for_metadata_encodes_policy_name(self):
-        client = _make_mock_client({"policy": {}})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.get_policy_for_metadata(
-                "meta.full.name", "table", _PATH_TRAVERSAL
-            )
-        )
-        url = _called_url(client.get)
-        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
-        self.assertNotIn("../../", url)
-
-    def test_list_metadata_by_policy_encodes_policy_name(self):
-        client = _make_mock_client({"metadataObjects": []})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(op.list_metadata_by_policy(_QUERY_INJECTION))
-        url = _called_url(client.get)
-        self.assertIn(_ENCODED_QUERY_INJECTION, url)
-        self.assertNotIn("?admin=true", url)
-
 
 class TestStatisticOperationUrlEncoding(unittest.TestCase):
     def test_list_of_statistics_encodes_metadata_fullname(self):
         client = _make_mock_client({"statistics": []})
         op = PlainRESTClientStatisticOperation(METALAKE, client)
-        asyncio.run(op.list_of_statistics(METALAKE, "table", _PATH_TRAVERSAL))
+        asyncio.run(op.list_of_statistics("table", _PATH_TRAVERSAL))
         url = _called_url(client.get)
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
@@ -510,7 +512,6 @@ class TestStatisticOperationUrlEncoding(unittest.TestCase):
         op = PlainRESTClientStatisticOperation(METALAKE, client)
         asyncio.run(
             op.list_statistic_for_partition(
-                METALAKE,
                 "table",
                 "catalog.schema.table",
                 from_partition_name=_QUERY_INJECTION,

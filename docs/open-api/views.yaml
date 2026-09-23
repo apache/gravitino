@@ -30,6 +30,9 @@ paths:
         - view
       summary: List views
       operationId: listViews
+      description: >
+        Lists views after authorizing access to the schema. When authorization is enabled, the
+        returned identifiers are filtered to views the caller owns or can read with SELECT_VIEW.
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
@@ -56,6 +59,9 @@ paths:
         - view
       summary: Create view
       operationId: createView
+      description: >
+        Creates a view. When authorization is enabled, the caller needs USE_CATALOG, USE_SCHEMA,
+        and CREATE_VIEW in scope and becomes the owner of the created view.
       requestBody:
         content:
           application/json:
@@ -106,7 +112,9 @@ paths:
         - view
       summary: Get view
       operationId: loadView
-      description: Return the specified view object
+      description: >
+        Returns the specified view metadata. When authorization is enabled, the caller needs
+        USE_CATALOG, USE_SCHEMA, and SELECT_VIEW in scope, or ownership.
       responses:
         "200":
           $ref: "#/components/responses/ViewResponse"
@@ -133,7 +141,9 @@ paths:
         - view
       summary: Update view
       operationId: alterView
-      description: Update the specified view in a schema
+      description: >
+        Updates the specified view metadata in a schema. When authorization is enabled, this is an
+        owner-only mutation; there is no ALTER_VIEW privilege.
       requestBody:
         content:
           application/json:
@@ -176,6 +186,9 @@ paths:
         - view
       summary: Delete view
       operationId: dropView
+      description: >
+        Deletes the specified view metadata. When authorization is enabled, this is an owner-only
+        mutation; there is no DROP_VIEW privilege.
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"

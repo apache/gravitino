@@ -133,9 +133,9 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def disable_catalog(self, name: str):
         return self.get_metalake().disable_catalog(name)
 
-    def test_connection(self, name: str) -> None:
-        """Test an existing catalog connection using its stored configuration."""
-        self.get_metalake().test_connection(name)
+    def test_connection(self, name: str, *changes: CatalogChange) -> None:
+        """Test an existing catalog connection with optional proposed changes."""
+        self.get_metalake().test_connection(name, *changes)
 
     def list_job_templates(self) -> List[JobTemplate]:
         """Lists all job templates in the current metalake.
@@ -222,11 +222,12 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         """
         return self.get_metalake().list_jobs(job_template_name)
 
-    def get_job(self, job_id: str) -> JobHandle:
-        """Retrieves a job by its ID.
+    def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
+        """Retrieves a job by its ID, optionally including its captured stdout/stderr output.
 
         Args:
             job_id: The ID of the job to retrieve.
+            include_output: Whether to also fetch and populate the job's stdout/stderr output.
 
         Returns:
             The JobHandle object corresponding to the specified job ID.
@@ -234,7 +235,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         Raises:
             NoSuchJobException: If no job with the specified ID exists.
         """
-        return self.get_metalake().get_job(job_id)
+        return self.get_metalake().get_job(job_id, include_output)
 
     def run_job(self, job_template_name: str, job_conf: Dict[str, str]) -> JobHandle:
         """Runs a job using the specified job template and configuration.
