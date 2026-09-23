@@ -41,7 +41,7 @@ POST /api/metalakes/prod/policies
   "enabled": true,
   "content": {
     "privileges": ["SELECT_TABLE", "MODIFY_TABLE"],
-    "applicable_roles": ["analyst", "data_engineer"]
+    "applicableRoles": ["analyst", "data_engineer"]
   }
 }
 ```
@@ -135,12 +135,12 @@ existing example. `system_access_control` follows the same pattern with a new
 | Field              | Type                     | Meaning                                                                                                             |
 | ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | `privileges`       | list of `Privilege.Name` | The privileges the rule confers. Each must be a permitted name — see [Permitted privileges](#permitted-privileges). |
-| `applicable_roles` | list of role names       | The **condition**. Satisfied when any listed role is among the caller's expanded roles.                             |
+| `applicableRoles`  | list of role names       | The **condition**. Satisfied when any listed role is among the caller's expanded roles.                             |
 
 `validate()` rejects at creation rather than at evaluation:
 
 - `privileges` is non-empty and every entry parses to a permitted `Privilege.Name`.
-- `applicable_roles` is non-empty and every name is non-blank.
+- `applicableRoles` is non-empty and every name is non-blank.
 
 Rejecting at write time matters because the alternative failure is silent: a policy naming a
 privilege that does not parse simply grants nothing, and nothing surfaces until someone notices
@@ -173,7 +173,7 @@ Everything else is rejected. Two classes are worth naming because the reasons di
   `CREATE_ROLE`, `CREATE_TAG`, `APPLY_TAG`, `CREATE_POLICY`, `APPLY_POLICY`. These turn one tagging
   operation into a standing ability to widen access. `MANAGE_GRANTS` binds to every taggable type
   and covers all children of whatever it binds to, so a tag carrying it on one catalog would let
-  every role in `applicable_roles` grant anything beneath that catalog — and would keep doing so
+  every role in `applicableRoles` grant anything beneath that catalog — and would keep doing so
   after the applier's own authority was revoked. `APPLY_TAG` and `APPLY_POLICY` close the loop
   further, letting a conferred role extend the tag system's own reach.
 - **Traversal** — `USE_CATALOG` and `USE_SCHEMA`, for the reasons in
@@ -184,7 +184,7 @@ access or to reach new territory. [OQ-4](#oq-4--authority-to-confer-access-throu
 who may apply a rule and does not substitute for this, because the applier holds the authority
 privilege by construction — the check they pass is exactly the one the rule would make permanent.
 
-### `applicable_roles` is a condition, not a principal
+### `applicableRoles` is a condition, not a principal
 
 The rule does not grant anything to `analyst`. It states that *if* the caller holds `analyst`
 among their expanded roles *and* the object carries `certified`, then `SELECT_TABLE` is satisfied
@@ -211,7 +211,7 @@ whether any access rule is satisfied. That requires three things:
 1. the tags effective at the object after nearest-wins resolution
    ([tag-assignment-values.md](tag-assignment-values.md)), including those inherited from ancestors;
 2. the `system_access_control` policies bound to those tags;
-3. for each, whether any of `applicable_roles` is among the caller's expanded roles.
+3. for each, whether any of `applicableRoles` is among the caller's expanded roles.
 
 Access rules only allow — `content` has a role condition but no deny effect — so a tag cannot
 restrict or deny. An RBAC `DENY` is unaffected; see [Allow and deny](#allow-and-deny).
@@ -244,7 +244,7 @@ Three properties follow from the surrounding code rather than from a rule this d
 
 One rule does not come for free. Role assumption narrows a request to the roles the caller
 activated, but that narrowing lives inside `enforceNarrowed`, on the jCasbin path the tag check
-does not take. The tag check therefore applies it itself: `applicable_roles` is tested against the
+does not take. The tag check therefore applies it itself: `applicableRoles` is tested against the
 caller's *active* roles, and an `ActiveRoles.none()` request grants nothing. Otherwise a caller who
 narrowed would silently keep tag-derived access they had asked to drop.
 
@@ -411,7 +411,7 @@ them:
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Resolve the object's effective tags | One relation query per level of the ancestor chain. Nothing caches the result — `RelationalEntityStore` caches entities, not relation queries. |
 | Load the policies bound to each tag | One `POLICY_METADATA_OBJECT_REL` query per distinct effective tag.                                                                             |
-| Test `applicable_roles`             | In memory, against roles the request has already loaded.                                                                                       |
+| Test `applicableRoles`              | In memory, against roles the request has already loaded.                                                                                       |
 
 The chain is not bounded by a constant. `getParentMetadataObjects` expands a hierarchical schema
 one level at a time, so a column under `catalog.a:b.table` walks five levels, and a deeper schema
@@ -451,7 +451,7 @@ rather than a defect, but it should be a deliberate choice rather than a surpris
 
 Two guards keep the not-allowed branch cheap where no tag could grant anyway: no enabled
 `system_access_control` policy in the metalake, resolved once per request; and no active roles on
-the request, since `applicable_roles` is tested against active roles and an empty set matches
+the request, since `applicableRoles` is tested against active roles and an empty set matches
 nothing. The first has no list-by-type query today, so it lists the metalake's policies.
 
 Three mitigations, in increasing order of what they cost to build:
