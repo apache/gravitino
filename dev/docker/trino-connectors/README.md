@@ -181,37 +181,54 @@ configure Basic or OAuth2. In the cluster this is usually
 `http://{service}.{namespace}.svc.cluster.local:8090`. A published HTTPS URL
 works the same way; it is not tied to the auth type.
 
+`gravitino.metalake` is optional. Omit it (or leave it empty) to load catalogs
+from every metalake. Set it when you want a single metalake only.
+
 `gravitino.client.authType` accepts `simple`, `basic`, `oauth2`, or
 `kerberos`. The OAuth2 token path key is `gravitino.client.oauth2.path`.
 
 ### Basic
 
+On a multi-node Trino cluster, also map the password to an env var (see
+[Worker credentials](#worker-credentials-on-a-distributed-cluster)) and set
+that env var on every pod.
+
 ```properties
 connector.name=gravitino
 gravitino.uri=http://gravitino.example.svc.cluster.local:8090
-gravitino.metalake=test
-gravitino.use-single-metalake=false
+# Optional: omit gravitino.metalake to load every metalake
+gravitino.use-single-metalake=true
 gravitino.client.authType=basic
 gravitino.client.basic.username=admin
 gravitino.client.basic.password={password}
+gravitino.dynamic-catalog.environment-variable.gravitino.client.basic.password=GRAVITINO_BASIC_PASSWORD
+gravitino.iceberg.rest-uri=http://gravitino.example.svc.cluster.local:9001/iceberg/
 ```
 
 ### OAuth2
 
 The connector authenticates with the client-credentials grant against any
 OAuth2 server. The example below uses Azure AD; a Keycloak realm token
-endpoint works the same way.
+endpoint works the same way. On a distributed cluster, map the credentials
+to env vars as shown.
 
 ```properties
 connector.name=gravitino
 gravitino.uri=http://gravitino.example.svc.cluster.local:8090
-gravitino.metalake=test
-gravitino.use-single-metalake=false
+# Optional: omit gravitino.metalake to load every metalake
+gravitino.use-single-metalake=true
 gravitino.client.authType=oauth2
 gravitino.client.oauth2.serverUri=https://login.microsoftonline.com
 gravitino.client.oauth2.credential={client_id}:{client_secret}
 gravitino.client.oauth2.path={tenant_id}/oauth2/v2.0/token
 gravitino.client.oauth2.scope={client_id}/.default
+gravitino.dynamic-catalog.environment-variable.gravitino.client.oauth2.credential=GRAVITINO_CLIENT_CREDENTIAL
+gravitino.iceberg.rest-uri=http://gravitino.example.svc.cluster.local:9001/iceberg/
+gravitino.iceberg.rest-catalog.security=OAUTH2
+gravitino.iceberg.rest-catalog.oauth2.server-uri=https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token
+gravitino.iceberg.rest-catalog.oauth2.credential={client_id}:{client_secret}
+gravitino.iceberg.rest-catalog.oauth2.scope={client_id}/.default
+gravitino.dynamic-catalog.environment-variable.gravitino.iceberg.rest-catalog.oauth2.credential=IRC_CLIENT_CREDENTIAL
 ```
 
 ### Worker credentials on a distributed cluster
@@ -219,19 +236,23 @@ gravitino.client.oauth2.scope={client_id}/.default
 The connector registers catalogs by issuing `CREATE CATALOG` over JDBC to the
 coordinator. Secret values are stripped from the catalog definition sent to
 workers, so a literal password or credential leaves distributed queries
-failing with `REMOTE_TASK_ERROR`. Reference secrets by environment variable
-instead: map a property to an env var with the
-`gravitino.dynamic-catalog.environment-variable.` prefix, and the connector
-writes `${ENV:...}` into the worker catalog definition.
+failing with `REMOTE_TASK_ERROR` or missing OAuth credential. Reference
+secrets by environment variable instead: map a property to an env var with
+the `gravitino.dynamic-catalog.environment-variable.` prefix, and the
+connector writes `${ENV:...}` into the worker catalog definition.
 
 ```properties
 # Property -> env var. The connector emits the property as '${ENV:VAR}' in the worker catalog.
+gravitino.dynamic-catalog.environment-variable.gravitino.client.basic.password=GRAVITINO_BASIC_PASSWORD
 gravitino.dynamic-catalog.environment-variable.gravitino.client.oauth2.credential=GRAVITINO_CLIENT_CREDENTIAL
 gravitino.dynamic-catalog.environment-variable.gravitino.iceberg.rest-catalog.oauth2.credential=IRC_CLIENT_CREDENTIAL
 ```
 
-Set the matching env vars (`GRAVITINO_CLIENT_CREDENTIAL`, etc.) on the
-coordinator and every worker.
+Set the matching env vars (`GRAVITINO_BASIC_PASSWORD`,
+`GRAVITINO_CLIENT_CREDENTIAL`, `IRC_CLIENT_CREDENTIAL`, etc.) on the
+coordinator and every worker. On Kubernetes with the official Trino Helm
+chart, put them in a Secret and mount with `envFrom` / `secretRef` so every
+pod receives the same values.
 
 ### Connecting to a TLS-enabled coordinator
 
@@ -259,6 +280,18 @@ creates.
 server (IRC), enabled by default. The IRC endpoint is discovered from the
 server automatically.
 
+Override `gravitino.iceberg.rest-uri` when the discovered address is wrong for
+the Trino network — for example when Gravitino advertises
+`http://...:9001` but Trino must use a Service DNS name, Ingress, or another
+reachable base URL ending in `/iceberg/`. Without a reachable URI, Iceberg
+queries fail with connection refused.
+
+When IRC itself requires OAuth2, pass settings under
+`gravitino.iceberg.rest-catalog.` (rewritten to `iceberg.rest-catalog.`) and
+map the credential with
+`gravitino.dynamic-catalog.environment-variable.gravitino.iceberg.rest-catalog.oauth2.credential`
+so workers can resolve it.
+
 | Property                                 | Default      | Notes                                                                                                           |
 |------------------------------------------|--------------|-----------------------------------------------------------------------------------------------------------------|
 | `gravitino.iceberg.rest-routing-enabled` | `true`       | Route non-REST Iceberg catalogs through IRC. Set `false` for legacy catalog-backend translation.                |
@@ -280,12 +313,13 @@ service identity, forward the Trino session user:
 | Property                                                                 | Required | Notes                                                     |
 |--------------------------------------------------------------------------|----------|-----------------------------------------------------------|
 | `connector.name`                                                         | Yes      | Must be `gravitino`.                                      |
-| `gravitino.metalake`                                                     | Yes      | Metalake on the server.                                   |
+| `gravitino.metalake`                                                     | No       | One metalake. Omit to load every metalake.                |
 | `gravitino.uri`                                                          | Yes      | Server REST URL.                                          |
 | `gravitino.use-single-metalake`                                          | No       | Default `true`. See catalog names.                        |
 | `gravitino.client.authType`                                              | Yes      | `simple`, `basic`, `oauth2`, or `kerberos`.               |
 | `gravitino.client.basic.username` / `.password`                          | Basic    | Basic credentials.                                        |
 | `gravitino.client.oauth2.serverUri` / `.path` / `.credential` / `.scope` | OAuth2   | OAuth2 client-credentials settings.                       |
+| `gravitino.dynamic-catalog.environment-variable.`                        | No       | Map secret properties to worker env vars.                 |
 | `trino.jdbc.user` / `.password`                                          | No       | Internal JDBC connection to the coordinator.              |
 | `trino.jdbc.ssl.enabled`                                                 | No       | Derived from `discovery.uri` scheme when unset.           |
 | `trino.jdbc.ssl.truststore.path` / `.password` / `.type`                 | No       | Coordinator certificate trust.                            |
@@ -294,7 +328,7 @@ service identity, forward the Trino session user:
 | `trino.jdbc.roles`                                                       | No       | Session roles, e.g. `system:sysadmin`.                    |
 | `trino.jdbc.properties.`                                                 | No       | Passthrough prefix for arbitrary JDBC driver properties.  |
 | `gravitino.iceberg.rest-routing-enabled`                                 | No       | Default `true`.                                           |
-| `gravitino.iceberg.rest-uri`                                             | No       | Override discovered IRC endpoint.                         |
+| `gravitino.iceberg.rest-uri`                                             | No       | Override discovered IRC endpoint when unreachable.        |
 | `gravitino.iceberg.rest-catalog.`                                        | No       | IRC passthrough prefix.                                   |
 | `gravitino.client.session.forwardUser`                                   | No       | Forward the session user.                                 |
 | `gravitino.trino.skip-version-validation`                                | No       | Default `false`.                                          |
