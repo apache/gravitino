@@ -50,41 +50,25 @@ jobs:
               - gradle.properties
               - gradlew
               - settings.gradle.kts
+      - name: List backend integration test shards
+        id: shards
+        run: echo "backend_it_shards=$(dev/ci/test-shards.sh backend-it --list)" >> "${GITHUB_OUTPUT}"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
+      backend_it_shards: ${{ steps.shards.outputs.backend_it_shards }}
 
-  BackendIT-on-push:
+  BackendIT:
     needs: changes
-    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
+    if: needs.changes.outputs.source_changes == 'true'
     strategy:
-      matrix:
-        architecture: [linux/amd64]
-        java-version: [ 17 ]
-        backend: [ h2, mysql, postgresql ]
-        test-mode: [ embedded, deploy ]
-        exclude:
-          - test-mode: 'embedded'
-            backend: 'mysql'
-          - test-mode: 'embedded'
-            backend: 'postgresql'
-          - test-mode: 'deploy'
-            backend: 'h2'
-    uses: ./.github/workflows/backend-integration-test-action.yml
-    with:
-      architecture: ${{ matrix.architecture }}
-      java-version: ${{ matrix.java-version }}
-      backend: ${{ matrix.backend }}
-      test-mode: ${{ matrix.test-mode }}
-
-  BackendIT-on-pr:
-    needs: changes
-    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
-    strategy:
+      fail-fast: false
       matrix:
         architecture: [ linux/amd64 ]
         java-version: [ 17 ]
         backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
+        # Shards are defined in dev/ci/test-shards.sh.
+        shard: ${{ fromJSON(needs.changes.outputs.backend_it_shards) }}
         exclude:
           - test-mode: 'embedded'
             backend: 'mysql'
@@ -98,3 +82,20 @@ jobs:
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
+      shard: ${{ matrix.shard }}
+
+  # Single status check that summarizes every backend integration test shard, so branch protection
+  # does not need to track individual shard names.
+  BackendIT-result:
+    runs-on: ubuntu-22.04
+    needs: [ changes, BackendIT ]
+    if: always()
+    steps:
+      - name: Check backend integration test results
+        run: |
+          results='${{ toJSON(needs.*.result) }}'
+          echo "${results}"
+          if echo "${results}" | grep -Eq '"(failure|cancelled)"'; then
+            echo "At least one backend integration test shard failed or was cancelled."
+            exit 1
+          fi
