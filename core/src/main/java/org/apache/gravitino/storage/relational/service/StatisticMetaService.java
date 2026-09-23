@@ -20,10 +20,17 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -79,17 +86,35 @@ public class StatisticMetaService {
             namespacedEntityId.namespaceIds()[0],
             namespacedEntityId.entityId(),
             NameIdentifierUtil.toMetadataObject(entity, type).type());
-    // Statistics have their own write API, so they do not inherit the schema fence from the
-    // metadata object update path. Fence schema-scoped targets explicitly to keep a schema cascade
-    // from deleting the target and then missing this independently committed statistic upsert.
-    doWithSchemaWriteLockIfNeeded(
-        entity,
-        type,
-        namespacedEntityId,
-        () ->
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos)));
+    Set<String> names = new HashSet<>();
+    for (StatisticPO po : pos) {
+      if (!names.add(po.getStatisticName())) {
+        throw new IllegalArgumentException(
+            "Duplicate statistic name in batch: " + po.getStatisticName());
+      }
+    }
+    pos.sort(Comparator.comparing(StatisticPO::getStatisticName));
+    Map<String, StatisticPO> previous =
+        listStatisticPOs(namespacedEntityId).stream()
+            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
+          for (StatisticPO po : pos) {
+            StatisticPO old = previous.get(po.getStatisticName());
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper ->
+                        old == null
+                            ? mapper.insertStatisticPO(po)
+                            : mapper.updateStatisticPOWithVersion(po, old));
+            if (updated != 1) {
+              throw new OptimisticLockException(
+                  "Statistic %s for %s changed during update", po.getStatisticName(), entity);
+            }
+          }
+        });
   }
 
   @Monitored(
@@ -100,11 +125,39 @@ public class StatisticMetaService {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
-    Long entityId = EntityIdService.getEntityId(identifier, type);
+    NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, type);
+    Map<String, StatisticPO> previous =
+        listStatisticPOs(observed).stream()
+            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    Set<String> orderedNames = new TreeSet<>(Comparator.nullsFirst(Comparator.naturalOrder()));
+    orderedNames.addAll(statisticNames);
+    int[] deleted = new int[] {0};
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
+          for (String name : orderedNames) {
+            StatisticPO old = previous.get(name);
+            if (old == null) {
+              continue;
+            }
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(old));
+            if (updated != 1) {
+              throw new OptimisticLockException(
+                  "Statistic %s for %s changed during deletion", name, identifier);
+            }
+            deleted[0]++;
+          }
+        });
+    return deleted[0];
+  }
 
-    return SessionUtils.doWithCommitAndFetchResult(
+  private List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint) {
+    return SessionUtils.getWithoutCommit(
         StatisticMetaMapper.class,
-        mapper -> mapper.batchDeleteStatisticPOs(entityId, statisticNames));
+        mapper ->
+            mapper.listStatisticPOsByEntityId(endpoint.namespaceIds()[0], endpoint.entityId()));
   }
 
   @Monitored(
@@ -114,35 +167,5 @@ public class StatisticMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,
         mapper -> mapper.deleteStatisticsByLegacyTimeline(legacyTimeline, limit));
-  }
-
-  private void doWithSchemaWriteLockIfNeeded(
-      NameIdentifier identifier,
-      Entity.EntityType type,
-      NamespacedEntityId namespacedEntityId,
-      Runnable writeOperation) {
-    long[] namespaceIds = namespacedEntityId.namespaceIds();
-    Long schemaId;
-    switch (type) {
-      case SCHEMA:
-        schemaId = namespacedEntityId.entityId();
-        break;
-      case TABLE:
-      case VIEW:
-      case COLUMN:
-      case FILESET:
-      case TOPIC:
-      case MODEL:
-      case FUNCTION:
-        schemaId = namespaceIds[2];
-        break;
-      default:
-        SessionUtils.doMultipleWithCommit(writeOperation);
-        return;
-    }
-
-    SchemaMetaService.getInstance()
-        .doWithSchemaWriteLock(
-            identifier, schemaId, namespaceIds[1], namespaceIds[0], writeOperation);
   }
 }

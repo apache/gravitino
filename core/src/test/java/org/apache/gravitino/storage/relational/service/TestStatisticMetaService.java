@@ -32,6 +32,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -49,7 +50,9 @@ import org.apache.gravitino.stats.StatisticValues;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
@@ -58,6 +61,60 @@ import org.junit.jupiter.api.TestTemplate;
 
 public class TestStatisticMetaService extends TestJDBCBackend {
   private final StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
+
+  @TestTemplate
+  public void testStatisticVersionCompareAndSet() throws Exception {
+    String metalake = "statistic_cas_metalake";
+    String catalog = "statistic_cas_catalog";
+    String schema = "statistic_cas_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    TableEntity table =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "statistic_cas_table");
+    StatisticEntity initial = createStatisticEntity(auditInfo, 10L);
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(initial), table.nameIdentifier(), Entity.EntityType.TABLE);
+    Long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+    StatisticPO stale =
+        SessionUtils.getWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.listStatisticPOsByEntityId(metalakeId, table.id()))
+            .get(0);
+    Assertions.assertEquals(1L, stale.getCurrentVersion());
+
+    StatisticEntity replacement = createStatisticEntity(auditInfo, 20L);
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(replacement), table.nameIdentifier(), Entity.EntityType.TABLE);
+    StatisticPO current =
+        SessionUtils.getWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.listStatisticPOsByEntityId(metalakeId, table.id()))
+            .get(0);
+    Assertions.assertEquals(stale.getStatisticId(), current.getStatisticId());
+    Assertions.assertEquals(2L, current.getCurrentVersion());
+    Assertions.assertEquals(1L, current.getLastVersion());
+    StatisticPO staleValue =
+        StatisticPO.initializeStatisticPOs(
+                List.of(createStatisticEntity(auditInfo, 30L)),
+                metalakeId,
+                table.id(),
+                MetadataObject.Type.TABLE)
+            .get(0);
+    int staleUpdated =
+        SessionUtils.getWithoutCommit(
+            StatisticMetaMapper.class,
+            mapper -> mapper.updateStatisticPOWithVersion(staleValue, stale));
+    Assertions.assertEquals(0, staleUpdated);
+    Assertions.assertEquals(
+        20L,
+        statisticMetaService
+            .listStatisticsByEntity(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .get(0)
+            .value()
+            .value());
+  }
 
   @TestTemplate
   public void testTableStatisticWriteWaitsForConcurrentSchemaDelete() throws Exception {

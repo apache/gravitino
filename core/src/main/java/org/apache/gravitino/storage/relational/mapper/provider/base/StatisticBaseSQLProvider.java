@@ -33,47 +33,41 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  public String batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return "<script>"
-        + "INSERT INTO "
+  /** Inserts a new live statistic without upsert fallback. */
+  public String insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO) {
+    return "INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
-        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
-        + "<foreach collection='statisticPOs' item='item' separator=','>"
-        + "(#{item.statisticId}, "
-        + "#{item.statisticName}, "
-        + "#{item.statisticValue}, "
-        + "#{item.metalakeId}, "
-        + "#{item.metadataObjectId}, "
-        + "#{item.metadataObjectType}, "
-        + "#{item.auditInfo}, "
-        + "#{item.currentVersion}, "
-        + "#{item.lastVersion}, "
-        + "#{item.deletedAt})"
-        + "</foreach>"
-        + " ON DUPLICATE KEY UPDATE "
-        + "  statistic_value = VALUES(statistic_value),"
-        + "  audit_info = VALUES(audit_info),"
-        + "  current_version = VALUES(current_version),"
-        + "  last_version = VALUES(last_version),"
-        + "  deleted_at = VALUES(deleted_at)"
-        + "</script>";
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES"
+        + " (#{statisticPO.statisticId}, #{statisticPO.statisticName},"
+        + " #{statisticPO.statisticValue}, #{statisticPO.metalakeId},"
+        + " #{statisticPO.metadataObjectId}, #{statisticPO.metadataObjectType},"
+        + " #{statisticPO.auditInfo}, 1, 1, 0)";
   }
 
-  public String batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return "<script>"
-        + "UPDATE "
+  /** Updates the value and advances the version when the observed row still matches. */
+  public String updateStatisticPOWithVersion(
+      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous) {
+    return "UPDATE "
+        + STATISTIC_META_TABLE_NAME
+        + " SET statistic_value = #{statisticPO.statisticValue},"
+        + " audit_info = #{statisticPO.auditInfo},"
+        + " last_version = current_version, current_version = current_version + 1"
+        + " WHERE statistic_id = #{previous.statisticId}"
+        + " AND metadata_object_id = #{previous.metadataObjectId}"
+        + " AND statistic_name = #{previous.statisticName}"
+        + " AND current_version = #{previous.currentVersion} AND deleted_at = 0";
+  }
+
+  /** Soft-deletes the observed statistic and advances its version. */
+  public String deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous) {
+    return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
-        + " WHERE "
-        + " statistic_name IN ("
-        + "<foreach collection='statisticNames' item='item' separator=','>"
-        + " #{item}"
-        + "</foreach>"
-        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId}"
-        + "</script>";
+        + ", last_version = current_version, current_version = current_version + 1"
+        + " WHERE statistic_id = #{previous.statisticId}"
+        + " AND metadata_object_id = #{previous.metadataObjectId}"
+        + " AND current_version = #{previous.currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
