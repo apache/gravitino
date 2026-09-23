@@ -26,6 +26,7 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -36,11 +37,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -61,6 +64,98 @@ import org.junit.jupiter.api.TestTemplate;
 
 public class TestStatisticMetaService extends TestJDBCBackend {
   private final StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
+
+  /** Verifies the version snapshot query excludes unrelated statistic rows. */
+  @TestTemplate
+  public void testStatisticSnapshotLoadsOnlyRequestedNames() throws Exception {
+    String metalake = "statistic_filtered_metalake";
+    String catalog = "statistic_filtered_catalog";
+    String schema = "statistic_filtered_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    TableEntity table =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "statistic_filtered");
+    StatisticEntity unrelated =
+        TableStatisticEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("unrelated")
+            .withValue(StatisticValues.longValue(2L))
+            .withAuditInfo(auditInfo)
+            .build();
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(createStatisticEntity(auditInfo, 1L), unrelated),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    NamespacedEntityId endpoint =
+        EntityIdService.getEntityIds(table.nameIdentifier(), Entity.EntityType.TABLE);
+    List<StatisticPO> selected = statisticMetaService.listStatisticPOs(endpoint, List.of("test"));
+    Assertions.assertEquals(1, selected.size());
+    Assertions.assertEquals("test", selected.get(0).getStatisticName());
+  }
+
+  /** Verifies two writers that observe a missing statistic get one conflict rather than a 500. */
+  @TestTemplate
+  public void testConcurrentFirstStatisticWritesReportConflict() throws Exception {
+    String metalake = "statistic_first_write_metalake";
+    String catalog = "statistic_first_write_catalog";
+    String schema = "statistic_first_write_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    TableEntity table =
+        createAndInsertTableEntity(
+            Namespace.of(metalake, catalog, schema), "statistic_first_write");
+
+    CyclicBarrier bothReadMissing = new CyclicBarrier(2);
+    StatisticMetaService racingService =
+        new StatisticMetaService() {
+          @Override
+          List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+            List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+            try {
+              bothReadMissing.await(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+            return rows;
+          }
+        };
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> first =
+          executor.submit(() -> writeFirstStatistic(racingService, table, auditInfo, 1L));
+      Future<Throwable> second =
+          executor.submit(() -> writeFirstStatistic(racingService, table, auditInfo, 2L));
+
+      Throwable firstFailure = first.get(30, TimeUnit.SECONDS);
+      Throwable secondFailure = second.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue((firstFailure == null) != (secondFailure == null));
+      Assertions.assertInstanceOf(
+          OptimisticLockException.class, firstFailure == null ? secondFailure : firstFailure);
+      Assertions.assertEquals(
+          1,
+          statisticMetaService
+              .listStatisticsByEntity(table.nameIdentifier(), Entity.EntityType.TABLE)
+              .size());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private Throwable writeFirstStatistic(
+      StatisticMetaService service, TableEntity table, AuditInfo auditInfo, long value) {
+    try {
+      service.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+          List.of(createStatisticEntity(auditInfo, value)),
+          table.nameIdentifier(),
+          Entity.EntityType.TABLE);
+      return null;
+    } catch (Throwable failure) {
+      return failure;
+    }
+  }
 
   @TestTemplate
   public void testStatisticVersionCompareAndSet() throws Exception {

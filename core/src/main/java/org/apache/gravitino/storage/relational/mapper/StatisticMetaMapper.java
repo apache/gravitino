@@ -34,6 +34,13 @@ public interface StatisticMetaMapper {
   List<StatisticPO> listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
+  /** Lists only the named live statistics for a metadata object. */
+  @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByNames")
+  List<StatisticPO> listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") long entityId,
+      @Param("names") List<String> names);
+
   /** Inserts a statistic only when no live row has the same name and target. */
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "insertStatisticPO")
   Integer insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO);
