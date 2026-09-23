@@ -225,6 +225,24 @@ class MockFilesetOperation(FilesetOperation):
 
 
 class MockPolicyOperation(PolicyOperation):
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        return f"list_policies_for_tag: {tag_name}"
+
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
+    ) -> str:
+        return (
+            f"associate_policy_with_tag: {tag_name}, {policy_name}, {selector}"
+        )
+
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
+    ) -> str:
+        return f"disassociate_policy_from_tag: {tag_name}, {policy_name}"
+
+    async def list_tags_for_policy(self, policy_name: str) -> str:
+        return f"list_tags_for_policy: {policy_name}"
+
     async def list_policies_for_metadata(
         self, metadata_full_name: str, metadata_type: str
     ) -> str:

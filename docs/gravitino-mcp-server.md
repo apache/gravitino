@@ -130,7 +130,11 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics` |
 | `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`     |
 | `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`     |
-| `list_policies_for_metadata`        | List all policies derived for a specific metadata item.                    | `policy`     |
+| `list_policies_for_tag`             | List policies directly associated with a tag, including selectors.             | `policy`, `tag` |
+| `associate_policy_with_tag`         | Associate a policy with a tag and selector.                                    | `policy`, `tag` |
+| `disassociate_policy_from_tag`      | Remove a direct policy association from a tag.                                 | `policy`, `tag` |
+| `list_tags_for_policy`              | List tags directly associated with a policy, including selectors.              | `policy`, `tag` |
+| `list_policies_for_metadata`        | List all policies derived for a specific metadata item.                        | `policy`     |
 | `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`  |
 | `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`  |
 | `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`       |
