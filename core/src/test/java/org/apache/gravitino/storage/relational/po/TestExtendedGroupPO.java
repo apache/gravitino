@@ -25,9 +25,12 @@ import org.junit.jupiter.api.Test;
 /** Tests for {@link ExtendedGroupPO} equality. */
 public class TestExtendedGroupPO {
 
-  private static ExtendedGroupPO po(String groupName, String roleNames, String roleIds)
+  private static ExtendedGroupPO po(
+      Long groupId, Long metalakeId, String groupName, String roleNames, String roleIds)
       throws IllegalAccessException {
     ExtendedGroupPO po = new ExtendedGroupPO();
+    FieldUtils.writeField(po, "groupId", groupId, true);
+    FieldUtils.writeField(po, "metalakeId", metalakeId, true);
     FieldUtils.writeField(po, "groupName", groupName, true);
     FieldUtils.writeField(po, "roleNames", roleNames, true);
     FieldUtils.writeField(po, "roleIds", roleIds, true);
@@ -36,15 +39,21 @@ public class TestExtendedGroupPO {
 
   @Test
   void testEqualsIncludesGroupFields() throws IllegalAccessException {
-    // Two different groups with identical role strings must not be equal; the
-    // parent GroupPO fields (groupId/groupName/metalakeId/...) are part of identity.
-    Assertions.assertNotEquals(po("group-a", "r1,r2", "1,2"), po("group-b", "r1,r2", "1,2"));
+    // The parent GroupPO fields are part of identity: two rows that differ only in a
+    // GroupPO field (groupId, metalakeId, or groupName) must not be equal even when the
+    // role strings match.
+    Assertions.assertNotEquals(
+        po(1L, 10L, "group-a", "r1,r2", "1,2"), po(2L, 10L, "group-a", "r1,r2", "1,2"));
+    Assertions.assertNotEquals(
+        po(1L, 10L, "group-a", "r1,r2", "1,2"), po(1L, 20L, "group-a", "r1,r2", "1,2"));
+    Assertions.assertNotEquals(
+        po(1L, 10L, "group-a", "r1,r2", "1,2"), po(1L, 10L, "group-b", "r1,r2", "1,2"));
   }
 
   @Test
   void testEqualsAndHashCodeConsistent() throws IllegalAccessException {
-    ExtendedGroupPO po1 = po("group-a", "r1,r2", "1,2");
-    ExtendedGroupPO po2 = po("group-a", "r1,r2", "1,2");
+    ExtendedGroupPO po1 = po(1L, 10L, "group-a", "r1,r2", "1,2");
+    ExtendedGroupPO po2 = po(1L, 10L, "group-a", "r1,r2", "1,2");
     Assertions.assertEquals(po1, po2);
     Assertions.assertEquals(po1.hashCode(), po2.hashCode());
   }
