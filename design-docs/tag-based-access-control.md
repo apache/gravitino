@@ -152,7 +152,22 @@ Whether `validate()` also requires the named role to *exist* is part of
 ### Permitted privileges
 
 Parsing to a `Privilege.Name` is a syntax check, not a safety one. A rule may confer only
-privileges that grant access to the tagged object itself; `validate()` rejects two classes:
+privileges that grant access to the tagged object itself, so `validate()` checks each name against
+a fixed allowlist:
+
+| Object   | Permitted                                          |
+| -------- | -------------------------------------------------- |
+| Table    | `SELECT_TABLE`, `MODIFY_TABLE`, `PROBE_TABLE_LIKE` |
+| View     | `SELECT_VIEW`                                      |
+| Fileset  | `READ_FILESET`, `WRITE_FILESET`                    |
+| Topic    | `CONSUME_TOPIC`, `PRODUCE_TOPIC`                   |
+| Model    | `USE_MODEL`                                        |
+| Function | `EXECUTE_FUNCTION`                                 |
+
+An allowlist rather than a denylist so the boundary fails closed: a privilege added to
+`Privilege.Name` later confers nothing through a tag until someone adds it here deliberately.
+
+Everything else is rejected. Two classes are worth naming because the reasons differ:
 
 - **Authority over the authorization system** — `MANAGE_USERS`, `MANAGE_GROUPS`, `MANAGE_GRANTS`,
   `CREATE_ROLE`, `CREATE_TAG`, `APPLY_TAG`, `CREATE_POLICY`, `APPLY_POLICY`. These turn one tagging
