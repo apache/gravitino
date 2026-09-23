@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -159,10 +161,22 @@ public class TestRelationalEntityStoreBatchGetLateFill {
   }
 
   @Test
-  void testBatchGetRemovesValueWrittenAfterClear() throws IllegalAccessException {
+  void testBatchGetRemovesValueWrittenAfterInvalidationDuringPut() throws IllegalAccessException {
     TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
     RecordingCache recordingCache = new RecordingCache();
-    recordingCache.beforePut = store::clearCache;
+    // Advance the epoch from inside the write-back, while this key's cache lock is held. It has to
+    // be an invalidation that does not take this key's lock: a whole-cache clear waits for every
+    // in-flight segment operation, so from this thread it would deadlock and from another thread
+    // it could never land here at all.
+    NameIdentifier unrelatedIdent = NameIdentifier.of(SCHEMA_NS, "t2");
+    recordingCache.beforePut =
+        () -> {
+          try {
+            store.delete(unrelatedIdent, Entity.EntityType.TABLE, false);
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        };
     FieldUtils.writeField(store, "cache", recordingCache, true);
     Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE))).thenReturn(List.of(table));
 
