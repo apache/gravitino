@@ -34,15 +34,25 @@ public interface StatisticMetaMapper {
   List<StatisticPO> listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
-  @InsertProvider(
-      type = StatisticSQLProviderFactory.class,
-      method = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
-  void batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs);
+  /** Lists only the named live statistics for a metadata object. */
+  @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByNames")
+  List<StatisticPO> listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") long entityId,
+      @Param("names") List<String> names);
 
-  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
-  Integer batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames);
+  /** Inserts a statistic only when no live row has the same name and target. */
+  @InsertProvider(type = StatisticSQLProviderFactory.class, method = "insertStatisticPO")
+  Integer insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO);
+
+  /** Replaces a statistic value only if its observed version is still current. */
+  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "updateStatisticPOWithVersion")
+  Integer updateStatisticPOWithVersion(
+      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous);
+
+  /** Soft-deletes a statistic only if its observed version is still current. */
+  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "deleteStatisticPOWithVersion")
+  Integer deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,

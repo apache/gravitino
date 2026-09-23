@@ -56,14 +56,20 @@ public class StatisticSQLProviderFactory {
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
   }
 
-  public static String batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return getProvider().batchInsertStatisticPOsOnDuplicateKeyUpdate(statisticPOs);
+  /** Returns SQL for a strict statistic insert. */
+  public static String insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO) {
+    return getProvider().insertStatisticPO(statisticPO);
   }
 
-  public static String batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return getProvider().batchDeleteStatisticPOs(entityId, statisticNames);
+  /** Returns SQL for a version-checked statistic update. */
+  public static String updateStatisticPOWithVersion(
+      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous) {
+    return getProvider().updateStatisticPOWithVersion(statisticPO, previous);
+  }
+
+  /** Returns SQL for a version-checked statistic soft delete. */
+  public static String deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous) {
+    return getProvider().deleteStatisticPOWithVersion(previous);
   }
 
   public static String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
@@ -73,6 +79,14 @@ public class StatisticSQLProviderFactory {
   public static String listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") Long entityId) {
     return getProvider().listStatisticPOsByEntityId(metalakeId, entityId);
+  }
+
+  /** Returns SQL to select only the named live statistics. */
+  public static String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return getProvider().listStatisticPOsByNames(metalakeId, entityId, names);
   }
 
   public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

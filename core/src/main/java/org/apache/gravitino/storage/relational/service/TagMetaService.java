@@ -49,6 +49,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -395,7 +396,8 @@ public class TagMetaService {
     String metalake = objectIdent.namespace().level(0);
 
     try {
-      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
+      NamespacedEntityId observedEndpoint = EntityIdService.getEntityIds(objectIdent, objectType);
+      Long metadataObjectId = observedEndpoint.entityId();
       List<TagValue> tagValuesToAdd = new ArrayList<>(Arrays.asList(nullToEmpty(tagsToAdd)));
       List<TagValue> tagValuesToRemove = new ArrayList<>(Arrays.asList(nullToEmpty(tagsToRemove)));
       Set<TagValue> commonTagValues = new LinkedHashSet<>(tagValuesToAdd);
@@ -403,12 +405,26 @@ public class TagMetaService {
       tagValuesToAdd.removeAll(commonTagValues);
       tagValuesToRemove.removeAll(commonTagValues);
 
+      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
+      long metalakeId =
+          objectType == Entity.EntityType.METALAKE
+              ? observedEndpoint.entityId()
+              : observedEndpoint.namespaceIds()[0];
+      LiveEndpointService.lockLiveEndpoint(
+          metalakeIdent, Entity.EntityType.METALAKE, new NamespacedEntityId(metalakeId));
+      if (objectType != Entity.EntityType.POLICY) {
+        LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
+      }
+
       List<String> tagNamesToUpdate = tagNamesToUpdate(tagValuesToAdd, tagValuesToRemove);
       List<TagPO> tagPOsToUpdate =
           tagNamesToUpdate.isEmpty()
               ? Collections.emptyList()
               : getTagPOsByMetalakeAndNames(metalake, tagNamesToUpdate);
       tagPOsToUpdate = lockTagsForAssignment(tagPOsToUpdate);
+      if (objectType == Entity.EntityType.POLICY) {
+        LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
+      }
       Map<String, TagPO> tagPOsByName = tagPOsByName(tagPOsToUpdate);
 
       List<TagPO> currentTagPOs =
