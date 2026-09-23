@@ -154,7 +154,12 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Awaitility.await()
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.CANCELLED);
-    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    // The first pull may already store CANCELLED if the process exits during cancellation.
+    JobHandle.Status statusAfterFirstPull = getJob(job.name()).status();
+    Assertions.assertTrue(
+        statusAfterFirstPull == JobHandle.Status.CANCELLING
+            || statusAfterFirstPull == JobHandle.Status.CANCELLED,
+        () -> "Expected CANCELLING or CANCELLED after first pull, but was " + statusAfterFirstPull);
 
     nodeA.pullAndUpdateJobStatus();
     JobEntity cancelled = getJob(job.name());
