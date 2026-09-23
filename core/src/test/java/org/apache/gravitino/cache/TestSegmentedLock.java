@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -439,5 +440,41 @@ public class TestSegmentedLock {
 
     segmentOpThread.join(5000);
     globalThread.join(5000);
+  }
+
+  @Test
+  @Timeout(30)
+  void testGlobalLockInsideSegmentOperationFailsFast() throws InterruptedException {
+    SegmentedLock lock = new SegmentedLock(4);
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+
+    // Run the re-entrant call on its own thread. Without the guard it parks forever, and a join
+    // timeout reports that as a failure instead of hanging the whole suite.
+    Thread reentrant =
+        new Thread(
+            () -> {
+              try {
+                lock.withLock("key1", () -> lock.withGlobalLock(() -> {}));
+              } catch (Throwable t) {
+                thrown.set(t);
+              }
+            });
+    reentrant.setDaemon(true);
+    reentrant.start();
+    reentrant.join(10000);
+
+    // Asserted before anything else touches the lock: a deadlocked thread still holds the gate,
+    // so every later call would block too.
+    assertFalse(reentrant.isAlive(), "withGlobalLock deadlocked inside a withLock action");
+    assertTrue(
+        thrown.get() instanceof IllegalStateException, "unexpected failure: " + thrown.get());
+    assertTrue(thrown.get().getMessage().contains("withLock"), thrown.get().getMessage());
+
+    // The rejected attempt must leave the instance usable: no global operation was started, and
+    // an ordinary one still runs.
+    assertFalse(lock.isClearing());
+    AtomicBoolean globalActionRan = new AtomicBoolean(false);
+    lock.withGlobalLock(() -> globalActionRan.set(true));
+    assertTrue(globalActionRan.get());
   }
 }
