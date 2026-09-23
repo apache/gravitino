@@ -105,7 +105,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "Doesn't support setting schema comment: " + originComment);
+          "Schema " + databaseName + ": catalog does not support schema comments");
     }
 
     StringBuilder createDatabaseSql =
@@ -132,7 +132,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "Doesn't support setting schema comment: " + originComment);
+          "Schema " + databaseName + ": catalog does not support schema comments");
     }
 
     try (final Connection connection = getConnection()) {
