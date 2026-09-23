@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -159,7 +160,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Awaitility.await()
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.CANCELLED);
-    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    // The first pull may already see the job as CANCELLED if the process exits quickly.
+    Assertions.assertTrue(
+        EnumSet.of(JobHandle.Status.CANCELLING, JobHandle.Status.CANCELLED)
+            .contains(getJob(job.name()).status()));
 
     nodeA.pullAndUpdateJobStatus();
     JobEntity cancelled = getJob(job.name());
