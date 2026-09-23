@@ -60,7 +60,9 @@ public final class SecretAlterChanges {
     List<CatalogChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    Map<String, String> originalProperties = Map.copyOf(properties);
+    // A null-tolerant snapshot of the properties before the changes mutate them; entity
+    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
+    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (CatalogChange change : changes) {
         if (change instanceof CatalogChange.SetSecretBinding) {
@@ -209,7 +211,9 @@ public final class SecretAlterChanges {
     List<SchemaChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    Map<String, String> originalProperties = Map.copyOf(properties);
+    // A null-tolerant snapshot of the properties before the changes mutate them; entity
+    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
+    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetSecretBinding) {
@@ -277,7 +281,9 @@ public final class SecretAlterChanges {
     List<FilesetChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    Map<String, String> originalProperties = Map.copyOf(properties);
+    // A null-tolerant snapshot of the properties before the changes mutate them; entity
+    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
+    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (FilesetChange change : changes) {
         if (change instanceof FilesetChange.SetSecretBinding) {

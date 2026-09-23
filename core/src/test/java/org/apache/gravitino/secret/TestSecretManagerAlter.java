@@ -83,6 +83,7 @@ public class TestSecretManagerAlter {
       Assertions.assertEquals(
           "old",
           secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(1, replacedUrns.size());
       Assertions.assertEquals(SecretUrn.parse(urn), replacedUrns.get(0));
 
       // After the alter commits, the caller deletes the collected URN.
