@@ -860,12 +860,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return catalogCompat().createCatalogTable(schema, comment, partitionKeys, options);
   }
 
-  protected CatalogCompat catalogCompat() {
-    // Every concrete, version-specific catalog entry class overrides this hook because the
-    // catalog/table API differs per Flink minor; there is no version-agnostic default.
-    throw new UnsupportedOperationException(
-        "catalogCompat() must be overridden by a Flink version-specific catalog implementation");
-  }
+  // Every concrete, version-specific catalog entry class overrides this hook because the
+  // catalog/table API differs per Flink minor; there is no version-agnostic default.
+  protected abstract CatalogCompat catalogCompat();
 
   private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
     List<Index> primaryKeyList =

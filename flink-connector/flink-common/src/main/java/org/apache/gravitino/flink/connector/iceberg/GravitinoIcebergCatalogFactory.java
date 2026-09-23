@@ -51,18 +51,15 @@ public abstract class GravitinoIcebergCatalogFactory implements BaseCatalogFacto
         toIcebergCatalogOptions(context.getOptions()));
   }
 
-  protected Catalog newCatalog(
+  // GravitinoIcebergCatalog is abstract (its inner-catalog construction differs per Flink
+  // version); every concrete, version-specific factory overrides this hook.
+  protected abstract Catalog newCatalog(
       String catalogName,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties) {
-    // GravitinoIcebergCatalog is abstract (its inner-catalog construction differs per Flink
-    // version); every concrete, version-specific factory overrides this hook.
-    throw new UnsupportedOperationException(
-        "newCatalog() must be overridden by a Flink version-specific catalog factory");
-  }
+      Map<String, String> icebergCatalogProperties);
 
   @Override
   public String factoryIdentifier() {

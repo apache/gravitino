@@ -75,19 +75,16 @@ public abstract class GravitinoHiveCatalogFactory implements BaseCatalogFactory 
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
   }
 
-  protected Catalog newCatalog(
+  // GravitinoHiveCatalog is abstract (its inner-catalog construction differs per Flink version);
+  // every concrete, version-specific factory overrides this hook.
+  protected abstract Catalog newCatalog(
       String catalogName,
       String defaultDatabase,
       Map<String, String> catalogOptions,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       @Nullable HiveConf hiveConf,
-      @Nullable String hiveVersion) {
-    // GravitinoHiveCatalog is abstract (its inner-catalog construction differs per Flink
-    // version); every concrete, version-specific factory overrides this hook.
-    throw new UnsupportedOperationException(
-        "newCatalog() must be overridden by a Flink version-specific catalog factory");
-  }
+      @Nullable String hiveVersion);
 
   @Override
   public String factoryIdentifier() {

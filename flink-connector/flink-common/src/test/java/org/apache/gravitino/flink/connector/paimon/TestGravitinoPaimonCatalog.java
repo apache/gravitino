@@ -89,18 +89,25 @@ public abstract class TestGravitinoPaimonCatalog {
    */
   private static class TestableBaseCatalog extends BaseCatalog {
 
+    private final CatalogCompat catalogCompat;
     private final AbstractCatalog realCatalog = mock(AbstractCatalog.class);
     private final Catalog gravitinoCatalog = mock(Catalog.class);
     private CatalogBaseTable toFlinkTableResult;
     private CatalogException toFlinkTableException;
 
-    TestableBaseCatalog() {
+    TestableBaseCatalog(CatalogCompat catalogCompat) {
       super(
           "test-catalog",
           Collections.emptyMap(),
           "default",
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
+      this.catalogCompat = catalogCompat;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
     }
 
     @Override
@@ -183,7 +190,7 @@ public abstract class TestGravitinoPaimonCatalog {
     }
   }
 
-  private static class CapturingPaimonCatalog extends GravitinoPaimonCatalog {
+  private class CapturingPaimonCatalog extends GravitinoPaimonCatalog {
 
     private final AbstractCatalog innerCatalog = mock(AbstractCatalog.class);
     private final Catalog injectedCatalog;
@@ -197,6 +204,11 @@ public abstract class TestGravitinoPaimonCatalog {
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
       this.injectedCatalog = injectedCatalog;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestGravitinoPaimonCatalog.this.catalogCompat();
     }
 
     @Override
@@ -228,7 +240,7 @@ public abstract class TestGravitinoPaimonCatalog {
    */
   @Test
   public void testDefaultEnrichCatalogTableIsIdentity() {
-    TestableBaseCatalog base = new TestableBaseCatalog();
+    TestableBaseCatalog base = new TestableBaseCatalog(catalogCompat());
     CatalogTable input = mock(CatalogTable.class);
     ObjectPath path = new ObjectPath("db", "tbl");
 
@@ -378,7 +390,7 @@ public abstract class TestGravitinoPaimonCatalog {
    */
   @Test
   public void testGetTablePreservesCatalogException() {
-    TestableBaseCatalog baseCatalog = new TestableBaseCatalog();
+    TestableBaseCatalog baseCatalog = new TestableBaseCatalog(catalogCompat());
     Catalog mockCatalog = baseCatalog.catalog();
     TableCatalog mockTableCatalog = mock(TableCatalog.class);
     when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);

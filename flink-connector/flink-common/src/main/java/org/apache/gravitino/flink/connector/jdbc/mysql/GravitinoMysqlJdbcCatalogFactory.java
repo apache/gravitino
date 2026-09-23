@@ -24,7 +24,7 @@ import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactory;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 
-public class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactory {
+public abstract class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactory {
 
   @Override
   public String gravitinoCatalogProvider() {

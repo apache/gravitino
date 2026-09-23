@@ -433,7 +433,7 @@ public abstract class TestBaseCatalog {
   }
 
   /** Simulates a Paimon-like catalog that overrides dialect hooks. */
-  private static class PaimonLikeBaseCatalog extends BaseCatalog {
+  private class PaimonLikeBaseCatalog extends BaseCatalog {
 
     PaimonLikeBaseCatalog() {
       super(
@@ -442,6 +442,11 @@ public abstract class TestBaseCatalog {
           "default",
           Mockito.mock(SchemaAndTablePropertiesConverter.class),
           Mockito.mock(PartitionConverter.class));
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override
@@ -541,7 +546,7 @@ public abstract class TestBaseCatalog {
     Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
   }
 
-  private static class TestableBaseCatalog extends BaseCatalog {
+  private class TestableBaseCatalog extends BaseCatalog {
 
     private final AbstractCatalog delegate;
     private final Catalog gravitinoCatalog;
@@ -562,6 +567,11 @@ public abstract class TestBaseCatalog {
       this.delegate = delegate;
       this.gravitinoCatalog = gravitinoCatalog;
       this.existingTable = existingTable;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override

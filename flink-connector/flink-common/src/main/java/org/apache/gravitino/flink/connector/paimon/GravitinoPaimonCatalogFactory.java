@@ -47,16 +47,13 @@ public abstract class GravitinoPaimonCatalogFactory implements BaseCatalogFactor
         context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
   }
 
-  protected Catalog newCatalog(
+  // GravitinoPaimonCatalog is abstract (its inner-catalog construction differs per Flink
+  // version); every concrete, version-specific factory overrides this hook.
+  protected abstract Catalog newCatalog(
       Context context,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
-      PartitionConverter partitionConverter) {
-    // GravitinoPaimonCatalog is abstract (its inner-catalog construction differs per Flink
-    // version); every concrete, version-specific factory overrides this hook.
-    throw new UnsupportedOperationException(
-        "newCatalog() must be overridden by a Flink version-specific catalog factory");
-  }
+      PartitionConverter partitionConverter);
 
   @Override
   public String factoryIdentifier() {
