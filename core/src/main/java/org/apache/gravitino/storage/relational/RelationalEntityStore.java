@@ -286,8 +286,8 @@ public class RelationalEntityStore
           () -> {
             if (cacheInvalidationEpoch.get() == epochBeforeRead) {
               cache.put(entity);
-              // A whole-cache clear can run while this key lock is held. If it happened during
-              // put, remove the value we may have written after the clear.
+              // Invalidation of another key or an ancestor can advance the epoch while this key
+              // lock is held. Remove the value if that happened during the put.
               if (cacheInvalidationEpoch.get() != epochBeforeRead) {
                 cache.invalidate(entity.nameIdentifier(), entity.type());
               }
