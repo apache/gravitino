@@ -75,6 +75,8 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
+| `External("lance.blob.v1")`      | Lance legacy blob                       |
+| `External("lance.blob.v2(...)")` | Lance blob v2                           |
 
 ### External Types
 
@@ -96,6 +98,35 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Large Binary`    | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                                         |
 | `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
+
+Gravitino types cannot carry Arrow field metadata. When loading a Lance table, a field with metadata is
+returned as `External(arrow_field_json_str)` so that the metadata is kept. If metadata appears anywhere
+inside a `List`, `Map` or `Union` field, the whole field is returned as `External(arrow_field_json_str)`.
+
+### Blob Types
+
+Lance blob columns use a readable external type instead of Arrow JSON:
+
+| External Type Definition                     | Arrow Field                                                                                             |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `External("lance.blob.v1")`                  | `LargeBinary` with metadata `lance-encoding:blob=true`                                                  |
+| `External("lance.blob.v2")`                  | `Struct<data: LargeBinary, uri: Utf8>` with metadata `ARROW:extension:name=lance.blob.v2`               |
+| `External("lance.blob.v2(with_range=true)")` | `Struct<data: LargeBinary, uri: Utf8, position: UInt64, size: UInt64>` with the same extension metadata |
+
+`lance.blob.v2` accepts these optional parameters, written as `lance.blob.v2(key=value, ...)`:
+
+| Parameter                  | Arrow Field Metadata                           | Value                                                       |
+|----------------------------|------------------------------------------------|-------------------------------------------------------------|
+| `with_range`               | -                                              | `true` or `false` (default), adds `position` and `size`     |
+| `inline_size_threshold`    | `lance-encoding:blob-inline-size-threshold`    | Integer >= 0                                                |
+| `dedicated_size_threshold` | `lance-encoding:blob-dedicated-size-threshold` | Integer > 0                                                 |
+| `pack_file_size_threshold` | `lance-encoding:blob-pack-file-size-threshold` | Integer > 0                                                 |
+
+For example, `External("lance.blob.v2(inline_size_threshold=4096, dedicated_size_threshold=1048576)")`.
+
+Legacy blob columns are rejected by Lance for file version 2.2 and later; use blob v2 for new tables.
+A blob field that does not exactly match these layouts, for example a legacy blob stored as `Binary` or
+a field with extra metadata, is returned as `External(arrow_field_json_str)`.
 
 ### Table Properties
 

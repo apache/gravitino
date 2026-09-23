@@ -259,7 +259,7 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
-  void testFieldWithMetadataConvertsToExternalTypeAndRoundTrips() {
+  void testBlobV2ConvertsToReadableExternalTypeAndRoundTrips() {
     Field blobField =
         new Field(
             "blob",
@@ -281,7 +281,125 @@ public class TestLanceDataTypeConverter {
     Type type = CONVERTER.toGravitino(blobField);
 
     assertInstanceOf(Types.ExternalType.class, type);
+    assertEquals(
+        "lance.blob.v2(with_range=true, inline_size_threshold=4096, "
+            + "dedicated_size_threshold=1048576)",
+        ((Types.ExternalType) type).catalogString());
     assertEquals(blobField, CONVERTER.toArrowField("blob", type, true));
+  }
+
+  @Test
+  void testFieldWithMetadataConvertsToJsonExternalTypeAndRoundTrips() {
+    Field field =
+        new Field(
+            "tagged",
+            new FieldType(true, ArrowType.Utf8.INSTANCE, null, Map.of("vendor:type", "tagged")),
+            null);
+
+    Type type = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, type);
+    assertTrue(((Types.ExternalType) type).catalogString().startsWith("{"));
+    assertEquals(field, CONVERTER.toArrowField("tagged", type, true));
+  }
+
+  @Test
+  void testStructWithBlobChildRoundTrips() {
+    Field blobChild =
+        LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.V2 + "(inline_size_threshold=1)");
+    Field structField =
+        new Field(
+            "record",
+            new FieldType(true, ArrowType.Struct.INSTANCE, null),
+            Collections.singletonList(blobChild));
+
+    Type type = CONVERTER.toGravitino(structField);
+
+    Types.StructType structType = assertInstanceOf(Types.StructType.class, type);
+    assertEquals(
+        Types.ExternalType.of("lance.blob.v2(inline_size_threshold=1)"),
+        structType.fields()[0].type());
+    assertEquals(structField, CONVERTER.toArrowField("record", type, true));
+  }
+
+  @Test
+  void testListWithMetadataChildRoundTrips() {
+    Field listField =
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(
+                LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.V1)));
+
+    assertJsonExternalTypeRoundTrips(listField);
+  }
+
+  @Test
+  void testMapWithMetadataOnEntriesRoundTrips() {
+    Field mapField =
+        new Field(
+            "tags",
+            new FieldType(true, new ArrowType.Map(false), null),
+            Collections.singletonList(
+                new Field(
+                    MapVector.DATA_VECTOR_NAME,
+                    new FieldType(
+                        false, ArrowType.Struct.INSTANCE, null, Map.of("vendor:entries", "x")),
+                    Arrays.asList(
+                        new Field(
+                            MapVector.KEY_NAME,
+                            new FieldType(false, ArrowType.Utf8.INSTANCE, null),
+                            null),
+                        new Field(
+                            MapVector.VALUE_NAME,
+                            new FieldType(true, ArrowType.Utf8.INSTANCE, null),
+                            null)))));
+
+    assertJsonExternalTypeRoundTrips(mapField);
+  }
+
+  @Test
+  void testUnionWithMetadataChildRoundTrips() {
+    Field unionField =
+        new Field(
+            "value",
+            new FieldType(
+                true,
+                new ArrowType.Union(
+                    UnionMode.Sparse,
+                    new int[] {
+                      org.apache.arrow.vector.types.Types.MinorType.VARCHAR.ordinal(),
+                      org.apache.arrow.vector.types.Types.MinorType.INT.ordinal()
+                    }),
+                null),
+            Arrays.asList(
+                new Field(
+                    "text",
+                    new FieldType(
+                        true, ArrowType.Utf8.INSTANCE, null, Map.of("vendor:type", "tagged")),
+                    null),
+                new Field("number", new FieldType(true, new ArrowType.Int(32, true), null), null)));
+
+    assertJsonExternalTypeRoundTrips(unionField);
+  }
+
+  @Test
+  void testLegacyJsonExternalTypeStillParses() {
+    String json =
+        "{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}";
+
+    Field field = CONVERTER.toArrowField("col", Types.ExternalType.of(json), true);
+
+    assertEquals(
+        new Field("col", new FieldType(true, ArrowType.LargeUtf8.INSTANCE, null), null), field);
+  }
+
+  private static void assertJsonExternalTypeRoundTrips(Field field) {
+    Type type = CONVERTER.toGravitino(field);
+
+    Types.ExternalType externalType = assertInstanceOf(Types.ExternalType.class, type);
+    assertTrue(externalType.catalogString().startsWith("{"));
+    assertEquals(field, CONVERTER.toArrowField(field.getName(), type, field.isNullable()));
   }
 
   @Test

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
@@ -113,6 +114,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) type;
+        if (LanceBlobTypes.isBlobCatalogString(externalType.catalogString())) {
+          return LanceBlobTypes.toArrowField(name, nullable, externalType.catalogString());
+        }
         Field field;
         try {
           field = mapper.readValue(externalType.catalogString(), Field.class);
@@ -203,11 +207,28 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   @Override
   public Type toGravitino(Field arrowField) {
-    if (arrowField.getMetadata() != null && !arrowField.getMetadata().isEmpty()) {
+    Optional<String> blobType = LanceBlobTypes.toCatalogString(arrowField);
+    if (blobType.isPresent()) {
+      return Types.ExternalType.of(blobType.get());
+    }
+
+    // Gravitino types cannot carry Arrow field metadata, so keep the whole field as Arrow JSON.
+    if (hasMetadata(arrowField)) {
       return toExternalType(arrowField);
     }
 
     FieldType fieldType = arrowField.getFieldType();
+    // List, map and union children are rebuilt with fixed names and without metadata, so any
+    // metadata below them can only be preserved by keeping the whole subtree as Arrow JSON.
+    // Struct children keep their names and are converted recursively.
+    ArrowType.ArrowTypeID typeId = fieldType.getType().getTypeID();
+    if ((typeId == ArrowType.ArrowTypeID.List
+            || typeId == ArrowType.ArrowTypeID.Map
+            || typeId == ArrowType.ArrowTypeID.Union)
+        && arrowField.getChildren().stream().anyMatch(LanceDataTypeConverter::hasMetadataInTree)) {
+      return toExternalType(arrowField);
+    }
+
     switch (fieldType.getType().getTypeID()) {
       case Map:
         Field structField = arrowField.getChildren().get(0);
@@ -330,5 +351,14 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       throw new RuntimeException("Failed to serialize Arrow field to string.", e);
     }
     return Types.ExternalType.of(typeString);
+  }
+
+  private static boolean hasMetadata(Field field) {
+    return field.getMetadata() != null && !field.getMetadata().isEmpty();
+  }
+
+  private static boolean hasMetadataInTree(Field field) {
+    return hasMetadata(field)
+        || field.getChildren().stream().anyMatch(LanceDataTypeConverter::hasMetadataInTree);
   }
 }
