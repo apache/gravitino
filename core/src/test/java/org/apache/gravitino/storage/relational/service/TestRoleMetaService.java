@@ -37,6 +37,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -58,10 +64,12 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -76,6 +84,75 @@ import org.junit.jupiter.api.TestTemplate;
 class TestRoleMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_role_test";
+
+  @TestTemplate
+  public void testPrivilegeInsertRejectsConcurrentTargetDelete() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "role_target_delete_catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_target_delete",
+            AUDIT_INFO,
+            catalog.name());
+    CatalogPO observed =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    CountDownLatch deleteWritten = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deletion =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int updated =
+                          SessionUtils.getWithoutCommit(
+                              CatalogMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteCatalogMetasByCatalogId(
+                                      catalog.id(), observed.getCurrentVersion()));
+                      assertEquals(1, updated);
+                      deleteWritten.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable failure) {
+                return failure;
+              }
+            });
+    try {
+      assertTrue(deleteWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> insertion =
+          executor.submit(
+              () -> {
+                try {
+                  RoleMetaService.getInstance().insertRole(role, false);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      Assertions.assertThrows(
+          TimeoutException.class, () -> insertion.get(500, TimeUnit.MILLISECONDS));
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deletion.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(NoSuchEntityException.class, insertion.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier()));
+  }
 
   private long queryRoleUpdatedAt(long roleId) {
     try (SqlSession sqlSession =

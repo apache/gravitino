@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -169,13 +170,17 @@ public class RoleMetaService {
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakePO.getMetalakeId());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
+      List<Runnable> endpointLocks = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getType(object));
         NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
-        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(identifier, entityType));
+        NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, entityType);
+        objectBuilder.withMetadataObjectId(observed.entityId());
+        endpointLocks.add(
+            () -> LiveEndpointService.lockLiveEndpoint(identifier, entityType, observed));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -184,6 +189,7 @@ public class RoleMetaService {
       // and its securable objects therefore change atomically, with the last overwrite winning.
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForRoleCreate(metalakePO),
+          () -> endpointLocks.forEach(Runnable::run),
           () ->
               SessionUtils.doWithoutCommit(
                   RoleMetaMapper.class,
@@ -247,8 +253,20 @@ public class RoleMetaService {
       List<SecurableObjectPO> deleteSecurableObjectPOs =
           toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalake);
 
-      List<SecurableObjectPO> insertSecurableObjectPOs =
-          toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
+      List<SecurableObjectPO> insertSecurableObjectPOs = Lists.newArrayList();
+      List<Runnable> endpointLocks = Lists.newArrayList();
+      for (SecurableObject object : insertObjects) {
+        NameIdentifier objectIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+        Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object.type());
+        NamespacedEntityId observed = EntityIdService.getEntityIds(objectIdentifier, objectType);
+        insertSecurableObjectPOs.add(
+            POConverters.initializeSecurablePOBuilderWithVersion(
+                    oldRoleEntity.id(), object, getType(object))
+                .withMetadataObjectId(observed.entityId())
+                .build());
+        endpointLocks.add(
+            () -> LiveEndpointService.lockLiveEndpoint(objectIdentifier, objectType, observed));
+      }
 
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -276,6 +294,7 @@ public class RoleMetaService {
               return;
             }
 
+            endpointLocks.forEach(Runnable::run);
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));

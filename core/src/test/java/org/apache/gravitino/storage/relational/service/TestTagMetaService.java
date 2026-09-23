@@ -72,8 +72,10 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -752,6 +754,75 @@ public class TestTagMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTagRel(tag.id()));
     Assertions.assertEquals(
         tag.id(), tagMetaService.getTagByIdentifier(renamed.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  public void testTagAssignmentRejectsConcurrentTargetDelete() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_tag_target_delete");
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_target_delete")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService.getInstance().insertTag(tag, false);
+    CatalogPO observed =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    CountDownLatch deleteWritten = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deletion =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      assertEquals(
+                          Integer.valueOf(1),
+                          SessionUtils.getWithoutCommit(
+                              CatalogMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteCatalogMetasByCatalogId(
+                                      catalog.id(), observed.getCurrentVersion())));
+                      deleteWritten.countDown();
+                      await(allowDeleteCommit);
+                    });
+                return null;
+              } catch (Throwable failure) {
+                return failure;
+              }
+            });
+    try {
+      assertTrue(deleteWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> assignment =
+          executor.submit(
+              () -> {
+                try {
+                  TagMetaService.getInstance()
+                      .associateTagsWithMetadataObject(
+                          catalog.nameIdentifier(),
+                          catalog.type(),
+                          new NameIdentifier[] {tag.nameIdentifier()},
+                          new NameIdentifier[0]);
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      Assertions.assertThrows(
+          TimeoutException.class, () -> assignment.get(500, TimeUnit.MILLISECONDS));
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deletion.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, assignment.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+    assertEquals(0, countActiveTagRel(tag.id()));
   }
 
   @TestTemplate
