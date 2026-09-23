@@ -213,7 +213,7 @@ public class TestDorisTableOperationsSqlGeneration {
         sql.contains(
             "DEFAULT "
                 + new DorisColumnDefaultValueConverter()
-                    .fromGravitinoForColumnDefinition(defaultValue, true, true)),
+                    .fromGravitinoForModifyColumn(defaultValue, true, true)),
         sql);
   }
 

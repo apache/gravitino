@@ -145,23 +145,23 @@ public class TestDorisColumnDefaultValueConverter {
   @Test
   public void testModifyColumnSerializesLoadedDefaultValues() {
     Assertions.assertNull(
-        CONVERTER.fromGravitinoForColumnDefinition(DEFAULT_VALUE_NOT_SET, false, false));
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_NOT_SET, false, false));
     Assertions.assertEquals(
-        "NULL", CONVERTER.fromGravitinoForColumnDefinition(Literals.NULL, false, false));
+        "NULL", CONVERTER.fromGravitinoForModifyColumn(Literals.NULL, false, false));
     Assertions.assertEquals(
-        "7", CONVERTER.fromGravitinoForColumnDefinition(Literals.integerLiteral(7), false, false));
+        "7", CONVERTER.fromGravitinoForModifyColumn(Literals.integerLiteral(7), false, false));
     Assertions.assertEquals(
         "CURRENT_TIMESTAMP",
-        CONVERTER.fromGravitinoForColumnDefinition(
+        CONVERTER.fromGravitinoForModifyColumn(
             DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
     Assertions.assertEquals(
         "CURRENT_DATE",
-        CONVERTER.fromGravitinoForColumnDefinition(
+        CONVERTER.fromGravitinoForModifyColumn(
             UnparsedExpression.of("CURRENT_DATE"), false, false));
 
     Assertions.assertEquals(
         "\"owner's \\\"value\\\"\\\\path\"",
-        CONVERTER.fromGravitinoForColumnDefinition(
+        CONVERTER.fromGravitinoForModifyColumn(
             Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)), false, false));
   }
 
@@ -172,11 +172,11 @@ public class TestDorisColumnDefaultValueConverter {
 
     Assertions.assertEquals(
         "\"" + "prefix" + "\\".repeat(3) + "\"suffix\"",
-        CONVERTER.fromGravitinoForColumnDefinition(
+        CONVERTER.fromGravitinoForModifyColumn(
             Literals.of(defaultValue, Types.VarCharType.of(255)), false, false));
     Assertions.assertEquals(
         "\"" + "prefix" + "\\".repeat(7) + "\"suffix\"",
-        CONVERTER.fromGravitinoForColumnDefinition(
+        CONVERTER.fromGravitinoForModifyColumn(
             Literals.of(defaultValue, Types.VarCharType.of(255)), true, true));
   }
 }

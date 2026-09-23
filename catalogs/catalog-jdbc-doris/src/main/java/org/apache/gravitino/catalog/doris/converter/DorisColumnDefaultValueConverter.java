@@ -103,7 +103,7 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
    * @return the Doris SQL representation, or {@code null} when the default is unset
    */
   @Nullable
-  public String fromGravitinoForColumnDefinition(
+  public String fromGravitinoForModifyColumn(
       Expression defaultValue, boolean doubleEscapeBackslashes, boolean tripleEscapeQuotes) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
       return null;

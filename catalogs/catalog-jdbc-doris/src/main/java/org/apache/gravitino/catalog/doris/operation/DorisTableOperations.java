@@ -1162,7 +1162,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                       isVersionAtLeast(version, 3, 0, 0) && !isVersionAtLeast(version, 4, 0, 0))
               .orElse(false);
       String defaultValue =
-          converter.fromGravitinoForColumnDefinition(column.defaultValue(), isDoris3x, isDoris3x);
+          converter.fromGravitinoForModifyColumn(column.defaultValue(), isDoris3x, isDoris3x);
       Preconditions.checkState(defaultValue != null, "Doris default value must not be null");
       sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
     }
