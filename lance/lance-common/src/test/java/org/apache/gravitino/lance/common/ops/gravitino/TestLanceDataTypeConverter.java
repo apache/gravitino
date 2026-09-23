@@ -415,6 +415,21 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
+  void testLargeAndFixedSizeListWithBlobChildRoundTrip() {
+    Field blobChild = LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.V2);
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.LargeList.INSTANCE, null),
+            Collections.singletonList(blobChild)));
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "images",
+            new FieldType(true, new ArrowType.FixedSizeList(2), null),
+            Collections.singletonList(blobChild)));
+  }
+
+  @Test
   void testStructWithBlobListConvertsToNativeTypes() {
     Field structField =
         new Field(
