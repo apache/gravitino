@@ -47,6 +47,7 @@ from gravitino.exceptions.base import (
     NotEmptyException,
     NotFoundException,
     NotInUseException,
+    OptimisticLockException,
     PartitionAlreadyExistsException,
     RESTException,
     RoleAlreadyExistsException,
@@ -68,6 +69,9 @@ from gravitino.exceptions.handlers.partition_error_handler import (
     PARTITION_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
+from gravitino.exceptions.handlers.statistics_error_handler import (
+    STATISTICS_ERROR_HANDLER,
+)
 from gravitino.exceptions.handlers.permission_error_handler import (
     PERMISSION_ERROR_HANDLER,
 )
@@ -79,6 +83,30 @@ from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
+    def test_optimistic_lock_conflict(self):
+        response = ErrorResponse.from_json(
+            '{"code":1012,"type":"OptimisticLockException",'
+            '"message":"Concurrent update","stack":null}'
+        )
+        generated = ErrorResponse.generate_error_response(
+            OptimisticLockException, "Concurrent update"
+        )
+        self.assertEqual(1012, generated.code())
+
+        for handler in (
+            REST_ERROR_HANDLER,
+            TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+            CATALOG_ERROR_HANDLER,
+        ):
+            with self.subTest(handler=type(handler).__name__):
+                with self.assertRaisesRegex(
+                    OptimisticLockException, "Concurrent update"
+                ):
+                    handler.handle(response)
+
     def test_rest_error_handler(self):
         with self.assertRaises(RESTException):
             REST_ERROR_HANDLER.handle(
