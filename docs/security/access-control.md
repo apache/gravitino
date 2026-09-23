@@ -73,7 +73,7 @@ Everything Gravitino manages is an object with a type and a name. The name is th
 below the metalake, so a table is `{catalog}.{schema}.{table}`, and requests identify an object by
 both type and name, since the same name can exist at more than one type.
 
-##### Local names containing one or more dots
+##### Local names containing one or more dots {#names-containing-dots}
 
 ::::caution
 When authorization is enabled, Gravitino cannot authorize a federated object whose local name
@@ -84,8 +84,8 @@ name instead of returning a partial result. Consequently, one object with a dott
 all sibling objects from appearing in list APIs.
 
 Rename or recreate the object in the source system with a name that does not contain dots before
-using it with authorization. When authorization is disabled, names supported by the connector
-remain accessible.
+using it with authorization. When authorization is disabled, existing source objects whose names
+are supported by the connector can still be listed and loaded.
 ::::
 
 Access to an object is controlled by privileges, granted through roles, and by ownership. Ownership
