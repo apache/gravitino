@@ -26,7 +26,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,12 +38,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -71,7 +66,6 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -81,8 +75,6 @@ import org.slf4j.LoggerFactory;
 public class JobManager implements JobOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(JobManager.class);
-
-  private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
 
   private static final String JOB_STAGING_DIR =
       File.separator
@@ -96,8 +88,6 @@ public class JobManager implements JobOperationDispatcher {
   private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
 
   private static final long JOB_STATUS_PULL_MIN_INTERVAL_IN_MS = 60 * 1000L; // 1 minute
-
-  private static final int TIMEOUT_IN_MS = 30 * 1000; // 30 seconds
 
   private final EntityStore entityStore;
 
@@ -225,6 +215,8 @@ public class JobManager implements JobOperationDispatcher {
   public void registerJobTemplate(String metalake, JobTemplateEntity jobTemplateEntity)
       throws JobTemplateAlreadyExistsException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+    // Fail on malformed placeholders now rather than on every job run.
+    JobTemplateResolver.validate(jobTemplateEntity);
 
     NameIdentifier jobTemplateIdent =
         NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateEntity.name());
@@ -494,6 +486,10 @@ public class JobManager implements JobOperationDispatcher {
     // Check if the job template exists, will throw NoSuchJobTemplateException if it does not exist.
     JobTemplateEntity jobTemplateEntity = getJobTemplate(metalake, jobTemplateName);
 
+    // Reject a job with missing parameters before creating anything for it.
+    JobTemplateResolver jobTemplateResolver = new JobTemplateResolver(jobTemplateEntity);
+    jobTemplateResolver.checkJobConf(jobConf);
+
     // Create staging directory.
     long jobId = idGenerator.nextId();
     String jobStagingPath =
@@ -510,7 +506,13 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
     // also downloading any necessary files from the URIs specified in the job template.
-    JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
+    JobTemplate jobTemplate;
+    try {
+      jobTemplate = jobTemplateResolver.resolve(jobConf, jobStagingDir);
+    } catch (RuntimeException e) {
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
+      throw e;
+    }
 
     // Serialize the resolved (placeholder-replaced) job template so callers can later see exactly
     // what was submitted for execution, not just the original template. This is done before
@@ -522,6 +524,7 @@ public class JobManager implements JobOperationDispatcher {
     try {
       runtimeJobTemplateJson = JsonUtils.anyFieldMapper().writeValueAsString(runtimeJobTemplateDTO);
     } catch (JsonProcessingException e) {
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw new RuntimeException("Failed to serialize the runtime job template", e);
     }
 
@@ -845,153 +848,6 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   @VisibleForTesting
-  public static JobTemplate createRuntimeJobTemplate(
-      JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
-    String name = jobTemplateEntity.name();
-    String comment = jobTemplateEntity.comment();
-
-    JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executable =
-        fetchFileFromUri(
-            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
-
-    List<String> args =
-        content.arguments().stream()
-            .map(arg -> replacePlaceholder(arg, jobConf))
-            .collect(Collectors.toList());
-    Map<String, String> environments =
-        content.environments().entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    entry -> replacePlaceholder(entry.getKey(), jobConf),
-                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
-    Map<String, String> customFields =
-        content.customFields().entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    entry -> replacePlaceholder(entry.getKey(), jobConf),
-                    entry -> replacePlaceholder(entry.getValue(), jobConf)));
-
-    // For shell job template
-    if (content.jobType() == JobTemplate.JobType.SHELL) {
-      List<String> scripts =
-          content.scripts().stream()
-              .map(
-                  script ->
-                      fetchFileFromUri(
-                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
-              .collect(Collectors.toList());
-
-      return ShellJobTemplate.builder()
-          .withName(name)
-          .withComment(comment)
-          .withExecutable(executable)
-          .withArguments(args)
-          .withEnvironments(environments)
-          .withCustomFields(customFields)
-          .withScripts(scripts)
-          .build();
-    }
-
-    // For Spark job template
-    if (content.jobType() == JobTemplate.JobType.SPARK) {
-      String className = replacePlaceholder(content.className(), jobConf);
-      List<String> jars =
-          content.jars().stream()
-              .map(
-                  jar ->
-                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
-              .collect(Collectors.toList());
-
-      List<String> files =
-          content.files().stream()
-              .map(
-                  file ->
-                      fetchFileFromUri(
-                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
-              .collect(Collectors.toList());
-
-      List<String> archives =
-          content.archives().stream()
-              .map(
-                  archive ->
-                      fetchFileFromUri(
-                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
-              .collect(Collectors.toList());
-
-      Map<String, String> configs =
-          content.configs().entrySet().stream()
-              .collect(
-                  Collectors.toMap(
-                      entry -> replacePlaceholder(entry.getKey(), jobConf),
-                      entry -> replacePlaceholder(entry.getValue(), jobConf)));
-
-      return SparkJobTemplate.builder()
-          .withName(name)
-          .withComment(comment)
-          .withExecutable(executable)
-          .withArguments(args)
-          .withEnvironments(environments)
-          .withCustomFields(customFields)
-          .withClassName(className)
-          .withJars(jars)
-          .withFiles(files)
-          .withArchives(archives)
-          .withConfigs(configs)
-          .build();
-    }
-
-    throw new IllegalArgumentException("Unsupported job type: " + content.jobType());
-  }
-
-  @VisibleForTesting
-  static String replacePlaceholder(String inputString, Map<String, String> replacements) {
-    if (StringUtils.isBlank(inputString)) {
-      return inputString; // Return as is if the input string is blank
-    }
-
-    StringBuilder result = new StringBuilder();
-
-    Matcher matcher = PLACEHOLDER_PATTERN.matcher(inputString);
-    while (matcher.find()) {
-      String key = matcher.group(1);
-      String replacement = replacements.get(key);
-      if (replacement != null) {
-        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
-      } else {
-        // If no replacement is found, keep the placeholder as is
-        matcher.appendReplacement(result, matcher.group(0));
-      }
-    }
-    matcher.appendTail(result);
-
-    return result.toString();
-  }
-
-  @VisibleForTesting
-  static List<String> fetchFilesFromUri(List<String> uris, File stagingDir, int timeoutInMs) {
-    return uris.stream()
-        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs))
-        .collect(Collectors.toList());
-  }
-
-  @VisibleForTesting
-  static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
-    try {
-      URI fileUri = new URI(uri);
-      File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
-      return FileFetcher.get()
-          .fetchFileFromUri(
-              uri,
-              destFile,
-              timeoutInMs,
-              null /* hadoopConf: job file URIs never use the hdfs scheme */);
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
-    }
-  }
-
-  @VisibleForTesting
   JobTemplateEntity updateJobTemplateEntity(
       NameIdentifier jobTemplateIdent,
       JobTemplateEntity jobTemplateEntity,
@@ -1092,20 +948,24 @@ public class JobManager implements JobOperationDispatcher {
       }
     }
 
-    return newTemplateBuilder
-        .withId(jobTemplateEntity.id())
-        .withName(newName)
-        .withComment(newComment)
-        .withNamespace(jobTemplateIdent.namespace())
-        .withTemplateContent(newTemplateContentBuilder.build())
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(jobTemplateEntity.auditInfo().creator())
-                .withCreateTime(jobTemplateEntity.auditInfo().createTime())
-                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                .withLastModifiedTime(Instant.now())
-                .build())
-        .build();
+    JobTemplateEntity newJobTemplateEntity =
+        newTemplateBuilder
+            .withId(jobTemplateEntity.id())
+            .withName(newName)
+            .withComment(newComment)
+            .withNamespace(jobTemplateIdent.namespace())
+            .withTemplateContent(newTemplateContentBuilder.build())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(jobTemplateEntity.auditInfo().creator())
+                    .withCreateTime(jobTemplateEntity.auditInfo().createTime())
+                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withLastModifiedTime(Instant.now())
+                    .build())
+            .build();
+    // Fail on malformed placeholders in the updated template.
+    JobTemplateResolver.validate(newJobTemplateEntity);
+    return newJobTemplateEntity;
   }
 
   private void deleteStagingDirOfUnsubmittedJob(File jobStagingDir, long jobId) {
