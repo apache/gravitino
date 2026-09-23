@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.junit.jupiter.api.Test;
@@ -70,8 +71,8 @@ public class TestLanceBlobTypes {
                 new FieldType(
                     true,
                     ArrowType.LargeBinary.INSTANCE,
-                    null,
-                    Map.of(LanceBlobTypes.BLOB_META_KEY, "true", "other", "x")),
+                    new DictionaryEncoding(1L, false, new ArrowType.Int(32, true)),
+                    blobMeta),
                 null)));
     assertEquals(
         Optional.empty(),
@@ -84,6 +85,63 @@ public class TestLanceBlobTypes {
                     null,
                     Map.of(LanceBlobTypes.BLOB_META_KEY, "yes")),
                 null)));
+  }
+
+  @Test
+  void testNonBlobMetadataIsIgnored() {
+    Field v1 =
+        new Field(
+            "b",
+            new FieldType(
+                true,
+                ArrowType.LargeBinary.INSTANCE,
+                null,
+                Map.of(LanceBlobTypes.BLOB_META_KEY, "true", "other", "x")),
+            null);
+    assertEquals(Optional.of("lance.blob.v1"), LanceBlobTypes.toCatalogString(v1));
+
+    // pyarrow extension types always export an ARROW:extension:metadata entry.
+    Field v2 =
+        v2Field(
+            minimalChildren(),
+            Map.of(
+                "ARROW:extension:metadata",
+                "",
+                "lance-schema:unenforced-primary-key",
+                "true",
+                LanceBlobTypes.INLINE_SIZE_THRESHOLD_META_KEY,
+                "16"));
+    assertEquals(
+        Optional.of("lance.blob.v2(inline_size_threshold=16)"), LanceBlobTypes.toCatalogString(v2));
+  }
+
+  @Test
+  void testIsBlob() {
+    assertTrue(LanceBlobTypes.isBlob(LanceBlobTypes.toArrowField("b", true, "lance.blob.v1")));
+    assertTrue(LanceBlobTypes.isBlob(LanceBlobTypes.toArrowField("b", true, "lance.blob.v2")));
+    assertTrue(
+        LanceBlobTypes.isBlob(
+            new Field(
+                "b",
+                new FieldType(
+                    true,
+                    ArrowType.Binary.INSTANCE,
+                    null,
+                    Map.of(LanceBlobTypes.BLOB_META_KEY, "true")),
+                null)));
+    assertFalse(
+        LanceBlobTypes.isBlob(
+            new Field(
+                "b",
+                new FieldType(
+                    true,
+                    ArrowType.LargeBinary.INSTANCE,
+                    null,
+                    Map.of(LanceBlobTypes.INLINE_SIZE_THRESHOLD_META_KEY, "1")),
+                null)));
+    assertFalse(
+        LanceBlobTypes.isBlob(
+            new Field("b", new FieldType(true, ArrowType.LargeBinary.INSTANCE, null), null)));
   }
 
   @Test
@@ -149,10 +207,31 @@ public class TestLanceBlobTypes {
             minimalChildren().get(1));
     assertFalse(LanceBlobTypes.toCatalogString(v2Field(childWithMetadata, Map.of())).isPresent());
 
-    // Unknown metadata key.
-    assertFalse(
-        LanceBlobTypes.toCatalogString(v2Field(minimalChildren(), Map.of("vendor:x", "1")))
-            .isPresent());
+    // Dictionary-encoded struct.
+    Field dictionaryEncoded =
+        new Field(
+            "blob",
+            new FieldType(
+                true,
+                ArrowType.Struct.INSTANCE,
+                new DictionaryEncoding(1L, false, new ArrowType.Int(32, true)),
+                Map.of(LanceBlobTypes.ARROW_EXT_NAME_KEY, LanceBlobTypes.BLOB_V2_EXT_NAME)),
+            minimalChildren());
+    assertFalse(LanceBlobTypes.toCatalogString(dictionaryEncoded).isPresent());
+
+    // Thresholds out of the range accepted by the readable form.
+    for (Map.Entry<String, String> threshold :
+        Map.of(
+                LanceBlobTypes.INLINE_SIZE_THRESHOLD_META_KEY, "-1",
+                LanceBlobTypes.DEDICATED_SIZE_THRESHOLD_META_KEY, "0",
+                LanceBlobTypes.PACK_FILE_SIZE_THRESHOLD_META_KEY, "0")
+            .entrySet()) {
+      assertFalse(
+          LanceBlobTypes.toCatalogString(
+                  v2Field(minimalChildren(), Map.of(threshold.getKey(), threshold.getValue())))
+              .isPresent(),
+          threshold.toString());
+    }
 
     // Non-canonical threshold value.
     assertFalse(
@@ -175,6 +254,7 @@ public class TestLanceBlobTypes {
   void testIsBlobCatalogString() {
     assertTrue(LanceBlobTypes.isBlobCatalogString("lance.blob.v1"));
     assertTrue(LanceBlobTypes.isBlobCatalogString("lance.blob.v2(with_range=true)"));
+    assertTrue(LanceBlobTypes.isBlobCatalogString(" lance.blob.v1 "));
     assertFalse(LanceBlobTypes.isBlobCatalogString("{\"name\":\"lance.blob.v1\"}"));
     assertFalse(LanceBlobTypes.isBlobCatalogString(null));
   }

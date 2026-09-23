@@ -99,9 +99,10 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
 
-Gravitino types cannot carry Arrow field metadata. When loading a Lance table, a field with metadata is
-returned as `External(arrow_field_json_str)` so that the metadata is kept. If metadata appears anywhere
-inside a `List`, `Map` or `Union` field, the whole field is returned as `External(arrow_field_json_str)`.
+Gravitino types cannot carry Arrow field metadata. When loading a Lance table, only Lance blob metadata
+is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. If a blob field appears
+anywhere inside a `List`, `Map` or `Union` field, the whole field is returned as
+`External(arrow_field_json_str)`.
 
 ### Blob Types
 
@@ -125,8 +126,9 @@ Lance blob columns use a readable external type instead of Arrow JSON:
 For example, `External("lance.blob.v2(inline_size_threshold=4096, dedicated_size_threshold=1048576)")`.
 
 Legacy blob columns are rejected by Lance for file version 2.2 and later; use blob v2 for new tables.
-A blob field that does not exactly match these layouts, for example a legacy blob stored as `Binary` or
-a field with extra metadata, is returned as `External(arrow_field_json_str)`.
+Metadata other than the blob keys above is not kept. A blob field that does not exactly match these
+layouts, for example a legacy blob stored as `Binary` or a threshold out of the accepted range, is
+returned as `External(arrow_field_json_str)`.
 
 ### Table Properties
 

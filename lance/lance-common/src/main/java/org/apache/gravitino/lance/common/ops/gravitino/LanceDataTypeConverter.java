@@ -125,16 +125,14 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
               "Failed to parse external type catalog string: " + externalType.catalogString(), e);
         }
         Preconditions.checkArgument(
-            name.equals(field.getName()),
-            "expected field name %s but got %s",
-            name,
-            field.getName());
-        Preconditions.checkArgument(
             nullable == field.isNullable(),
             "expected field nullable %s but got %s",
             nullable,
             field.isNullable());
-        return field;
+        // The column name is authoritative: a renamed column keeps its stored JSON type.
+        return name.equals(field.getName())
+            ? field
+            : new Field(name, field.getFieldType(), field.getChildren());
 
       default:
         // non-complex type
@@ -212,20 +210,21 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       return Types.ExternalType.of(blobType.get());
     }
 
-    // Gravitino types cannot carry Arrow field metadata, so keep the whole field as Arrow JSON.
-    if (hasMetadata(arrowField)) {
+    // Only Lance blob metadata is recognized. A blob field outside the canonical layout keeps the
+    // whole field as Arrow JSON so the blob is not turned into a plain binary or struct column.
+    if (LanceBlobTypes.isBlob(arrowField)) {
       return toExternalType(arrowField);
     }
 
     FieldType fieldType = arrowField.getFieldType();
-    // List, map and union children are rebuilt with fixed names and without metadata, so any
-    // metadata below them can only be preserved by keeping the whole subtree as Arrow JSON.
-    // Struct children keep their names and are converted recursively.
+    // List, map and union children are rebuilt with fixed names and without metadata, so a blob
+    // below them can only be preserved by keeping the whole subtree as Arrow JSON. Struct children
+    // keep their names and are converted recursively.
     ArrowType.ArrowTypeID typeId = fieldType.getType().getTypeID();
     if ((typeId == ArrowType.ArrowTypeID.List
             || typeId == ArrowType.ArrowTypeID.Map
             || typeId == ArrowType.ArrowTypeID.Union)
-        && arrowField.getChildren().stream().anyMatch(LanceDataTypeConverter::hasMetadataInTree)) {
+        && arrowField.getChildren().stream().anyMatch(LanceDataTypeConverter::hasBlobInTree)) {
       return toExternalType(arrowField);
     }
 
@@ -353,12 +352,8 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
     return Types.ExternalType.of(typeString);
   }
 
-  private static boolean hasMetadata(Field field) {
-    return field.getMetadata() != null && !field.getMetadata().isEmpty();
-  }
-
-  private static boolean hasMetadataInTree(Field field) {
-    return hasMetadata(field)
-        || field.getChildren().stream().anyMatch(LanceDataTypeConverter::hasMetadataInTree);
+  private static boolean hasBlobInTree(Field field) {
+    return LanceBlobTypes.isBlob(field)
+        || field.getChildren().stream().anyMatch(LanceDataTypeConverter::hasBlobInTree);
   }
 }

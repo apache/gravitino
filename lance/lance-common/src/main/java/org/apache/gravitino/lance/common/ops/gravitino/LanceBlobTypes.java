@@ -46,8 +46,8 @@ import org.apache.arrow.vector.types.pojo.FieldType;
  *       parentheses are omitted.
  * </ul>
  *
- * <p>Only fields exactly matching the canonical Lance layout get a catalog string, so the round
- * trip is lossless. Any other field is left to the Arrow JSON representation.
+ * <p>Only Lance blob metadata is recognized; other field metadata is not represented. A blob field
+ * that does not exactly match the canonical Lance layout is left to the Arrow JSON representation.
  */
 final class LanceBlobTypes {
 
@@ -72,6 +72,13 @@ final class LanceBlobTypes {
           "inline_size_threshold", INLINE_SIZE_THRESHOLD_META_KEY,
           "dedicated_size_threshold", DEDICATED_SIZE_THRESHOLD_META_KEY,
           "pack_file_size_threshold", PACK_FILE_SIZE_THRESHOLD_META_KEY);
+
+  // Catalog string parameter name -> minimum accepted value, matching Lance's validation.
+  private static final Map<String, Long> THRESHOLD_MINIMUMS =
+      ImmutableMap.of(
+          "inline_size_threshold", 0L,
+          "dedicated_size_threshold", 1L,
+          "pack_file_size_threshold", 1L);
 
   private static final ArrowType UINT64 = new ArrowType.Int(64, false);
 
@@ -100,6 +107,19 @@ final class LanceBlobTypes {
   private LanceBlobTypes() {}
 
   /**
+   * Returns whether the field carries Lance blob metadata, either legacy blob or blob v2.
+   *
+   * @param field The Arrow field.
+   * @return true if the field is a Lance blob field.
+   */
+  static boolean isBlob(Field field) {
+    Map<String, String> metadata = field.getMetadata();
+    return metadata != null
+        && (metadata.containsKey(BLOB_META_KEY)
+            || BLOB_V2_EXT_NAME.equals(metadata.get(ARROW_EXT_NAME_KEY)));
+  }
+
+  /**
    * Returns the catalog string of a canonical Lance blob field.
    *
    * @param field The Arrow field.
@@ -123,7 +143,7 @@ final class LanceBlobTypes {
    * @return true if the string starts with {@code lance.blob.}.
    */
   static boolean isBlobCatalogString(String catalogString) {
-    return catalogString != null && catalogString.startsWith(PREFIX);
+    return catalogString != null && catalogString.trim().startsWith(PREFIX);
   }
 
   /**
@@ -188,13 +208,14 @@ final class LanceBlobTypes {
 
   private static boolean isCanonicalV1(Field field, Map<String, String> metadata) {
     return field.getType() instanceof ArrowType.LargeBinary
+        && field.getDictionary() == null
         && field.getChildren().isEmpty()
-        && metadata.size() == 1
         && "true".equals(metadata.get(BLOB_META_KEY));
   }
 
   private static Optional<String> toV2CatalogString(Field field, Map<String, String> metadata) {
     if (!(field.getType() instanceof ArrowType.Struct)
+        || field.getDictionary() != null
         || !BLOB_V2_EXT_NAME.equals(metadata.get(ARROW_EXT_NAME_KEY))) {
       return Optional.empty();
     }
@@ -213,21 +234,15 @@ final class LanceBlobTypes {
     if (withRange) {
       params.add(WITH_RANGE + "=true");
     }
-    int knownKeys = 1;
     for (Map.Entry<String, String> param : THRESHOLD_PARAMS.entrySet()) {
       String value = metadata.get(param.getValue());
       if (value == null) {
         continue;
       }
-      if (!isCanonicalNumber(value)) {
+      if (!isCanonicalThreshold(param.getKey(), value)) {
         return Optional.empty();
       }
       params.add(param.getKey() + "=" + value);
-      knownKeys++;
-    }
-    if (knownKeys != metadata.size()) {
-      // Unknown metadata keys cannot be expressed in the catalog string.
-      return Optional.empty();
     }
 
     return Optional.of(params.isEmpty() ? V2 : V2 + "(" + String.join(", ", params) + ")");
@@ -275,7 +290,7 @@ final class LanceBlobTypes {
               value, key, catalogString),
           e);
     }
-    long min = key.equals("inline_size_threshold") ? 0 : 1;
+    long min = THRESHOLD_MINIMUMS.get(key);
     Preconditions.checkArgument(
         threshold >= min,
         "Invalid value %s for %s in Lance blob type %s, expected an integer >= %s",
@@ -286,9 +301,10 @@ final class LanceBlobTypes {
     return Long.toString(threshold);
   }
 
-  private static boolean isCanonicalNumber(String value) {
+  private static boolean isCanonicalThreshold(String key, String value) {
     try {
-      return Long.toString(Long.parseLong(value)).equals(value);
+      long threshold = Long.parseLong(value);
+      return Long.toString(threshold).equals(value) && threshold >= THRESHOLD_MINIMUMS.get(key);
     } catch (NumberFormatException e) {
       return false;
     }
