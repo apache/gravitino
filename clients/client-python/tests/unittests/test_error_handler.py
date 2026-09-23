@@ -83,6 +83,24 @@ from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
+    def test_statistics_handler_keeps_specific_errors(self):
+        response = ErrorResponse.from_json(
+            '{"code":1001,"type":"IllegalArgumentException",'
+            '"message":"Invalid statistic","stack":null}'
+        )
+        with self.assertRaisesRegex(IllegalArgumentException, "Invalid statistic"):
+            STATISTICS_ERROR_HANDLER.handle(response)
+
+    def test_statistics_handler_forwards_unrecognized_codes(self):
+        for code in (1011, 1999):
+            with self.subTest(code=code):
+                response = ErrorResponse.from_json(
+                    f'{{"code":{code},"type":"UnexpectedError",'
+                    '"message":"Server error","stack":null}'
+                )
+                with self.assertRaisesRegex(RESTException, "Server error"):
+                    STATISTICS_ERROR_HANDLER.handle(response)
+
     def test_optimistic_lock_conflict(self):
         response = ErrorResponse.from_json(
             '{"code":1012,"type":"OptimisticLockException",'

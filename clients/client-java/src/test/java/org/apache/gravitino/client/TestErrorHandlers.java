@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.client;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.junit.jupiter.api.Assertions;
@@ -30,23 +33,27 @@ import org.junit.jupiter.api.Test;
 public class TestErrorHandlers {
 
   @Test
-  public void testOptimisticLockConflictAcrossHandlers() {
+  @SuppressWarnings("unchecked")
+  public void testOptimisticLockConflictAcrossHandlers() throws ReflectiveOperationException {
     ErrorResponse response =
         ErrorResponse.optimisticLockConflict(
             OptimisticLockException.class.getSimpleName(), "Concurrent update", null);
-    List<Consumer<ErrorResponse>> handlers =
-        Arrays.asList(
-            ErrorHandlers.restErrorHandler(),
-            ErrorHandlers.tableErrorHandler(),
-            ErrorHandlers.viewErrorHandler(),
-            ErrorHandlers.partitionErrorHandler(),
-            ErrorHandlers.statisticsErrorHandler(),
-            ErrorHandlers.catalogErrorHandler());
+    List<Method> factories =
+        Arrays.stream(ErrorHandlers.class.getDeclaredMethods())
+            .filter(method -> Modifier.isPublic(method.getModifiers()))
+            .filter(method -> Modifier.isStatic(method.getModifiers()))
+            .filter(method -> method.getName().endsWith("ErrorHandler"))
+            .filter(method -> method.getParameterCount() == 0)
+            .filter(method -> Consumer.class.isAssignableFrom(method.getReturnType()))
+            .collect(Collectors.toList());
+    Assertions.assertFalse(factories.isEmpty());
 
-    for (Consumer<ErrorResponse> handler : handlers) {
+    for (Method factory : factories) {
+      Consumer<ErrorResponse> handler = (Consumer<ErrorResponse>) factory.invoke(null);
       OptimisticLockException exception =
-          Assertions.assertThrows(OptimisticLockException.class, () -> handler.accept(response));
-      Assertions.assertEquals("Concurrent update", exception.getMessage());
+          Assertions.assertThrows(
+              OptimisticLockException.class, () -> handler.accept(response), factory.getName());
+      Assertions.assertEquals("Concurrent update", exception.getMessage(), factory.getName());
     }
   }
 }
