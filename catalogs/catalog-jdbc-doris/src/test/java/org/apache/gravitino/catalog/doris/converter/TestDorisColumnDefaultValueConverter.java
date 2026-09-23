@@ -152,8 +152,7 @@ public class TestDorisColumnDefaultValueConverter {
         "7", CONVERTER.fromGravitinoForModifyColumn(Literals.integerLiteral(7), false, false));
     Assertions.assertEquals(
         "CURRENT_TIMESTAMP",
-        CONVERTER.fromGravitinoForModifyColumn(
-            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
     Assertions.assertEquals(
         "CURRENT_DATE",
         CONVERTER.fromGravitinoForModifyColumn(
