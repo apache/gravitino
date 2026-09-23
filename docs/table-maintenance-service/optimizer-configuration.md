@@ -74,6 +74,11 @@ redacts them in DRY-RUN / SUBMIT output).
 
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
+The policy-driven path needs the same keys. Its compaction adapter only derives the table, the
+where clause and the rewrite options from the policy, so `catalog_name`, `catalog_type`,
+`catalog_uri` and `warehouse_location` must come from `gravitino.optimizer.jobSubmitterConfig.`.
+Missing ones are reported when the job is submitted, instead of failing later inside Spark.
+
 ## Job Submission Configuration
 
 A direct job submission carries its own `jobConf`. This is `builtin-iceberg-update-stats` with the keys it needs.
@@ -98,11 +103,11 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
 
 `updater_options` and `spark_conf` are JSON strings inside a JSON object, so their quotes are escaped. That nesting is the most common source of malformed submissions.
 
-Built-in Iceberg templates list optional keys as `--flag` + `{{placeholder}}`. Omitting a key from
-`jobConf` does not remove that flag from the submitted command; it can leave a dangling flag such as
-`--updater-options` with no value. Prefer sending an explicit value for each placeholder you use
-(or a documented default) instead of dropping the key. See
-[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+Only some of these keys are required. The built-in templates give the optional ones a default, so
+`jobConf` can leave them out; a submission that misses a required key is rejected with an error
+that lists the missing keys. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates) for the required keys
+and the defaults of each template.
 
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
 ship that JAR or fill template `jars`, so include it yourself — for example

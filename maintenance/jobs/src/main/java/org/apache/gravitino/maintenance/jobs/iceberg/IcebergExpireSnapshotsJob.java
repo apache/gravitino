@@ -39,7 +39,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -66,7 +66,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    *   <li>--older-than &lt;timestamp&gt; Optional. Expire snapshots older than this timestamp
    *       (e.g., '2024-01-01 00:00:00')
    *   <li>--retain-last &lt;count&gt; Optional. Number of most recent snapshots to retain
-   *   <li>--stream-results Optional. Flag to enable streaming of intermediate results
+   *   <li>--stream-results [true|false] Optional. Whether to stream intermediate results. A bare
+   *       --stream-results means true
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
    *
@@ -115,13 +116,12 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     // Optional arguments
     String olderThan = argMap.get("older-than");
     String retainLast = argMap.get("retain-last");
-    // --stream-results is a boolean flag (presence = true)
-    boolean streamResults = argMap.containsKey("stream-results");
     String sparkConfJson = argMap.get("spark-conf");
 
-    // Validate retain-last if provided
+    boolean streamResults = false;
     try {
       validateRetainLast(retainLast);
+      streamResults = parseStreamResults(argMap.get("stream-results"));
     } catch (IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       printUsage();
@@ -223,6 +223,29 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   /**
+   * Parse the value of {@code --stream-results}.
+   *
+   * @param value the value, {@code true} for a bare {@code --stream-results}, or null if the option
+   *     is absent or empty
+   * @return whether to stream intermediate results
+   * @throws IllegalArgumentException if the value is neither true nor false
+   */
+  static boolean parseStreamResults(String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return false;
+    }
+    String trimmed = value.trim();
+    if ("true".equalsIgnoreCase(trimmed)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(trimmed)) {
+      return false;
+    }
+    throw new IllegalArgumentException(
+        "Invalid stream-results value '" + value + "'. Must be true or false");
+  }
+
+  /**
    * Validate the retain-last parameter value.
    *
    * @param retainLast the retain-last value to validate
@@ -261,7 +284,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
             + "  --retain-last <count>     Number of most recent snapshots to retain\n"
             + "                              Must be a positive integer (>= 1)\n"
             + "                              Default: 1 (Iceberg default)\n"
-            + "  --stream-results          Enable streaming of intermediate delete results\n"
+            + "  --stream-results [bool]   Stream intermediate delete results (true or false)\n"
+            + "                              A bare --stream-results means true\n"
             + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
             + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
@@ -293,12 +317,13 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         "--table",
         "{{table_identifier}}",
         "--older-than",
-        "{{older_than}}",
+        "{{older_than:-}}",
         "--retain-last",
-        "{{retain_last}}",
-        "{{stream_results}}",
+        "{{retain_last:-}}",
+        "--stream-results",
+        "{{stream_results:-false}}",
         "--spark-conf",
-        "{{spark_conf}}");
+        "{{spark_conf:-}}");
   }
 
   /**

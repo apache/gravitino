@@ -29,8 +29,8 @@ means implementing an executor. See
 
 ### Register a Shell Template
 
-A shell template runs an executable. Placeholders in `arguments`, `environments`, and `customFields`
-are filled in when a job runs.
+A shell template runs an executable. Its placeholders are filled in with the job configuration when
+a job runs. See [Placeholders](#placeholders).
 
 ```json
 {
@@ -84,6 +84,52 @@ an error that names the missing setting, and no job is created.
   "configs": {"spark.executor.memory": "4g"}
 }
 ```
+
+### Placeholders
+
+Any string in a template can contain placeholders: `executable`, `className`, the entries of
+`scripts`, `jars`, `files`, and `archives`, and the keys and values of `environments`, `configs`,
+and `customFields`. When a job runs, each placeholder is replaced with a value from the job
+configuration (`jobConf`).
+
+| Syntax              | Meaning                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `{{name}}`          | Required. A run without a value for `name` is rejected.                                      |
+| `{{name:-default}}` | Optional. `default` is used when the job configuration has no value. It can be empty: `{{name:-}}`. |
+| `\{{`               | A literal `{{`, for example to pass `{{ds}}` to another tool. Written as `"\\{{"` in JSON.   |
+
+For example, a template with `"arguments": ["--date", "{{date}}", "--mode", "{{mode:-full}}"]` run
+with `{"date": "2026-09-22"}` passes `--date 2026-09-22 --mode full` to the job.
+
+:::caution
+Templates registered before Gravitino supported default values could pass an unresolved
+placeholder through to the job as literal text, which is how templates carried another tool's
+syntax, such as `{{ds}}` or `{{.Values.image}}`. A placeholder with no value is now a required
+parameter, so those runs are rejected. Escape such text as `\{{ds}}`, or give the parameter a
+default value.
+:::
+
+- A value in the job configuration is used as is, including an empty string `""`. A `null` value
+  counts as no value. Values are never scanned for placeholders.
+- A default declared on one occurrence of a parameter applies to all of its occurrences. A
+  template that gives the same parameter different defaults is rejected when it is registered or
+  updated.
+- A default value is used as is and can span lines, but its braces must be balanced, so the
+  placeholder ends at the first `}}` outside of them. This makes a JSON object a valid default, for
+  example `{{options:-{"k":"v"}}}`. A default with unbalanced braces, such as `{{options:-{}}`, is
+  rejected when the template is registered or updated.
+- If any required parameter has no value, the run request fails with an error that lists all the
+  missing parameters. No job is created and no file is downloaded.
+- Keys in the job configuration that the template does not use are ignored, and the server logs a
+  warning.
+- A placeholder name can contain letters, digits, `_`, `.`, and `-`. Text such as `{{ name }}`,
+  with spaces, is not a placeholder and is passed through as is.
+- Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
+  text. A value that ends with a backslash right before a placeholder has to double it, as in
+  `\\{{name}}`.
+- A placeholder whose default value contains braces cannot be immediately followed by a literal
+  `}`, because it is then unclear which `}}` closes it. Put the whole structure in the default
+  value, or insert a space. A default value without braces, such as `{"k":{{v:-1}}}`, is fine.
 
 ### List, Get, and Delete Templates
 
