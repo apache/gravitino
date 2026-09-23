@@ -41,9 +41,11 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -229,6 +231,16 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .planTableScan(tableIdentifier, scanRequest, context.requestCredentialVending(), privilege);
+  }
+
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .fetchScanTasks(tableIdentifier, request);
   }
 
   @Override
