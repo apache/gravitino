@@ -739,6 +739,51 @@ public class TestFilesetMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteRejectsAStaleVersionAfterAMetadataOnlyAlter() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_stale_delete");
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp");
+    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    FilesetPO stalePO = getFilesetPO(fileset.id());
+
+    // An audit-only alter advances occ_version and deliberately leaves current_version alone. A
+    // drop still guarded by current_version would not notice it and would delete a fileset the
+    // caller never observed in its current state.
+    AuditInfo laterAudit =
+        AuditInfo.builder().withCreator("later-updater").withCreateTime(Instant.now()).build();
+    updateFilesetUnchecked(
+        fileset.nameIdentifier(),
+        entity ->
+            createFilesetEntity(
+                entity.id(), entity.namespace(), entity.name(), laterAudit, "/tmp"));
+
+    FilesetPO afterAlter = getFilesetPO(fileset.id());
+    Assertions.assertEquals(stalePO.getCurrentVersion(), afterAlter.getCurrentVersion());
+    Assertions.assertEquals(stalePO.getOccVersion() + 1, afterAlter.getOccVersion().longValue());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    FilesetMetaService.getInstance()
+                        .deleteFilesetWithVersion(fileset.nameIdentifier(), stalePO)));
+
+    // The stale drop stopped before removing anything.
+    Assertions.assertEquals(
+        laterAudit.creator(),
+        FilesetMetaService.getInstance()
+            .getFilesetByIdentifier(fileset.nameIdentifier())
+            .auditInfo()
+            .creator());
+  }
+
+  @TestTemplate
   public void testDeleteReportsNoSuchWhenDeletedConcurrently() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_double_delete");
     FilesetEntity fileset =

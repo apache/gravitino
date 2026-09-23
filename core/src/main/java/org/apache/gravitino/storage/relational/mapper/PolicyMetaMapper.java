@@ -56,7 +56,6 @@ public interface PolicyMetaMapper {
         @Result(property = "currentVersion", column = "current_version"),
         @Result(property = "lastVersion", column = "last_version"),
         @Result(property = "occVersion", column = "occ_version"),
-        @Result(property = "occVersion", column = "occ_version"),
         @Result(property = "deletedAt", column = "deleted_at"),
         @Result(property = "policyVersionPO.id", column = "id"),
         @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
@@ -126,7 +125,6 @@ public interface PolicyMetaMapper {
         @Result(property = "auditInfo", column = "audit_info"),
         @Result(property = "currentVersion", column = "current_version"),
         @Result(property = "lastVersion", column = "last_version"),
-        @Result(property = "occVersion", column = "occ_version"),
         @Result(property = "occVersion", column = "occ_version"),
         @Result(property = "deletedAt", column = "deleted_at")
       })

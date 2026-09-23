@@ -469,6 +469,13 @@ public class FilesetMetaService {
       return;
     }
 
+    // The snapshot check is in the statement only when the alter allocates a version, so an alter
+    // that allocates none can have failed for one reason: it lost the OCC race. Its observed
+    // version is fixed, so retrying would repeat the same comparison and fail again.
+    if (newFilesetPO.getCurrentVersion().equals(oldFilesetPO.getCurrentVersion())) {
+      throw filesetWriteFailure(identifier, oldFilesetPO);
+    }
+
     // The metadata CAS also rejects a version that already has an active stored snapshot. Only
     // that uncommon legacy case needs the MAX(version) round trip; normal alters finish above.
     Long maxStoredVersion =
