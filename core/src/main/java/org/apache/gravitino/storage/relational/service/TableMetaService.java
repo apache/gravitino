@@ -316,7 +316,6 @@ public class TableMetaService {
     return EntityVersion.of(tablePO.getTableId(), tablePO.getCurrentVersion());
   }
 
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     return deleteTable(identifier, null);
   }
@@ -332,6 +331,7 @@ public class TableMetaService {
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier, @Nullable EntityVersion expected) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
     if (expected != null) {

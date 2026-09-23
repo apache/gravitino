@@ -291,7 +291,6 @@ public class TopicMetaService {
     return EntityVersion.of(topicPO.getTopicId(), topicPO.getCurrentVersion());
   }
 
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier) {
     return deleteTopic(identifier, null);
   }
@@ -307,6 +306,7 @@ public class TopicMetaService {
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier, @Nullable EntityVersion expected) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
     if (expected != null) {

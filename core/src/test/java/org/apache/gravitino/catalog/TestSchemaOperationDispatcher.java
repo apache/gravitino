@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
+import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,10 +52,12 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
@@ -62,6 +65,8 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -379,6 +384,28 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+  }
+
+  @Test
+  void testCascadingDropKeepsRegistrationRecreatedDuringExternalDrop() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_aba");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity registered = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    TableEntity child =
+        TestUtil.getTestTableEntity(
+            idGenerator.nextId(), "child", Namespace.of(metalake, catalog, schemaIdent.name()));
+    entityStore.put(child, false);
+
+    reset(entityStore);
+    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .when(entityStore)
+        .getVersion(schemaIdent, SCHEMA);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> dispatcher.dropSchema(schemaIdent, true));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertTrue(entityStore.exists(child.nameIdentifier(), TABLE));
   }
 
   @Test

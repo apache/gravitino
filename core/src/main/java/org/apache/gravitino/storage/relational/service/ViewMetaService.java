@@ -221,9 +221,6 @@ public class ViewMetaService {
     }
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident) {
     return deleteView(ident, null);
   }
@@ -251,6 +248,9 @@ public class ViewMetaService {
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident, @Nullable EntityVersion expected) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
     if (expected != null) {

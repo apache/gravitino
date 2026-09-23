@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
+import static org.apache.gravitino.Entity.EntityType.TOPIC;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
@@ -50,12 +51,14 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -259,6 +262,27 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+  }
+
+  @Test
+  void testDropTopicKeepsRegistrationRecreatedDuringExternalDrop() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_topic_drop_aba");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(topicNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic");
+    topicOperationDispatcher.createTopic(
+        topicIdent, "comment", null, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    TopicEntity registered = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
+
+    reset(entityStore);
+    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .when(entityStore)
+        .getVersion(topicIdent, TOPIC);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(topicIdent, TOPIC, TopicEntity.class).id());
   }
 
   @Test

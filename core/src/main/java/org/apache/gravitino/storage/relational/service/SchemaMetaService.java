@@ -268,9 +268,6 @@ public class SchemaMetaService {
     return newEntity;
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     return deleteSchema(identifier, cascade, null);
   }
@@ -299,6 +296,9 @@ public class SchemaMetaService {
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchema")
   public boolean deleteSchema(
       NameIdentifier identifier, boolean cascade, @Nullable EntityVersion expected) {
     NameIdentifierUtil.checkSchema(identifier);

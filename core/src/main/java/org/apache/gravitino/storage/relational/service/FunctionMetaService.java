@@ -141,9 +141,6 @@ public class FunctionMetaService {
     }
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteFunction")
   public boolean deleteFunction(NameIdentifier ident) {
     return deleteFunction(ident, null);
   }
@@ -171,6 +168,9 @@ public class FunctionMetaService {
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFunction")
   public boolean deleteFunction(NameIdentifier ident, @Nullable EntityVersion expected) {
     FunctionPO functionPO = getFunctionPOByIdentifier(ident);
     if (expected != null) {

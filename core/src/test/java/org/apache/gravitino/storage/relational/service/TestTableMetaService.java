@@ -343,8 +343,17 @@ public class TestTableMetaService extends TestJDBCBackend {
                 second.nameIdentifier(), EntityVersion.of(current.id(), current.version() + 1)));
 
     // The matching observation deletes.
-    Assertions.assertTrue(service.deleteTable(second.nameIdentifier(), current));
+    long maxIdBeforeVersionedDelete = maxEntityChangeId();
+    Assertions.assertTrue(
+        backend.delete(second.nameIdentifier(), Entity.EntityType.TABLE, false, current));
     Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertTrue(
+        listEntityChanges(maxIdBeforeVersionedDelete).stream()
+            .anyMatch(
+                record ->
+                    record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record.getFullName().equals(second.nameIdentifier().toString())
+                        && record.getOperateType() == OperateType.DROP));
   }
 
   @TestTemplate
