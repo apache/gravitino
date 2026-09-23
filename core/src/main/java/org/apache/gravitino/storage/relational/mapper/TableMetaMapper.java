@@ -82,6 +82,19 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaByIdForUpdate")
   TablePO selectTableMetaByIdForUpdate(@Param("tableId") Long tableId);
 
+  /** Locks a table ID even when its old registration was soft deleted. */
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableMetaByIdIncludingDeletedForUpdate")
+  TablePO selectTableMetaByIdIncludingDeletedForUpdate(@Param("tableId") Long tableId);
+
+  /** Restores only the soft-deleted row with the matching ID and observed version. */
+  @UpdateProvider(type = TableMetaSQLProviderFactory.class, method = "restoreDeletedTableMeta")
+  Integer restoreDeletedTableMeta(
+      @Param("tableMeta") TablePO tablePO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt);
+
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 

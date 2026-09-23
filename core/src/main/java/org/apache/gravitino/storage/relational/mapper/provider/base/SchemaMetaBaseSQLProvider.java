@@ -219,6 +219,38 @@ public class SchemaMetaBaseSQLProvider {
     return selectSchemaMetaById(schemaId) + " FOR UPDATE";
   }
 
+  /** Selects and locks a schema row by ID even when it has been soft deleted. */
+  public String selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId) {
+    return "SELECT schema_id as schemaId, schema_name as schemaName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} FOR UPDATE";
+  }
+
+  /** Restores a deleted schema only if its version and deletion marker still match. */
+  public String restoreDeletedSchemaMeta(
+      @Param("schemaMeta") SchemaPO schemaPO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET schema_name = #{schemaMeta.schemaName},"
+        + " metalake_id = #{schemaMeta.metalakeId},"
+        + " catalog_id = #{schemaMeta.catalogId},"
+        + " schema_comment = #{schemaMeta.schemaComment},"
+        + " properties = #{schemaMeta.properties},"
+        + " audit_info = #{schemaMeta.auditInfo},"
+        + " current_version = #{schemaMeta.currentVersion},"
+        + " last_version = #{schemaMeta.lastVersion},"
+        + " deleted_at = 0"
+        + " WHERE schema_id = #{schemaMeta.schemaId}"
+        + " AND last_version = #{oldVersion}"
+        + " AND deleted_at = #{oldDeletedAt} AND deleted_at <> 0";
+  }
+
   /** Returns SQL that selects and share-locks an active schema by ID. */
   public String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
     return selectSchemaMetaById(schemaId) + " LOCK IN SHARE MODE";

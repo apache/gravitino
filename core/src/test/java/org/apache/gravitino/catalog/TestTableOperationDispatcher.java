@@ -361,20 +361,19 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(targetNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
     NameIdentifier source = NameIdentifier.of(sourceNs, "orders");
-    NameIdentifier copy = NameIdentifier.of(targetNs, "orders_copy");
+    NameIdentifier copy = NameIdentifier.of(targetNs, "orders");
     tableOperationDispatcher.createTable(
         source, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     TableEntity registered = entityStore.get(source, TABLE, TableEntity.class);
+    Assertions.assertTrue(
+        entityStore.list(Namespace.of(metalake, catalog), SchemaEntity.class, SCHEMA).stream()
+            .anyMatch(schema -> schema.name().equals(sourceNs.level(2))));
     Map<String, String> copiedProperties =
         new HashMap<>(testCatalogOperations().loadTable(source).properties());
     testCatalogOperations()
         .createTable(
             copy, new Column[0], "copy", copiedProperties, new Transform[0], null, null, null);
 
-    // The in-memory store does not enforce the relational store's unique primary key.
-    doThrow(new EntityAlreadyExistsException("Duplicate table ID"))
-        .when(entityStore)
-        .put(any(TableEntity.class), eq(false));
     IllegalArgumentException error =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copy));
@@ -384,6 +383,32 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(
         registered.id(), entityStore.get(source, TABLE, TableEntity.class).id());
     Assertions.assertFalse(entityStore.exists(copy, TABLE));
+  }
+
+  @Test
+  public void testLoadTableRebindsIdentifierAfterExternalCrossSchemaMove() throws IOException {
+    Namespace sourceNs = Namespace.of(metalake, catalog, "schemaMoveSource");
+    Namespace targetNs = Namespace.of(metalake, catalog, "schemaMoveTarget");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(sourceNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(targetNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier source = NameIdentifier.of(sourceNs, "orders");
+    NameIdentifier target = NameIdentifier.of(targetNs, "orders");
+    tableOperationDispatcher.createTable(
+        source, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity registered = entityStore.get(source, TABLE, TableEntity.class);
+
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> properties = new HashMap<>(ops.loadTable(source).properties());
+    Assertions.assertTrue(ops.dropTable(source));
+    ops.createTable(
+        target, new Column[0], "comment", properties, new Transform[0], null, null, null);
+
+    tableOperationDispatcher.loadTable(target);
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(target, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(source, TABLE));
   }
 
   @Test

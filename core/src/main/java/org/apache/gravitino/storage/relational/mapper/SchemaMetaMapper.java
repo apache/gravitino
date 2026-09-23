@@ -102,6 +102,19 @@ public interface SchemaMetaMapper {
       method = "selectSchemaMetaByIdForUpdate")
   SchemaPO selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId);
 
+  /** Locks a schema ID even when its old registration was soft deleted. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdIncludingDeletedForUpdate")
+  SchemaPO selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId);
+
+  /** Restores only the soft-deleted row with the matching ID and observed version. */
+  @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "restoreDeletedSchemaMeta")
+  Integer restoreDeletedSchemaMeta(
+      @Param("schemaMeta") SchemaPO schemaPO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt);
+
   /** Selects and share-locks an active schema by ID for the current transaction. */
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,

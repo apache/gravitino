@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -137,7 +138,37 @@ public class TableMetaService {
                                       "Table ID %d belongs to schema ID %d, not schema ID %d",
                                       po.getTableId(), owner.getSchemaId(), po.getSchemaId()));
                         }
-                        ops.insertPO(mapper, po, overwrite);
+                        if (!overwrite) {
+                          TablePO prior =
+                              mapper.selectTableMetaByIdIncludingDeletedForUpdate(po.getTableId());
+                          if (prior != null) {
+                            if (prior.getDeletedAt() == 0
+                                || !Objects.equals(prior.getMetalakeId(), po.getMetalakeId())) {
+                              throw new EntityAlreadyExistsException(
+                                  "Table ID %d is already used by another registration",
+                                  po.getTableId());
+                            }
+                            // The old catalog was detached but the external table kept its ID.
+                            // Restore only this deleted ID; an upsert could overwrite a different
+                            // live table that happens to have the target name.
+                            TablePO revived =
+                                TablePO.builder(po)
+                                    .withCurrentVersion(prior.getLastVersion() + 1)
+                                    .withLastVersion(prior.getLastVersion() + 1)
+                                    .build();
+                            Preconditions.checkState(
+                                mapper.restoreDeletedTableMeta(
+                                        revived, prior.getLastVersion(), prior.getDeletedAt())
+                                    == 1,
+                                "Table ID %s changed while restoring its registration",
+                                po.getTableId());
+                            persistedPO.set(revived);
+                          } else {
+                            ops.insertPO(mapper, po, false);
+                          }
+                        } else {
+                          ops.insertPO(mapper, po, true);
+                        }
                         if (overwrite) {
                           // MySQL may preserve the existing table ID during an upsert. Read the
                           // stored identity and database-generated version while the row is locked.
@@ -166,7 +197,7 @@ public class TableMetaService {
                           }
                           mapper.insertTableVersionOnDuplicateKeyUpdate(storedPO);
                         } else {
-                          mapper.insertTableVersion(po);
+                          mapper.insertTableVersion(persistedPO.get());
                         }
                       }),
               () -> {
