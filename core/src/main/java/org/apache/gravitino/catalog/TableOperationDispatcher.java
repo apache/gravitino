@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -604,7 +605,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       if (observedOwner != null && !observedOwner.equals(identifier)) {
         // Updating the observed row uses the store's version check. A second server that observed
         // the same old name cannot move the row again after the first import commits.
-        store.update(observedOwner, TableEntity.class, TABLE, current -> tableEntity);
+        store.update(
+            observedOwner,
+            TableEntity.class,
+            TABLE,
+            current -> withReusedColumnIds(tableEntity, current));
       } else {
         // Import a new name without overwrite so a concurrent import of the same ID cannot move
         // its row. Preserve overwrite when repairing a registration already stored at this name.
@@ -683,6 +688,53 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         identifier,
         id);
     return Pair.of(currentOwner, ownerStatus.getRight());
+  }
+
+  /**
+   * Re-registers an externally renamed table under its new name without disturbing its column ids.
+   *
+   * <p>The import builds its columns from the external catalog, so each one carries a freshly
+   * generated id. The store diffs columns by id, so handing those over would retire every stored
+   * column and insert a replacement. Tags, owners, and privileges are keyed by the column id, so
+   * they would be dropped even though nothing about the columns changed. Match the imported columns
+   * back to the observed rows by name, the same rule {@link
+   * org.apache.gravitino.storage.relational.service.TableColumnMetaService} applies when an
+   * overwrite re-registers a table under its existing name.
+   */
+  private TableEntity withReusedColumnIds(TableEntity imported, TableEntity observed) {
+    List<ColumnEntity> importedColumns = imported.columns();
+    if (importedColumns == null || importedColumns.isEmpty() || observed.columns() == null) {
+      return imported;
+    }
+    Map<String, Long> storedIdsByName = Maps.newHashMap();
+    observed.columns().forEach(c -> storedIdsByName.putIfAbsent(c.name(), c.id()));
+    List<ColumnEntity> reused = Lists.newArrayListWithCapacity(importedColumns.size());
+    for (ColumnEntity column : importedColumns) {
+      // Remove the id as it is handed out, so two columns sharing a name cannot claim the same one.
+      Long storedId = storedIdsByName.remove(column.name());
+      reused.add(storedId == null ? column : withColumnId(column, storedId));
+    }
+    return TableEntity.builder()
+        .withId(imported.id())
+        .withName(imported.name())
+        .withNamespace(imported.namespace())
+        .withColumns(reused)
+        .withAuditInfo(imported.auditInfo())
+        .build();
+  }
+
+  private ColumnEntity withColumnId(ColumnEntity column, Long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(column.name())
+        .withPosition(column.position())
+        .withDataType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .withAuditInfo((AuditInfo) column.auditInfo())
+        .build();
   }
 
   /** Returns the identifier of the live table in the schema that owns this id, if any. */

@@ -499,6 +499,42 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testLoadTableKeepsColumnIdsAfterExternalRename() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaExternalRenameColumns");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "after");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(oldIdent, columns, "comment", props, new Transform[0]);
+    Map<String, Long> idsBeforeRename = columnIds(oldIdent);
+
+    // Renamed outside Gravitino: the old name is gone, the new one carries the identifier.
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> movedProps = new HashMap<>(ops.loadTable(oldIdent).properties());
+    Assertions.assertTrue(ops.dropTable(oldIdent));
+    ops.createTable(newIdent, columns, "comment", movedProps, new Transform[0], null, null, null);
+
+    tableOperationDispatcher.loadTable(newIdent);
+
+    // Tags, owners, and privileges are keyed by the column id, so re-registering the table under
+    // its new name must keep the ids rather than replace every column.
+    Assertions.assertEquals(idsBeforeRename, columnIds(newIdent));
+  }
+
+  @Test
   public void testLoadTableDoesNotRebindAfterOwnerChangesOnAnotherNode() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schemaConcurrentCopiedId");
     schemaOperationDispatcher.createSchema(
