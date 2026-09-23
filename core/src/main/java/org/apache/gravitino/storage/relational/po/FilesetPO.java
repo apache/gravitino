@@ -219,6 +219,10 @@ public class FilesetPO {
       Preconditions.checkArgument(filesetPO.deletedAt != null, "Deleted at is required");
       // An alter that leaves every stored field untouched allocates no snapshot and keeps
       // current_version pointing at the one already stored, so the list is empty rather than null.
+      //
+      // This used to reject an empty list, which also stopped a create from storing a row with no
+      // snapshot for current_version to resolve. That case cannot arise: a create builds one
+      // snapshot per storage location, and FilesetEntity.validate rejects an entity that has none.
       Preconditions.checkArgument(
           filesetPO.filesetVersionPOs != null, "Fileset version is required");
     }
