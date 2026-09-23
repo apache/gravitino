@@ -44,6 +44,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -212,12 +213,46 @@ public class TestClickHouseTableOperationsUnit {
     }
   }
 
-  private static void assertLegacyWriteError(
-      IllegalArgumentException exception, Index.IndexType indexType) {
-    Assertions.assertTrue(exception.getMessage().contains("test_table"));
-    Assertions.assertTrue(exception.getMessage().contains("idx_legacy"));
-    Assertions.assertTrue(exception.getMessage().contains(indexType.name()));
-    Assertions.assertTrue(exception.getMessage().contains("metadata-only"));
+  @Test
+  void testToPartitionExpressionSupportsStartFunctions() {
+    Assertions.assertEquals(
+        "toStartOfWeek(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfWeek", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfMonth(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfMonth", new Expression[] {NamedReference.field("event_time")})));
+  }
+
+  @Test
+  void testToPartitionExpressionRejectsUnsupportedFunctionTransforms() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfQuarter", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfWeek",
+                    new Expression[] {
+                      NamedReference.field("event_time"), NamedReference.field("tenant_id")
+                    })));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfWeek",
+                    new Expression[] {
+                      FunctionExpression.of("toDate", NamedReference.field("event_time"))
+                    })));
   }
 
   private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
@@ -1706,5 +1741,13 @@ public class TestClickHouseTableOperationsUnit {
       String typeFull, String expression) throws Exception {
     return Assertions.assertThrows(
         IllegalArgumentException.class, () -> getIndexesForSetMetadata(typeFull, expression));
+  }
+
+  private static void assertLegacyWriteError(
+      IllegalArgumentException exception, Index.IndexType indexType) {
+    Assertions.assertTrue(exception.getMessage().contains("test_table"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_legacy"));
+    Assertions.assertTrue(exception.getMessage().contains(indexType.name()));
+    Assertions.assertTrue(exception.getMessage().contains("metadata-only"));
   }
 }

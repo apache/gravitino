@@ -1155,7 +1155,9 @@ public class CatalogOceanBaseIT extends BaseIT {
             UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
-        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
+        exception
+            .getMessage()
+            .contains("Schema " + testSchemaName + ": catalog does not support schema comments"));
 
     // test null comment
     String testSchemaName2 = "test2";

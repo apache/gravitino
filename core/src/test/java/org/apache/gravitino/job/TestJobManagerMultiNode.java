@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.job;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -37,8 +43,10 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
+import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -63,6 +71,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private static final String TEMPLATE = "sleep_job";
 
+  private static final String ECHO_TEMPLATE = "echo_job";
+
   // Active jobs not updated for this long are expired, and finished jobs are cleaned up after it.
   // The tests move the job timestamps back instead of waiting for it to elapse.
   private static final long JOB_KEEP_TIME_IN_MS = TimeUnit.HOURS.toMillis(1);
@@ -83,9 +93,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   public void setUpNodes() throws Exception {
     testDir = Files.createTempDirectory("gravitino-test-job-multi-node").toFile();
 
-    Config config = new Config(false) {};
-    config.set(Configs.JOB_STAGING_DIR, new File(testDir, "staging").getAbsolutePath());
-    config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, JOB_KEEP_TIME_IN_MS);
+    // Both nodes share the same staging directory, like a deployment on shared storage.
+    Config config = newConfig(new File(testDir, "staging"));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     // Both nodes share the same metadata store, backed by the relational backend under test.
@@ -96,11 +105,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
     createAndInsertMakeLake(METALAKE);
     backend.insert(newSleepJobTemplateEntity(), false);
+    backend.insert(newEchoJobTemplateEntity(), false);
 
-    executorA = new LocalJobExecutor();
-    executorA.initialize(Collections.emptyMap());
-    executorB = new LocalJobExecutor();
-    executorB.initialize(Collections.emptyMap());
+    executorA = newLocalJobExecutor(config);
+    executorB = newLocalJobExecutor(config);
     nodeA = newJobManager(config, entityStore, executorA);
     nodeB = newJobManager(config, entityStore, executorB);
   }
@@ -152,7 +160,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Awaitility.await()
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.CANCELLED);
-    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    // The first pull may already see the job as CANCELLED if the process exits quickly.
+    Assertions.assertTrue(
+        EnumSet.of(JobHandle.Status.CANCELLING, JobHandle.Status.CANCELLED)
+            .contains(getJob(job.name()).status()));
 
     nodeA.pullAndUpdateJobStatus();
     JobEntity cancelled = getJob(job.name());
@@ -198,6 +209,183 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Assertions.assertFalse(jobExists(cancellingJob.name()));
   }
 
+  @TestTemplate
+  public void testGetJobOutputFromAnotherNode() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("a");
+
+    // Node B didn't run the job, it reads the output from the shared staging directory.
+    JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+    Assertions.assertEquals(ImmutableList.of("hello a"), jobWithOutput.stdout());
+    Assertions.assertEquals(ImmutableList.of("oops a"), jobWithOutput.stderr());
+
+    // The output doesn't depend on the node that ran the job being alive.
+    nodeA.close();
+    nodeA = null;
+    Assertions.assertEquals(
+        ImmutableList.of("hello a"), nodeB.getJob(METALAKE, job.name(), true).stdout());
+  }
+
+  @TestTemplate
+  public void testGetJobOutputAfterTemplateRenamed() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("b");
+
+    String newName = ECHO_TEMPLATE + "_renamed";
+    nodeA.alterJobTemplate(METALAKE, ECHO_TEMPLATE, JobTemplateChange.rename(newName));
+
+    // The job reports the new template name, which its staging directory doesn't depend on.
+    JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+    Assertions.assertEquals(newName, jobWithOutput.jobTemplateName());
+    Assertions.assertEquals(ImmutableList.of("hello b"), jobWithOutput.stdout());
+  }
+
+  @TestTemplate
+  public void testGetJobOutputOfTemplateNamedWithSpecialCharacters() throws IOException {
+    // Template names are not restricted, and must not affect running the job or reading its output.
+    for (String templateName : ImmutableList.of("etl job \"v2\" 中文 #1", "team/etl")) {
+      backend.insert(
+          newScriptJobTemplateEntity(
+              templateName, "echo \"hello $1\"\necho \"oops $1\" >&2\n", "{{name}}"),
+          false);
+
+      JobEntity job = nodeA.runJob(METALAKE, templateName, ImmutableMap.of("name", "d"));
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+
+      JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
+      Assertions.assertEquals(ImmutableList.of("hello d"), jobWithOutput.stdout(), templateName);
+      Assertions.assertEquals(ImmutableList.of("oops d"), jobWithOutput.stderr(), templateName);
+    }
+  }
+
+  @TestTemplate
+  public void testGetJobOutputDoesNotFollowSymlinkFromAnotherNode() throws IOException {
+    // A file on the node reading the output, outside the staging directory.
+    File secret = new File(testDir, "secret.txt");
+    Files.writeString(secret.toPath(), "top secret\n");
+    // The job replaces its own output file with an absolute symlink while running.
+    String templateName = "symlink_job";
+    backend.insert(
+        newScriptJobTemplateEntity(
+            templateName, "echo \"hello\"\nln -sf \"$1\" output.log\n", "{{target}}"),
+        false);
+
+    JobEntity job =
+        nodeA.runJob(METALAKE, templateName, ImmutableMap.of("target", secret.getAbsolutePath()));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+
+    Assertions.assertEquals(
+        Collections.emptyList(), nodeB.getJob(METALAKE, job.name(), true).stdout());
+  }
+
+  @TestTemplate
+  public void testGetJobOutputFromNodeNotSharingStagingDir() throws IOException {
+    JobEntity job = runEchoJobOnNodeA("c");
+
+    // A node with a staging directory of its own can't reach the output, and reports none
+    // instead of failing.
+    Config otherConfig = newConfig(new File(testDir, "other-staging"));
+    JobManager nodeC = newJobManager(otherConfig, entityStore, newLocalJobExecutor(otherConfig));
+    try {
+      JobEntity jobWithOutput = nodeC.getJob(METALAKE, job.name(), true);
+      Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stdout());
+      Assertions.assertEquals(Collections.emptyList(), jobWithOutput.stderr());
+    } finally {
+      nodeC.close();
+    }
+  }
+
+  private JobEntity runEchoJobOnNodeA(String name) throws IOException {
+    JobEntity job = nodeA.runJob(METALAKE, ECHO_TEMPLATE, ImmutableMap.of("name", name));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+    return job;
+  }
+
+  @TestTemplate
+  public void testStagingDirIsCleanedUpAfterTemplateRenamed() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+    Assertions.assertTrue(jobStagingDir(job).isDirectory());
+
+    // Before the fix, the cleanup rebuilt the staging path from the new template name, missed the
+    // directory and deleted only the job entity, leaking the directory.
+    nodeA.alterJobTemplate(METALAKE, TEMPLATE, JobTemplateChange.rename("renamed_sleep_job"));
+    Assertions.assertEquals("renamed_sleep_job", getJob(job.name()).jobTemplateName());
+    moveJobTimestampsBack(job.name());
+    nodeB.cleanUpStagingDirs();
+
+    Assertions.assertFalse(jobExists(job.name()));
+    assertNoStagingDirLeft(job);
+  }
+
+  @TestTemplate
+  public void testStagingDirIsDeletedWithRenamedTemplate() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+
+    nodeA.alterJobTemplate(METALAKE, TEMPLATE, JobTemplateChange.rename("renamed_sleep_job"));
+    nodeA.alterJobTemplate(
+        METALAKE, "renamed_sleep_job", JobTemplateChange.rename("renamed_twice_sleep_job"));
+    Assertions.assertTrue(nodeB.deleteJobTemplate(METALAKE, "renamed_twice_sleep_job"));
+
+    Assertions.assertFalse(jobExists(job.name()));
+    assertNoStagingDirLeft(job);
+  }
+
+  @TestTemplate
+  public void testStagingDirIsCleanedUpAfterMetalakeRenamed() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+    moveJobTimestampsBack(job.name());
+
+    String newMetalake = METALAKE + "_renamed";
+    entityStore.update(
+        NameIdentifierUtil.ofMetalake(METALAKE),
+        BaseMetalake.class,
+        Entity.EntityType.METALAKE,
+        metalake ->
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(newMetalake)
+                .withComment(metalake.comment())
+                .withProperties(metalake.properties())
+                .withAuditInfo(metalake.auditInfo())
+                .withVersion(metalake.getVersion())
+                .build());
+    nodeB.cleanUpStagingDirs();
+
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> nodeB.getJob(newMetalake, job.name(), false));
+    assertNoStagingDirLeft(job);
+  }
+
+  private JobEntity runFinishedJobOnNodeA() throws IOException {
+    JobEntity job = nodeA.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0"));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+    nodeA.pullAndUpdateJobStatus();
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, getJob(job.name()).status());
+    return job;
+  }
+
+  private File jobStagingDir(JobEntity job) {
+    return new File(testDir, "staging/job-runs/" + job.name());
+  }
+
+  // Checks the whole staging directory rather than the expected path, so a directory left in any
+  // layout is caught.
+  private void assertNoStagingDirLeft(JobEntity job) throws IOException {
+    try (Stream<Path> paths = Files.walk(new File(testDir, "staging").toPath())) {
+      List<Path> left =
+          paths
+              .filter(path -> path.getFileName().toString().equals(job.name()))
+              .collect(Collectors.toList());
+      Assertions.assertTrue(left.isEmpty(), "Staging directory left behind: " + left);
+    }
+  }
+
   private JobEntity runLongJobOnNodeA() throws IOException {
     JobEntity job = nodeA.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600"));
     Awaitility.await()
@@ -210,7 +398,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private JobEntity getJob(String jobName) {
     // Read through node B, as it works the same from any node sharing the metadata store.
-    return nodeB.getJob(METALAKE, jobName);
+    return nodeB.getJob(METALAKE, jobName, false);
   }
 
   // Simulates that the keep time has elapsed since the job was last updated, or finished.
@@ -253,20 +441,31 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   private JobTemplateEntity newSleepJobTemplateEntity() throws IOException {
-    File script = new File(testDir, "sleep-job.sh");
     // Exec the sleep, so that killing the job process also stops the sleep.
-    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep \"$1\"\n");
+    return newScriptJobTemplateEntity(TEMPLATE, "exec sleep \"$1\"\n", "{{seconds}}");
+  }
+
+  private JobTemplateEntity newEchoJobTemplateEntity() throws IOException {
+    return newScriptJobTemplateEntity(
+        ECHO_TEMPLATE, "echo \"hello $1\"\necho \"oops $1\" >&2\n", "{{name}}");
+  }
+
+  private JobTemplateEntity newScriptJobTemplateEntity(
+      String name, String scriptBody, String argument) throws IOException {
+    // Not named after the template, whose name may contain any character.
+    File script = Files.createTempFile(testDir.toPath(), "job", ".sh").toFile();
+    Files.writeString(script.toPath(), "#!/bin/bash\n" + scriptBody);
     Assertions.assertTrue(script.setExecutable(true));
 
     return JobTemplateEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName(TEMPLATE)
+        .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate(METALAKE))
         .withTemplateContent(
             JobTemplateEntity.TemplateContent.builder()
                 .withJobType(JobTemplate.JobType.SHELL)
                 .withExecutable(script.getAbsolutePath())
-                .withArguments(Lists.newArrayList("{{seconds}}"))
+                .withArguments(Lists.newArrayList(argument))
                 .withEnvironments(Collections.emptyMap())
                 .withCustomFields(Collections.emptyMap())
                 .withScripts(Collections.emptyList())
@@ -274,6 +473,21 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private static Config newConfig(File stagingDir) {
+    Config config = new Config(false) {};
+    config.set(Configs.JOB_STAGING_DIR, stagingDir.getAbsolutePath());
+    config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, JOB_KEEP_TIME_IN_MS);
+    return config;
+  }
+
+  // Configured the way JobExecutorFactory configures it for a server with this configuration.
+  private static LocalJobExecutor newLocalJobExecutor(Config config) {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(
+        ImmutableMap.of(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR)));
+    return executor;
   }
 
   private static JobManager newJobManager(

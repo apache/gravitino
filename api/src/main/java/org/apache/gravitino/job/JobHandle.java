@@ -19,6 +19,8 @@
 package org.apache.gravitino.job;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -117,5 +119,31 @@ public interface JobHandle {
         "runtimeJobTemplate() is not implemented by "
             + getClass().getName()
             + "; override this method");
+  }
+
+  /**
+   * Get the captured standard output of the job, as a list of lines. This is only populated when
+   * the handle was obtained via {@link SupportsJobs#getJob(String, boolean)} with {@code
+   * includeOutput=true}; handles obtained via the plain {@link SupportsJobs#getJob(String)}, {@link
+   * SupportsJobs#listJobs()}, or {@link SupportsJobs#runJob(String, java.util.Map)} always return
+   * an empty list here.
+   *
+   * @return the stdout lines of the job, or an empty list if not available
+   */
+  default List<String> stdout() {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Get the captured standard error output of the job, as a list of lines. This is only populated
+   * when the handle was obtained via {@link SupportsJobs#getJob(String, boolean)} with {@code
+   * includeOutput=true}; handles obtained via the plain {@link SupportsJobs#getJob(String)}, {@link
+   * SupportsJobs#listJobs()}, or {@link SupportsJobs#runJob(String, java.util.Map)} always return
+   * an empty list here.
+   *
+   * @return the stderr lines of the job, or an empty list if not available
+   */
+  default List<String> stderr() {
+    return Collections.emptyList();
   }
 }

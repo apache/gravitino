@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.OwnerMetaPostgreSQLProvider;
@@ -51,6 +52,87 @@ public class OwnerMetaSQLProviderFactory {
   static class OwnerMetaMySQLProvider extends OwnerMetaBaseSQLProvider {}
 
   static class OwnerMetaH2Provider extends OwnerMetaBaseSQLProvider {}
+
+  /** Returns SQL that locks an active metadata object before assigning its owner. */
+  public static String selectMetadataObjectIdForUpdate(
+      @Param("entityId") Long entityId,
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityType") Entity.EntityType entityType) {
+    String table;
+    String idColumn;
+    switch (entityType) {
+      case CATALOG:
+        table = CatalogMetaMapper.TABLE_NAME;
+        idColumn = "catalog_id";
+        break;
+      case SCHEMA:
+        table = SchemaMetaMapper.TABLE_NAME;
+        idColumn = "schema_id";
+        break;
+      case TABLE:
+        table = TableMetaMapper.TABLE_NAME;
+        idColumn = "table_id";
+        break;
+      case COLUMN:
+        table = TableColumnMapper.COLUMN_TABLE_NAME;
+        idColumn = "column_id";
+        break;
+      case FILESET:
+        table = FilesetMetaMapper.META_TABLE_NAME;
+        idColumn = "fileset_id";
+        break;
+      case TOPIC:
+        table = TopicMetaMapper.TABLE_NAME;
+        idColumn = "topic_id";
+        break;
+      case MODEL:
+        table = ModelMetaMapper.TABLE_NAME;
+        idColumn = "model_id";
+        break;
+      case VIEW:
+        table = ViewMetaMapper.TABLE_NAME;
+        idColumn = "view_id";
+        break;
+      case FUNCTION:
+        table = FunctionMetaMapper.TABLE_NAME;
+        idColumn = "function_id";
+        break;
+      case ROLE:
+        table = RoleMetaMapper.ROLE_TABLE_NAME;
+        idColumn = "role_id";
+        break;
+      case TAG:
+        table = TagMetaMapper.TAG_TABLE_NAME;
+        idColumn = "tag_id";
+        break;
+      case POLICY:
+        table = PolicyMetaMapper.POLICY_META_TABLE_NAME;
+        idColumn = "policy_id";
+        break;
+      case JOB_TEMPLATE:
+        table = JobTemplateMetaMapper.TABLE_NAME;
+        idColumn = "job_template_id";
+        break;
+      case JOB:
+        table = JobMetaMapper.TABLE_NAME;
+        idColumn = "job_run_id";
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported owned object type: " + entityType);
+    }
+    // Column versions can share a column ID; always lock the same oldest live row.
+    String orderColumn = entityType == Entity.EntityType.COLUMN ? "id" : idColumn;
+    return "SELECT "
+        + idColumn
+        + " FROM "
+        + table
+        + " WHERE "
+        + idColumn
+        + " = #{entityId} AND metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " ORDER BY "
+        + orderColumn
+        + " LIMIT 1 FOR UPDATE";
+  }
 
   public static String selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,

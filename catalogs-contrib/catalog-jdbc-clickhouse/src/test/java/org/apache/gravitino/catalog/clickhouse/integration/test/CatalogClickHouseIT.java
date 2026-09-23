@@ -75,6 +75,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.FunctionExpression.FuncExpressionImpl;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -641,6 +642,66 @@ public class CatalogClickHouseIT extends BaseIT {
     Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
     Assertions.assertEquals(0, loaded.partitioning().length);
     Assertions.assertEquals("", loaded.properties().get(TableConstants.PARTITION_KEY));
+  }
+
+  @Test
+  void testLoadAndCreateWithStartOfWeekAndMonthPartitionTransforms() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "event_time",
+              Types.TimestampType.withoutTimeZone(),
+              "event time",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET)
+        };
+
+    for (String functionName : new String[] {"toStartOfWeek", "toStartOfMonth"}) {
+      String nativeTableName = GravitinoITUtils.genRandomName("native_start_partition");
+      String createdTableName = GravitinoITUtils.genRandomName("created_start_partition");
+      String createNativeSql =
+          String.format(
+              "CREATE TABLE `%s`.`%s` (`event_time` DateTime) "
+                  + "ENGINE = MergeTree PARTITION BY %s(event_time) "
+                  + "ORDER BY event_time",
+              schemaName, nativeTableName, functionName);
+      clickhouseService.executeQuery(createNativeSql);
+
+      Transform expectedTransform =
+          Transforms.apply(functionName, new Expression[] {NamedReference.field("event_time")});
+      String expectedPartitionKey = functionName + "(event_time)";
+      Table nativeLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, nativeTableName));
+      Assertions.assertArrayEquals(
+          new Transform[] {expectedTransform}, nativeLoaded.partitioning());
+      Assertions.assertEquals(
+          expectedPartitionKey, nativeLoaded.properties().get(TableConstants.PARTITION_KEY));
+
+      tableCatalog.createTable(
+          NameIdentifier.of(schemaName, createdTableName),
+          columns,
+          "start function partition roundtrip",
+          createProperties(),
+          new Transform[] {expectedTransform},
+          Distributions.NONE,
+          getSortOrders("event_time"));
+
+      Table createdLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, createdTableName));
+      Assertions.assertArrayEquals(
+          new Transform[] {expectedTransform}, createdLoaded.partitioning());
+      Assertions.assertEquals(
+          expectedPartitionKey, createdLoaded.properties().get(TableConstants.PARTITION_KEY));
+
+      String showCreateSql =
+          clickhouseService.executeQueryForResult(
+              String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, createdTableName));
+      String normalizedShowCreateSql = StringUtils.deleteWhitespace(showCreateSql).replace("`", "");
+      Assertions.assertTrue(
+          StringUtils.containsIgnoreCase(
+              normalizedShowCreateSql, "PARTITIONBY" + expectedPartitionKey),
+          "CREATE should emit the ClickHouse partition function: " + showCreateSql);
+    }
   }
 
   @Test
