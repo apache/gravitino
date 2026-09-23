@@ -151,10 +151,19 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     } finally {
       System.setOut(originalOut);
     }
-    assertTrue(
-        output
-            .toString(StandardCharsets.UTF_8)
-            .contains("Rewrite Manifests Results: Rewritten manifests:"));
+    String stdout = output.toString(StandardCharsets.UTF_8);
+    String expectedSql = "CALL `manifest_catalog`.system.rewrite_manifests(table => 'db.events'";
+    if (caching != null) {
+      expectedSql += ", use_caching => " + caching;
+    }
+    if (spec != null) {
+      expectedSql += ", spec_id => " + spec;
+    }
+    expectedSql += ")";
+    int execution = stdout.indexOf("Executing Iceberg rewrite_manifests procedure: " + expectedSql);
+    int results = stdout.indexOf("Rewrite Manifests Results: Rewritten manifests:");
+    assertTrue(execution >= 0, stdout);
+    assertTrue(results > execution, stdout);
     if (SparkSession.getActiveSession().isDefined()) {
       assertTrue(SparkSession.getActiveSession().get().sparkContext().isStopped());
     }

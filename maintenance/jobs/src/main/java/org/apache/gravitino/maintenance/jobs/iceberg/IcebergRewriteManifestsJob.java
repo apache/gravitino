@@ -217,6 +217,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
     try (SparkSession spark = builder.getOrCreate()) {
       IcebergJobUtils.requireIcebergSparkRuntime();
+      System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
       List<Row> results = spark.sql(sql).collectAsList();
       if (!results.isEmpty()) {
         Row result = results.get(0);
