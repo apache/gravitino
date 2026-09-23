@@ -66,4 +66,15 @@ public class TestPolicyBuiltInType {
     Assertions.assertEquals(RowFilterContent.class, Policy.BuiltInType.ROW_FILTER.contentClass());
     Assertions.assertEquals(ColumnMaskContent.class, Policy.BuiltInType.COLUMN_MASK.contentClass());
   }
+
+  @Test
+  void testAccessControlPolicyType() {
+    Assertions.assertEquals(
+        Policy.BuiltInType.ACCESS_CONTROL,
+        Policy.BuiltInType.fromPolicyType("system_access_control"));
+    Assertions.assertEquals(
+        "system_access_control", Policy.BuiltInType.ACCESS_CONTROL.policyType());
+    Assertions.assertEquals(
+        AccessControlContent.class, Policy.BuiltInType.ACCESS_CONTROL.contentClass());
+  }
 }
