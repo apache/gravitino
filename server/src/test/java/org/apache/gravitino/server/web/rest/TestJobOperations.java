@@ -22,15 +22,21 @@ import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -650,6 +656,23 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
     Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp4.getType());
 
+    // Test throw UnsupportedOperationException
+    doThrow(new UnsupportedOperationException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp5b =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp5b.getStatus());
+    ErrorResponse errorResp4b = resp5b.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp4b.getType());
+
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(jobOperationDispatcher)
@@ -1092,6 +1115,126 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testGetJob() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    when(jobOperationDispatcher.getJob(metalake, job.name(), false, null, null)).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+    // includeOutput defaults to false, so no output is fetched or returned.
+    Assertions.assertNull(jobResp.getJob().stdout());
+    Assertions.assertNull(jobResp.getJob().stderr());
+
+    verify(jobOperationDispatcher, never()).getJob(any(), any(), eq(true), any(), any());
+  }
+
+  @Test
+  public void testGetJobWithOutput() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+    List<String> stdout = Lists.newArrayList("line1", "line2");
+    List<String> stderr = Lists.newArrayList("err1");
+    JobEntity jobWithOutput = job.withOutput(stdout, stderr);
+
+    when(jobOperationDispatcher.getJob(metalake, job.name(), true, null, null))
+        .thenReturn(jobWithOutput);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(stdout, jobResp.getJob().stdout());
+    Assertions.assertEquals(stderr, jobResp.getJob().stderr());
+  }
+
+  @Test
+  public void testGetJobWithOutputCustomLimits() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+    List<String> stdout = Lists.newArrayList("line1");
+    List<String> stderr = Lists.newArrayList();
+    JobEntity jobWithOutput = job.withOutput(stdout, stderr);
+
+    // The outputMaxLines/outputMaxBytes query parameters are passed straight through to the
+    // dispatcher as-is; clamping against the global configuration happens downstream in
+    // JobManager, not in the REST layer.
+    when(jobOperationDispatcher.getJob(metalake, job.name(), true, 10, 1024))
+        .thenReturn(jobWithOutput);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .queryParam("outputMaxLines", "10")
+            .queryParam("outputMaxBytes", "1024")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(stdout, jobResp.getJob().stdout());
+    Assertions.assertEquals(stderr, jobResp.getJob().stderr());
+  }
+
+  @Test
+  public void testGetJobWithOutputUnsupportedOperation() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    doThrow(new UnsupportedOperationException("output retrieval not supported"))
+        .when(jobOperationDispatcher)
+        .getJob(metalake, job.name(), true, null, null);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testGetJobWithInvalidOutputMaxLines() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    doThrow(new IllegalArgumentException("maxLines must be positive if specified"))
+        .when(jobOperationDispatcher)
+        .getJob(metalake, job.name(), true, 0, null);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .queryParam("outputMaxLines", "0")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
   public void testRunJob() {
     String templateName = "shell_template_1";
     Map<String, String> jobConf = ImmutableMap.of("key1", "value1", "key2", "value2");
@@ -1213,6 +1356,20 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(0, jobResp.getCode());
     Assertions.assertEquals(JobHandle.Status.CANCELLED, jobResp.getJob().status());
     Assertions.assertNull(jobResp.getJob().runtimeJobTemplate());
+  }
+
+  @Test
+  public void testCancelJobIsResponseMetered() throws Exception {
+    Method cancelJob = JobOperations.class.getMethod("cancelJob", String.class, String.class);
+    ResponseMetered metered = cancelJob.getAnnotation(ResponseMetered.class);
+    Assertions.assertNotNull(metered);
+    Assertions.assertEquals("cancel-job", metered.name());
+    Assertions.assertTrue(metered.absolute());
+
+    Timed timed = cancelJob.getAnnotation(Timed.class);
+    Assertions.assertNotNull(timed);
+    Assertions.assertTrue(timed.name().startsWith("cancel-job."));
+    Assertions.assertTrue(timed.absolute());
   }
 
   @Test

@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',
@@ -257,6 +258,7 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
     `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',
@@ -268,6 +270,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user group relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
@@ -322,7 +325,7 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`,`deleted_at`),
+    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
     KEY `idx_meid` (`metadata_object_id`),
     KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
@@ -404,21 +407,6 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
     KEY `policy_version_info_idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
-
-CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
-    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
-    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy relation audit info',
-    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation current version',
-    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_pid` (`policy_id`),
-    KEY `policy_relation_meta_idx_mid` (`metadata_object_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

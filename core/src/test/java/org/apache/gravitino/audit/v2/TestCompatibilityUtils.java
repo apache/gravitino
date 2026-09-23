@@ -83,6 +83,8 @@ public class TestCompatibilityUtils {
       },
       {OperationType.LIST_METADATA_OBJECTS_FOR_TAG, Operation.LIST_METADATA_OBJECTS_FOR_TAG},
       {OperationType.LIST_TAGS_INFO, Operation.LIST_TAGS_INFO},
+      {OperationType.ADD_POLICY_FOR_TAG, Operation.ADD_POLICY_FOR_TAG},
+      {OperationType.REMOVE_POLICY_FROM_TAG, Operation.REMOVE_POLICY_FROM_TAG},
       {OperationType.ADD_PARTITION, Operation.ADD_PARTITION},
       {OperationType.DROP_PARTITION, Operation.DROP_PARTITION},
       {OperationType.PURGE_PARTITION, Operation.PURGE_PARTITION},

@@ -35,7 +35,10 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.SemanticModel;
@@ -68,7 +71,8 @@ public class TestSemanticModelHookDispatcher {
     FieldUtils.writeField(env, "ownerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(env, "catalogManager", mockCatalogManager(Capability.DEFAULT), true);
     try {
-      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher);
+      SemanticModelHookDispatcher hook =
+          new SemanticModelHookDispatcher(dispatcher, env::ownerDispatcher);
       SemanticModel result =
           hook.createSemanticModel(IDENT, "comment", definition, ImmutableMap.of());
 
@@ -111,8 +115,10 @@ public class TestSemanticModelHookDispatcher {
     FieldUtils.writeField(
         env, "catalogManager", mockCatalogManager(new CaseInsensitiveCapability()), true);
     try {
-      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher);
-      hook.createSemanticModel(ident, "comment", definition, ImmutableMap.of());
+      SemanticModelHookDispatcher hook =
+          new SemanticModelHookDispatcher(dispatcher, env::ownerDispatcher);
+      new SemanticModelNormalizeDispatcher(hook, env.catalogManager())
+          .createSemanticModel(ident, "comment", definition, ImmutableMap.of());
 
       ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
       Mockito.verify(ownerDispatcher)
@@ -143,7 +149,8 @@ public class TestSemanticModelHookDispatcher {
 
     FieldUtils.writeField(env, "ownerDispatcher", null, true);
     try {
-      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher);
+      SemanticModelHookDispatcher hook =
+          new SemanticModelHookDispatcher(dispatcher, env::ownerDispatcher);
       SemanticModel result =
           hook.createSemanticModel(IDENT, "comment", definition, ImmutableMap.of());
 
@@ -175,7 +182,8 @@ public class TestSemanticModelHookDispatcher {
     FieldUtils.writeField(env, "ownerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(env, "catalogManager", mockCatalogManager(Capability.DEFAULT), true);
     try {
-      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher);
+      SemanticModelHookDispatcher hook =
+          new SemanticModelHookDispatcher(dispatcher, env::ownerDispatcher);
       RuntimeException thrown =
           assertThrows(
               RuntimeException.class,
@@ -208,7 +216,8 @@ public class TestSemanticModelHookDispatcher {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     FieldUtils.writeField(env, "ownerDispatcher", ownerDispatcher, true);
     try {
-      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher);
+      SemanticModelHookDispatcher hook =
+          new SemanticModelHookDispatcher(dispatcher, env::ownerDispatcher);
 
       assertSame(listed, hook.listSemanticModels(namespace));
       assertSame(loaded, hook.loadSemanticModel(IDENT));
@@ -224,9 +233,9 @@ public class TestSemanticModelHookDispatcher {
 
   private static CatalogManager mockCatalogManager(Capability capability) throws Exception {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(wrapper.capabilities()).thenReturn(capability);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     return catalogManager;
   }
 

@@ -49,6 +49,12 @@ tests:
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "rootLogger\\.level = info"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.name = org\\.casbin\\.jcasbin"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.level = warn"
 
   - it: renders customized Gravitino and log4j configuration
     release:
@@ -63,6 +69,7 @@ tests:
         gravitino.custom.setting: "{{ .Values.entity.store }}"
       log4j2Properties:
         rootLoggerLevel: debug
+        jcasbinLoggerLevel: debug
       additionalLog4j2Properties:
         logger.custom.name: org.apache.gravitino.Custom
     asserts:
@@ -81,6 +88,9 @@ tests:
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "rootLogger\\.level = debug"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.jcasbin\\.level = debug"
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "logger\\.custom\\.name = org\\.apache\\.gravitino\\.Custom"
@@ -326,3 +336,58 @@ tests:
       - notMatchRegex:
           path: data["gravitino.conf"]
           pattern: "gravitino\\.iceberg-rest\\.default-catalog-name"
+
+  - it: renders log rotation and retention defaults
+    release:
+      name: gravitino
+    asserts:
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "property\\.logMaxAge = 30d"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "property\\.serverLogMaxTotalSize = 2GB"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.filePattern = \\$\\{basePath\\}/\\$\\{serverName\\}_%d\\{yyyyMMdd\\}\\.%i\\.log\\.gz"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.policies\\.size\\.size = 100MB"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.fileIndex = nomax"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.maxDepth = 1"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.glob = \\$\\{serverName\\}_\\*\\.log\\.gz"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.ifAny\\.ifAccumulatedFileSize\\.exceeds = \\$\\{serverLogMaxTotalSize\\}"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.ifAny\\.ifLastModified\\.age = \\$\\{logMaxAge\\}"
+
+  - it: renders customized log retention
+    release:
+      name: gravitino
+    set:
+      log4j2Properties:
+        logMaxAge: 7d
+        serverLogMaxTotalSize: 500MB
+        rollingAppenderPoliciesSizeSize: 20MB
+        rollingAppenderStrategyDeleteIfFileNameGlob: "app_*.log.gz"
+    asserts:
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "property\\.logMaxAge = 7d"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "property\\.serverLogMaxTotalSize = 500MB"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.policies\\.size\\.size = 20MB"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.glob = app_\\*\\.log\\.gz"

@@ -21,6 +21,9 @@
 
 
 
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
+
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
 
@@ -40,6 +43,15 @@ COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is di
 
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
+
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_meta.audit_info IS 'idp user audit info';
+
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_group_meta.audit_info IS 'idp group audit info';
+
+ALTER TABLE idp_user_group_rel ADD COLUMN IF NOT EXISTS audit_info TEXT NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN idp_user_group_rel.audit_info IS 'idp user group relation audit info';
 
 ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;
 
@@ -138,3 +150,16 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'stru
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE owner_meta
+    SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
+        updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    WHERE deleted_at = 0
+      AND id < (
+        SELECT MAX(d.id) FROM owner_meta d
+        WHERE d.deleted_at = 0
+          AND d.metadata_object_id = owner_meta.metadata_object_id
+          AND d.metadata_object_type = owner_meta.metadata_object_type
+      );

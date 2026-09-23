@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +46,11 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -54,14 +60,22 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -196,6 +210,107 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testPolicyAssociationsForTag() {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    PolicyEntity policy = mock(PolicyEntity.class);
+    when(policy.name()).thenReturn(policyName);
+    when(policy.policyType()).thenReturn(Policy.BuiltInType.CUSTOM);
+    when(policy.enabled()).thenReturn(true);
+    when(policy.content())
+        .thenReturn(
+            PolicyContents.custom(
+                Collections.emptyMap(), Collections.singleton(MetadataObject.Type.TABLE), null));
+    when(policy.auditInfo()).thenReturn(testAuditInfo1);
+    RelationalEntity<PolicyEntity> association =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            NameIdentifier.of(metalake, tagName),
+            org.apache.gravitino.Entity.EntityType.TAG,
+            policy);
+    when(tagManager.listPolicyAssociationsForTag(metalake, tagName))
+        .thenReturn(new RelationalEntity<?>[] {association});
+
+    Response listResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), listResponse.getStatus());
+    Assertions.assertArrayEquals(
+        new String[] {policyName}, listResponse.readEntity(NameListResponse.class).getNames());
+
+    Response detailsResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+    PolicyForTagAssociationListResponse details =
+        detailsResponse.readEntity(PolicyForTagAssociationListResponse.class);
+    details.validate();
+    Assertions.assertEquals(1, details.getAssociations().length);
+    Assertions.assertSame(
+        AllValuesSelector.get(), details.getAssociations()[0].getSelector().toSelector());
+
+    PolicyAssociationSelectorDTO selector =
+        PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get());
+    PolicyTagAddRequest request = new PolicyTagAddRequest(selector);
+    Response addResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), addResponse.getStatus());
+    PolicyTagAssociationResponse response =
+        addResponse.readEntity(PolicyTagAssociationResponse.class);
+    response.validate();
+    Assertions.assertEquals(policyName, response.getPolicy());
+    Assertions.assertEquals(tagName, response.getTag());
+    Assertions.assertEquals(AllValuesSelector.get(), response.getSelector().toSelector());
+    Mockito.verify(tagManager)
+        .addPolicyForTag(metalake, tagName, policyName, AllValuesSelector.get());
+
+    Response removeResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), removeResponse.getStatus());
+    Mockito.verify(tagManager).removePolicyFromTag(metalake, tagName, policyName);
+  }
+
+  @Test
+  public void testAddPolicyForTagAlreadyAssociated() {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    doThrow(new PolicyAlreadyAssociatedException("mock error"))
+        .when(tagManager)
+        .addPolicyForTag(
+            Mockito.eq(metalake), Mockito.eq(tagName), Mockito.eq(policyName), Mockito.any());
+
+    for (PolicyAssociationSelectorDTO selector :
+        new PolicyAssociationSelectorDTO[] {
+          PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get()),
+          PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance"))
+        }) {
+      Response response =
+          target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(
+                  Entity.entity(
+                      new PolicyTagAddRequest(selector), MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse.getCode());
+      Assertions.assertEquals(
+          PolicyAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
+    }
   }
 
   @Test
@@ -1165,6 +1280,22 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    // The deprecated route delegates to MetadataObjectTagOperations, so it inherits the same guard.
+    Response response =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
   }
 
   private String tagPath(String metalake) {

@@ -20,16 +20,14 @@
 package org.apache.gravitino.hook;
 
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
@@ -48,14 +46,18 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
 
   private final SemanticModelDispatcher dispatcher;
+  private final Supplier<OwnerDispatcher> ownerDispatcher;
 
   /**
    * Creates a Semantic Model hook dispatcher.
    *
    * @param dispatcher The underlying dispatcher.
+   * @param ownerDispatcher Supplies the owner dispatcher, or null when authorization is disabled.
    */
-  public SemanticModelHookDispatcher(SemanticModelDispatcher dispatcher) {
+  public SemanticModelHookDispatcher(
+      SemanticModelDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   @Override
@@ -85,22 +87,11 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
         dispatcher.createSemanticModel(ident, comment, definition, properties);
 
     // Set the creator as the owner of the Semantic Model.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerDispatcher != null) {
-      // The inner NormalizeDispatcher case-folds the parent namespace based on catalog
-      // capabilities, so the entity is stored under the normalized identifier. Rebuild that
-      // identifier here - namespace from the catalog capability, name from the created Semantic
-      // Model, which already carries the Gravitino-owned naming rules - so the owner is attached to
-      // the same identifier the manager sees.
-      Capability capability =
-          CapabilityHelpers.getCapability(ident, GravitinoEnv.getInstance().catalogManager());
-      Namespace normalizedNamespace =
-          CapabilityHelpers.applyCapabilities(
-              ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability);
-      NameIdentifier normalizedIdent = NameIdentifier.of(normalizedNamespace, semanticModel.name());
-      ownerDispatcher.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SEMANTIC_MODEL),
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
+    if (ownerManager != null) {
+      ownerManager.setOwner(
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SEMANTIC_MODEL),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }

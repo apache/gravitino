@@ -20,6 +20,9 @@
 
 
 
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
+
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
@@ -35,6 +38,12 @@ ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEF
 ALTER TABLE `idp_user_meta` ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
 
 ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+
+ALTER TABLE `idp_user_meta` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user audit info' AFTER `enabled`;
+
+ALTER TABLE `idp_group_meta` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp group audit info' AFTER `group_comment`;
+
+ALTER TABLE `idp_user_group_rel` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user group relation audit info' AFTER `group_id`;
 
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
@@ -92,3 +101,16 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB COMMENT 'semantic model version information';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE `owner_meta`
+    SET `deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+        `updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+    WHERE `deleted_at` = 0
+      AND `id` < (
+        SELECT MAX(d.`id`) FROM `owner_meta` d
+        WHERE d.`deleted_at` = 0
+          AND d.`metadata_object_id` = `owner_meta`.`metadata_object_id`
+          AND d.`metadata_object_type` = `owner_meta`.`metadata_object_type`
+      );

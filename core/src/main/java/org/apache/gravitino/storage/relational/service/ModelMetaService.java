@@ -38,13 +38,13 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -97,26 +97,22 @@ public class ModelMetaService {
       fillModelPOBuilderParentEntityId(builder, modelEntity.namespace());
       ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the model cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      modelEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertModelMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertModelMeta(po);
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              modelEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      ModelMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertModelMetaOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertModelMeta(po);
+                        }
+                      }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, modelEntity.nameIdentifier().toString());
@@ -155,6 +151,8 @@ public class ModelMetaService {
                         Entity.EntityType.MODEL.name(),
                         modelFullName,
                         OperateType.DROP));
+            EntityChangeLogDiagnostics.logAppended(
+                metalakeName, Entity.EntityType.MODEL.name(), OperateType.DROP, modelFullName);
           });
     } catch (NoSuchEntityException e) {
       // Another writer dropped the model between the read above and this transaction. A drop that
@@ -347,33 +345,41 @@ public class ModelMetaService {
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     try {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // This is the first write in the transaction. It succeeds only if the model still has
-            // the concurrency version read above, so an older request cannot overwrite a newer
-            // model or add an incorrect change-log entry.
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    ModelMetaMapper.class,
-                    mapper ->
-                        mapper.updateModelMeta(
-                            POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
-            if (updated == 0) {
-              throw modelWriteFailure(identifier, oldModelPO);
-            }
-          },
-          () -> {
-            if (isRenamed) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.MODEL.name(),
-                          oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              identifier,
+              oldModelPO.getSchemaId(),
+              oldModelPO.getCatalogId(),
+              oldModelPO.getMetalakeId(),
+              () -> {
+                // The model CAS is the first child write. It succeeds only if the concurrency
+                // version
+                // still matches, so an older request cannot overwrite a newer model or add an
+                // incorrect change-log entry.
+                int updated =
+                    SessionUtils.getWithoutCommit(
+                        ModelMetaMapper.class,
+                        mapper ->
+                            mapper.updateModelMeta(
+                                POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+                if (updated == 0) {
+                  throw modelWriteFailure(identifier, oldModelPO);
+                }
+              },
+              () -> {
+                if (isRenamed) {
+                  SessionUtils.doWithoutCommit(
+                      EntityChangeLogMapper.class,
+                      mapper ->
+                          mapper.insertEntityChange(
+                              metalakeName,
+                              Entity.EntityType.MODEL.name(),
+                              oldFullName,
+                              OperateType.ALTER));
+                  EntityChangeLogDiagnostics.logAppended(
+                      metalakeName, Entity.EntityType.MODEL.name(), OperateType.ALTER, oldFullName);
+                }
+              });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());
@@ -515,10 +521,5 @@ public class ModelMetaService {
                 modelId, MetadataObject.Type.MODEL.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(modelId));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper ->
-            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                modelId, MetadataObject.Type.MODEL.name()));
   }
 }

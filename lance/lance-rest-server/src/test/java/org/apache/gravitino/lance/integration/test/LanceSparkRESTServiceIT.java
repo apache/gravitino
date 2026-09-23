@@ -46,6 +46,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;
@@ -58,25 +59,30 @@ import org.junit.jupiter.api.Test;
 
 public class LanceSparkRESTServiceIT extends BaseIT {
 
-  private static final String LANCE_SPARK_CATALOG = "lance";
   private static final String LANCE_SPARK_CATALOG_CLASS =
       "org.lance.spark.LanceNamespaceSparkCatalog";
+  private static final String LANCE_SPARK_EXTENSIONS =
+      "org.lance.spark.extensions.LanceSparkSessionExtensions";
   private static final String LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY =
       "gravitino.lance.spark.bundle.jar";
   private static final String JAVA_MODULE_OPEN_OPTIONS =
       "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_spark_catalog");
+  private static final String HISTORY_CATALOG_NAME =
+      GravitinoITUtils.genRandomName("lance_history_catalog");
   private static final String TABLE_COLUMNS = "(id INT, score FLOAT)";
   private static final String LANCE_CLASS_PREFIX = "org.lance.";
   private static final String LANCE_NATIVE_LOADER_CLASS_PREFIX = "io.questdb.jar.jni.";
   private static final String LANCE_NATIVE_RESOURCE_PREFIX = "nativelib/";
 
   private final Set<String> createdSchemas = new LinkedHashSet<>();
+  private final Set<String> createdHistorySchemas = new LinkedHashSet<>();
 
   private SparkSession sparkSession;
   private URLClassLoader sparkClientClassLoader;
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  private Catalog historyCatalog;
   private Path tempDir;
 
   @Override
@@ -88,6 +94,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     this.metalake = createMetalake(getLanceRESTServerMetalakeName());
     this.tempDir = Files.createTempDirectory("lance_spark_rest_service_it_");
     this.catalog = createCatalog(CATALOG_NAME);
+    this.historyCatalog = createCatalog(HISTORY_CATALOG_NAME, true);
     this.sparkSession = createSparkSession();
   }
 
@@ -140,6 +147,27 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       dropSchema(schemaName);
     }
     createdSchemas.clear();
+
+    for (String schemaName : createdHistorySchemas) {
+      dropSchema(HISTORY_CATALOG_NAME, schemaName, historyCatalog);
+    }
+    createdHistorySchemas.clear();
+  }
+
+  @Test
+  public void testCatalogRegisteredByDiscoveryPlugin() {
+    SparkConf sparkConf = sparkSession.sparkContext().getConf();
+
+    Assertions.assertEquals(
+        LANCE_SPARK_CATALOG_CLASS, sparkConf.get("spark.sql.catalog." + CATALOG_NAME));
+    Assertions.assertEquals("rest", sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".impl"));
+    Assertions.assertEquals(
+        getLanceRestServiceUrl(), sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".uri"));
+    Assertions.assertEquals(
+        CATALOG_NAME, sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".parent"));
+    Assertions.assertTrue(
+        Arrays.asList(sparkConf.get("spark.sql.extensions").split(","))
+            .contains(LANCE_SPARK_EXTENSIONS));
   }
 
   @Test
@@ -207,6 +235,45 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     assertRow(rows.get(1), 2, 2.2f);
     assertRow(rows.get(2), 3, 3.3f);
     assertRow(rows.get(3), 4, 4.4f);
+  }
+
+  @Test
+  public void testReadHistoricalVersionViaSpark() {
+    String schemaName = createHistorySchema("spark_history_read");
+    String tableName = newTableName("orders");
+    String tableIdentifier = String.format("%s.%s.%s", HISTORY_CATALOG_NAME, schemaName, tableName);
+
+    sql(
+        "CREATE TABLE %s (id INT, score FLOAT) USING lance TBLPROPERTIES ('format'='lance')",
+        tableIdentifier);
+    sql(
+        "INSERT INTO %s VALUES " + "(1, CAST(1.1 AS FLOAT)), " + "(2, CAST(2.2 AS FLOAT))",
+        tableIdentifier);
+    long firstVersion = loadLanceVersion(historyCatalog, schemaName, tableName);
+
+    sql(
+        "INSERT INTO %s VALUES " + "(3, CAST(3.3 AS FLOAT)), " + "(4, CAST(4.4 AS FLOAT))",
+        tableIdentifier);
+    long latestVersion = loadLanceVersion(historyCatalog, schemaName, tableName);
+
+    Assertions.assertTrue(
+        latestVersion > firstVersion,
+        String.format(
+            "Expected the second Spark write to advance the Lance version, but got %d then %d",
+            firstVersion, latestVersion));
+
+    List<Row> latestRows = sql("SELECT id, score FROM %s ORDER BY id", tableIdentifier);
+    Assertions.assertEquals(4, latestRows.size());
+    assertRow(latestRows.get(0), 1, 1.1f);
+    assertRow(latestRows.get(1), 2, 2.2f);
+    assertRow(latestRows.get(2), 3, 3.3f);
+    assertRow(latestRows.get(3), 4, 4.4f);
+
+    List<Row> historicalRows =
+        sql("SELECT id, score FROM %s VERSION AS OF %d ORDER BY id", tableIdentifier, firstVersion);
+    Assertions.assertEquals(2, historicalRows.size());
+    assertRow(historicalRows.get(0), 1, 1.1f);
+    assertRow(historicalRows.get(1), 2, 2.2f);
   }
 
   @Test
@@ -299,8 +366,8 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> createLanceTable(nonExistentSchemaName, tableName));
-    assertFailureContainsAll(
-        exception, "NoSuchSchemaException", nonExistentSchemaName, "does not exist");
+    assertFailureContainsAll(exception, nonExistentSchemaName, "does not exist");
+    assertFailureContainsAny(exception, "NoSuchSchemaException", "Namespace not found");
     Assertions.assertFalse(catalog.asSchemas().schemaExists(nonExistentSchemaName));
   }
 
@@ -361,12 +428,21 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    return createCatalog(catalogName, false);
+  }
+
+  private Catalog createCatalog(String catalogName, boolean versionCheck) {
+    ImmutableMap.Builder<String, String> properties =
+        ImmutableMap.<String, String>builder().put(Catalog.PROPERTY_LOCATION, tempDir.toString());
+    if (versionCheck) {
+      properties.put(LanceConstants.LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK");
+    }
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-generic",
         "catalog for lance spark rest service tests",
-        ImmutableMap.of(Catalog.PROPERTY_LOCATION, tempDir.toString()));
+        properties.build());
   }
 
   private SparkSession createSparkSession() {
@@ -385,11 +461,9 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             .set("spark.jars", bundleJarPath)
             .set("spark.driver.extraClassPath", bundleJarPath)
             .set("spark.executor.extraClassPath", bundleJarPath)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG, LANCE_SPARK_CATALOG_CLASS)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".impl", "rest")
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".uri", getLanceRestServiceUrl())
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".parent", CATALOG_NAME)
-            .set("spark.sql.defaultCatalog", LANCE_SPARK_CATALOG)
+            .set("spark.plugins", GravitinoLakehouseRESTDiscoveryPlugin.class.getName())
+            .set("spark.sql.gravitino.lanceREST.uri", getLanceRestServiceUrl())
+            .set("spark.sql.defaultCatalog", CATALOG_NAME)
             .set("spark.driver.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.executor.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.ui.enabled", "false");
@@ -478,6 +552,13 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     return schemaName;
   }
 
+  private String createHistorySchema(String schemaNamePrefix) {
+    String schemaName = newSchemaName(schemaNamePrefix);
+    sql("CREATE DATABASE %s.%s", HISTORY_CATALOG_NAME, schemaName);
+    createdHistorySchemas.add(schemaName);
+    return schemaName;
+  }
+
   private void createLanceTable(String schemaName, String tableName) {
     sql(
         "CREATE TABLE %s.%s %s USING lance TBLPROPERTIES ('format'='lance')",
@@ -485,24 +566,28 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private void dropSchema(String schemaName) {
+    dropSchema(CATALOG_NAME, schemaName, catalog);
+  }
+
+  private void dropSchema(String sparkCatalogName, String schemaName, Catalog sourceCatalog) {
     if (sparkSession != null) {
       try {
-        sql("DROP DATABASE IF EXISTS %s CASCADE", schemaName);
+        sql("DROP DATABASE IF EXISTS %s.%s CASCADE", sparkCatalogName, schemaName);
         return;
       } catch (RuntimeException e) {
-        if (catalog == null) {
+        if (sourceCatalog == null) {
           throw e;
         }
       }
     }
 
-    if (catalog != null && catalog.asSchemas().schemaExists(schemaName)) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+    if (sourceCatalog != null && sourceCatalog.asSchemas().schemaExists(schemaName)) {
+      sourceCatalog.asSchemas().dropSchema(schemaName, true);
     }
   }
 
   private List<String> listNamespaces() {
-    return sql("SHOW NAMESPACES IN %s", LANCE_SPARK_CATALOG).stream()
+    return sql("SHOW NAMESPACES IN %s", CATALOG_NAME).stream()
         .map(row -> row.getString(0))
         .collect(Collectors.toList());
   }
@@ -513,6 +598,17 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
   private String newTableName(String prefix) {
     return GravitinoITUtils.genRandomName(prefix);
+  }
+
+  private long loadLanceVersion(Catalog sourceCatalog, String schemaName, String tableName) {
+    Table table =
+        sourceCatalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    String version = table.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    Assertions.assertNotNull(
+        version,
+        String.format(
+            "Expected Gravitino to refresh the Lance version for %s.%s", schemaName, tableName));
+    return Long.parseLong(version);
   }
 
   private void assertTableLocationAndFormat(Table table, String schemaName, String tableName) {

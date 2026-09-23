@@ -43,6 +43,9 @@ gravitino.server.webserver.threadPoolWorkQueueSize = 100
 gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
+# Whether to include server-side stack traces in HTTP error responses. Set this to false in new
+# deployments. It remains true by default only to avoid breaking legacy clients that expect stack.
+gravitino.server.webserver.includeErrorStackTrace = true
 # UI inactivity timeout in milliseconds. The UI environment variable
 # NEXT_PUBLIC_IDLE_TIMEOUT_MS is used when this config is not set.
 # gravitino.ui.sessionIdleTimeoutMs = 900000
@@ -137,3 +140,10 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.lance-rest.gravitino-uri = http://localhost:8090
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
 # gravitino.lance-rest.gravitino-metalake = metalake
+
+# THE CONFIGURATION FOR sensitive property key matching
+# Comma-separated keywords. Each entry is a literal substring, not a regular expression.
+# This list replaces the default (secret,password,token,credential,access,account).
+# Omit a default keyword to stop masking keys that only match that word. An empty value
+# disables name-based matching.
+# gravitino.secret.sensitiveKeyKeywords = secret,password,token,credential,private,passwrod

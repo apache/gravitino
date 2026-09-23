@@ -32,6 +32,7 @@ import io.trino.spi.connector.SchemaTableName;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -45,23 +46,30 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
   public static final SchemaTableName TABLE_NAME =
       new SchemaTableName(SYSTEM_TABLE_SCHEMA_NAME, "catalog");
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private static final ConnectorTableMetadata TABLE_METADATA =
       new ConnectorTableMetadata(
           TABLE_NAME,
           List.of(
               ColumnMetadata.builder().setName("name").setType(VARCHAR).build(),
               ColumnMetadata.builder().setName("provider").setType(VARCHAR).build(),
-              ColumnMetadata.builder().setName("properties").setType(VARCHAR).build()));
+              ColumnMetadata.builder().setName("properties").setType(VARCHAR).build(),
+              ColumnMetadata.builder().setName("metalake").setType(VARCHAR).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
+  @Nullable private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableCatalog.
    *
    * @param catalogConnectorManager the manager for catalog connectors
+   * @param metalake the metalake to report on, or null for every metalake
    */
-  public GravitinoSystemTableCatalog(CatalogConnectorManager catalogConnectorManager) {
+  public GravitinoSystemTableCatalog(
+      CatalogConnectorManager catalogConnectorManager, @Nullable String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.metalake = metalake;
   }
 
   @Override
@@ -69,14 +77,23 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     List<GravitinoCatalog> gravitinoCatalogs = new ArrayList<>();
     // retrieve catalogs form the Gravitino server with the configuration metalakes,
     // the catalogConnectorManager does not manager catalogs in worker nodes
-    catalogConnectorManager
-        .getUsedMetalakes()
+    // The manager is shared by every entry catalog in this Trino, so narrow to the metalake this
+    // connector is configured with; without one, report every metalake.
+    catalogConnectorManager.getUsedMetalakes().stream()
+        .filter(metalakeName -> metalake == null || metalake.equals(metalakeName))
         .forEach(
             (metalakeName) -> {
-              GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
-              Catalog[] catalogs = metalake.listCatalogsInfo();
+              GravitinoMetalake gravitinoMetalake =
+                  catalogConnectorManager.getMetalake(metalakeName);
+              Catalog[] catalogs = gravitinoMetalake.listCatalogsInfo();
               for (Catalog catalog : catalogs) {
-                if (catalogConnectorManager.skipCatalog(catalog.name())) {
+                // Must match against the same Trino-qualified name the load loop skips against
+                // (quoted "metalake.catalog" when catalog names carry the metalake), or a skip
+                // pattern written
+                // against the qualified name never matches here.
+                String trinoCatalogName =
+                    catalogConnectorManager.getTrinoCatalogName(metalakeName, catalog.name());
+                if (catalogConnectorManager.skipCatalog(trinoCatalogName)) {
                   continue;
                 }
                 if (catalog.type() == Catalog.Type.RELATIONAL) {
@@ -89,6 +106,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     BlockBuilder nameColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     BlockBuilder providerColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     BlockBuilder propertyColumnBuilder = VARCHAR.createBlockBuilder(null, size);
+    BlockBuilder metalakeColumnBuilder = VARCHAR.createBlockBuilder(null, size);
 
     for (GravitinoCatalog catalog : gravitinoCatalogs) {
       Preconditions.checkArgument(catalog != null, "catalog should not be null");
@@ -98,17 +116,19 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
       try {
         VARCHAR.writeString(
             propertyColumnBuilder,
-            new ObjectMapper().writeValueAsString(new TreeMap<>(catalog.getProperties())));
+            OBJECT_MAPPER.writeValueAsString(new TreeMap<>(catalog.getProperties())));
       } catch (JsonProcessingException e) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, "Invalid property format", e); //
       }
+      VARCHAR.writeString(metalakeColumnBuilder, catalog.getMetalake());
     }
     return new Page(
         size,
         nameColumnBuilder.build(),
         providerColumnBuilder.build(),
-        propertyColumnBuilder.build());
+        propertyColumnBuilder.build(),
+        metalakeColumnBuilder.build());
   }
 
   @Override

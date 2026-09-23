@@ -39,6 +39,7 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
+import org.apache.flink.table.types.DataType;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -55,12 +56,53 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestBaseCatalog {
+
+  @Test
+  void testDefaultFlinkTypeConversion() {
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
+    Assertions.assertEquals(DataTypes.INT(), catalog.toFlinkType(Types.IntegerType.get()));
+    Assertions.assertEquals(DataTypes.STRING(), catalog.toFlinkType(Types.StringType.get()));
+    Assertions.assertEquals(
+        DataTypes.DECIMAL(10, 2), catalog.toFlinkType(Types.DecimalType.of(10, 2)));
+  }
+
+  @Test
+  void testSchemaUsesCatalogTypeConversion() {
+    Type nativeType = Types.ExternalType.of("native_text");
+    BaseCatalog catalog =
+        new TestableBaseCatalog(null, null) {
+          /** {@inheritDoc} */
+          @Override
+          protected DataType toFlinkType(Type type) {
+            return type.equals(nativeType) ? DataTypes.STRING() : super.toFlinkType(type);
+          }
+        };
+    org.apache.gravitino.rel.Column[] columns = {
+      org.apache.gravitino.rel.Column.of("text", nativeType, "source comment"),
+      org.apache.gravitino.rel.Column.of("required_text", nativeType, null, false, false, null),
+      org.apache.gravitino.rel.Column.of("id", Types.IntegerType.get(), null)
+    };
+    Schema schema = catalog.buildSchemaFromColumns(columns).build();
+    Schema.UnresolvedPhysicalColumn text =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0);
+    Schema.UnresolvedPhysicalColumn requiredText =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(1);
+    Schema.UnresolvedPhysicalColumn id =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(2);
+    Assertions.assertEquals("text", text.getName());
+    Assertions.assertEquals(DataTypes.STRING(), text.getDataType());
+    Assertions.assertEquals("source comment", text.getComment().orElseThrow());
+    Assertions.assertEquals(DataTypes.STRING().notNull(), requiredText.getDataType());
+    Assertions.assertEquals(DataTypes.INT(), id.getDataType());
+    Assertions.assertEquals(nativeType, columns[0].dataType());
+  }
 
   @Test
   public void testHiveSchemaChanges() {

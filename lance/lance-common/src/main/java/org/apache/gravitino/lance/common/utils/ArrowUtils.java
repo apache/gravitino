@@ -23,11 +23,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
+import org.apache.arrow.flatbuf.Message;
+import org.apache.arrow.flatbuf.MessageHeader;
+import org.apache.arrow.flatbuf.RecordBatch;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.ipc.ReadChannel;
+import org.apache.arrow.vector.ipc.message.MessageMetadataResult;
+import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 public class ArrowUtils {
@@ -57,16 +63,64 @@ public class ArrowUtils {
   }
 
   public static Schema parseArrowIpcStream(byte[] stream) {
+    return parseArrowIpcStream(stream, false);
+  }
+
+  /**
+   * Parses a schema-only Arrow IPC stream, rejecting record batches containing rows.
+   *
+   * @param stream the Arrow IPC stream
+   * @return the stream schema
+   * @throws UnsupportedOperationException if any record batch contains rows
+   * @throws IllegalArgumentException if the stream cannot be parsed
+   */
+  public static Schema parseSchemaOnlyIpcStream(byte[] stream) {
+    return parseArrowIpcStream(stream, true);
+  }
+
+  private static Schema parseArrowIpcStream(byte[] stream, boolean requireEmpty) {
     Schema schema;
+    boolean containsRows = false;
     try (BufferAllocator allocator = new RootAllocator();
         ByteArrayInputStream bais = new ByteArrayInputStream(stream);
         ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
       schema = reader.getVectorSchemaRoot().getSchema();
+      if (requireEmpty) {
+        containsRows = containsRecordBatchRows(bais);
+      }
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to parse Arrow IPC stream", e);
     }
 
     Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");
+    if (containsRows) {
+      throw new UnsupportedOperationException(
+          "CreateTable only supports schema-only Arrow streams; "
+              + "write records through a Lance client or engine after creation");
+    }
     return schema;
+  }
+
+  private static boolean containsRecordBatchRows(ByteArrayInputStream input) throws IOException {
+    // The schema reader has consumed the schema message. Inspect only subsequent message headers;
+    // skipping bodies avoids allocating or decoding vectors, including dictionary values.
+    try (ReadChannel channel = new ReadChannel(Channels.newChannel(input))) {
+      MessageMetadataResult metadata;
+      while ((metadata = MessageSerializer.readMessage(channel)) != null) {
+        Message message = metadata.getMessage();
+        if (message.headerType() == MessageHeader.RecordBatch) {
+          RecordBatch batch = (RecordBatch) message.header(new RecordBatch());
+          Preconditions.checkArgument(batch.length() >= 0, "Invalid Arrow record batch row count");
+          if (batch.length() > 0) {
+            return true;
+          }
+        } else if (message.headerType() != MessageHeader.DictionaryBatch) {
+          throw new IOException("Unexpected Arrow message type: " + message.headerType());
+        }
+        Preconditions.checkArgument(message.bodyLength() >= 0, "Invalid Arrow message body length");
+        input.skipNBytes(message.bodyLength());
+      }
+      return false;
+    }
   }
 }

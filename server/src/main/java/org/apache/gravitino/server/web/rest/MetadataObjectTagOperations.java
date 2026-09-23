@@ -94,7 +94,8 @@ public class MetadataObjectTagOperations {
   @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-tag", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && CAN_ACCESS_METADATA)")
+      expression =
+          "METALAKE::OWNER || ((TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG) && CAN_ACCESS_METADATA)")
   public Response getTagForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -289,6 +290,14 @@ public class MetadataObjectTagOperations {
 
   private Response associateTagsForObjectInternal(
       String metalake, String type, String fullName, TagsAssociateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ASSOCIATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -314,6 +323,16 @@ public class MetadataObjectTagOperations {
 
   private Response associateTagValuesForObjectInternal(
       String metalake, String type, String fullName, TagValuesAssociateRequest request) {
+    if (request == null) {
+      return withMediaType(
+          ExceptionHandlers.handleTagException(
+              OperationType.ASSOCIATE,
+              "",
+              fullName,
+              new IllegalArgumentException("Request body cannot be null")),
+          TAG_VALUES_MEDIA_TYPE);
+    }
+
     LOG.info(
         "Received associate tag values request for object type: {}, full name: {} under metalake: {}",
         type,

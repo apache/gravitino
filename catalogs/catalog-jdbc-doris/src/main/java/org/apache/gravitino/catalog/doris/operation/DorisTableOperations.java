@@ -39,19 +39,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.utils.DorisUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -61,6 +65,7 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -70,12 +75,15 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.utils.ExceptionMessages;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
+  private static final Pattern INDEX_PROPERTY_PATTERN =
+      Pattern.compile("\\s*\"([^\"]*)\"\\s*=\\s*\"([^\"]*)\"\\s*(,)?\\s*");
   private static final Pattern DORIS_VERSION_PATTERN =
       Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.?\\d*)");
 
@@ -215,7 +223,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                   .toString());
         }
       } catch (Exception e) {
-        throw new RuntimeException("Failed to get the number of backend servers", e);
+        throw ExceptionMessages.wrap("Failed to get the number of backend servers", e);
       }
     }
 
@@ -258,47 +266,78 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (!hasAutoIncrement) {
       return;
     }
-    Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
-    String version = null;
-    // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
-    // SHOW FRONTENDS returns the actual Doris version in the "Version" column
-    // (e.g. "doris-3.0.6.2-rc01-910c4249c5").
-    try (Connection connection = dataSource.getConnection();
-        Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
-      ResultSetMetaData meta = rs.getMetaData();
-      int versionCol = -1;
-      for (int i = 1; i <= meta.getColumnCount(); i++) {
-        if ("Version".equals(meta.getColumnLabel(i))) {
-          versionCol = i;
-          break;
-        }
-      }
-      if (rs.next() && versionCol > 0) {
-        String versionStr = rs.getString(versionCol);
-        // Extract X.Y.Z from "doris-X.Y.Z-suffix-commit" using regex for robustness
-        Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionStr);
-        if (matcher.find()) {
-          version = matcher.group(1);
-        }
-      }
-    } catch (SQLException e) {
-      throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
-              + "and the Doris FE is reachable.",
-          e);
-    }
-    if (version == null) {
-      throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
-              + "and the Doris FE is reachable.");
-    }
+    String version = getDorisVersion("AUTO_INCREMENT compatibility check");
     if (!isVersionAtLeast(version, 2, 1, 0)) {
       throw new UnsupportedOperationException(
           "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
     }
+  }
+
+  private String getDorisVersion(String purpose) {
+    Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
+    String version = null;
+    SQLException frontendsQueryFailure = null;
+    try (Connection connection = dataSource.getConnection()) {
+      // FRONTENDS() is readable with the default information_schema SELECT privilege on Doris
+      // 3.0.6.2, while SHOW FRONTENDS requires ADMIN/OPERATOR there. Older Doris releases such as
+      // 1.2.x do not support the table-valued function, so retain SHOW FRONTENDS as a fallback.
+      try (Statement stmt = connection.createStatement();
+          ResultSet rs = stmt.executeQuery("SELECT Version FROM FRONTENDS()")) {
+        if (rs.next()) {
+          version = extractDorisVersion(rs.getString(1));
+        }
+      } catch (SQLException e) {
+        frontendsQueryFailure = e;
+      }
+
+      if (version == null) {
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
+          ResultSetMetaData meta = rs.getMetaData();
+          int versionCol = -1;
+          for (int i = 1; i <= meta.getColumnCount(); i++) {
+            if ("Version".equalsIgnoreCase(meta.getColumnLabel(i))) {
+              versionCol = i;
+              break;
+            }
+          }
+          if (rs.next() && versionCol > 0) {
+            version = extractDorisVersion(rs.getString(versionCol));
+          }
+        } catch (SQLException e) {
+          if (frontendsQueryFailure != null) {
+            e.addSuppressed(frontendsQueryFailure);
+          }
+          throw e;
+        }
+      }
+    } catch (SQLException e) {
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for "
+              + purpose
+              + ". "
+              + "Ensure the connection user can query FRONTENDS() or, on older Doris versions, "
+              + "has permission to execute SHOW FRONTENDS, and the Doris FE is reachable.",
+          e);
+    }
+    if (version == null) {
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for "
+              + purpose
+              + ". "
+              + "Ensure the connection user can query FRONTENDS() or, on older Doris versions, "
+              + "has permission to execute SHOW FRONTENDS, and the Doris FE is reachable.");
+    }
+    return version;
+  }
+
+  @Nullable
+  private static String extractDorisVersion(@Nullable String versionString) {
+    if (versionString == null) {
+      return null;
+    }
+    Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionString);
+    return matcher.find() ? matcher.group(1) : null;
   }
 
   @VisibleForTesting
@@ -351,11 +390,14 @@ public class DorisTableOperations extends JdbcTableOperations {
                   String fieldName =
                       requireSingleTopLevelIndexField(index.name(), index.fieldNames());
                   String usingClause = mapIndexTypeToUsingClause(index.type());
+                  String propertiesSql =
+                      generateIndexPropertiesSql(index.type(), index.properties());
                   if (usingClause.isEmpty()) {
-                    return String.format("INDEX `%s` (`%s`)", index.name(), fieldName);
+                    return String.format("INDEX `%s` (`%s`)", index.name(), fieldName)
+                        + propertiesSql;
                   }
-                  return String.format(
-                      "INDEX `%s` (`%s`) %s", index.name(), fieldName, usingClause);
+                  return String.format("INDEX `%s` (`%s`) %s", index.name(), fieldName, usingClause)
+                      + propertiesSql;
                 })
             .collect(Collectors.joining(",\n"));
 
@@ -549,13 +591,15 @@ public class DorisTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
-      // Check if Index_type column exists (available in Doris 2.0+).
+      // Check which optional columns are available on this Doris version.
       boolean hasIndexType = false;
+      boolean hasProperties = false;
       ResultSetMetaData metaData = resultSet.getMetaData();
       for (int i = 1; i <= metaData.getColumnCount(); i++) {
         if ("Index_type".equals(metaData.getColumnName(i))) {
           hasIndexType = true;
-          break;
+        } else if ("Properties".equals(metaData.getColumnName(i))) {
+          hasProperties = true;
         }
       }
 
@@ -563,17 +607,24 @@ public class DorisTableOperations extends JdbcTableOperations {
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        // Doris always names the primary key index "PRIMARY"; detect it first.
+        String dorisIndexType = hasIndexType ? resultSet.getString("Index_type") : null;
+        // Preserve the legacy PRIMARY mapping unless authoritative metadata identifies NGRAM_BF,
+        // which must fail closed.
         Index.IndexType gravitinoIndexType;
-        if ("PRIMARY".equals(indexName)) {
+        if ("PRIMARY".equals(indexName) && !"NGRAM_BF".equalsIgnoreCase(dorisIndexType)) {
           gravitinoIndexType = Index.IndexType.PRIMARY_KEY;
         } else if (hasIndexType) {
-          gravitinoIndexType = mapDorisIndexType(resultSet.getString("Index_type"), indexName);
+          gravitinoIndexType = mapDorisIndexType(dorisIndexType, indexName);
         } else {
-          // Doris 1.2.x: no Index_type column, infer from index name
           gravitinoIndexType = mapDorisIndexType(null, indexName);
         }
-        indexes.add(Indexes.of(gravitinoIndexType, indexName, new String[][] {{columnName}}));
+        Map<String, String> indexProperties = Collections.emptyMap();
+        if (hasProperties && "INVERTED".equalsIgnoreCase(dorisIndexType)) {
+          indexProperties = parseIndexProperties(resultSet.getString("Properties"), indexName);
+        }
+        indexes.add(
+            Indexes.of(
+                gravitinoIndexType, indexName, new String[][] {{columnName}}, indexProperties));
       }
       return indexes;
     } catch (SQLException e) {
@@ -615,6 +666,10 @@ public class DorisTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case "ANN":
         return Index.IndexType.VECTOR;
+      case "NGRAM_BF":
+        throw new UnsupportedOperationException(
+            String.format(
+                "Doris index '%s' uses unsupported native index type 'NGRAM_BF'", indexName));
       default:
         LOG.warn(
             "Unknown Doris index type '{}' for index '{}', falling back to INVERTED",
@@ -644,11 +699,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-    if (StringUtils.isNotEmpty(tableBuilder.comment())) {
+    if (StringUtils.isNotEmpty(tableBuilder.comment())
+        && !"OLAP".equalsIgnoreCase(tableBuilder.comment())) {
       return;
     }
 
-    // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
+    // Doris JDBC metadata can report the OLAP engine as REMARKS. Query the actual table comment
+    // from information_schema when REMARKS is empty or contains that engine name. Preserve the
+    // Gravitino ID suffix so JdbcCatalogOperations can extract it when loading the table.
     StringBuilder comment = new StringBuilder();
     String sql =
         "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
@@ -729,10 +787,19 @@ public class DorisTableOperations extends JdbcTableOperations {
      * */
 
     // Not all operations require the original table information, so lazy loading is used here
+    validateIndexChangeConflicts(changes);
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+    Optional<String> addColumnDorisVersion =
+        Arrays.stream(changes)
+                .filter(TableChange.AddColumn.class::isInstance)
+                .map(TableChange.AddColumn.class::cast)
+                .map(TableChange.AddColumn::getDefaultValue)
+                .anyMatch(DorisTableOperations::requiresVersionAwareAddColumnEscaping)
+            ? Optional.of(getDorisVersion("ADD COLUMN default literal compatibility check"))
+            : Optional.empty();
     for (int i = 0; i < changes.length; i++) {
       TableChange change = changes[i];
       if (change instanceof TableChange.UpdateComment) {
@@ -746,7 +813,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(addColumnFieldDefinition(addColumn));
+        alterSql.add(addColumnFieldDefinition(addColumn, addColumnDorisVersion));
       } else if (change instanceof TableChange.RenameColumn) {
         throw new IllegalArgumentException("Rename column is not supported yet");
       } else if (change instanceof TableChange.UpdateColumnType) {
@@ -802,13 +869,42 @@ public class DorisTableOperations extends JdbcTableOperations {
       alterSql.add("MODIFY COMMENT \"" + escapeSqlLiteral(newComment, '"') + "\"");
     }
 
-    if (CollectionUtils.isEmpty(alterSql)) {
+    List<String> nonEmptyAlterSql =
+        alterSql.stream().filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+    if (CollectionUtils.isEmpty(nonEmptyAlterSql)) {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    String result =
+        "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", nonEmptyAlterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
+  }
+
+  private static void validateIndexChangeConflicts(TableChange... changes) {
+    Set<String> deleteIndexNames = new HashSet<>();
+    Set<String> addIndexNames = new HashSet<>();
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.DeleteIndex) {
+        String indexName = ((TableChange.DeleteIndex) change).getName();
+        Preconditions.checkArgument(
+            deleteIndexNames.add(indexName),
+            "Index '%s' cannot be deleted more than once in the same request",
+            indexName);
+        Preconditions.checkArgument(
+            !addIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+      } else if (change instanceof TableChange.AddIndex) {
+        String indexName = ((TableChange.AddIndex) change).getName();
+        Preconditions.checkArgument(
+            !deleteIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+        addIndexNames.add(indexName);
+      }
+    }
   }
 
   private String updateColumnNullabilityDefinition(
@@ -855,7 +951,8 @@ public class DorisTableOperations extends JdbcTableOperations {
         "MODIFY COLUMN `%s` COMMENT '%s'", col, escapeSqlLiteral(newComment, '\''));
   }
 
-  private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
+  private String addColumnFieldDefinition(
+      TableChange.AddColumn addColumn, Optional<String> dorisVersion) {
     String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Doris does not support nested column names.");
@@ -875,6 +972,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
     }
+
+    if (!DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(serializeAddColumnDefaultValue(addColumn.getDefaultValue(), dorisVersion))
+          .append(SPACE);
+    }
+
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition
@@ -899,6 +1004,37 @@ public class DorisTableOperations extends JdbcTableOperations {
       throw new IllegalArgumentException("Invalid column position.");
     }
     return columnDefinition.toString();
+  }
+
+  private static boolean requiresVersionAwareAddColumnEscaping(Expression defaultValue) {
+    if (!(defaultValue instanceof Literal)) {
+      return false;
+    }
+    Object value = ((Literal<?>) defaultValue).value();
+    if (value == null) {
+      return false;
+    }
+    String stringValue = String.valueOf(value);
+    return stringValue.contains("\\") || stringValue.contains("\"\"");
+  }
+
+  private String serializeAddColumnDefaultValue(
+      Expression defaultValue, Optional<String> dorisVersion) {
+    Preconditions.checkState(
+        columnDefaultValueConverter instanceof DorisColumnDefaultValueConverter,
+        "DorisColumnDefaultValueConverter is required for Doris ADD COLUMN");
+    DorisColumnDefaultValueConverter converter =
+        (DorisColumnDefaultValueConverter) columnDefaultValueConverter;
+    boolean requiresDoubleEscaping =
+        dorisVersion
+            .map(
+                version ->
+                    isVersionAtLeast(version, 3, 0, 0) && !isVersionAtLeast(version, 4, 0, 0))
+            .orElse(false);
+    boolean useSingleQuoteDelimiter =
+        dorisVersion.map(version -> !isVersionAtLeast(version, 4, 0, 0)).orElse(false);
+    return converter.fromGravitinoForAddColumn(
+        defaultValue, requiresDoubleEscaping, useSingleQuoteDelimiter);
   }
 
   private String updateColumnPositionFieldDefinition(
@@ -1008,19 +1144,24 @@ public class DorisTableOperations extends JdbcTableOperations {
     String fieldName =
         requireSingleTopLevelIndexField(addIndex.getName(), addIndex.getFieldNames());
     String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
+    String propertiesSql = generateIndexPropertiesSql(addIndex.getType(), addIndex.getProperties());
     if (usingClause.isEmpty()) {
-      return String.format("ADD INDEX `%s` (`%s`)", addIndex.getName(), fieldName);
+      return String.format("ADD INDEX `%s` (`%s`)", addIndex.getName(), fieldName) + propertiesSql;
     }
-    return String.format("ADD INDEX `%s` (`%s`) %s", addIndex.getName(), fieldName, usingClause);
+    return String.format("ADD INDEX `%s` (`%s`) %s", addIndex.getName(), fieldName, usingClause)
+        + propertiesSql;
   }
 
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (!deleteIndex.isIfExists()) {
-      Preconditions.checkArgument(
-          Arrays.stream(lazyLoadTable.index())
-              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
-          "Index does not exist");
+    boolean indexExists =
+        Arrays.stream(lazyLoadTable.index())
+            .anyMatch(index -> index.name().equals(deleteIndex.getName()));
+    if (!indexExists) {
+      if (deleteIndex.isIfExists()) {
+        return "";
+      }
+      throw new IllegalArgumentException("Index does not exist: " + deleteIndex.getName());
     }
     return "DROP INDEX `" + deleteIndex.getName() + "`";
   }
@@ -1073,6 +1214,78 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     return null;
+  }
+
+  @VisibleForTesting
+  static Map<String, String> parseIndexProperties(
+      @Nullable String propertiesText, String indexName) {
+    if (StringUtils.isBlank(propertiesText)) {
+      return Collections.emptyMap();
+    }
+
+    String trimmed = propertiesText.trim();
+    Preconditions.checkArgument(
+        trimmed.length() >= 2 && trimmed.startsWith("(") && trimmed.endsWith(")"),
+        "Malformed Properties metadata for Doris index '%s'",
+        indexName);
+
+    String entries = trimmed.substring(1, trimmed.length() - 1);
+    if (StringUtils.isBlank(entries)) {
+      return Collections.emptyMap();
+    }
+
+    Map<String, String> properties = new HashMap<>();
+    Matcher matcher = INDEX_PROPERTY_PATTERN.matcher(entries);
+    int position = 0;
+    while (position < entries.length()) {
+      matcher.region(position, entries.length());
+      Preconditions.checkArgument(
+          matcher.lookingAt(), "Malformed Properties metadata for Doris index '%s'", indexName);
+
+      String key = matcher.group(1);
+      String value = matcher.group(2);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(key),
+          "Malformed Properties metadata for Doris index '%s': property key must not be blank",
+          indexName);
+      Preconditions.checkArgument(
+          !properties.containsKey(key),
+          "Malformed Properties metadata for Doris index '%s': duplicate property key '%s'",
+          indexName,
+          key);
+      properties.put(key, value);
+
+      position = matcher.end();
+      boolean hasSeparator = matcher.group(3) != null;
+      Preconditions.checkArgument(
+          hasSeparator == (position < entries.length()),
+          "Malformed Properties metadata for Doris index '%s'",
+          indexName);
+    }
+    return Collections.unmodifiableMap(properties);
+  }
+
+  private static String generateIndexPropertiesSql(
+      Index.IndexType indexType, @Nullable Map<String, String> properties) {
+    if (indexType != Index.IndexType.INVERTED || properties == null || properties.isEmpty()) {
+      return "";
+    }
+
+    properties.forEach(
+        (key, value) -> {
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(key), "Doris index property key must not be blank");
+          Preconditions.checkArgument(
+              value != null, "Doris index property '%s' must not have a null value", key);
+          Preconditions.checkArgument(
+              key.chars().noneMatch(Character::isISOControl),
+              "Doris index property key must not contain control characters");
+          Preconditions.checkArgument(
+              value.chars().noneMatch(Character::isISOControl),
+              "Doris index property '%s' must not contain control characters",
+              key);
+        });
+    return DorisUtils.generatePropertiesSql(new TreeMap<>(properties));
   }
 
   private static String requireSingleTopLevelIndexField(String indexName, String[][] fieldNames) {

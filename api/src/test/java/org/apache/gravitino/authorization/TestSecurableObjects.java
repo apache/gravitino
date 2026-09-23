@@ -222,6 +222,7 @@ public class TestSecurableObjects {
     Privilege manageUsers = Privileges.ManageUsers.allow();
     Privilege manageGroups = Privileges.ManageGroups.allow();
     Privilege manageGrants = Privileges.ManageGrants.allow();
+    Privilege viewSecretProviders = Privileges.ViewSecretProviders.allow();
     Privilege createModel = Privileges.RegisterModel.allow();
     Privilege createModelVersion = Privileges.LinkModelVersion.allow();
     Privilege useModel = Privileges.UseModel.allow();
@@ -242,6 +243,7 @@ public class TestSecurableObjects {
     Privilege createSemanticModel = Privileges.CreateSemanticModel.allow();
     Privilege selectSemanticModel = Privileges.SelectSemanticModel.allow();
     Privilege modifySemanticModel = Privileges.ModifySemanticModel.allow();
+    Privilege useSecret = Privileges.UseSecret.allow();
 
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.TAG));
@@ -400,6 +402,15 @@ public class TestSecurableObjects {
     Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.COLUMN));
 
+    Assertions.assertTrue(viewSecretProviders.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(viewSecretProviders.canBindTo(MetadataObject.Type.COLUMN));
+
     // Test manager groups
     Assertions.assertTrue(manageGroups.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.CATALOG));
@@ -454,6 +465,19 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
+
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL_VERSION));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.FUNCTION));
 
     Assertions.assertTrue(createTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(createTag.canBindTo(MetadataObject.Type.CATALOG));
@@ -618,5 +642,22 @@ public class TestSecurableObjects {
     Assertions.assertEquals(
         Privileges.ModifySemanticModel.deny(),
         Privileges.deny(Privilege.Name.MODIFY_SEMANTIC_MODEL));
+  }
+
+  @Test
+  public void testHashCodeConsistentWithUnorderedPrivileges() {
+    SecurableObject one =
+        SecurableObjects.ofCatalog(
+            "catalog",
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow()));
+    SecurableObject another =
+        SecurableObjects.ofCatalog(
+            "catalog",
+            Lists.newArrayList(Privileges.CreateSchema.allow(), Privileges.UseCatalog.allow()));
+
+    // equals compares privileges as an unordered collection, so hashCode must agree
+    // regardless of the order the privileges were supplied in.
+    Assertions.assertEquals(one, another);
+    Assertions.assertEquals(one.hashCode(), another.hashCode());
   }
 }

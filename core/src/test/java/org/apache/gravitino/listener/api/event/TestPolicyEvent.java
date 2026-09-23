@@ -37,9 +37,6 @@ import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyPreEvent;
@@ -54,13 +51,7 @@ import org.apache.gravitino.listener.api.event.policy.EnablePolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.EnablePolicyPreEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyPreEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesPreEvent;
@@ -291,36 +282,6 @@ public class TestPolicyEvent {
   }
 
   @Test
-  void testListMetadataObjectsForPolicyEvent() {
-    dispatcher.listMetadataObjectsForPolicy("metalake", policy.name());
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    NameIdentifier identifier = NameIdentifierUtil.ofPolicy("metalake", policy.name());
-
-    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
-    Assertions.assertEquals(ListMetadataObjectsForPolicyPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(
-        OperationType.LIST_METADATA_OBJECTS_FOR_POLICY, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
-
-    Event postevent = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
-    Assertions.assertEquals(ListMetadataObjectsForPolicyEvent.class, postevent.getClass());
-    Assertions.assertEquals(
-        OperationType.LIST_METADATA_OBJECTS_FOR_POLICY, postevent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
-    Assertions.assertEquals(1, ((ListMetadataObjectsForPolicyEvent) postevent).resultCount());
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  void testListMetadataObjectsForPolicyEventDeprecatedConstructorReturnsNegativeCount() {
-    NameIdentifier identifier = NameIdentifierUtil.ofPolicy("metalake", policy.name());
-    ListMetadataObjectsForPolicyEvent event =
-        new ListMetadataObjectsForPolicyEvent("user", identifier);
-    Assertions.assertEquals(-1, event.resultCount());
-  }
-
-  @Test
   void testListPolicyInfosForMetadataObjectEvent() {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(
@@ -356,80 +317,6 @@ public class TestPolicyEvent {
     ListPolicyInfosForMetadataObjectEvent event =
         new ListPolicyInfosForMetadataObjectEvent("user", "metalake", metadataObject);
     Assertions.assertEquals(-1, event.resultCount());
-  }
-
-  @Test
-  void testAssociatePoliciesForMetadataObjectEvent() {
-    MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
-            Entity.EntityType.CATALOG);
-
-    String[] policiesToAdd = {"policy1", "policy2"};
-    String[] policiesToRemove = {"policy3"};
-
-    dispatcher.associatePoliciesForMetadataObject(
-        "metalake", metadataObject, policiesToAdd, policiesToRemove);
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
-
-    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
-    Assertions.assertEquals(AssociatePoliciesForMetadataObjectPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(
-        MetadataObject.Type.CATALOG,
-        ((AssociatePoliciesForMetadataObjectPreEvent) preEvent).metadataObject().type());
-    Assertions.assertArrayEquals(
-        policiesToAdd, ((AssociatePoliciesForMetadataObjectPreEvent) preEvent).policiesToAdd());
-    Assertions.assertArrayEquals(
-        policiesToRemove,
-        ((AssociatePoliciesForMetadataObjectPreEvent) preEvent).policiesToRemove());
-
-    Assertions.assertEquals(
-        OperationType.ASSOCIATE_POLICIES_FOR_METADATA_OBJECT, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
-
-    Event postevent = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
-    Assertions.assertEquals(AssociatePoliciesForMetadataObjectEvent.class, postevent.getClass());
-    Assertions.assertEquals(
-        MetadataObject.Type.CATALOG,
-        ((AssociatePoliciesForMetadataObjectEvent) postevent).metadataObject().type());
-    Assertions.assertArrayEquals(
-        policiesToAdd, ((AssociatePoliciesForMetadataObjectEvent) postevent).policiesToAdd());
-    Assertions.assertArrayEquals(
-        policiesToRemove, ((AssociatePoliciesForMetadataObjectEvent) postevent).policiesToRemove());
-    Assertions.assertEquals(
-        OperationType.ASSOCIATE_POLICIES_FOR_METADATA_OBJECT, postevent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
-  }
-
-  @Test
-  void testGetPolicyForMetadataObjectEvent() {
-    MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
-            Entity.EntityType.CATALOG);
-
-    dispatcher.getPolicyForMetadataObject("metalake", metadataObject, policy.name());
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent("metalake", metadataObject);
-
-    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
-    Assertions.assertEquals(GetPolicyForMetadataObjectPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.GET_POLICY_FOR_METADATA_OBJECT, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
-
-    Event postevent = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
-    Assertions.assertEquals(GetPolicyForMetadataObjectEvent.class, postevent.getClass());
-    Assertions.assertEquals(
-        OperationType.GET_POLICY_FOR_METADATA_OBJECT, postevent.operationType());
-    Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
-
-    PolicyInfo policyInfo = ((GetPolicyForMetadataObjectEvent) postevent).policyInfo();
-    checkPolicyInfo(policyInfo, policy);
   }
 
   @Test
@@ -559,20 +446,6 @@ public class TestPolicyEvent {
   }
 
   @Test
-  void testListMetadataObjectsForPolicyFailureEvent() {
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> failureDispatcher.listMetadataObjectsForPolicy("metalake", policy.name()));
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(ListMetadataObjectsForPolicyFailureEvent.class, event.getClass());
-    Assertions.assertEquals(
-        GravitinoRuntimeException.class,
-        ((ListMetadataObjectsForPolicyFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_POLICY, event.operationType());
-    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-  }
-
-  @Test
   void testListPolicyInfosForMetadataObjectFailureEvent() {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(
@@ -589,61 +462,6 @@ public class TestPolicyEvent {
         ((ListPolicyInfosForMetadataObjectFailureEvent) event).exception().getClass());
     Assertions.assertEquals(
         OperationType.LIST_POLICY_INFOS_FOR_METADATA_OBJECT, event.operationType());
-    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-  }
-
-  @Test
-  void testAssociatePoliciesForMetadataObjectFailureEvent() {
-    MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
-            Entity.EntityType.CATALOG);
-
-    String[] policiesToAssociate = new String[] {"policy1", "policy2"};
-    String[] policiesToDisassociate = new String[] {"policy3", "policy4"};
-
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () ->
-            failureDispatcher.associatePoliciesForMetadataObject(
-                "metalake", metadataObject, policiesToAssociate, policiesToDisassociate));
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(AssociatePoliciesForMetadataObjectFailureEvent.class, event.getClass());
-    Assertions.assertEquals(
-        GravitinoRuntimeException.class,
-        ((AssociatePoliciesForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(
-        MetadataObject.Type.CATALOG,
-        ((AssociatePoliciesForMetadataObjectFailureEvent) event).metadataObject().type());
-    Assertions.assertArrayEquals(
-        policiesToAssociate,
-        ((AssociatePoliciesForMetadataObjectFailureEvent) event).policiesToAdd());
-    Assertions.assertArrayEquals(
-        policiesToDisassociate,
-        ((AssociatePoliciesForMetadataObjectFailureEvent) event).policiesToRemove());
-    Assertions.assertEquals(
-        OperationType.ASSOCIATE_POLICIES_FOR_METADATA_OBJECT, event.operationType());
-    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
-  }
-
-  @Test
-  void testGetPolicyForMetadataObjectFailureEvent() {
-    MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
-            Entity.EntityType.CATALOG);
-
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () ->
-            failureDispatcher.getPolicyForMetadataObject(
-                "metalake", metadataObject, policy.name()));
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(GetPolicyForMetadataObjectFailureEvent.class, event.getClass());
-    Assertions.assertEquals(
-        GravitinoRuntimeException.class,
-        ((GetPolicyForMetadataObjectFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(OperationType.GET_POLICY_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
@@ -704,22 +522,6 @@ public class TestPolicyEvent {
         .thenReturn(policy);
     when(dispatcher.getPolicy(any(String.class), any(String.class))).thenReturn(policy);
     when(dispatcher.deletePolicy(metalake, policy.name())).thenReturn(true);
-    when(dispatcher.getPolicyForMetadataObject(
-            any(String.class), any(MetadataObject.class), any(String.class)))
-        .thenReturn(policy);
-    MetadataObject catalog =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
-            Entity.EntityType.CATALOG);
-    MetadataObject[] objects = new MetadataObject[] {catalog};
-
-    when(dispatcher.listMetadataObjectsForPolicy(any(String.class), any(String.class)))
-        .thenReturn(objects);
-
-    when(dispatcher.associatePoliciesForMetadataObject(
-            any(String.class), any(MetadataObject.class), any(String[].class), any(String[].class)))
-        .thenReturn(new String[] {"policy1", "policy2"});
-
     when(dispatcher.listPolicyInfosForMetadataObject(any(String.class), any(MetadataObject.class)))
         .thenReturn(new PolicyEntity[] {policy, policy});
 

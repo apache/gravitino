@@ -56,11 +56,6 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().insertFunctionMeta(functionPO);
   }
 
-  public static String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return getProvider().insertFunctionMetaOnDuplicateKeyUpdate(functionPO);
-  }
-
   public static String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFunctionPOsBySchemaId(schemaId);
   }
@@ -90,13 +85,37 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().selectFunctionMetaBySchemaIdAndName(schemaId, functionName);
   }
 
+  /** Delegates a root-only locking lookup by function natural key. */
+  public static String selectFunctionMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return getProvider().selectFunctionMetaBySchemaIdAndNameForUpdate(schemaId, functionName);
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks an active function metadata row.
+   *
+   * @param functionId the function ID
+   * @return the locking select SQL
+   */
+  public static String selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId) {
+    return getProvider().selectFunctionMetaByIdForUpdate(functionId);
+  }
+
   public static String selectFunctionIdBySchemaIdAndFunctionName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
     return getProvider().selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName);
   }
 
-  public static String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
-    return getProvider().softDeleteFunctionMetaByFunctionId(functionId);
+  /**
+   * Returns SQL that soft-deletes a function with a version check.
+   *
+   * @param functionId the function ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion) {
+    return getProvider().softDeleteFunctionMetaByFunctionId(functionId, currentVersion);
   }
 
   public static String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {

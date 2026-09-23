@@ -55,7 +55,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     jobOperationDispatcher.registerJobTemplate(metalake, jobTemplateEntity);
 
     // Set the creator as the owner of the job template.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           metalake,
@@ -91,8 +91,10 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
-    return jobOperationDispatcher.getJob(metalake, jobId);
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
+    return jobOperationDispatcher.getJob(metalake, jobId, includeOutput, maxLines, maxBytes);
   }
 
   @Override
@@ -101,7 +103,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     JobEntity jobEntity = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
 
     // Set the creator as the owner of the job.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           metalake,

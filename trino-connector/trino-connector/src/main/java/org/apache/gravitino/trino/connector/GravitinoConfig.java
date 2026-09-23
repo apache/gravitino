@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -80,6 +81,17 @@ public class GravitinoConfig {
   /** The Trino Iceberg REST catalog property prefix. */
   private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
 
+  /**
+   * {@code gravitino.client.authType} values that authenticate the connector's own Gravitino client
+   * but have no representation in Trino's Iceberg REST security modes ({@code NONE}/{@code
+   * OAUTH2}). A catalog routed through the Iceberg REST server under one of these types sends no
+   * credentials to it unless {@code gravitino.iceberg.rest-catalog.security} is set explicitly.
+   */
+  private static final Set<String> AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT =
+      Set.of("basic", "kerberos");
+
+  private static final String OAUTH2 = "OAUTH2";
+
   /** Prefix for environment-variable references propagated to dynamic catalogs. */
   static final String GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX =
       "gravitino.dynamic-catalog.environment-variable.";
@@ -102,9 +114,10 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry(
           "gravitino.metalake",
-          "The name of the metalake (top-level namespace) to connect to",
+          "The name of the metalake (top-level namespace) to connect to. "
+              + "When unset, the catalogs of every metalake are loaded.",
           "",
-          true);
+          false);
 
   private static final ConfigEntry GRAVITINO_USER =
       new ConfigEntry(
@@ -114,23 +127,37 @@ public class GravitinoConfig {
           false);
 
   /**
-   * @deprecated Please use {@code gravitino.use-single-metalake} instead.
+   * @deprecated Please use {@code gravitino.catalog-name-with-metalake} instead.
    */
   @Deprecated
   @SuppressWarnings("UnusedVariable")
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
-          "Deprecated: omits the metalake prefix from catalog names. Use gravitino.use-single-metalake instead.",
+          "Deprecated: omits the metalake prefix from catalog names. Use gravitino.catalog-name-with-metalake instead.",
           "true",
           false);
 
+  /**
+   * Legacy switch, read only when {@code gravitino.catalog-name-with-metalake} is unset.
+   *
+   * @deprecated Please use {@code gravitino.catalog-name-with-metalake} instead.
+   */
+  @Deprecated
   private static final ConfigEntry GRAVITINO_SINGLE_METALAKE_MODE =
       new ConfigEntry(
           "gravitino.use-single-metalake",
-          "If true, only one metalake is supported in this connector; identify the catalog by <catalog_name>. "
-              + "If false, multiple metalakes are supported; identify the catalog by <metalake_name>.<catalog_name>.",
+          "Deprecated: if false, identify the catalog by <metalake_name>.<catalog_name> and load "
+              + "every metalake. Use gravitino.catalog-name-with-metalake instead.",
           "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_CATALOG_NAME_WITH_METALAKE =
+      new ConfigEntry(
+          "gravitino.catalog-name-with-metalake",
+          "If true, identify the catalog by <metalake_name>.<catalog_name> and load every metalake. "
+              + "If false, identify the catalog by <catalog_name>.",
+          "false",
           false);
 
   private static final ConfigEntry GRAVITINO_CLOUD_REGION_CODE =
@@ -345,12 +372,35 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the metalake name for used.
+   * Retrieves the configured metalake name.
    *
-   * @return the metalake name for used
+   * @return the trimmed metalake name, or an empty string when {@code gravitino.metalake} is unset;
+   *     see {@link #hasMetalake()}
    */
   public String getMetalake() {
-    return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
+    // Trimmed so a stray leading/trailing space in the catalog properties file does not make this
+    // value silently stop matching the canonical metalake name the load loop records states
+    // under, e.g. in the catalog_status/load_status system tables' per-metalake filtering.
+    return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue).trim();
+  }
+
+  /**
+   * Whether a metalake is configured.
+   *
+   * @return true if {@code gravitino.metalake} is set to a non-blank value
+   */
+  public boolean hasMetalake() {
+    return !getMetalake().isEmpty();
+  }
+
+  /**
+   * Whether the catalogs of every metalake are loaded. This is the case when no metalake is
+   * configured, or when catalog names carry the metalake.
+   *
+   * @return true if all metalakes are loaded
+   */
+  public boolean loadAllMetalakes() {
+    return !hasMetalake() || catalogNameWithMetalake();
   }
 
   /**
@@ -374,14 +424,33 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the single metalake mode.
+   * Whether Trino catalog names carry the metalake, as {@code "<metalake>.<catalog>"}. The
+   * deprecated {@code gravitino.use-single-metalake=false} is honored when the new key is unset.
    *
-   * @return the single metalake mode
+   * @return true if catalog names are qualified with the metalake
    */
-  public boolean singleMetalakeMode() {
-    return Boolean.parseBoolean(
-        config.getOrDefault(
-            GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue));
+  public boolean catalogNameWithMetalake() {
+    String value = config.get(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key);
+    if (value != null) {
+      return parseBooleanConfig(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key, value.trim());
+    }
+    return !parseBooleanConfig(
+        GRAVITINO_SINGLE_METALAKE_MODE.key,
+        config
+            .getOrDefault(
+                GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue)
+            .trim());
+  }
+
+  /**
+   * Whether the deprecated {@code gravitino.use-single-metalake} key is present and still decides
+   * the catalog naming, so that its use can be reported.
+   *
+   * @return true if the deprecated key is set and the replacing key is not
+   */
+  public boolean usesDeprecatedSingleMetalakeKey() {
+    return config.containsKey(GRAVITINO_SINGLE_METALAKE_MODE.key)
+        && !config.containsKey(GRAVITINO_CATALOG_NAME_WITH_METALAKE.key);
   }
 
   boolean isDynamicConnector() {
@@ -642,15 +711,17 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX and
-    // GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX
+    // Copy configuration with prefixes that are not represented by exact entries in
+    // CONFIG_DEFINITIONS. In particular, scoped Iceberg REST URIs must reach dynamic catalogs so
+    // that workers use the same per-metalake endpoint as the coordinator.
     config.entrySet().stream()
         .filter(
             entry ->
                 (entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
                         || entry
                             .getKey()
-                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
+                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key)
+                        || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_URI.key + "."))
                     && !GravitinoConnectorFactory.isSecuritySensitivePropertyName(entry.getKey()))
         .forEach(
             entry ->
@@ -797,10 +868,8 @@ public class GravitinoConfig {
    * Unlike the discovered endpoint, this is plain local file configuration and is therefore
    * identical and valid on every node — coordinator and workers alike.
    *
-   * <p>{@code gravitino.iceberg.rest-uri.<metalake>} is checked first. The unscoped {@code
-   * gravitino.iceberg.rest-uri} is honored only in single-metalake mode, where it is unambiguous;
-   * in multi-metalake mode it is ignored, since a single Iceberg REST server serves exactly one
-   * metalake and applying it to every metalake would misroute the others.
+   * <p>{@code gravitino.iceberg.rest-uri.<metalake>} is checked first and overrides the unscoped
+   * {@code gravitino.iceberg.rest-uri}, which is the default for every metalake.
    *
    * @param metalake the metalake to resolve the override for
    * @return the manually configured Iceberg REST server endpoint, or an empty string when unset
@@ -810,11 +879,8 @@ public class GravitinoConfig {
     if (StringUtils.isNotBlank(scopedValue)) {
       return scopedValue;
     }
-    if (singleMetalakeMode()) {
-      return config.getOrDefault(
-          GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
-    }
-    return GRAVITINO_ICEBERG_REST_URI.defaultValue;
+    return config.getOrDefault(
+        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
   }
 
   /**
@@ -822,13 +888,20 @@ public class GravitinoConfig {
    * {@code gravitino.iceberg.rest-catalog.} prefix rewritten to {@code iceberg.rest-catalog.}.
    *
    * @return the Trino Iceberg REST catalog properties
+   * @throws TrinoException if the connector authenticates to Gravitino with a type that has no
+   *     Trino Iceberg REST security equivalent and {@code gravitino.iceberg.rest-catalog.security}
+   *     was not set explicitly to resolve the mismatch
    */
   public Map<String, String> getIcebergRestCatalogConfig() {
     String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
     Map<String, String> restCatalogConfig = new HashMap<>();
 
-    if ("oauth2".equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))) {
-      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "OAUTH2");
+    String authType = config.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if ("simple".equalsIgnoreCase(authType)) {
+      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "NONE");
+    } else if (OAUTH2.equalsIgnoreCase(authType)
+        && OAUTH2.equalsIgnoreCase(config.getOrDefault(prefix + "security", OAUTH2))) {
+      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", OAUTH2);
       putIfNotBlank(
           restCatalogConfig,
           TRINO_ICEBERG_REST_CATALOG_PREFIX + "oauth2.credential",
@@ -854,7 +927,38 @@ public class GravitinoConfig {
                 restCatalogConfig.put(
                     TRINO_ICEBERG_REST_CATALOG_PREFIX + entry.getKey().substring(prefix.length()),
                     entry.getValue()));
+
+    validateRestCatalogAuthentication(restCatalogConfig);
     return restCatalogConfig;
+  }
+
+  /**
+   * Fails fast when the resolved Iceberg REST catalog config would send no credentials to the
+   * Iceberg REST server, yet the connector authenticates to Gravitino itself with {@code basic} or
+   * {@code kerberos}, which Trino's Iceberg REST client cannot carry over. Left unchecked, such a
+   * catalog registers successfully and every query against it fails at {@code fetchConfig} once the
+   * REST server requires authentication, an error far removed from its cause.
+   */
+  private void validateRestCatalogAuthentication(Map<String, String> restCatalogConfig) {
+    if (restCatalogConfig.containsKey(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security")) {
+      return;
+    }
+    String authType = config.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if (authType == null
+        || !AUTH_TYPES_WITHOUT_REST_CATALOG_EQUIVALENT.contains(
+            authType.toLowerCase(Locale.ROOT))) {
+      return;
+    }
+    throw new TrinoException(
+        GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+        String.format(
+            "Cannot route an Iceberg catalog through the Iceberg REST server: "
+                + "gravitino.client.authType=%s has no equivalent Trino Iceberg REST security "
+                + "mode, so no credentials would be sent to it. If the REST server requires "
+                + "authentication, set 'gravitino.iceberg.rest-catalog.security' (and any "
+                + "matching oauth2.* properties) explicitly. If it does not, set "
+                + "'gravitino.iceberg.rest-catalog.security=NONE' to confirm that.",
+            authType));
   }
 
   private static void putIfNotBlank(Map<String, String> target, String key, String value) {

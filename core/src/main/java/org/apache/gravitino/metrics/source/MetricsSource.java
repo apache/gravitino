@@ -20,16 +20,13 @@
 package org.apache.gravitino.metrics.source;
 
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
+import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.Timer;
-import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.GravitinoEnv;
 
 /**
  * MetricsSource provides utilities to collect specified kind metrics, all metrics must create with
@@ -47,19 +44,10 @@ public abstract class MetricsSource {
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
-  private final int timeSlidingWindowSeconds;
 
   protected MetricsSource(String name) {
     this.metricsSourceName = name;
     metricRegistry = new MetricRegistry();
-    Config config = GravitinoEnv.getInstance().config();
-    if (config != null) {
-      this.timeSlidingWindowSeconds =
-          config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
-    } else {
-      // Couldn't get config when testing
-      this.timeSlidingWindowSeconds = Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS;
-    }
   }
 
   /**
@@ -107,12 +95,7 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Histogram
    */
   public Histogram getHistogram(String name) {
-    return this.metricRegistry.histogram(
-        name,
-        () ->
-            new Histogram(
-                new SlidingTimeWindowArrayReservoir(
-                    getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+    return this.metricRegistry.histogram(name, () -> new Histogram(newReservoir()));
   }
 
   /**
@@ -122,12 +105,7 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Timer
    */
   public Timer getTimer(String name) {
-    return this.metricRegistry.timer(
-        name,
-        () ->
-            new Timer(
-                new SlidingTimeWindowArrayReservoir(
-                    getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+    return this.metricRegistry.timer(name, () -> new Timer(newReservoir()));
   }
 
   /**
@@ -140,7 +118,14 @@ public abstract class MetricsSource {
     return this.metricRegistry.meter(name);
   }
 
-  protected int getTimeSlidingWindowSeconds() {
-    return timeSlidingWindowSeconds;
+  /**
+   * Creates the {@link Reservoir} backing new timers and histograms. Package-visible so tests can
+   * override it to inject a reservoir with a controllable {@link com.codahale.metrics.Clock}
+   * instead of exercising real wall-clock time.
+   *
+   * @return a new {@link ExponentiallyDecayingReservoir}
+   */
+  protected Reservoir newReservoir() {
+    return new ExponentiallyDecayingReservoir();
   }
 }

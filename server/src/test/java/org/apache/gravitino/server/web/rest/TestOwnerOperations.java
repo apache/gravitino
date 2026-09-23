@@ -94,7 +94,12 @@ class TestOwnerOperations extends BaseOperationsTest {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -314,6 +319,17 @@ class TestOwnerOperations extends BaseOperationsTest {
             .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
     ErrorResponse errorResponse3 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse3.getCode());
+  }
+
+  @Test
+  public void testSetOwnerForObjectWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/owners/metalake/metalake1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

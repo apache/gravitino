@@ -28,7 +28,7 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 |-----------|-----------------|
 | List      | ✅ Full          |
 | Load      | ✅ Full          |
-| Alter     | Not support now |
+| Alter     | ✅ Partial       |
 | Create    | ✅ Full          |
 | Register  | ✅ Full          |
 | Drop      | ✅ Full          |
@@ -114,6 +114,22 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
 - `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
 
+### Format boundary
+
+The Generic Catalog is format-agnostic for its general table APIs, but a Lance table operation must
+target an entity whose `format` property is `lance` (case-insensitive). Lance REST direct
+operations such as describe, drop, deregister, and alter reject a known non-Lance entity with
+HTTP `400 INVALID_INPUT`; `tableExists` presents it as absent. These checks preserve the existing
+metadata and location.
+
+For create requests dispatched to the Lance table delegator, an existing non-Lance entity remains
+a normal name conflict for `CREATE` (`409`). `EXIST_OK`, create `OVERWRITE`, and register
+`OVERWRITE` are rejected with `IllegalArgumentException` by the direct Gravitino API, which is
+returned as HTTP `400` by the Lance REST service. In particular, overwrite validation happens
+before metadata removal or a Lance dataset delete. Generic Catalog `ListTables` behavior is
+unchanged; it continues to list all formats. Format-specific listing is a separate follow-up
+concern.
+
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
 Also set additional properties specific to your lakehouse format or custom requirements.
@@ -135,8 +151,9 @@ Gravitino. It adds a dataset version check to every `loadTable` call.
 :::note Zero-column Lance dataset
 If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
 version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
-as long as the stored version is unchanged. Once columns are written to the dataset, the next
-`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
+as long as the stored version is unchanged. Before recording a new version, Lance table
+alterations recheck an empty stored schema and abort if it cannot be loaded, so incomplete column
+metadata is not associated with the latest dataset version.
 :::
 
 ### Table Operations
@@ -144,6 +161,41 @@ as long as the stored version is unchanged. Once columns are written to the data
 Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
 
 The following sections provide examples and important details for working with Lance tables. 
+
+#### Add a Column
+
+Lance tables support adding nullable, top-level columns through the Gravitino table API. New
+columns are appended to the schema, and Lance backfills existing rows with `NULL`.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "@type": "addColumn",
+      "fieldName": ["new_column"],
+      "type": "string",
+      "comment": "New nullable column",
+      "position": "default",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ]
+}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables/lance_table
+```
+
+The following add-column options are not supported:
+
+- Nested columns
+- Non-nullable columns
+- `FIRST` or `AFTER` column positions
+- Default values
+- Auto-increment columns
+
+:::note
+This operation is available through the Gravitino table API and Java client. The Lance REST
+`/add_columns` endpoint is not supported yet.
+:::
 
 #### Create a Lance Table
 
