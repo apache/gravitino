@@ -73,11 +73,11 @@ Everything Gravitino manages is an object with a type and a name. The name is th
 below the metalake, so a table is `{catalog}.{schema}.{table}`, and requests identify an object by
 both type and name, since the same name can exist at more than one type.
 
-##### Names containing dots
+##### Local names containing one or more dots
 
 ::::caution
 When authorization is enabled, Gravitino cannot authorize a federated object whose local name
-contains a dot (`.`), because dots separate the components of a qualified metadata object name.
+contains one or more dots (`.`), because dots separate the components of a qualified metadata object name.
 Loading such an object returns `400 Bad Request`. If a connector returns one of these objects in a
 list, Gravitino rejects the entire list request with `400 Bad Request` and identifies the unsupported
 name instead of returning a partial result. Consequently, one object with a dotted name can prevent
