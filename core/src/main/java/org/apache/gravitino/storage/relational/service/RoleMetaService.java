@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -170,7 +171,7 @@ public class RoleMetaService {
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakePO.getMetalakeId());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
-      List<Runnable> endpointLocks = Lists.newArrayList();
+      List<EndpointLock> endpointLocks = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
@@ -179,17 +180,16 @@ public class RoleMetaService {
         Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
         NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, entityType);
         objectBuilder.withMetadataObjectId(observed.entityId());
-        endpointLocks.add(
-            () -> LiveEndpointService.lockLiveEndpoint(identifier, entityType, observed));
+        endpointLocks.add(new EndpointLock(identifier, entityType, observed));
         securableObjectPOs.add(objectBuilder.build());
       }
+      Collections.sort(endpointLocks);
 
       // The role row is written before its securable objects. Concurrent overwrites then contend
       // on the role row first and replace the child rows only after they are serialized. The role
       // and its securable objects therefore change atomically, with the last overwrite winning.
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForRoleCreate(metalakePO),
-          () -> endpointLocks.forEach(Runnable::run),
           () ->
               SessionUtils.doWithoutCommit(
                   RoleMetaMapper.class,
@@ -200,6 +200,7 @@ public class RoleMetaService {
                       mapper.insertRoleMeta(rolePO);
                     }
                   }),
+          () -> endpointLocks.forEach(Runnable::run),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
@@ -254,7 +255,7 @@ public class RoleMetaService {
           toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalake);
 
       List<SecurableObjectPO> insertSecurableObjectPOs = Lists.newArrayList();
-      List<Runnable> endpointLocks = Lists.newArrayList();
+      List<EndpointLock> endpointLocks = Lists.newArrayList();
       for (SecurableObject object : insertObjects) {
         NameIdentifier objectIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object.type());
@@ -264,11 +265,16 @@ public class RoleMetaService {
                     oldRoleEntity.id(), object, getType(object))
                 .withMetadataObjectId(observed.entityId())
                 .build());
-        endpointLocks.add(
-            () -> LiveEndpointService.lockLiveEndpoint(objectIdentifier, objectType, observed));
+        endpointLocks.add(new EndpointLock(objectIdentifier, objectType, observed));
       }
+      Collections.sort(endpointLocks);
 
       SessionUtils.doMultipleWithCommit(
+          () ->
+              LiveEndpointService.lockLiveEndpoint(
+                  NameIdentifier.of(metalake),
+                  Entity.EntityType.METALAKE,
+                  new NamespacedEntityId(metalakeId)),
           () -> {
             int updated =
                 SessionUtils.getWithoutCommit(
@@ -568,5 +574,44 @@ public class RoleMetaService {
 
   private static String getType(SecurableObject securableObject) {
     return securableObject.type().name();
+  }
+
+  private static final class EndpointLock implements Runnable, Comparable<EndpointLock> {
+    private static final Comparator<EndpointLock> ORDER =
+        Comparator.comparingInt((EndpointLock lock) -> lockOrder(lock.type))
+            .thenComparingLong(lock -> lock.observed.entityId());
+
+    private final NameIdentifier identifier;
+    private final Entity.EntityType type;
+    private final NamespacedEntityId observed;
+
+    private EndpointLock(
+        NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId observed) {
+      this.identifier = identifier;
+      this.type = type;
+      this.observed = observed;
+    }
+
+    @Override
+    public void run() {
+      LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
+    }
+
+    @Override
+    public int compareTo(EndpointLock other) {
+      return ORDER.compare(this, other);
+    }
+
+    private static int lockOrder(Entity.EntityType type) {
+      // Relation writers take ordinary metadata endpoints before tags and policies, and
+      // PolicyTagRelService locks tags before policies.
+      if (type == Entity.EntityType.TAG) {
+        return Integer.MAX_VALUE - 1;
+      }
+      if (type == Entity.EntityType.POLICY) {
+        return Integer.MAX_VALUE;
+      }
+      return type.ordinal();
+    }
   }
 }
