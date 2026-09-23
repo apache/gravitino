@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -576,7 +577,8 @@ public class RoleMetaService {
     return securableObject.type().name();
   }
 
-  private static final class EndpointLock implements Runnable, Comparable<EndpointLock> {
+  @VisibleForTesting
+  static final class EndpointLock implements Runnable, Comparable<EndpointLock> {
     private static final Comparator<EndpointLock> ORDER =
         Comparator.comparingInt((EndpointLock lock) -> lockOrder(lock.type))
             .thenComparingLong(lock -> lock.observed.entityId());
@@ -585,8 +587,7 @@ public class RoleMetaService {
     private final Entity.EntityType type;
     private final NamespacedEntityId observed;
 
-    private EndpointLock(
-        NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId observed) {
+    EndpointLock(NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId observed) {
       this.identifier = identifier;
       this.type = type;
       this.observed = observed;
@@ -600,6 +601,13 @@ public class RoleMetaService {
     @Override
     public int compareTo(EndpointLock other) {
       return ORDER.compare(this, other);
+    }
+
+    @Override
+    public String toString() {
+      // A failed ordering assertion is about which endpoint sits where, so print that rather
+      // than an identity hash.
+      return type + "(" + observed.entityId() + ")";
     }
 
     private static int lockOrder(Entity.EntityType type) {

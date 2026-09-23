@@ -63,6 +63,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -1623,5 +1624,41 @@ class TestRoleMetaService extends TestJDBCBackend {
     } catch (SQLException e) {
       throw new RuntimeException("Advance role version failed", e);
     }
+  }
+
+  @TestTemplate
+  public void testEndpointLocksSortIntoTheGlobalLockOrder() {
+    // Every relation writer takes its endpoint locks in one order, or two of them can wait on each
+    // other: ordinary metadata objects first, then tags, then policies. TagMetaService and
+    // PolicyTagRelService encode the tail of that order by hand, so this pins the sort that
+    // RoleMetaService relies on to agree with them.
+    // FUNCTION and MODEL are declared after TAG and POLICY in EntityType, so sorting on the enum
+    // order alone would take them after a tag or a policy and invert the order the other two
+    // services use. Those two types are what make this sort more than a formality.
+    RoleMetaService.EndpointLock policy = endpointLock("a_policy", Entity.EntityType.POLICY, 10L);
+    RoleMetaService.EndpointLock tag = endpointLock("z_tag", Entity.EntityType.TAG, 20L);
+    RoleMetaService.EndpointLock function =
+        endpointLock("a_function", Entity.EntityType.FUNCTION, 30L);
+    RoleMetaService.EndpointLock model = endpointLock("a_model", Entity.EntityType.MODEL, 31L);
+    RoleMetaService.EndpointLock catalogHigherId =
+        endpointLock("c2", Entity.EntityType.CATALOG, 41L);
+    RoleMetaService.EndpointLock catalogLowerId =
+        endpointLock("c1", Entity.EntityType.CATALOG, 40L);
+
+    List<RoleMetaService.EndpointLock> locks =
+        Lists.newArrayList(policy, tag, function, model, catalogHigherId, catalogLowerId);
+    Collections.sort(locks);
+
+    assertEquals(
+        Lists.newArrayList(catalogLowerId, catalogHigherId, model, function, tag, policy),
+        locks,
+        "endpoint locks must sort ordinary objects before tags and policies, and by ID within a"
+            + " type");
+  }
+
+  private static RoleMetaService.EndpointLock endpointLock(
+      String name, Entity.EntityType type, long id) {
+    return new RoleMetaService.EndpointLock(
+        NameIdentifier.of("metalake", name), type, new NamespacedEntityId(id, 1L));
   }
 }

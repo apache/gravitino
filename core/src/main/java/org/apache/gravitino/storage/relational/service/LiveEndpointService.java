@@ -30,7 +30,12 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 
-/** Fences metadata-object endpoints while a relation or statistic write is in progress. */
+/**
+ * Fences metadata-object endpoints while a relation write is in progress.
+ *
+ * <p>Statistic writers take a schema lock of their own today and adopt this fence in #13177, so
+ * nothing here covers them yet.
+ */
 public final class LiveEndpointService {
 
   private LiveEndpointService() {}
@@ -52,7 +57,7 @@ public final class LiveEndpointService {
     if (type == Entity.EntityType.METALAKE) {
       lock(identifier, type, observed.entityId());
     } else {
-      Preconditions.checkArgument(namespaceIds.length > 0, "Missing metalake ID for %s", type);
+      checkNamespaceDepth(type, namespaceIds, 1);
       lock(identifier, Entity.EntityType.METALAKE, namespaceIds[0]);
       if (type == Entity.EntityType.CATALOG) {
         lock(identifier, type, observed.entityId());
@@ -61,8 +66,10 @@ public final class LiveEndpointService {
         if (type == Entity.EntityType.SCHEMA) {
           lock(identifier, type, observed.entityId());
         } else {
+          checkNamespaceDepth(type, namespaceIds, 3);
           lock(identifier, Entity.EntityType.SCHEMA, namespaceIds[2]);
           if (type == Entity.EntityType.COLUMN) {
+            checkNamespaceDepth(type, namespaceIds, 4);
             lock(identifier, Entity.EntityType.TABLE, namespaceIds[3]);
           } else {
             lock(identifier, type, observed.entityId());
@@ -86,6 +93,26 @@ public final class LiveEndpointService {
     if (!Arrays.equals(current.fullIds(), observed.fullIds())) {
       throw missing(identifier, type);
     }
+  }
+
+  /**
+   * Rejects a namespace that is too shallow for the walk below it.
+   *
+   * <p>The walk indexes the namespace by position, so a chain shorter than its type implies would
+   * otherwise leave the endpoint partly unlocked or fail with an index error that names nothing.
+   *
+   * @param type the endpoint type being locked
+   * @param namespaceIds the observed namespace ID chain
+   * @param required the number of namespace IDs the walk is about to rely on
+   */
+  private static void checkNamespaceDepth(
+      Entity.EntityType type, long[] namespaceIds, int required) {
+    Preconditions.checkArgument(
+        namespaceIds.length >= required,
+        "A %s endpoint needs at least %s namespace IDs, got %s",
+        type,
+        required,
+        namespaceIds.length);
   }
 
   private static void lock(NameIdentifier identifier, Entity.EntityType type, long id) {
