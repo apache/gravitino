@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.sun.net.httpserver.HttpServer;
 import java.io.File;
@@ -1869,6 +1870,72 @@ public class TestJobManager {
     } finally {
       FileUtils.deleteDirectory(outsideDir);
     }
+  }
+
+  @Test
+  public void testCleanUpStagingDirsDeletesLegacyStagingDirOfNestedTemplateName()
+      throws IOException {
+    // Template names may contain '/', which the legacy layout put in the path as is, so the job
+    // directory is nested deeper. The template was never renamed: this is an upgraded job.
+    JobEntity job = expiredJob();
+    JobEntity nestedTemplateJob =
+        JobEntity.builder()
+            .withId(job.id())
+            .withJobExecutionId(job.jobExecutionId())
+            .withNamespace(job.namespace())
+            .withJobTemplateName("team/etl")
+            .withStartedAt(job.startedAt())
+            .withFinishedAt(job.finishedAt())
+            .withStatus(job.status())
+            .withAuditInfo(job.auditInfo())
+            .build();
+    mockListActiveJobs(nestedTemplateJob);
+    when(entityStore.delete(NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB))
+        .thenReturn(true);
+    File legacyDir = new File(testStagingDir, metalake + "/team/etl/" + job.name());
+    Assertions.assertTrue(legacyDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(legacyDir.exists());
+  }
+
+  @Test
+  public void testFindLegacyJobStagingDirsOfNestedTemplateNames() throws IOException {
+    long jobId = idGenerator.nextId();
+    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
+    File stagingDir = new File(testStagingDir).getAbsoluteFile();
+    File nestedDir = new File(stagingDir, metalake + "/team/etl/" + jobDirName);
+    Assertions.assertTrue(nestedDir.mkdirs());
+    File deeplyNestedDir = new File(stagingDir, metalake + "/a/b/c/d/" + jobDirName);
+    Assertions.assertTrue(deeplyNestedDir.mkdirs());
+
+    // The staging directory of another job is not descended into: a directory of its own files
+    // named like this job is not this job's staging directory.
+    File otherJobDir =
+        new File(
+            stagingDir,
+            metalake
+                + "/shell_job/"
+                + JobHandle.JOB_ID_PREFIX
+                + (jobId + 1)
+                + File.separator
+                + jobDirName);
+    Assertions.assertTrue(otherJobDir.mkdirs());
+
+    // A template name nested deeper than the lookup goes keeps its directory.
+    StringBuilder tooDeepPath = new StringBuilder(metalake);
+    for (int i = 0; i < 20; i++) {
+      tooDeepPath.append(File.separator).append("d").append(i);
+    }
+    File tooDeepDir = new File(stagingDir, tooDeepPath + File.separator + jobDirName);
+    Assertions.assertTrue(tooDeepDir.mkdirs());
+
+    Assertions.assertEquals(
+        ImmutableSet.of(nestedDir.getAbsolutePath(), deeplyNestedDir.getAbsolutePath()),
+        jobManager.findLegacyJobStagingDirs(jobId).stream()
+            .map(File::getAbsolutePath)
+            .collect(Collectors.toSet()));
   }
 
   @Test

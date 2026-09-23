@@ -95,6 +95,14 @@ public class JobManager implements JobOperationDispatcher {
   // layout.
   private static final String JOB_RUNS_DIR_NAME = "job-runs";
 
+  private static final Pattern JOB_DIR_PATTERN =
+      Pattern.compile(Pattern.quote(JobHandle.JOB_ID_PREFIX) + "\\d+");
+
+  // Bounds how deep a legacy staging directory is looked up below a job template's first path
+  // element. A template name nested deeper than this keeps its directory, which is better than
+  // walking an unrelated directory tree an operator put in the staging directory.
+  private static final int LEGACY_JOB_STAGING_DIR_MAX_DEPTH = 16;
+
   private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
 
   private static final long JOB_STATUS_PULL_MIN_INTERVAL_IN_MS = 60 * 1000L; // 1 minute
@@ -1129,10 +1137,9 @@ public class JobManager implements JobOperationDispatcher {
         // file system, must not prevent finding the job under the other directories.
         try (DirectoryStream<Path> templateDirs = Files.newDirectoryStream(metalakeDir)) {
           for (Path templateDir : templateDirs) {
-            Path jobDir = templateDir.resolve(jobDirName);
-            if (Files.isDirectory(templateDir, LinkOption.NOFOLLOW_LINKS)
-                && Files.isDirectory(jobDir, LinkOption.NOFOLLOW_LINKS)) {
-              legacyJobStagingDirs.add(jobDir.toFile());
+            if (Files.isDirectory(templateDir, LinkOption.NOFOLLOW_LINKS)) {
+              collectLegacyJobStagingDirs(
+                  templateDir, jobDirName, LEGACY_JOB_STAGING_DIR_MAX_DEPTH, legacyJobStagingDirs);
             }
           }
         } catch (IOException | DirectoryIteratorException e) {
@@ -1145,6 +1152,29 @@ public class JobManager implements JobOperationDispatcher {
       }
     }
     return legacyJobStagingDirs;
+  }
+
+  // The legacy layout put the template name in the path as is, and a template name may contain
+  // '/', so the job directory can be nested deeper than <metalake>/<template>/job-<id>, e.g. under
+  // a template named "team/etl". The staging directory of another job is never descended into: its
+  // contents are that job's own files.
+  private static void collectLegacyJobStagingDirs(
+      Path dir, String jobDirName, int remainingDepth, List<File> legacyJobStagingDirs)
+      throws IOException {
+    try (DirectoryStream<Path> children = Files.newDirectoryStream(dir)) {
+      for (Path child : children) {
+        if (!Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+
+        String name = child.getFileName().toString();
+        if (name.equals(jobDirName)) {
+          legacyJobStagingDirs.add(child.toFile());
+        } else if (remainingDepth > 0 && !JOB_DIR_PATTERN.matcher(name).matches()) {
+          collectLegacyJobStagingDirs(child, jobDirName, remainingDepth - 1, legacyJobStagingDirs);
+        }
+      }
+    }
   }
 
   private void deleteJobStagingDir(JobEntity job) throws IOException {
