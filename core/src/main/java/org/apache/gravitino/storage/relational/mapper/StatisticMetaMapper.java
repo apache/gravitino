@@ -34,15 +34,18 @@ public interface StatisticMetaMapper {
   List<StatisticPO> listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
-  @InsertProvider(
-      type = StatisticSQLProviderFactory.class,
-      method = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
-  void batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs);
+  /** Inserts a statistic only when no live row has the same name and target. */
+  @InsertProvider(type = StatisticSQLProviderFactory.class, method = "insertStatisticPO")
+  Integer insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO);
 
-  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
-  Integer batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames);
+  /** Replaces a statistic value only if its observed version is still current. */
+  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "updateStatisticPOWithVersion")
+  Integer updateStatisticPOWithVersion(
+      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous);
+
+  /** Soft-deletes a statistic only if its observed version is still current. */
+  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "deleteStatisticPOWithVersion")
+  Integer deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,
