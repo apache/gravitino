@@ -42,7 +42,7 @@ TMS uses a **dual trigger model** (§5.4–§5.6):
   invokes an in-process TMS callback for **compaction only** (§5.4.1).
 - **Scheduled path** — each node runs a **`MaintenanceScheduler`** (`selectDueWork` per-row claim).
   When `next_due_at` is due, any node may claim and run that policy. **All four policy types** use
-  this path (§9: at-least-once latest-state).
+  this path.
 
 ---
 
@@ -172,7 +172,7 @@ Gravitino IRC (:9001, same JVM as main server)
 MaintenanceScheduler (every node — §5.3)
         selectDueWork → claim → submit
         ├─ Compaction due (§5.4.2)  // job: update-stats → decision → compaction
-        ├─ Track A (§5.5): manifest | expire (soft: manifest before expire; worst-first)
+        ├─ Track A (§5.5): manifest | expire
         ├─ Track B (§5.6): orphan (oldest-cleanup-first)
         v
 Gravitino Job framework + job_run_meta (§6.4)
@@ -316,8 +316,7 @@ IRC commit succeeded → post-commit hook (§5.1.1)
 
 IRC thread: async hand-off only. No `next_due_at` check. Order: **`minIntervalMs` → claim →
 submit** (one job: **update-stats → decision → compaction**). Missing state → skip. Async failure →
-best effort (§9); next commit or scheduler can still drive. Multi-node: claim (§6.1) prevents
-double-submit.
+next commit or scheduler can still drive. Multi-node: claim (§6.1) prevents double-submit.
 
 #### 5.4.2 Scheduler path (scheduled compaction)
 
@@ -330,11 +329,8 @@ after update-stats. Manifest / expire / orphan: **scheduler only**.
 
 ### 5.5 Hot pipeline (scheduled — Track A)
 
-Track A: **manifest** and **expire** as **separate** policies — each has its own state row / claim.
-With separate policies, TMS **cannot** guarantee true serial execution (manifest must succeed, then
-expire). At best it can **soft-order**: prefer manifest before expire; skip expire while that table
-has a due/RUNNING manifest; schedule manifest earlier when both attach. Compaction uses the
-compaction track (§5.4.2). Per-type `minIntervalMs` (§7.3); rank worst-first.
+Track A: **manifest** and **expire** as **separate** scheduled policies (own state row / claim each).
+Compaction uses the compaction track (§5.4.2). Per-type `minIntervalMs` (§7.3).
 
 ---
 
@@ -422,8 +418,7 @@ String keys need rewrite/purge via `IcebergTableLifecycleHook` (§7.2).
 
 ### 6.4 Job run history (`job_run_meta`)
 
-Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, clear `job_id`
-(§9.3).
+Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, clear `job_id`.
 ---
 
 ## 7. Configuration
@@ -496,13 +491,13 @@ on discovery (§5.3.1).
 |           | 1                                                       | 2                                              | 3                                              | 4                                                  | 5                                 | 6–8                 |
 | --------- | ------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- | -------------------------------------------------- | --------------------------------- | ------------------- |
 | Work item | In-process plugin + commit callback                     | State table + claim                            | `MaintenanceScheduler` + discovery             | Compaction on scheduler schedule                   | Track A / B                       | Profile API, harden |
-| Notes     | Feature; IRC async `IcebergCommitEventHandler` (§5.4.1) | State materialization; nearest-wins (§5.2, §6) | `selectDueWork` + Iceberg/HMS discovery (§5.3) | Scheduler compaction; commit path unchanged (§5.4) | Hot pipeline + orphan (§5.5–§5.6) | §5.2.2, §9          |
+| Notes     | Feature; IRC async `IcebergCommitEventHandler` (§5.4.1) | State materialization; nearest-wins (§5.2, §6) | `selectDueWork` + Iceberg/HMS discovery (§5.3) | Scheduler compaction; commit path unchanged (§5.4) | Hot pipeline + orphan (§5.5–§5.6) | §5.2.2              |
 
 #### Phase 1–4 checklist
 
 - [ ] Phase 1: IRC async `IcebergCommitEventHandler` (§5.4.1, §7.2).
 - [ ] Phase 3: scheduler workers; discovery from Iceberg/HMS; immediate table attach; CAS
-      `selectDueWork`; heartbeats; `next_due_at`; all four types; Track A soft order; orphan
+      `selectDueWork`; heartbeats; `next_due_at`; all four types; Track A; orphan
       oldest-first + interval gate; multi-node claim tests; commit-path
       heartbeat registration; discovery reconcile (§5.2–§5.6, §6.1).
 - [ ] Phase 4: commit path does not write `next_due_at`; claim +
@@ -510,38 +505,13 @@ on discovery (§5.3.1).
 
 ### 8.2 Review Checklist
 
-|           | Deployment                                     | Policy                                                                          | Trigger                                                                           | Discovery                                                       | Multi-node                                                        | Commit callback                             | Durability                       | Orchestration                                    | Industry                             | Fault tolerance                                                |
-| --------- | ---------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------- |
-| Checklist | `extensionPackages`; IRC same JVM on **8090**. | Four types; nearest-wins; table attach immediate; above-table discovery (§5.2). | Compaction: commit + scheduler; others: scheduler + `next_due_at` (§5.4, §5.2.4). | Iceberg/HMS list; separate from `selectDueWork` (§5.3.1, §4.4). | No leader; per-row CAS like `IcebergCleanupManager` (§5.3, §4.3). | Async `IcebergCommitEventHandler` (§5.4.1). | State for claim/schedule (§6.2). | Track A soft order; orphan separate (§5.5–§5.6). | §4.2 / §4.3 / §4.4 (row CAS chosen). | Scheduler at-least-once latest-state; commit best effort (§9). |
+|           | Deployment                                     | Policy                                                                          | Trigger                                                                           | Discovery                                                       | Multi-node                                                        | Commit callback                             | Durability                       | Orchestration                         | Industry                             |
+| --------- | ---------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------------------------- | ------------------------------------ |
+| Checklist | `extensionPackages`; IRC same JVM on **8090**. | Four types; nearest-wins; table attach immediate; above-table discovery (§5.2). | Compaction: commit + scheduler; others: scheduler + `next_due_at` (§5.4, §5.2.4). | Iceberg/HMS list; separate from `selectDueWork` (§5.3.1, §4.4). | No leader; per-row CAS like `IcebergCleanupManager` (§5.3, §4.3). | Async `IcebergCommitEventHandler` (§5.4.1). | State for claim/schedule (§6.2). | Track A; orphan separate (§5.5–§5.6). | §4.2 / §4.3 / §4.4 (row CAS chosen). |
 
 ---
 
-## 9. Fault tolerance and delivery guarantees
-
-### 9.1 Delivery models
-
-|            | Best effort                         | At-least-once latest-state                                  | Exactly-once job effect                              |
-| ---------- | ----------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------- |
-| TMS target | **Commit compaction path** (§5.4.1) | **`MaintenanceScheduler` path** — recovery from table state | **Not required** — claim + `job_id` bound duplicates |
-
-**Commit path:** best effort after async hand-off; handler failure → next commit or scheduler. Manifest /
-expire / orphan are scheduler-only.
-
-**Scheduler path:** coalescing OK — act on **current** state; due row stays due until claim + complete.
-
-### 9.2 Recovery is driven by table state
-
-Recovery / interval gates use per-policy `last_job_id` / `job_id`, and `minIntervalMs` (§7.3).
-
-### 9.3 Recovery at failure boundaries
-
-|          | Async handler fails before claim          | Node fails holding a claim                                            | `minIntervalMs` gate fails before claim       | Job accepted before `job_id` recorded |
-| -------- | ----------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
-| Behavior | Next commit or scheduler schedule retries | Stale `heartbeat_at` reclaims `RUNNING`; peer `selectDueWork` retries | Skip claim; retry later when interval elapsed | Claim + `job_id` bound duplicates     |
-
----
-
-## 10. References
+## 9. References
 
 1. [Gravitino Iceberg REST](../docs/iceberg-rest-service.md); [policies](../docs/manage-policies-in-gravitino.md); [compaction policy](../docs/iceberg-compaction-policy.md)
 2. [Expire](./iceberg-expire-snapshots-maintenance-job.md) / [rewrite-manifests](./iceberg-rewrite-manifests-job.md) / [remove-orphan](./iceberg-remove-orphan-files-maintenance-job.md) design docs
