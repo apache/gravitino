@@ -14,7 +14,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 
 ## Capabilities
 
-1. Supports [Hive catalog](flink-catalog-hive.md) (Flink 1.18, 1.19, and 1.20 only; not yet available on
+1. Supports [Hive catalog](flink-catalog-hive.md) (Flink 1.19 and 1.20 only; not yet available on
    Flink 2.x — see [Prerequisites](#prerequisites))
 2. Supports [Iceberg catalog](flink-catalog-iceberg.md)
 3. Supports [Paimon catalog](flink-catalog-paimon.md)
@@ -23,8 +23,8 @@ The connector is published as a version-specific runtime JAR for each supported 
 
 ## Prerequisites
 
-* Scala 2.12 (Flink 1.18, 1.19, and 1.20 only; Flink 2.x removed the Scala APIs)
-* Flink 1.18, 1.19, 1.20, or 2.1
+* Scala 2.12 (Flink 1.19 and 1.20 only; Flink 2.x removed the Scala APIs)
+* Flink 1.19, 1.20, or 2.1
 * JDK 8, 11 or 17 for Flink 1.x; JDK 17 for Flink 2.x
 
 On Flink 2.x, the Hive catalog is not supported: `flink-connector-hive` has not published a
@@ -36,12 +36,11 @@ catalogs are supported on Flink 2.x.
 
 1. [Build](../how-to-build.md) or download the Gravitino Flink connector runtime JAR that matches your Flink minor version, and place it in the classpath of Flink.
 
-| Flink version | Runtime artifact |
-|---------------|------------------|
-| 1.18          | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| Flink version | Runtime artifact                                                       |
+|---------------|------------------------------------------------------------------------|
 | 1.19          | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
-| 2.1           | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar` |
+| 2.1           | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
 
 Do not mix runtime JARs from different Flink minor versions in the same Flink deployment.
 

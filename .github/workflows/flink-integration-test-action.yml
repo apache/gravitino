@@ -48,7 +48,7 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests for every supported Flink minor
         run: |
-          for v in 1.18 1.19 1.20 2.1; do
+          for v in 1.19 1.20 2.1; do
             ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true \
               :flink-connector:flink-$v:test \
               --tests "org.apache.gravitino.flink.connector.integration.test.**"
@@ -64,8 +64,6 @@ jobs:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
           path: |
             build/reports
-            flink-connector/v1.18/flink/build/*.log
-            flink-connector/v1.18/flink/build/*.tar
             flink-connector/v1.19/flink/build/*.log
             flink-connector/v1.19/flink/build/*.tar
             flink-connector/v1.20/flink/build/*.log

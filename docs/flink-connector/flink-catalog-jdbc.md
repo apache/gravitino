@@ -28,7 +28,6 @@ Place the following JAR files in the lib directory of your Flink installation:
 
 | Flink version | Flink JDBC connector version | Gravitino runtime artifact                                             |
 |---------------|------------------------------|------------------------------------------------------------------------|
-| 1.18          | `3.2.0-1.18`                 | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
 | 1.19          | `3.3.0-1.19`                 | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `3.3.0-1.20`                 | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 | 2.1           | `4.1.0-2.1`                  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
