@@ -49,15 +49,10 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
 ::::caution Topic names containing dots
-When authorization is enabled, Gravitino cannot authorize a topic whose name contains a dot (`.`),
-because dots separate the components of a qualified metadata object name. Loading such a topic
-returns `400 Bad Request`. If a Kafka cluster contains one of these topics, Gravitino rejects the
-entire topic list request with `400 Bad Request` and identifies the unsupported name instead of
-returning a partial result. Consequently, one topic with a dotted name can prevent every topic in the
-schema from appearing in list APIs and Explore.
-
-Rename or recreate the topic in Kafka with a name that does not contain dots before using it with
-authorization. When authorization is disabled, Kafka-supported topic names remain accessible.
+When authorization is enabled, topic names containing dots are unsupported, and one such topic can
+cause the entire topic list request to fail. See
+[Names containing dots](./security/access-control.md#names-containing-dots) for details and the
+workaround.
 ::::
 
 ### Topic Properties
