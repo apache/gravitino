@@ -49,9 +49,19 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(1, monthStartPartitions.length);
     assertFunctionTransform(monthStartPartitions[0], "toStartOfMonth", "event_time");
 
+    Transform[] quarterStartPartitions =
+        operations.parsePartitioning("toStartOfQuarter(event_time)");
+    Assertions.assertEquals(1, quarterStartPartitions.length);
+    assertFunctionTransform(quarterStartPartitions[0], "toStartOfQuarter", "event_time");
+
+    Transform[] yearStartPartitions = operations.parsePartitioning("toStartOfYear(event_time)");
+    Assertions.assertEquals(1, yearStartPartitions.length);
+    assertFunctionTransform(yearStartPartitions[0], "toStartOfYear", "event_time");
+
     // A native expression that cannot be structured returns an empty transform array. The raw
     // expression is instead exposed through the read-only partition-key property during load.
     Assertions.assertEquals(0, operations.parsePartitioning("cityHash64(user_id) % 16").length);
+    Assertions.assertEquals(0, operations.parsePartitioning("toStartOfDay(event_time)").length);
 
     Transform[] identityPartitions = operations.parsePartitioning("metric_type");
     Assertions.assertEquals(1, identityPartitions.length);
@@ -63,10 +73,14 @@ public class TestClickHouseTableOperationsPartitioning {
     assertSingleFieldTransform(tuplePartitions[1], Transforms.NAME_OF_IDENTITY, "tenant_id");
 
     Transform[] functionTuplePartitions =
-        operations.parsePartitioning("(toStartOfWeek(ts), toStartOfMonth(created_at))");
-    Assertions.assertEquals(2, functionTuplePartitions.length);
+        operations.parsePartitioning(
+            "(toStartOfWeek(ts), toStartOfMonth(created_at), "
+                + "toStartOfQuarter(created_at), toStartOfYear(ts))");
+    Assertions.assertEquals(4, functionTuplePartitions.length);
     assertFunctionTransform(functionTuplePartitions[0], "toStartOfWeek", "ts");
     assertFunctionTransform(functionTuplePartitions[1], "toStartOfMonth", "created_at");
+    assertFunctionTransform(functionTuplePartitions[2], "toStartOfQuarter", "created_at");
+    assertFunctionTransform(functionTuplePartitions[3], "toStartOfYear", "ts");
 
     Assertions.assertEquals(0, operations.parsePartitioning("tuple()").length);
     Assertions.assertEquals(0, operations.parsePartitioning("  ").length);
@@ -80,6 +94,10 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(0, operations.parsePartitioning("toYear(toString(event_time))").length);
     Assertions.assertEquals(
         0, operations.parsePartitioning("toStartOfMonth(toDate(event_time))").length);
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toStartOfQuarter(toDate(event_time))").length);
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toStartOfYear(toDate(event_time))").length);
   }
 
   @Test
@@ -98,6 +116,15 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(1, monthStartPartitions.length);
     assertFunctionTransform(monthStartPartitions[0], "toStartOfMonth", "event-time");
 
+    Transform[] quarterStartPartitions =
+        operations.parsePartitioning("toStartOfQuarter(`event-time`)");
+    Assertions.assertEquals(1, quarterStartPartitions.length);
+    assertFunctionTransform(quarterStartPartitions[0], "toStartOfQuarter", "event-time");
+
+    Transform[] yearStartPartitions = operations.parsePartitioning("toStartOfYear(`event-time`)");
+    Assertions.assertEquals(1, yearStartPartitions.length);
+    assertFunctionTransform(yearStartPartitions[0], "toStartOfYear", "event-time");
+
     Transform[] identityPartitions = operations.parsePartitioning("`event-time`");
     Assertions.assertEquals(1, identityPartitions.length);
     assertSingleFieldTransform(identityPartitions[0], Transforms.NAME_OF_IDENTITY, "event-time");
@@ -108,6 +135,13 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(0, operations.parsePartitioning("toStartOfWeek(event_time, 1)").length);
     Assertions.assertEquals(
         0, operations.parsePartitioning("toStartOfWeek(event_time, 1, 'Asia/Shanghai')").length);
+  }
+
+  @Test
+  public void testQuarterAndYearAdditionalArgumentsRemainUnstructured() {
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toStartOfQuarter(event_time, 1)").length);
+    Assertions.assertEquals(0, operations.parsePartitioning("toStartOfYear(event_time, 1)").length);
   }
 
   private void assertFunctionTransform(

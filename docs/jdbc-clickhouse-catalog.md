@@ -271,10 +271,10 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
    - Accept format: `id`, `(id, name)`, `(func(id), name)`, `func(id)`;
    - Reject format: `(id + 1)`, `(func(id) + 1)`, etc.
 
-- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at`, `PARTITION BY toYYYYMM(created_at)`, `PARTITION BY toStartOfWeek(created_at)`, and `PARTITION BY toStartOfMonth(created_at)` are supported, but `PARTITION BY (created_at + 1)` is not supported.
+- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at`, `PARTITION BY toYYYYMM(created_at)`, `PARTITION BY toStartOfWeek(created_at)`, `PARTITION BY toStartOfMonth(created_at)`, `PARTITION BY toStartOfQuarter(created_at)`, and `PARTITION BY toStartOfYear(created_at)` are supported, but `PARTITION BY (created_at + 1)` is not supported.
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
-   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, and `PARTITION BY toStartOfMonth(column_name)`. Other function expressions are not supported as structured transforms.
+   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, `PARTITION BY toStartOfMonth(column_name)`, `PARTITION BY toStartOfQuarter(column_name)`, and `PARTITION BY toStartOfYear(column_name)`. Other function expressions are not supported as structured transforms.
    - `toStartOfWeek(column_name)` uses ClickHouse's default mode `0` (Sunday start) and the server timezone. Calls with an explicit mode or timezone are not structured.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
 

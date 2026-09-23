@@ -147,6 +147,16 @@ public class TestClickHouseTableOperationsUnit {
         ClickHouseTableSqlUtils.toPartitionExpression(
             Transforms.apply(
                 "toStartOfMonth", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfQuarter(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfQuarter", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfYear(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfYear", new Expression[] {NamedReference.field("event_time")})));
   }
 
   @Test
@@ -156,7 +166,25 @@ public class TestClickHouseTableOperationsUnit {
         () ->
             ClickHouseTableSqlUtils.toPartitionExpression(
                 Transforms.apply(
-                    "toStartOfQuarter", new Expression[] {NamedReference.field("event_time")})));
+                    "toStartOfDay", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfQuarter",
+                    new Expression[] {
+                      NamedReference.field("event_time"), NamedReference.field("tenant_id")
+                    })));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfYear",
+                    new Expression[] {
+                      FunctionExpression.of("toDate", NamedReference.field("event_time"))
+                    })));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
