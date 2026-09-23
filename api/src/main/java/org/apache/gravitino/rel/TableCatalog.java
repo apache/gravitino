@@ -319,4 +319,28 @@ public interface TableCatalog {
   default boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     throw new UnsupportedOperationException("purgeTable not supported.");
   }
+
+  /**
+   * Resolves a normalized table identifier to the identifier under which the table is physically
+   * stored by the underlying source, when the two can differ.
+   *
+   * <p>Most catalogs store an object under exactly the name Gravitino normalized it to, so the
+   * default implementation returns {@code ident} unchanged. A catalog whose name normalization is
+   * not reversible — for example one that folds an unquoted name to a fixed case while the source
+   * also preserves case-sensitive names created with a different case — may override this to map
+   * the normalized name back to the actual stored name, so that a name returned by {@link
+   * #listTables(Namespace)} can be loaded, altered, and dropped as given.
+   *
+   * <p>Implementations must be side-effect free and must not open new connections beyond what the
+   * catalog already holds; they are invoked on the load/alter/drop path before the operation runs.
+   * The returned identifier is used both for the underlying source call and as the Gravitino entity
+   * store key, so it must stay consistent across both.
+   *
+   * @param ident A normalized table identifier.
+   * @return The identifier under which the table is physically stored; {@code ident} unchanged when
+   *     no mapping is needed.
+   */
+  default NameIdentifier resolveTableName(NameIdentifier ident) {
+    return ident;
+  }
 }

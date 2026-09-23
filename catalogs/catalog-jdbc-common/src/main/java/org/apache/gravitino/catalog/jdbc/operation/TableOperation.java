@@ -148,4 +148,26 @@ public interface TableOperation {
   default JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
     throw new UnsupportedOperationException("Table partition operation is not supported yet");
   }
+
+  /**
+   * Maps a normalized table name to the name under which the table is physically stored, when the
+   * two can differ for this backend.
+   *
+   * <p>The default returns {@code tableName} unchanged: most backends store a table under exactly
+   * the normalized name. A backend whose name normalization is not reversible (for example one that
+   * folds unquoted names to a fixed case while also preserving case-sensitive names) may override
+   * this to look the real stored name up from its catalog, so a name returned by {@link
+   * #listTables(String)} round-trips through load/alter/drop.
+   *
+   * <p>Implementations must be side-effect free and reuse the operation's existing data source
+   * rather than opening new connections.
+   *
+   * @param databaseName The name of the database (schema).
+   * @param tableName The normalized table name.
+   * @return The physically stored table name; {@code tableName} unchanged when no mapping is
+   *     needed.
+   */
+  default String resolveTableName(String databaseName, String tableName) {
+    return tableName;
+  }
 }

@@ -365,6 +365,15 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @throws NoSuchTableException If the specified table does not exist in the Jdbc.
    */
   @Override
+  public NameIdentifier resolveTableName(NameIdentifier tableIdent) {
+    String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
+    String resolved = tableOperation.resolveTableName(databaseName, tableIdent.name());
+    return resolved.equals(tableIdent.name())
+        ? tableIdent
+        : NameIdentifier.of(tableIdent.namespace(), resolved);
+  }
+
+  @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     String tableName = tableIdent.name();
