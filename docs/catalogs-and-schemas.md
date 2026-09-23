@@ -74,9 +74,9 @@ where they are.
 
 ### What Gravitino Stores
 
-Gravitino stores the catalog registration, the schemas and objects created through it, and anything
-associated with those objects such as tags, derived policies, and ownership. It does not store a copy of the
-source system's contents.
+Gravitino stores the catalog registration, the schemas and objects created through it, and their tag
+assignments and ownership. Policies are derived from effective tags when they are read. Gravitino
+does not store a copy of the source system's contents.
 
 Listing tables in a schema reaches the source system at request time, so a table created directly in
 Hive appears the next time Gravitino is asked. The consequence worth knowing is that Gravitino

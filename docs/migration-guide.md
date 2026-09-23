@@ -27,6 +27,9 @@ existing deployments. For database backup, schema scripts, and rollback commands
   A policy matching through multiple tags appears once. With `details=true`, `inherited` is
   true only if the matching tag assignments are inherited. Disabled policies remain associated
   with tags but do not appear in object policy results.
+- In Gravitino 1.3, disabling a policy was advisory and did not change what consumers received.
+  Object policy lookup now excludes disabled policies. Before upgrading, inventory disabled
+  policies and re-enable any that consumers must continue to receive.
 - The legacy `supportedObjectTypes` field no longer filters object policy lookup. Consumers
   must decide which policy types they can use. For example, TMS should consume the built-in
   compaction policy type from each table's resolved policies.
@@ -43,9 +46,10 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 Paths in this table are relative to `/api/metalakes/{metalake}`. A policy-to-tag association
 requires a selector. `ALL_VALUES` matches tag presence, including an assignment without a
-value; `TAG_VALUE` matches one exact assignment value. To change an existing selector, remove
-the association and add it again. See [Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations)
-for REST and Java examples.
+value; `TAG_VALUE` matches when one effective tag assignment value equals the selector value.
+To change an existing selector, remove the association and add it again. See
+[Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) for REST and Java
+examples.
 
 The Python client can manage tag assignments but does not provide policy APIs. Use REST for
 policy-to-tag association changes.
@@ -57,10 +61,11 @@ policy-to-tag association changes.
   A tag can have no value, one value, or multiple values.
 - Allowed values are chosen when a tag is created and cannot be changed later. Plan the
   constraint before using a `TAG_VALUE` selector.
-- A direct assignment on a child replaces inherited values for the same tag name. For example,
-  `data_domain=risk` on a table overrides `data_domain=finance` from its catalog, so a
-  `TAG_VALUE("finance")` association no longer matches that table. A dedicated migration tag
-  with `ALL_VALUES` avoids this interaction.
+- Resolution uses the nearest assignment for a tag name. A direct assignment replaces all
+  inherited values, and a nearer ancestor overrides a farther one. For example,
+  `data_domain=risk` on a schema overrides `data_domain=finance` on its catalog for every table
+  in that schema, so a `TAG_VALUE("finance")` association no longer matches those tables. A
+  dedicated migration tag with `ALL_VALUES` avoids this interaction.
 
 See [Manage Tags](./manage-tags-in-gravitino.md#create-a-tag-with-a-value-constraint)
 for tag creation and value assignment examples.
@@ -82,7 +87,8 @@ for tag creation and value assignment examples.
 ### Migration checklist
 
 1. On the old runtime, back up the database. Export direct policy associations for **each
-   metalake** and record policy results on representative descendants. The old
+   metalake**, inventory disabled policies, and record policy results on representative
+   descendants. Re-enable disabled policies that consumers must continue to receive. The old
    `/policies/{policy}/objects` endpoint is unavailable after the upgrade.
 2. Map each direct relation to a tag assignment. A dedicated tag per policy with
    `ALL_VALUES` preserves the original scope; review existing tag values and child overrides

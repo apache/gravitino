@@ -21,7 +21,8 @@ service consumes the built-in Iceberg compaction policy.
 1. [Create a policy](./manage-policies-in-gravitino.md#create-a-policy) and
    [create a tag](./manage-tags-in-gravitino.md#create-a-tag) in the same metalake.
 2. [Associate the policy with the tag](./manage-policies-in-gravitino.md#associate-a-policy-with-a-tag).
-   Choose `ALL_VALUES` to match tag presence or `TAG_VALUE` to match one exact assignment value.
+   Choose `ALL_VALUES` to match tag presence or `TAG_VALUE` to match when an assignment contains
+   one specified value.
 3. [Assign the tag](./manage-tags-in-gravitino.md#object-operations) to an object or its ancestor.
 4. [List the object's policies](./manage-policies-in-gravitino.md#list-policies-on-an-object) to
    confirm the result.
@@ -46,18 +47,19 @@ it does not interpret their names or values. Built-in types have a defined conte
 
 Policy content also has `properties` and `supportedObjectTypes`. Properties describe the policy
 itself, such as its owner or consumer. `supportedObjectTypes` is required when creating a custom
-policy and cannot be changed later. Object policy lookup does not filter by this field; each
-consumer decides whether a policy type applies to the object it is processing.
+policy. A custom policy content update replaces the whole content and can change this field; for a
+built-in policy, the field cannot be changed after creation. Object policy lookup does not filter
+by this field; each consumer decides whether a policy type applies to the object it is processing.
 
 ### Policy-to-Tag Associations
 
 Each association connects one policy to one tag and stores a selector. The selector determines
 whether that association contributes the policy to an object's lookup result.
 
-| Selector     | When it matches                                                        |
-|--------------|------------------------------------------------------------------------|
-| `ALL_VALUES` | The effective tag is present, including an assignment without a value. |
-| `TAG_VALUE`  | The effective tag has the specified exact assignment value.            |
+| Selector     | When it matches                                                          |
+|--------------|--------------------------------------------------------------------------|
+| `ALL_VALUES` | The effective tag is present, including an assignment without a value.   |
+| `TAG_VALUE`  | One of the effective tag assignment values equals the specified value.   |
 
 A policy may be associated with multiple tags. Association listings show those direct relations
 and their selectors, even if no object currently matches them. An object policy lookup returns each
@@ -67,12 +69,19 @@ A selector cannot be changed in place. Remove the policy-to-tag association and 
 the new selector. Removing an association leaves the policy, tag, and tag assignments intact.
 Deleting a policy removes its associations.
 
+Object policy lookup covers `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`,
+`MODEL`, and `FUNCTION`. This includes columns, which did not support direct policy associations.
+A tag assigned to a catalog or schema can therefore make its policies appear in descendant column
+lookups. Because lookup does not filter by `supportedObjectTypes`, a policy whose content lists
+only `TABLE` can still appear in a column lookup; consumers must enforce the intended scope.
+
 ### Effective Tags and Inheritance
 
 An object receives tags assigned directly to it and tags inherited from its metadata object
-ancestors. When both the object and an ancestor assign the same tag name, the object's direct
-assignment wins, including its assignment values. Tag names themselves are flat; tags do not
-inherit from other tags.
+ancestors. Resolution starts at the object and walks upward, so the nearest assignment of a tag
+name wins, including its assignment values. A direct assignment therefore overrides every
+ancestor, and a schema assignment overrides the same tag assigned on its catalog for the schema's
+descendants. Tag names themselves are flat; tags do not inherit from other tags.
 
 For example, a catalog with `data_domain=finance` gives its tables that effective assignment.
 A table assigned `data_domain=risk` instead uses `risk`, so a policy associated with

@@ -316,6 +316,10 @@ Click **Create Policy** to open the create form. Fill in the required fields and
 To find the tags associated with a policy and inspect their selectors, use the
 [policy-to-tag association API](./manage-policies-in-gravitino.md#list-associations).
 
+The current **Metadata Objects** view and direct policy controls still call the removed direct
+object-policy association APIs and do not work. Use the REST API or Java client for policy-to-tag
+associations until these UI controls are updated.
+
 ### Access
 
 The Access module is visible only when `gravitino.authorization.enable=true`.

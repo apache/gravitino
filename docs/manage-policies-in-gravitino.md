@@ -22,8 +22,10 @@ The Python client does not cover policies, so the examples below are REST and Ja
 ### Create a Policy
 
 A policy needs a name and a type. Content carries the rules, the object types the policy supports,
-and optional properties. `supportedObjectTypes` cannot be changed after creation. Object policy
-lookup does not filter by this field; consumers decide which policy types they can use.
+and optional properties. For a built-in policy, `supportedObjectTypes` cannot be changed after
+creation. Updating custom policy content replaces the whole content and can change this field.
+Object policy lookup does not filter by this field; consumers decide which policy types they can
+use.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -222,10 +224,10 @@ client.deletePolicy("retention_30d");
 Create a policy and a tag in the same metalake before associating them. Each policy-to-tag
 association has a selector:
 
-| Selector     | Match condition                                                  |
-|--------------|------------------------------------------------------------------|
-| `ALL_VALUES` | The effective tag is present, with or without assignment values. |
-| `TAG_VALUE`  | The effective tag has the specified exact assignment value.      |
+| Selector     | Match condition                                                        |
+|--------------|------------------------------------------------------------------------|
+| `ALL_VALUES` | The effective tag is present, with or without assignment values.       |
+| `TAG_VALUE`  | One effective tag assignment value equals the specified value.         |
 
 The selector belongs to the association, not to the policy or the tag. An existing association
 cannot be replaced by another add request. Remove it and add it again to change its selector.
@@ -323,9 +325,10 @@ of its ancestors. See [Manage tags in Gravitino](./manage-tags-in-gravitino.md) 
 operations.
 
 For the `TAG_VALUE("finance")` association above, assign `data_domain=finance` to a table or one
-of its ancestors. A direct assignment of `data_domain` on the table overrides an inherited
-assignment of the same tag. For example, assigning only `data_domain=risk` to the table stops
-`retention_30d` from matching there, even if its catalog has `data_domain=finance`.
+of its ancestors. The nearest assignment of `data_domain` overrides farther assignments of the
+same tag. For example, a schema assignment of `data_domain=risk` overrides
+`data_domain=finance` on its catalog for every table in the schema. A direct table assignment
+overrides both.
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v2+json" \
@@ -353,7 +356,10 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-Table customers = ...
+Table customers =
+    client.loadCatalog("catalog1")
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of("schema1", "customers"));
 String[] policyNames = customers.supportsPolicies().listPolicies();
 Policy[] policies = customers.supportsPolicies().listPolicyInfos();
 ```
