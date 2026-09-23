@@ -257,11 +257,20 @@ in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2
 Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
 Iceberg support.
 
-Optional template arguments are still listed as `--flag` + `{{placeholder}}` pairs. If `jobConf`
-omits a key (or leaves the placeholder unresolved), the flag remains on the process command line as
-a dangling argument (for example `--updater-options` with no value before `--spark-conf`). Callers
-and UIs should supply every placeholder they care about with an explicit value, including optional
-ones they intentionally disable or leave at a documented default, rather than omitting the key.
+`jobConf` only needs the required keys below. Optional keys fall back to the template default when
+left out, and a submission that misses a required key is rejected with an error that lists the
+missing keys. An empty string is a value, not an omission: it overrides the default and means
+"not set" to these jobs.
+
+| Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
+|--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| All three                            | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| `builtin-iceberg-update-stats`       | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
+| `builtin-iceberg-rewrite-data-files` | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
+| `builtin-iceberg-expire-snapshots`   | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
+
+`where_clause` has no default on purpose: an empty where clause compacts every data file in the
+table, so it must be asked for explicitly.
 
 ## Update Statistics
 

@@ -20,16 +20,22 @@ package org.apache.gravitino.job;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -38,7 +44,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestJobTemplate {
+public class TestJobTemplateResolver {
 
   private static File tempDir;
   private File tempStagingDir;
@@ -74,94 +80,11 @@ public class TestJobTemplate {
   }
 
   @Test
-  public void testReplacePlaceholders() {
-    String template = "Hello, {{name}}! Welcome to {{place}}.";
-    Map<String, String> replacements = ImmutableMap.of("name", "Alice", "place", "Wonderland");
-
-    String result = JobManager.replacePlaceholder(template, replacements);
-    Assertions.assertEquals("Hello, Alice! Welcome to Wonderland.", result);
-
-    // Test with missing replacements
-    replacements = ImmutableMap.of("name", "Bob");
-    result = JobManager.replacePlaceholder(template, replacements);
-    Assertions.assertEquals("Hello, Bob! Welcome to {{place}}.", result);
-
-    // Test with no replacements
-    result = JobManager.replacePlaceholder(template, ImmutableMap.of());
-    Assertions.assertEquals("Hello, {{name}}! Welcome to {{place}}.", result);
-
-    // Test with no placeholders
-    String noPlaceholders = "Hello, World!";
-    result = JobManager.replacePlaceholder(noPlaceholders, replacements);
-    Assertions.assertEquals("Hello, World!", result);
-
-    // Test with repeated placeholders
-    String repeatedTemplate = "Hello, {{name}}! Your name is {{name}}.";
-    replacements = ImmutableMap.of("name", "Charlie");
-    result = JobManager.replacePlaceholder(repeatedTemplate, replacements);
-    Assertions.assertEquals("Hello, Charlie! Your name is Charlie.", result);
-
-    // Test with incomplete placeholders
-    String incompleteTemplate = "Hello, {{name}! Welcome to {{place}}.";
-    replacements = ImmutableMap.of("name", "Dave", "place", "Earth");
-    result = JobManager.replacePlaceholder(incompleteTemplate, replacements);
-    Assertions.assertEquals("Hello, {{name}! Welcome to Earth.", result);
-
-    // Test with empty template
-    String emptyTemplate = "";
-    result = JobManager.replacePlaceholder(emptyTemplate, replacements);
-    Assertions.assertEquals("", result);
-
-    // Test with nested braces
-    String nestedTemplate = "Hello, {{name}}! Your code is {{{value}}}.";
-    replacements = ImmutableMap.of("name", "Eve", "value", "42");
-    result = JobManager.replacePlaceholder(nestedTemplate, replacements);
-    Assertions.assertEquals("Hello, Eve! Your code is {42}.", result);
-
-    nestedTemplate = "Hello, {{name}}! Your code is {{{{value}}}}.";
-    result = JobManager.replacePlaceholder(nestedTemplate, replacements);
-    Assertions.assertEquals("Hello, Eve! Your code is {{42}}.", result);
-
-    // Test with special characters in placeholders.
-    String specialTemplate = "Hello, {{name}}! Your score is {{score%}}.";
-    replacements = ImmutableMap.of("name", "Frank", "score%", "100%");
-    result = JobManager.replacePlaceholder(specialTemplate, replacements);
-    Assertions.assertEquals("Hello, Frank! Your score is {{score%}}.", result);
-
-    // Test with alphanumeric placeholders
-    String alphanumericTemplate = "Hello, {{user_name}}! Your score is {{score123}}.";
-    replacements = ImmutableMap.of("user_name", "Grace", "score123", "200");
-    result = JobManager.replacePlaceholder(alphanumericTemplate, replacements);
-    Assertions.assertEquals("Hello, Grace! Your score is 200.", result);
-
-    // Test with "." and "-"
-    String dotDashTemplate = "Hello, {{user.name}}! Your score is {{score-123}}.";
-    replacements = ImmutableMap.of("user.name", "Hank", "score-123", "300");
-    result = JobManager.replacePlaceholder(dotDashTemplate, replacements);
-    Assertions.assertEquals("Hello, Hank! Your score is 300.", result);
-  }
-
-  @Test
-  public void testReplacePlaceholdersWithSpecialCharacters() {
-    // Replacement values containing '$' and '\' must be treated as literal text,
-    // not as Matcher replacement syntax (group references and escapes).
-    String template = "config={{conf}}";
-
-    Map<String, String> replacements = ImmutableMap.of("conf", "path=C:\\tmp and cost=$5");
-    String result = JobManager.replacePlaceholder(template, replacements);
-    Assertions.assertEquals("config=path=C:\\tmp and cost=$5", result);
-
-    // A '$' followed by a digit must not substitute the placeholder's own group
-    replacements = ImmutableMap.of("conf", "p$1x");
-    result = JobManager.replacePlaceholder(template, replacements);
-    Assertions.assertEquals("config=p$1x", result);
-  }
-
-  @Test
   public void testFetchFilesFromUir() throws IOException {
     File testFile1 = Files.createTempFile(tempDir.toPath(), "testFile1", ".txt").toFile();
     String result =
-        JobManager.fetchFileFromUri(testFile1.toURI().toString(), tempStagingDir, 30 * 1000);
+        JobTemplateResolver.fetchFileFromUri(
+            testFile1.toURI().toString(), tempStagingDir, 30 * 1000);
     File resultFile = new File(result);
     Assertions.assertEquals(testFile1.getName(), resultFile.getName());
 
@@ -170,7 +93,8 @@ public class TestJobTemplate {
 
     List<String> expectedUris =
         Lists.newArrayList(testFile2.toURI().toString(), testFile3.toURI().toString());
-    List<String> resultUris = JobManager.fetchFilesFromUri(expectedUris, tempStagingDir, 30 * 1000);
+    List<String> resultUris =
+        JobTemplateResolver.fetchFilesFromUri(expectedUris, tempStagingDir, 30 * 1000);
 
     Assertions.assertEquals(2, resultUris.size());
     List<String> resultFileNames =
@@ -209,15 +133,15 @@ public class TestJobTemplate {
             .build();
 
     JobTemplate result =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "arg3", "value3",
-                "arg4", "value4",
-                "val1", "value1",
-                "val2", "value2",
-                "customVal1", "customValue1"),
-            tempStagingDir);
+        new JobTemplateResolver(entity)
+            .resolve(
+                ImmutableMap.of(
+                    "arg3", "value3",
+                    "arg4", "value4",
+                    "val1", "value1",
+                    "val2", "value2",
+                    "customVal1", "customValue1"),
+                tempStagingDir);
 
     Assertions.assertEquals(shellJobTemplate.name(), result.name());
     Assertions.assertEquals(shellJobTemplate.comment(), result.comment());
@@ -270,17 +194,17 @@ public class TestJobTemplate {
             .build();
 
     JobTemplate result =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "arg3", "value3",
-                "arg4", "value4",
-                "val1", "value1",
-                "val2", "value2",
-                "customVal1", "customValue1",
-                "scriptName1", "testScript1",
-                "scriptName2", "testScript2"),
-            tempStagingDir);
+        new JobTemplateResolver(entity)
+            .resolve(
+                ImmutableMap.of(
+                    "arg3", "value3",
+                    "arg4", "value4",
+                    "val1", "value1",
+                    "val2", "value2",
+                    "customVal1", "customValue1",
+                    "scriptName1", "testScript1",
+                    "scriptName2", "testScript2"),
+                tempStagingDir);
 
     Assertions.assertEquals("echo", new File(result.executable).getName());
     Assertions.assertEquals(2, ((ShellJobTemplate) result).scripts().size());
@@ -337,16 +261,16 @@ public class TestJobTemplate {
             .build();
 
     JobTemplate result =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "arg3", "value3",
-                "val1", "value1",
-                "val2", "value2",
-                "customVal1", "customValue1",
-                "executor-mem", "4g",
-                "driver-cores", "2"),
-            tempStagingDir);
+        new JobTemplateResolver(entity)
+            .resolve(
+                ImmutableMap.of(
+                    "arg3", "value3",
+                    "val1", "value1",
+                    "val2", "value2",
+                    "customVal1", "customValue1",
+                    "executor-mem", "4g",
+                    "driver-cores", "2"),
+                tempStagingDir);
 
     Assertions.assertEquals(sparkJobTemplate.name(), result.name());
     Assertions.assertEquals(sparkJobTemplate.comment(), result.comment());
@@ -434,17 +358,17 @@ public class TestJobTemplate {
             .build();
 
     JobTemplate result =
-        JobManager.createRuntimeJobTemplate(
-            entity,
-            ImmutableMap.of(
-                "arg3", "value3",
-                "val1", "value1",
-                "val2", "value2",
-                "customVal1", "customValue1",
-                "executor-mem", "4g",
-                "driver-cores", "2",
-                "env", "test"),
-            tempStagingDir);
+        new JobTemplateResolver(entity)
+            .resolve(
+                ImmutableMap.of(
+                    "arg3", "value3",
+                    "val1", "value1",
+                    "val2", "value2",
+                    "customVal1", "customValue1",
+                    "executor-mem", "4g",
+                    "driver-cores", "2",
+                    "env", "test"),
+                tempStagingDir);
 
     Assertions.assertEquals(executable.getName(), new File(result.executable).getName());
     Assertions.assertEquals(Lists.newArrayList("arg1", "arg2", "value3"), result.arguments());
@@ -473,5 +397,180 @@ public class TestJobTemplate {
                 .map(archive -> new File(archive).getName())
                 .collect(Collectors.toList());
     Assertions.assertTrue(archiveNames.contains(archive1.getName()));
+  }
+
+  @Test
+  public void testCheckJobConf() {
+    JobTemplateEntity entity =
+        shellTemplateEntity(Lists.newArrayList("{{table}}", "{{target}}", "{{mode:-full}}"));
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new JobTemplateResolver(entity).checkJobConf(ImmutableMap.of("table", "t")));
+    Assertions.assertTrue(e.getMessage().contains("[target]"), e.getMessage());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new JobTemplateResolver(entity).checkJobConf(null));
+
+    // Optional parameters and unused keys don't fail the check.
+    Assertions.assertDoesNotThrow(
+        () ->
+            new JobTemplateResolver(entity)
+                .checkJobConf(ImmutableMap.of("table", "t", "target", "", "unused", "x")));
+  }
+
+  @Test
+  public void testCreateUsesDefaultValues() {
+    JobTemplateEntity entity =
+        shellTemplateEntity(
+            Lists.newArrayList("--table", "{{table}}", "--mode", "{{mode:-full}}", "{{note:-}}"));
+
+    JobTemplate result =
+        new JobTemplateResolver(entity).resolve(ImmutableMap.of("table", "t"), tempStagingDir);
+    Assertions.assertEquals(
+        Lists.newArrayList("--table", "t", "--mode", "full", ""), result.arguments());
+  }
+
+  @Test
+  public void testCreateFailsBeforeFetchingOnMissingParameters() {
+    JobTemplateEntity entity = shellTemplateEntity(Lists.newArrayList("{{table}}"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new JobTemplateResolver(entity).resolve(ImmutableMap.of(), tempStagingDir));
+    // The executable is not fetched when a parameter is missing.
+    String[] staged = tempStagingDir.list();
+    Assertions.assertTrue(staged == null || staged.length == 0);
+  }
+
+  @Test
+  public void testCreateRejectsDuplicateKeysAfterResolution() {
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("duplicate_keys")
+            .withExecutable("/bin/echo")
+            .withEnvironments(ImmutableMap.of("{{a}}", "1", "{{b}}", "2"))
+            .build();
+    JobTemplateEntity entity = toEntity(template);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new JobTemplateResolver(entity)
+                    .resolve(ImmutableMap.of("a", "SAME", "b", "SAME"), tempStagingDir));
+    Assertions.assertTrue(e.getMessage().contains("SAME"), e.getMessage());
+  }
+
+  private static HttpServer createLoopbackHttpServer(String response) throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/artifact.jar",
+        exchange -> {
+          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(bytes);
+          }
+        });
+    return server;
+  }
+
+  @Test
+  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
+    File stagingDir = tempStagingDir;
+
+    Path missingFilePath =
+        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
+    String uri = missingFilePath.toUri().toString();
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> JobTemplateResolver.fetchFileFromUri(uri, stagingDir, 1000));
+  }
+
+  @Test
+  public void testFetchFileFromUriSsrfBlocked() {
+    File stagingDir = tempStagingDir;
+    FileFetcher.get().initialize(true);
+
+    // Loopback address
+    RuntimeException e1 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                JobTemplateResolver.fetchFileFromUri(
+                    "http://127.0.0.1:8090/configs", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e1);
+
+    // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
+    RuntimeException e2 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                JobTemplateResolver.fetchFileFromUri(
+                    "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e2);
+
+    // RFC-1918 private range
+    RuntimeException e3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobTemplateResolver.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e3);
+
+    // Alibaba Cloud / Oracle Cloud metadata endpoint
+    RuntimeException e4 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                JobTemplateResolver.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e4);
+  }
+
+  @Test
+  public void testFetchFileFromUriShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
+    File stagingDir = tempStagingDir;
+    HttpServer server = createLoopbackHttpServer("job artifact");
+
+    try {
+      server.start();
+      int port = server.getAddress().getPort();
+      FileFetcher.get().initialize(false);
+
+      String fetchedFile =
+          JobTemplateResolver.fetchFileFromUri(
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
+
+      Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
+    } finally {
+      FileFetcher.get().initialize(true);
+      server.stop(0);
+    }
+  }
+
+  private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
+    Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
+    Assertions.assertTrue(
+        exception.getCause().getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
+  }
+
+  private static JobTemplateEntity shellTemplateEntity(List<String> arguments) {
+    return toEntity(
+        ShellJobTemplate.builder()
+            .withName("shell_job")
+            .withExecutable("/bin/echo")
+            .withArguments(arguments)
+            .build());
+  }
+
+  private static JobTemplateEntity toEntity(JobTemplate template) {
+    return JobTemplateEntity.builder()
+        .withId(1L)
+        .withName(template.name())
+        .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
   }
 }
