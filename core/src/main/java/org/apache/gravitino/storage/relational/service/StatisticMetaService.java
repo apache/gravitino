@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -51,7 +53,7 @@ public class StatisticMetaService {
     return INSTANCE;
   }
 
-  private StatisticMetaService() {}
+  StatisticMetaService() {}
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -95,20 +97,34 @@ public class StatisticMetaService {
     }
     pos.sort(Comparator.comparing(StatisticPO::getStatisticName));
     Map<String, StatisticPO> previous =
-        listStatisticPOs(namespacedEntityId).stream()
+        listStatisticPOs(
+                namespacedEntityId,
+                pos.stream().map(StatisticPO::getStatisticName).collect(Collectors.toList()))
+            .stream()
             .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
     SessionUtils.doMultipleWithCommit(
         () -> {
           LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
           for (StatisticPO po : pos) {
             StatisticPO old = previous.get(po.getStatisticName());
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper ->
-                        old == null
-                            ? mapper.insertStatisticPO(po)
-                            : mapper.updateStatisticPOWithVersion(po, old));
+            int updated;
+            try {
+              updated =
+                  SessionUtils.getWithoutCommit(
+                      StatisticMetaMapper.class,
+                      mapper ->
+                          old == null
+                              ? mapper.insertStatisticPO(po)
+                              : mapper.updateStatisticPOWithVersion(po, old));
+            } catch (RuntimeException e) {
+              // A writer can create the same statistic after the snapshot above. A duplicate
+              // insert is a stale snapshot, not an internal server error.
+              if (old == null && isDuplicateKey(e)) {
+                throw new OptimisticLockException(
+                    "Statistic %s for %s changed during update", po.getStatisticName(), entity);
+              }
+              throw e;
+            }
             if (updated != 1) {
               throw new OptimisticLockException(
                   "Statistic %s for %s changed during update", po.getStatisticName(), entity);
@@ -126,11 +142,15 @@ public class StatisticMetaService {
       return 0;
     }
     NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, type);
-    Map<String, StatisticPO> previous =
-        listStatisticPOs(observed).stream()
-            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
     Set<String> orderedNames = new TreeSet<>(Comparator.nullsFirst(Comparator.naturalOrder()));
     orderedNames.addAll(statisticNames);
+    orderedNames.remove(null);
+    if (orderedNames.isEmpty()) {
+      return 0;
+    }
+    Map<String, StatisticPO> previous =
+        listStatisticPOs(observed, new ArrayList<>(orderedNames)).stream()
+            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
     int[] deleted = new int[] {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
@@ -153,11 +173,23 @@ public class StatisticMetaService {
     return deleted[0];
   }
 
-  private List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint) {
+  List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
     return SessionUtils.getWithoutCommit(
         StatisticMetaMapper.class,
         mapper ->
-            mapper.listStatisticPOsByEntityId(endpoint.namespaceIds()[0], endpoint.entityId()));
+            mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
+  }
+
+  private static boolean isDuplicateKey(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SQLException) {
+        SQLException sql = (SQLException) cause;
+        if ("23505".equals(sql.getSQLState()) || sql.getErrorCode() == 1062) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Monitored(

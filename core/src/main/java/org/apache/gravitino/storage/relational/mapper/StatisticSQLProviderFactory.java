@@ -81,6 +81,14 @@ public class StatisticSQLProviderFactory {
     return getProvider().listStatisticPOsByEntityId(metalakeId, entityId);
   }
 
+  /** Returns SQL to select only the named live statistics. */
+  public static String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return getProvider().listStatisticPOsByNames(metalakeId, entityId, names);
+  }
+
   public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteStatisticsByMetalakeId(metalakeId);
   }

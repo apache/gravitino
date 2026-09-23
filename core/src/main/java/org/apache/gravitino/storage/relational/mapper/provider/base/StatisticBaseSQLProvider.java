@@ -87,6 +87,20 @@ public class StatisticBaseSQLProvider {
         + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
   }
 
+  /** Selects the requested live statistics without loading unrelated values or audit fields. */
+  public String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return "<script>"
+        + listStatisticPOsByEntityId(metalakeId, entityId)
+        + " AND statistic_name IN "
+        + "<foreach collection='names' item='name' open='(' separator=',' close=')'>"
+        + "#{name}"
+        + "</foreach>"
+        + "</script>";
+  }
+
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
