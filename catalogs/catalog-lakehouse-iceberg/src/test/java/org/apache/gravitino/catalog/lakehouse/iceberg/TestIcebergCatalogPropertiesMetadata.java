@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,14 @@ public class TestIcebergCatalogPropertiesMetadata {
         metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER));
     Assertions.assertTrue(
         metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
+  }
+
+  @Test
+  void testCloudAccessKeyIdsAreVisibleAndSecretsAreHidden() {
+    Assertions.assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
   }
 
   @Test

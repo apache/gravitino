@@ -33,6 +33,7 @@ import io.trino.spi.connector.SchemaTableName;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager.LoadOutcome;
 
@@ -64,16 +65,16 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
               ColumnMetadata.builder().setName("metalake_errors").setType(VARCHAR).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableLoadStatus.
    *
    * @param catalogConnectorManager the manager for catalog connectors
-   * @param metalake the metalake to report errors for
+   * @param metalake the metalake to report errors for, or null for every metalake
    */
   public GravitinoSystemTableLoadStatus(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
     this.metalake = metalake;
   }
@@ -99,10 +100,16 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
     writeNullableString(lastErrorColumnBuilder, loadOutcome.getLastError());
 
     // The load loop itself is shared by every entry catalog, so the columns above are global.
-    // Only the per metalake errors are narrowed to the metalake this connector reports on.
+    // Only the per metalake errors are narrowed to the metalake this connector reports on; without
+    // a configured metalake every metalake's error is shown.
     Map<String, String> allErrors = loadOutcome.getMetalakeErrors();
-    Map<String, String> metalakeErrors =
-        allErrors.containsKey(metalake) ? Map.of(metalake, allErrors.get(metalake)) : Map.of();
+    Map<String, String> metalakeErrors;
+    if (metalake == null) {
+      metalakeErrors = allErrors;
+    } else {
+      metalakeErrors =
+          allErrors.containsKey(metalake) ? Map.of(metalake, allErrors.get(metalake)) : Map.of();
+    }
     if (metalakeErrors.isEmpty()) {
       metalakeErrorsColumnBuilder.appendNull();
     } else {

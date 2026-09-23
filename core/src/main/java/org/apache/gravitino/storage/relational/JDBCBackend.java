@@ -63,6 +63,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -88,6 +89,7 @@ import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -281,6 +283,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
       case VIEW:
         return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
+      case SEMANTIC_MODEL:
+        return (E) SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -694,16 +698,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
         }
 
-      case POLICY_METADATA_OBJECT_REL:
-        if (identType == Entity.EntityType.POLICY) {
-          return (List<E>)
-              PolicyMetaService.getInstance().listAssociatedEntitiesForPolicy(nameIdentifier);
-        } else {
-          return (List<E>)
-              PolicyMetaService.getInstance()
-                  .listPoliciesForMetadataObject(nameIdentifier, identType);
-        }
-
       case TAG_METADATA_OBJECT_REL:
         if (identType == Entity.EntityType.TAG) {
           return (List<E>)
@@ -790,11 +784,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return (List<E>)
-            PolicyMetaService.getInstance()
-                .associatePoliciesWithMetadataObject(
-                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       case TAG_METADATA_OBJECT_REL:
         return (List<E>)
             TagMetaService.getInstance()
@@ -905,10 +894,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
     switch (relType) {
-      case POLICY_METADATA_OBJECT_REL:
-        return (E)
-            PolicyMetaService.getInstance()
-                .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       case TAG_METADATA_OBJECT_REL:
         return (E)
             TagMetaService.getInstance()
@@ -1012,6 +997,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
     } else if (e instanceof ViewEntity) {
       ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
+    } else if (e instanceof SemanticModelEntity) {
+      SemanticModelMetaService.getInstance()
+          .insertSemanticModel((SemanticModelEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
       throw new UnsupportedEntityTypeException(
@@ -1111,14 +1099,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
 
   private static void insertEntityChange(
       NameIdentifier ident, Entity.EntityType entityType, OperateType operateType) {
+    String metalake = NameIdentifierUtil.getMetalake(ident);
+    String fullName = EntityChangeLogNameIdentifierCodec.encode(ident);
     SessionUtils.doWithoutCommit(
         EntityChangeLogMapper.class,
-        mapper ->
-            mapper.insertEntityChange(
-                NameIdentifierUtil.getMetalake(ident),
-                entityType.name(),
-                EntityChangeLogNameIdentifierCodec.encode(ident),
-                operateType));
+        mapper -> mapper.insertEntityChange(metalake, entityType.name(), fullName, operateType));
+    EntityChangeLogDiagnostics.logAppended(metalake, entityType.name(), operateType, fullName);
   }
 
   private static boolean shouldRecordEntityDrop(Entity.EntityType entityType) {

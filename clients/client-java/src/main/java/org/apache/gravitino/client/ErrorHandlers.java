@@ -73,6 +73,7 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -1111,6 +1112,10 @@ public class ErrorHandlers {
               .getType()
               .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
             throw new TagAlreadyAssociatedException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
@@ -1419,6 +1424,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE) {
+        throw new OptimisticLockException("%s", formatErrorMessage(errorResponse));
+      }
       if (errorResponse.getCode() == ErrorConstants.CONNECTION_FAILED_CODE) {
         throw new ConnectionFailedException("%s", formatErrorMessage(errorResponse));
       }

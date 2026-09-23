@@ -31,7 +31,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 | Option | Meaning | Used by |
 | --- | --- | --- |
-| `--identifiers` | Comma-separated identifiers. Table format supports `catalog.schema.table` (or `schema.table` when default catalog is configured). | Most commands |
+| `--identifiers` | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands |
 | `--strategy-name` | Policy name to evaluate, for example `iceberg_compaction_default`. | `submit-strategy-jobs` |
 | `--dry-run` | Preview mode. Prints recommendations or job configs without submitting jobs. | `submit-strategy-jobs`, `submit-update-stats-job` |
 | `--limit` | Maximum number of strategy jobs to process. Must be `> 0`. | `submit-strategy-jobs` |
@@ -79,7 +79,10 @@ job scopes with multiple metric/statistic fields:
 ## Identifier Rules
 
 - Table and partition records: `catalog.schema.table`
-- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted
+- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted by
+  `submit-strategy-jobs`, `update-statistics`, `monitor-metrics`, `list-table-metrics`, and
+  `submit-update-stats-job`
+- `append-metrics` accepts both table and job identifiers, so it does not apply the default catalog
 - Job records: parsed as a regular Gravitino `NameIdentifier`
 
 ## CLI Workflow Examples
@@ -244,6 +247,22 @@ Three job templates ship with the service, and they are complementary rather tha
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
+These templates set Iceberg Spark session and catalog classes, but they do not list an Iceberg Spark
+runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
+that runs with your Spark cluster is yours to supply. Provide a matching
+`iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
+commonly through `spark.jars` in `spark_conf`, or by installing it into `SPARK_HOME`. Align the
+artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
+in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
+Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
+Iceberg support.
+
+Optional template arguments are still listed as `--flag` + `{{placeholder}}` pairs. If `jobConf`
+omits a key (or leaves the placeholder unresolved), the flag remains on the process command line as
+a dangling argument (for example `--updater-options` with no value before `--spark-conf`). Callers
+and UIs should supply every placeholder they care about with an explicit value, including optional
+ones they intentionally disable or leave at a documented default, rather than omitting the key.
+
 ## Update Statistics
 
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
@@ -328,7 +347,7 @@ CALL `rest_catalog`.system.expire_snapshots(
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
-cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-expire-snapshots/{job_id}/stdout.log
+cat /tmp/gravitino/jobs/staging/job-runs/{job_id}/output.log
 ```
 
 A successful run reports its state as `SUCCEEDED` and logs the counts it removed:

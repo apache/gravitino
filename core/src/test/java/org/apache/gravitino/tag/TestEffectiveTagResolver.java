@@ -102,6 +102,9 @@ public class TestEffectiveTagResolver {
         new TagEntity[] {directDomain, schemaClassification, catalogOwner}, effectiveTags);
     Assertions.assertArrayEquals(
         new String[] {"finance"}, effectiveTags[0].assignment().orElseThrow().values());
+    Assertions.assertFalse(effectiveTags[0].inherited().orElseThrow());
+    Assertions.assertTrue(effectiveTags[1].inherited().orElseThrow());
+    Assertions.assertTrue(effectiveTags[2].inherited().orElseThrow());
   }
 
   @Test

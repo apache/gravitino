@@ -46,6 +46,8 @@ import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -67,10 +69,13 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotParser;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
@@ -81,10 +86,12 @@ import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
@@ -241,6 +248,76 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksUnknownPlanTask(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "fetch_tasks_table", true);
+
+    dummyEventListener.clearEvent();
+
+    // Scan planning hands out no plan tasks yet, so every plan task presented here is one this
+    // server never issued, reported as 404 per the Iceberg REST spec.
+    Response response =
+        doFetchScanTasks(
+            namespace, "fetch_tasks_table", new FetchScanTasksRequest("not-a-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    // Assert on the error payload, not just the status: an unregistered route would also yield
+    // 404, which would let this test pass without the endpoint existing.
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchPlanTaskException", error.type());
+    Assertions.assertTrue(
+        error.message().contains("not-a-plan-task"),
+        "Error message should name the rejected plan task, but was: " + error.message());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    // A missing table is reported as a missing table, not masked as an unknown plan task.
+    Response response =
+        doFetchScanTasks(namespace, "missing_table", new FetchScanTasksRequest("any-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchTableException", error.type());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testScanPlanningEndpointsRejectMissingRequestBody(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "empty_body_table", true);
+
+    // Jersey hands the resource method a null entity when the body is absent. Both scan planning
+    // endpoints must report that as a 400 rather than letting a downstream NPE become a 500.
+    for (String endpoint : new String[] {"plan", "tasks"}) {
+      Response response =
+          getTableClientBuilder(namespace, Optional.of("empty_body_table/" + endpoint))
+              .post(Entity.entity("", MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(
+          Status.BAD_REQUEST.getStatusCode(),
+          response.getStatus(),
+          "Empty body on /" + endpoint + " should be a 400, not a 500");
+    }
+    // No events are asserted here: the request is rejected at the REST boundary before it reaches
+    // the dispatcher chain, so no operation event is dispatched.
   }
 
   @ParameterizedTest
@@ -564,6 +641,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
     Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/plan"));
+    return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doFetchScanTasks(Namespace ns, String tableName, FetchScanTasksRequest request) {
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/tasks"));
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
@@ -1091,6 +1173,25 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         refs.keySet(),
         refsTableResponse.tableMetadata().refs().keySet(),
         "Refs should be preserved in filtered response");
+
+    // Filtering must not alter anything other than the snapshot list
+    Assertions.assertNotNull(allTableResponse.metadataLocation());
+    Assertions.assertEquals(
+        allTableResponse.metadataLocation(),
+        refsTableResponse.metadataLocation(),
+        "snapshots=refs must keep metadata-location in the response");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().lastUpdatedMillis(),
+        refsTableResponse.tableMetadata().lastUpdatedMillis(),
+        "snapshots=refs must not change last-updated-ms");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().previousFiles(),
+        refsTableResponse.tableMetadata().previousFiles(),
+        "snapshots=refs must not add a metadata-log entry");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().snapshotLog(),
+        refsTableResponse.tableMetadata().snapshotLog(),
+        "snapshots=refs must keep the full snapshot-log for lazy loading");
   }
 
   @ParameterizedTest
@@ -1133,10 +1234,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   void testFilterSnapshotsByRefsKeepsCredentials() {
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
-            tableSchema,
-            org.apache.iceberg.PartitionSpec.unpartitioned(),
-            "s3://bucket/db/tbl",
-            ImmutableMap.of());
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
     org.apache.iceberg.rest.credentials.Credential credential =
         IcebergRESTUtils.toRESTCredential(
             "s3://bucket/db/tbl/",
@@ -1158,6 +1256,64 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         "token", filtered.credentials().get(0).config().get("s3.session-token"));
     Assertions.assertEquals("org.apache.iceberg.aws.s3.S3FileIO", filtered.config().get("io-impl"));
+  }
+
+  @Test
+  void testFilterSnapshotsByRefsPreservesMetadataLocationAndHistory() {
+    TableMetadata base =
+        TableMetadata.newTableMetadata(
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
+    Snapshot first = snapshot(1L, null, 1000L);
+    Snapshot second = snapshot(2L, 1L, 2000L);
+    TableMetadata withHistory =
+        TableMetadata.buildFrom(
+                TableMetadata.buildFrom(base).setBranchSnapshot(first, "main").build())
+            .setBranchSnapshot(second, "main")
+            .build();
+    String metadataLocation = "s3://bucket/db/tbl/metadata/00002-abc.metadata.json";
+    // Round-trip through the parser so the metadata looks like one loaded from a metadata file:
+    // no pending changes and a known metadata location, exactly what loadTable hands over.
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(metadataLocation, TableMetadataParser.toJson(withHistory));
+    Assertions.assertEquals(2, metadata.snapshots().size());
+    LoadTableResponse original = LoadTableResponse.builder().withTableMetadata(metadata).build();
+
+    LoadTableResponse filtered = IcebergTableOperations.filterSnapshotsByRefs(original);
+
+    Assertions.assertEquals(
+        ImmutableSet.of(2L),
+        filtered.tableMetadata().snapshots().stream()
+            .map(Snapshot::snapshotId)
+            .collect(Collectors.toSet()),
+        "only the ref-referenced snapshot should remain");
+    Assertions.assertEquals(
+        metadataLocation, filtered.metadataLocation(), "metadata-location must be preserved");
+    Assertions.assertEquals(
+        metadata.lastUpdatedMillis(),
+        filtered.tableMetadata().lastUpdatedMillis(),
+        "last-updated-ms must not be bumped by filtering");
+    Assertions.assertEquals(
+        metadata.previousFiles(),
+        filtered.tableMetadata().previousFiles(),
+        "filtering must not append a metadata-log entry");
+    Assertions.assertEquals(
+        metadata.snapshotLog(),
+        filtered.tableMetadata().snapshotLog(),
+        "snapshot-log must be kept intact for lazy snapshot loading");
+  }
+
+  private static Snapshot snapshot(long snapshotId, Long parentId, long timestampMs) {
+    String json =
+        String.format(
+            "{\"snapshot-id\":%d,%s\"timestamp-ms\":%d,\"sequence-number\":%d,"
+                + "\"summary\":{\"operation\":\"append\"},"
+                + "\"manifest-list\":\"s3://bucket/db/tbl/metadata/snap-%d.avro\",\"schema-id\":0}",
+            snapshotId,
+            parentId == null ? "" : String.format("\"parent-snapshot-id\":%d,", parentId),
+            timestampMs,
+            snapshotId,
+            snapshotId);
+    return SnapshotParser.fromJson(json);
   }
 
   @ParameterizedTest

@@ -19,8 +19,10 @@
 package org.apache.gravitino.dto.job;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.List;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -44,6 +46,8 @@ public class TestJobDTO {
             queuedAt,
             startedAt,
             finishedAt,
+            null,
+            null,
             null);
 
     Assertions.assertDoesNotThrow(jobDTO::validate);
@@ -58,6 +62,37 @@ public class TestJobDTO {
     Assertions.assertEquals(queuedAt, deserJobDTO.queuedAt());
     Assertions.assertEquals(startedAt, deserJobDTO.startedAt());
     Assertions.assertEquals(finishedAt, deserJobDTO.finishedAt());
+    Assertions.assertNull(deserJobDTO.stdout());
+    Assertions.assertNull(deserJobDTO.stderr());
+  }
+
+  @Test
+  public void testSerDeWithOutput() throws JsonProcessingException {
+    List<String> stdout = ImmutableList.of("line1", "line2");
+    List<String> stderr = ImmutableList.of("err1");
+    JobDTO jobDTO =
+        new JobDTO(
+            "job-111",
+            "testTemplate",
+            JobHandle.Status.SUCCEEDED,
+            AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            Instant.now(),
+            Instant.now(),
+            Instant.now(),
+            null,
+            stdout,
+            stderr);
+
+    Assertions.assertDoesNotThrow(jobDTO::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
+    Assertions.assertTrue(serJson.contains("\"stdout\""));
+    Assertions.assertTrue(serJson.contains("\"stderr\""));
+
+    JobDTO deserJobDTO = JsonUtils.objectMapper().readValue(serJson, JobDTO.class);
+    Assertions.assertEquals(jobDTO, deserJobDTO);
+    Assertions.assertEquals(stdout, deserJobDTO.stdout());
+    Assertions.assertEquals(stderr, deserJobDTO.stderr());
   }
 
   @Test
@@ -70,6 +105,8 @@ public class TestJobDTO {
             JobHandle.Status.QUEUED,
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
             queuedAt,
+            null,
+            null,
             null,
             null,
             null);
@@ -99,6 +136,8 @@ public class TestJobDTO {
             queuedAt,
             startedAt,
             finishedAt,
+            null,
+            null,
             null);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
@@ -174,7 +213,9 @@ public class TestJobDTO {
             Instant.now(),
             Instant.now(),
             Instant.now(),
-            runtimeJobTemplate);
+            runtimeJobTemplate,
+            null,
+            null);
 
     Assertions.assertDoesNotThrow(jobDTO::validate);
 
@@ -196,6 +237,8 @@ public class TestJobDTO {
             JobHandle.Status.QUEUED,
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
             Instant.now(),
+            null,
+            null,
             null,
             null,
             null);

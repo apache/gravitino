@@ -109,6 +109,17 @@ public class TestGravitinoConnectorFactoryStart {
   }
 
   @Test
+  public void testStaticConnectorStartsWithoutMetalake() {
+    CoordinatorFactory factory = newFactory();
+    Map<String, String> config = staticConfig();
+    config.remove("gravitino.metalake");
+
+    // Without a metalake the entry catalog serves every metalake instead of refusing to start.
+    assertNotNull(factory.create("gravitino", config, mockContext()));
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
+  }
+
+  @Test
   public void testDynamicConnectorDoesNotStartTheManager() {
     CoordinatorFactory factory = newFactory();
 

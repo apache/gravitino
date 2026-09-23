@@ -30,6 +30,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
+  public String selectUserMetaByIdForShare(Long userId) {
+    return selectUserMetaById(userId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteUserMetaByUserId(Long userId, Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME

@@ -20,6 +20,7 @@ package org.apache.gravitino.rel.expressions.distributions;
 
 import java.util.Arrays;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 
@@ -35,6 +36,21 @@ public class Distributions {
   /** NONE is used to indicate that there is no distribution. */
   public static final Distribution NONE =
       new DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION);
+
+  /**
+   * Returns true if the distribution is the NONE distribution. A null distribution means "no
+   * distribution specified" and is therefore treated as NONE. For non-null values the comparison is
+   * structural, so both the built-in implementation and DTO representations of NONE match.
+   *
+   * @param distribution The distribution to check; may be null.
+   * @return true if the distribution is null or represents the NONE distribution.
+   */
+  public static boolean isNone(@Nullable Distribution distribution) {
+    return distribution == null
+        || (distribution.strategy() == Strategy.NONE
+            && distribution.number() == 0
+            && Arrays.equals(distribution.expressions(), Expression.EMPTY_EXPRESSION));
+  }
 
   /** List bucketing strategy hash, TODO: #1505 Separate the bucket number from the Distribution. */
   public static final Distribution HASH =

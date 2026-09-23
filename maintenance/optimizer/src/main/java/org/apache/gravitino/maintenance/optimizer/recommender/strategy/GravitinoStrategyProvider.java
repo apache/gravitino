@@ -77,14 +77,10 @@ public class GravitinoStrategyProvider implements StrategyProvider {
             .loadCatalog(IdentifierUtils.getCatalogNameFromTableIdentifier(nameIdentifier))
             .asTableCatalog()
             .loadTable(IdentifierUtils.removeCatalogFromIdentifier(nameIdentifier));
-    String[] policyNames = t.supportsPolicies().listPolicies();
-    List<Strategy> policies =
-        Arrays.stream(policyNames)
-            .map(t.supportsPolicies()::getPolicy)
-            .filter(Objects::nonNull)
-            .map(this::toStrategy)
-            .collect(Collectors.toList());
-    return policies;
+    return Arrays.stream(t.supportsPolicies().listPolicyInfos())
+        .filter(Objects::nonNull)
+        .map(this::toStrategy)
+        .collect(Collectors.toList());
   }
 
   /**

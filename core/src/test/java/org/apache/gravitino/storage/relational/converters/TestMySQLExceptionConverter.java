@@ -37,4 +37,20 @@ public class TestMySQLExceptionConverter {
         () -> converter.toGravitinoException(mockException, Entity.EntityType.METALAKE, "test"),
         String.format("The %s entity: %s already exists.", Entity.EntityType.METALAKE, "test"));
   }
+
+  @Test
+  public void testConvertValueTooLongException() {
+    SQLException sqlException =
+        new SQLException("Data too long for column 'tag_name'", "22001", 1406);
+    MySQLExceptionConverter converter = new MySQLExceptionConverter();
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.toGravitinoException(sqlException, Entity.EntityType.TAG, "test"));
+    Assertions.assertEquals(
+        "The tag entity has a value that exceeds the maximum length of its column.",
+        exception.getMessage());
+    // The database error must not be exposed to the client through the cause.
+    Assertions.assertNull(exception.getCause());
+  }
 }

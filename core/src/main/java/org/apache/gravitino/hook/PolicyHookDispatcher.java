@@ -101,11 +101,6 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   }
 
   @Override
-  public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
-    return dispatcher.listMetadataObjectsForPolicy(metalake, policyName);
-  }
-
-  @Override
   public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
     return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
@@ -114,21 +109,5 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
     return dispatcher.listPolicyInfosForMetadataObject(metalake, metadataObject);
-  }
-
-  @Override
-  public String[] associatePoliciesForMetadataObject(
-      String metalake,
-      MetadataObject metadataObject,
-      String[] policiesToAdd,
-      String[] policiesToRemove) {
-    return dispatcher.associatePoliciesForMetadataObject(
-        metalake, metadataObject, policiesToAdd, policiesToRemove);
-  }
-
-  @Override
-  public PolicyEntity getPolicyForMetadataObject(
-      String metalake, MetadataObject metadataObject, String policyName) {
-    return dispatcher.getPolicyForMetadataObject(metalake, metadataObject, policyName);
   }
 }
