@@ -117,13 +117,13 @@ your Spark, Scala, and Iceberg versions. Details are under
 Submit `builtin-iceberg-rewrite-manifests` directly through
 `POST /api/metalakes/{metalake}/jobs/runs`. Its `jobConf` uses these job-specific keys:
 
-| Key | Meaning | Default |
-| --- | --- | --- |
-| `catalog_name` | Iceberg catalog registered in Spark | Required |
-| `table_identifier` | Table identifier, for example `db.t1` | Required |
-| `spec_id` | Existing partition spec whose manifests to rewrite | Current table spec |
-| `use_caching` | `true` or `false` to control caching during rewriting | Installed Iceberg default (`false` in 1.11.0) |
-| `spark_conf` | JSON string containing additional Spark settings | None |
+| Key                | Meaning                                               | Default                                       |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                   | Required                                      |
+| `table_identifier` | Table identifier, for example `db.t1`                 | Required                                      |
+| `spec_id`          | Existing partition spec whose manifests to rewrite    | Current table spec                            |
+| `use_caching`      | `true` or `false` to control caching during rewriting | Installed Iceberg default (`false` in 1.11.0) |
+| `spark_conf`       | JSON string containing additional Spark settings      | None                                          |
 
 Include the Spark and catalog template settings shown in the
 [submission example](./optimizer-cli-reference.md#submitting-the-job), and make the matching
