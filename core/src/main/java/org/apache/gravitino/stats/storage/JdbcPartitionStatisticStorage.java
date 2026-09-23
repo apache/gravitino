@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.gravitino.Entity;
@@ -63,6 +64,7 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
   private final DataSource dataSource;
   private final EntityStore entityStore;
   private final DatabaseType databaseType;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
 
   /** Supported database types. */
   private enum DatabaseType {
@@ -356,6 +358,9 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
 
   @Override
   public void close() throws IOException {
+    if (!closed.compareAndSet(false, true)) {
+      return;
+    }
     LOG.debug("Closing JdbcPartitionStatisticStorage");
     // This storage is the only reachable owner of the pooled DataSource: the
     // factory that created it is discarded by the manager, so close must

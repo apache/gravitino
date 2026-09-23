@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.stats.storage;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,10 +111,12 @@ public class TestJdbcPartitionStatisticStorage {
     dataSource.setDriverClassName("org.h2.Driver");
     dataSource.setUrl("jdbc:h2:mem:stats_close_test;DB_CLOSE_DELAY=-1");
 
-    try (JdbcPartitionStatisticStorage owned = new JdbcPartitionStatisticStorage(dataSource)) {
-      // no-op: never open a connection
-    }
+    JdbcPartitionStatisticStorage owned = new JdbcPartitionStatisticStorage(dataSource);
+    owned.close();
+    assertTrue(dataSource.isClosed());
 
+    // close() is idempotent: a second call must not throw and must leave the pool closed.
+    assertDoesNotThrow(owned::close);
     assertTrue(dataSource.isClosed());
   }
 
