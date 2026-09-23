@@ -222,9 +222,9 @@ final class LanceBlobTypes {
 
     List<Field> children = field.getChildren();
     boolean withRange;
-    if (children.equals(V2_MINIMAL_CHILDREN)) {
+    if (childrenMatch(children, V2_MINIMAL_CHILDREN)) {
       withRange = false;
-    } else if (children.equals(V2_FULL_CHILDREN)) {
+    } else if (childrenMatch(children, V2_FULL_CHILDREN)) {
       withRange = true;
     } else {
       return Optional.empty();
@@ -308,6 +308,26 @@ final class LanceBlobTypes {
     } catch (NumberFormatException e) {
       return false;
     }
+  }
+
+  // Compares blob v2 children the way Lance classifies the layout: by name, Arrow type and
+  // nullability. Child metadata is not part of the layout and is ignored.
+  private static boolean childrenMatch(List<Field> actual, List<Field> expected) {
+    if (actual.size() != expected.size()) {
+      return false;
+    }
+    for (int i = 0; i < actual.size(); i++) {
+      Field actualChild = actual.get(i);
+      Field expectedChild = expected.get(i);
+      if (!actualChild.getName().equals(expectedChild.getName())
+          || !actualChild.getType().equals(expectedChild.getType())
+          || actualChild.isNullable() != expectedChild.isNullable()
+          || actualChild.getDictionary() != null
+          || !actualChild.getChildren().isEmpty()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static Field nullableChild(String name, ArrowType type) {

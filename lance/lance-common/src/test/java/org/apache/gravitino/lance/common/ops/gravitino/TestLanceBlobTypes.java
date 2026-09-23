@@ -113,6 +113,22 @@ public class TestLanceBlobTypes {
                 "16"));
     assertEquals(
         Optional.of("lance.blob.v2(inline_size_threshold=16)"), LanceBlobTypes.toCatalogString(v2));
+
+    // Child metadata is not part of the blob v2 layout.
+    List<Field> childWithMetadata =
+        Arrays.asList(
+            new Field(
+                "data",
+                new FieldType(
+                    true,
+                    ArrowType.LargeBinary.INSTANCE,
+                    null,
+                    Map.of("lance-encoding:compression", "zstd")),
+                null),
+            minimalChildren().get(1));
+    assertEquals(
+        Optional.of("lance.blob.v2"),
+        LanceBlobTypes.toCatalogString(v2Field(childWithMetadata, Map.of())));
   }
 
   @Test
@@ -197,15 +213,18 @@ public class TestLanceBlobTypes {
             minimalChildren().get(1));
     assertFalse(LanceBlobTypes.toCatalogString(v2Field(nonNullable, Map.of())).isPresent());
 
-    // Child with metadata.
-    List<Field> childWithMetadata =
+    // Dictionary-encoded child.
+    List<Field> dictionaryChild =
         Arrays.asList(
+            minimalChildren().get(0),
             new Field(
-                "data",
-                new FieldType(true, ArrowType.LargeBinary.INSTANCE, null, Map.of("k", "v")),
-                null),
-            minimalChildren().get(1));
-    assertFalse(LanceBlobTypes.toCatalogString(v2Field(childWithMetadata, Map.of())).isPresent());
+                "uri",
+                new FieldType(
+                    true,
+                    ArrowType.Utf8.INSTANCE,
+                    new DictionaryEncoding(1L, false, new ArrowType.Int(32, true))),
+                null));
+    assertFalse(LanceBlobTypes.toCatalogString(v2Field(dictionaryChild, Map.of())).isPresent());
 
     // Dictionary-encoded struct.
     Field dictionaryEncoded =
