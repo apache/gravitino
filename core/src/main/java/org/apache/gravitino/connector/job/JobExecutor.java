@@ -20,6 +20,8 @@
 package org.apache.gravitino.connector.job;
 
 import java.io.Closeable;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -111,5 +113,51 @@ public interface JobExecutor extends Closeable {
    */
   default boolean isJobStateNodeLocal() {
     return false;
+  }
+
+  /**
+   * Get the captured standard output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
+   * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
+   * know about - the job entity itself may still exist even after the executor's own bookkeeping
+   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
+   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
+   * reported as empty output, not as an error.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
+   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
+   *     both the read cost and the response size regardless of how the content is shaped.
+   * @return the stdout lines of the job, or an empty list if not available.
+   */
+  default List<String> getJobStdout(String jobId, int maxLines, int maxBytes) {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Get the captured standard error output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
+   * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
+   * know about - the job entity itself may still exist even after the executor's own bookkeeping
+   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
+   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
+   * reported as empty output, not as an error.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
+   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
+   *     both the read cost and the response size regardless of how the content is shaped.
+   * @return the stderr lines of the job, or an empty list if not available.
+   */
+  default List<String> getJobStderr(String jobId, int maxLines, int maxBytes) {
+    return Collections.emptyList();
   }
 }

@@ -15,6 +15,14 @@ determinism, and how definitions and implementations relate, see [Functions](./f
 creating the catalog and schema a function lives in, see
 [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md).
 
+:::note
+Registering a function stores its metadata in Gravitino; whether an engine can call it depends on
+the engine's connector. The Trino connector exposes only implementations with language `SQL` and
+runtime `TRINO`; Python and Java implementations, and any implementation with another runtime, are
+managed in Gravitino but are not visible or callable from Trino. See
+[Trino Connector UDF Support](./trino-connector/udf-support.md).
+:::
+
 ## Function Operations
 
 ### Register a SQL Function

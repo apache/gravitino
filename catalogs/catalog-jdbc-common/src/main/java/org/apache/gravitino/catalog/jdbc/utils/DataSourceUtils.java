@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -76,11 +77,14 @@ public class DataSourceUtils {
     // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
     // to execute at connection time, and the H2 driver class must also be blocked to prevent
     // bypassing this check via a mismatched driver and URL combination.
-    String decodedUrl = recursiveDecode(jdbcConfig.getJdbcUrl().toLowerCase());
-    if (decodedUrl.startsWith("jdbc:h2")) {
+    String lowerUrl = jdbcConfig.getJdbcUrl().toLowerCase(Locale.ROOT);
+    boolean isH2Url =
+        JdbcUrlUtils.decodedFormsForScan(lowerUrl).stream()
+            .anyMatch(form -> form.startsWith("jdbc:h2"));
+    if (isH2Url) {
       throw new GravitinoRuntimeException("H2 JDBC URL is not allowed in catalog configuration");
     }
-    if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
+    if (jdbcConfig.getJdbcDriver().toLowerCase(Locale.ROOT).startsWith("org.h2.")) {
       throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
     }
     // Reject DBCP2 pool properties that load arbitrary classes via reflection before handing the
@@ -90,8 +94,43 @@ public class DataSourceUtils {
     try {
       return createDBCPDataSource(jdbcConfig);
     } catch (Exception exception) {
+      if (isDriverClassMissing(exception)) {
+        // Some JDBC drivers are not packaged with Gravitino and must be installed by the user.
+        // Surface a clear, actionable message naming the driver instead of a raw
+        // ClassNotFoundException.
+        throw new GravitinoRuntimeException(
+            exception,
+            "JDBC driver class '%s' was not found on the catalog classpath. Install the driver "
+                + "JAR in the catalog's libs directory and recreate the catalog.",
+            jdbcConfig.getJdbcDriver());
+      }
       throw new GravitinoRuntimeException(exception, "Error creating datasource");
     }
+  }
+
+  /**
+   * Returns whether the given throwable chain indicates a missing JDBC driver class. DBCP2 reports
+   * an absent driver as a {@link ClassNotFoundException} (sometimes wrapped in a {@link
+   * SQLException} whose message is "Cannot load JDBC driver class ..."), so both the exception
+   * chain and that message are checked.
+   *
+   * @param throwable the throwable thrown while creating the data source
+   * @return {@code true} if the failure is due to a driver class that cannot be loaded
+   */
+  private static boolean isDriverClassMissing(Throwable throwable) {
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      if (current instanceof ClassNotFoundException || current instanceof NoClassDefFoundError) {
+        return true;
+      }
+      String message = current.getMessage();
+      if (message != null && message.contains("Cannot load JDBC driver class")) {
+        return true;
+      }
+      if (current.getCause() == current) {
+        break;
+      }
+    }
+    return false;
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
@@ -102,6 +141,11 @@ public class DataSourceUtils {
     String jdbcUrl = jdbcConfig.getJdbcUrl();
     basicDataSource.setUrl(jdbcUrl);
     String driverClassName = jdbcConfig.getJdbcDriver();
+    // DBCP2 loads the driver lazily on the first connection, so a missing driver would otherwise
+    // only surface much later (and as an opaque error). Verify the driver class is on the catalog
+    // classpath now, so catalog creation fails fast with a clear, actionable message. Loaded
+    // without initialization; the H2 driver is already rejected above.
+    verifyDriverPresent(driverClassName);
     basicDataSource.setDriverClassName(driverClassName);
     String userName = jdbcConfig.getUsername();
     basicDataSource.setUsername(userName);
@@ -115,6 +159,23 @@ public class DataSourceUtils {
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
+  }
+
+  /**
+   * Verifies that the configured JDBC driver class is loadable from the catalog classpath. The
+   * class is resolved without initialization using the catalog's context class loader (falling back
+   * to this class's loader), so an absent driver fails catalog creation immediately rather than on
+   * the first connection.
+   *
+   * @param driverClassName the fully qualified JDBC driver class name
+   * @throws ClassNotFoundException if the driver class is not on the catalog classpath
+   */
+  private static void verifyDriverPresent(String driverClassName) throws ClassNotFoundException {
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    if (classLoader == null) {
+      classLoader = DataSourceUtils.class.getClassLoader();
+    }
+    Class.forName(driverClassName, false, classLoader);
   }
 
   private static Properties getProperties(JdbcConfig jdbcConfig) {
@@ -146,23 +207,6 @@ public class DataSourceUtils {
         }
       }
     }
-  }
-
-  private static String recursiveDecode(String url) {
-    String prev;
-    String decoded = url;
-    int max = 5;
-
-    do {
-      prev = decoded;
-      try {
-        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
-      }
-    } while (!prev.equals(decoded) && --max > 0);
-
-    return decoded;
   }
 
   public static void closeDataSource(DataSource dataSource) {

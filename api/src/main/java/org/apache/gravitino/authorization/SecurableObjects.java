@@ -221,8 +221,13 @@ public class SecurableObjects {
 
     @Override
     public int hashCode() {
-      int result = super.hashCode();
-      return Objects.hash(result, privileges);
+      // equals compares privileges as an unordered collection, so the hash must be
+      // order-independent too rather than relying on the stored list order.
+      int privilegesHash = 0;
+      for (Privilege privilege : privileges) {
+        privilegesHash += Objects.hashCode(privilege);
+      }
+      return Objects.hash(super.hashCode(), privilegesHash);
     }
 
     @Override

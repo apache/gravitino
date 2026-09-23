@@ -36,6 +36,10 @@ dependencies {
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.slf4j.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -45,6 +49,8 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+    // The optional OpenSSL provider contains LGPL code. Hadoop's default mode falls back to JSSE.
+    exclude(dependency("org.wildfly.openssl:wildfly-openssl"))
 
     // Exclude Gravitino modules to prevent class duplication and "Split Packages" issues.
     // These modules (api, common, catalogs) are already provided by the Gravitino server and gravitino-filesystem-hadoop3-runtime.
@@ -86,4 +92,11 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  val bundle = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(bundle)
+  inputs.file(bundle.flatMap { it.archiveFile })
+  doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

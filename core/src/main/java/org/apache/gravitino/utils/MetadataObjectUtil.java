@@ -332,7 +332,7 @@ public class MetadataObjectUtil {
       case JOB:
         NameIdentifierUtil.checkJob(identifier);
         try {
-          env.internalJobOperationDispatcher().getJob(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJob(metalake, object.fullName(), false);
         } catch (NoSuchJobException e) {
           throw exceptionToThrowSupplier.get();
         }

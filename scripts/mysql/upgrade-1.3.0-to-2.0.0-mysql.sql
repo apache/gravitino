@@ -17,6 +17,9 @@
 -- under the License.
 --
 
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
+
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
@@ -102,7 +105,6 @@ ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_i
 ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`;
 ALTER TABLE `policy_version_info` RENAME INDEX `idx_mid` TO `policy_version_info_idx_mid`;
-ALTER TABLE `policy_relation_meta` RENAME INDEX `idx_mid` TO `policy_relation_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `uk_sid_fn_del` TO `function_meta_uk_sid_fn_del`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_mid` TO `function_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_cid` TO `function_meta_idx_cid`;
@@ -180,3 +182,18 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE `owner_meta` o
+    JOIN (
+        SELECT `metadata_object_id`, `metadata_object_type`, MAX(`id`) AS keep_id
+        FROM `owner_meta`
+        WHERE `deleted_at` = 0
+        GROUP BY `metadata_object_id`, `metadata_object_type`
+        HAVING COUNT(*) > 1
+    ) d ON o.`metadata_object_id` = d.`metadata_object_id`
+       AND o.`metadata_object_type` = d.`metadata_object_type`
+    SET o.`deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+        o.`updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+    WHERE o.`deleted_at` = 0 AND o.`id` <> d.keep_id;

@@ -42,7 +42,6 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -110,17 +109,13 @@ public class ViewMetaService {
     try {
       ViewPO po = initializeViewPO(viewEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the view cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      viewEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () -> insertViewWithoutCommit(viewEntity, po, overwrite));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              viewEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () -> insertViewWithoutCommit(viewEntity, po, overwrite));
     } catch (RuntimeException re) {
       try {
         ExceptionUtils.checkSQLException(
@@ -166,28 +161,58 @@ public class ViewMetaService {
 
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            if (isSchemaChanged) {
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId);
-            }
-          },
-          () -> {
-            // current_version is the sole OCC token. The root CAS is the transaction's decision
-            // point and must run before the unguarded version-row insert below.
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
-            if (updated == 0) {
-              throw viewWriteFailure(ident, oldViewPO);
-            }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewVersionInfoMapper.class,
-                  mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      if (isSchemaChanged) {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockCatalogForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        oldViewPO.getSchemaId(),
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId),
+            () -> {
+              int updated =
+                  SessionUtils.getWithoutCommit(
+                      ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+              if (updated == 0) {
+                throw viewWriteFailure(ident, oldViewPO);
+              }
+            },
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ViewVersionInfoMapper.class,
+                    mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      } else {
+        SchemaMetaService.getInstance()
+            .doWithSchemaWriteLock(
+                newEntity.nameIdentifier(),
+                newSchemaId,
+                newCatalogId,
+                newMetalakeId,
+                () -> {
+                  int updated =
+                      SessionUtils.getWithoutCommit(
+                          ViewMetaMapper.class,
+                          mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+                  if (updated == 0) {
+                    throw viewWriteFailure(ident, oldViewPO);
+                  }
+                },
+                () ->
+                    SessionUtils.doWithoutCommit(
+                        ViewVersionInfoMapper.class,
+                        mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      }
       return newEntity;
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -434,11 +459,6 @@ public class ViewMetaService {
         TagMetadataObjectRelMapper.class,
         mapper ->
             mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                viewId, MetadataObject.Type.VIEW.name()));
-    SessionUtils.doWithoutCommit(
-        PolicyMetadataObjectRelMapper.class,
-        mapper ->
-            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                 viewId, MetadataObject.Type.VIEW.name()));
   }
 

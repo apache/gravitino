@@ -106,6 +106,11 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaMetaById(schemaId);
   }
 
+  /** Returns SQL that checks whether an active child exists in the schema. */
+  public static String selectActiveChildBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().selectActiveChildBySchemaId(schemaId);
+  }
+
   /** Returns SQL that selects and locks an active schema by ID. */
   public static String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
     return getProvider().selectSchemaMetaByIdForUpdate(schemaId);

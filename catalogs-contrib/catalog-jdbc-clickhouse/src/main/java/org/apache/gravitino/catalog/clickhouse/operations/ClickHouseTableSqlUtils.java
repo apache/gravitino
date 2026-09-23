@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -44,7 +45,7 @@ final class ClickHouseTableSqlUtils {
 
   private ClickHouseTableSqlUtils() {}
 
-  static Transform[] parsePartitioning(String partitionKey) {
+  static Transform[] parsePartitioning(@Nullable String partitionKey) {
     if (StringUtils.isBlank(partitionKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -61,7 +62,13 @@ final class ClickHouseTableSqlUtils {
       if (StringUtils.isBlank(expression)) {
         continue;
       }
-      transforms.add(parsePartitionExpression(expression, partitionKey));
+      Transform transform = parsePartitionExpression(expression);
+      if (transform == null) {
+        // A single unsupported native expression means the whole partition key cannot be
+        // represented as structured transforms.
+        return Transforms.EMPTY_TRANSFORM;
+      }
+      transforms.add(transform);
     }
 
     return transforms.toArray(new Transform[0]);
@@ -178,49 +185,48 @@ final class ClickHouseTableSqlUtils {
     return normalizeIndexExpression(current);
   }
 
-  private static Transform parsePartitionExpression(
-      String expression, String originalPartitionKey) {
+  @Nullable
+  private static Transform parsePartitionExpression(String expression) {
     String trimmedExpression = StringUtils.trim(expression);
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYearMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.year(identifier);
+      String identifier = extractPartitionIdentifier(toYearMatcher.group(1));
+      return identifier == null ? null : Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.month(identifier);
+      String identifier = extractPartitionIdentifier(toYYYYMMMatcher.group(1));
+      return identifier == null ? null : Transforms.month(identifier);
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = normalizeIdentifier(toDateMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.day(identifier);
+      String identifier = extractPartitionIdentifier(toDateMatcher.group(1));
+      return identifier == null ? null : Transforms.day(identifier);
     }
 
-    if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
-      throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYear, toYYYYMM, toDate partition expressions, but got: "
-              + trimmedExpression);
-    }
+    String identifier = extractPartitionIdentifier(trimmedExpression);
+    return identifier == null ? null : Transforms.identity(identifier);
+  }
 
-    String identifier = normalizeIdentifier(trimmedExpression);
-    Preconditions.checkArgument(
-        isStrictIdentifier(identifier),
-        "Only simple identifier is supported for partition expression, but got: "
-            + originalPartitionKey);
-    return Transforms.identity(identifier);
+  /**
+   * Extracts a partition column name from an expression. A backtick-quoted identifier (which may
+   * contain special characters such as {@code -}) is always treated as a column name. Otherwise the
+   * expression must match the strict column-name pattern. Returns {@code null} for arbitrary
+   * expressions such as {@code f(x)} that cannot be represented as a single column reference.
+   */
+  @Nullable
+  private static String extractPartitionIdentifier(String expression) {
+    String trimmed = StringUtils.trim(expression);
+    if (StringUtils.startsWith(trimmed, "`")
+        && StringUtils.endsWith(trimmed, "`")
+        && trimmed.length() >= 2) {
+      String inner = trimmed.substring(1, trimmed.length() - 1);
+      return StringUtils.isNotBlank(inner) ? inner : null;
+    }
+    return isStrictIdentifier(trimmed) ? trimmed : null;
   }
 
   private static String normalizePartitionKey(String partitionKey) {

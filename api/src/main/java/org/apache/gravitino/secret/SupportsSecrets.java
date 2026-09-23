@@ -30,8 +30,10 @@ import java.util.Map;
  *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
  *   <li>Stored plaintext for property keys whose names look sensitive (contain {@code secret},
  *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
- *       case-insensitive), so mistyped / undeclared credential properties remain usable after API
- *       responses mask them as {@code ******}.
+ *       case-insensitive) when the key is undeclared or declared {@code hidden}, so mistyped /
+ *       undeclared credential properties remain usable after API responses mask them as {@code
+ *       ******}. Declared non-hidden configuration keys are not returned even when the name
+ *       matches.
  * </ul>
  *
  * <p>Properties that are only declared {@code hidden} in property metadata, and whose names do

@@ -578,12 +578,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result is ambiguous: the external schema may have been renamed or dropped out
-          // of band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            deleteObservedRegistration(ident, SCHEMA, true, observed);
+          // A non-cascading false result may mean the external schema was renamed, so preserve
+          // its registration. An explicit cascade also removes stale metadata, but only if the
+          // registration is still the one observed before the external call.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
+            droppedFromStore = deleteObservedRegistration(ident, SCHEMA, true, observed);
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(
@@ -595,10 +595,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          if (droppedFromCatalog) {
+          if (droppedFromCatalog || droppedFromStore) {
             secretManager.deleteSecretsFromProperties(schemaProperties);
           }
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 
