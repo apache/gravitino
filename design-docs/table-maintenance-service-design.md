@@ -129,12 +129,12 @@ Nightly compaction covers tables that stop receiving commits.
 Peer nodes typically use one of three patterns: **1** = policy grain; **2** = row grain;
 **3** = external Cron + queue.
 
-|                  | 1. Policy-level compete                                                                                     | 2. Row-level CAS                                                                                                                                                   | 3. External cron enqueue                                                                                                                                        |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Typical products | ShedLock; Spring + Redis/DB lock; Quartz JDBC Cluster                                                       | Temporal lease; Hangfire; db-scheduler; SQS visibility timeout (analogy)                                                                                           | OpenHouse CronJob; Floe                                                                                                                                         |
-| Pros             | Simple or mature; one winner per policy fire; prevents double runs of the same policy                       | Peers claim different `(table, policy)` rows — no whole-policy lock; same claim shared with the commit path (no double-submit)                                     | Decouples trigger from execution; consumers scale on the **external** queue                                                                                     |
-| Cons             | Winner then lists the whole policy scope — hard to parallelize **per table**; lock/trigger is policy-scoped | —                                                                                                                                                                  | Requires **extra components** (external Cron and/or message queue); duplicate-enqueue and consumer **idempotency** still needed                                 |
-| Chosen? Reason   | **Rejected.** Coarse policy grain; does not give per-table claim shared with the commit path.               | **Chosen** (§5.3). Matches in-tree cleanup; scheduler and commit path share the same `(table, policy)` claim; scales with due rows, not with a single policy lock. | **Rejected.** TMS must not introduce other runtime components beyond Gravitino and its entity DB. Pattern **2** keeps coordination in-process + existing store. |
+|                  | 1. Policy-level compete                                                                                     | 2. Row-level CAS                                                                                                                          | 3. External cron enqueue                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typical products | ShedLock; Spring + Redis/DB lock; Quartz JDBC Cluster                                                       | Temporal lease; Hangfire; db-scheduler; SQS visibility timeout (analogy)                                                                  | OpenHouse CronJob; Floe                                                                                                                                         |
+| Pros             | Simple or mature; one winner per policy fire; prevents double runs of the same policy                       | Peers claim different `(table, policy)` rows — no whole-policy lock; same claim shared with the commit path (no double-submit)            | Decouples trigger from execution; consumers scale on the **external** queue                                                                                     |
+| Cons             | Winner then lists the whole policy scope — hard to parallelize **per table**; lock/trigger is policy-scoped | —                                                                                                                                         | Requires **extra components** (external Cron and/or message queue); duplicate-enqueue and consumer **idempotency** still needed                                 |
+| Chosen? Reason   | **Rejected.** Coarse policy grain; does not give per-table claim shared with the commit path.               | **Chosen** (§5.3). Scheduler and commit path share the same `(table, policy)` claim; scales with due rows, not with a single policy lock. | **Rejected.** TMS must not introduce other runtime components beyond Gravitino and its entity DB. Pattern **2** keeps coordination in-process + existing store. |
 
 ---
 ### 4.4 Table discovery options
@@ -231,9 +231,9 @@ Each policy stores a **schedule** in `policy_meta.content`; TMS sets wall-clock 
 
 **Illustrative `content.schedule` (crontab):**
 
-|                             | `nightly_compaction` | `weekly_snapshot_expiry` | `manifest_rewrite` | `orphan_cleanup`               |
-| --------------------------- | -------------------- | ------------------------ | ------------------ | ------------------------------ |
-| `content.schedule` (stored) | `0 2 * * *`          | `0 3 * * 0`              | `0 4 * * *`        | `0 4 * * 0` + `enabled: false` |
+|                             | `nightly_compaction` | `nightly_snapshot_expiry` | `nightly_manifest_rewrite` | `weekly_orphan_cleanup` |
+| --------------------------- | -------------------- | ------------------------- | -------------------------- | ----------------------- |
+| `content.schedule` (stored) | `0 2 * * *`          | `0 3 * * *`               | `0 4 * * *`                | `0 5 * * 0`             |
 
 **Commit vs scheduler:** `schedule` / `next_due_at` are **scheduler only**; commit neither reads nor advances them.
 
@@ -279,16 +279,17 @@ due rows into an in-memory queue.
 ```text
 worker loop (× workerThreads):
   SELECT up to candidateWindow due candidates   // IDLE or stale RUNNING; next_due_at <= now
+  if SELECT returns 0 rows → sleep pollIntervalSecs; continue
   try CAS claim one row (§6.1)                  // only if this worker is free
   if claim wins → heartbeat → submit Spark → release IDLE when done
-  if no claimable row → sleep pollIntervalSecs
+  if CAS loses → try next candidate in the batch (do not sleep)
 ```
 
-| Concept            | Meaning                                                                                               |
-| ------------------ | ----------------------------------------------------------------------------------------------------- |
-| `workerThreads`    | Max **concurrent** claims / in-flight submits on this node (default **8**).                           |
-| `candidateWindow`  | Max rows per **SELECT** for CAS retries (default **32**). May be **>** `workerThreads`.               |
-| `pollIntervalSecs` | Sleep when a worker finds **no** claimable row (default **60**). Not “flush a batch every N seconds”. |
+| Concept            | Meaning                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
+| `workerThreads`    | Max **concurrent** claims / in-flight submits on this node (default **8**).                       |
+| `candidateWindow`  | Max rows per **SELECT** for CAS retries (default **32**).                                         |
+| `pollIntervalSecs` | Sleep only when **SELECT returns 0 rows** (default **60**). CAS losses do not trigger this sleep. |
 
 **Claim at most free capacity:** if 8 workers are busy, do **not** claim more rows. Extra due rows stay
 `IDLE` (or reclaimable stale `RUNNING`) in `table_maintenance_state` until a worker is free or another
@@ -390,7 +391,8 @@ Both nodes SELECT up to candidateWindow due candidates → each free worker CAS-
   UPDATE … SET state=RUNNING, heartbeat_at=:now
   WHERE … AND (state=IDLE OR (state=RUNNING AND heartbeat_at < :heartbeatExpiry))
   winner (rows_affected=1) → heartbeat → submit → IDLE when job finishes
-  loser / no free worker → leave row due in DB; try next candidate or sleep pollIntervalSecs
+  CAS loser → try next candidate in the batch (do not sleep)
+  SELECT returned 0 rows → sleep pollIntervalSecs
 Never claim more rows than free workers; unclaimed due rows stay in table_maintenance_state
 Heartbeats cover scheduler + commit-path claims (same pattern as iceberg_cleanup_job.heartbeat_at)
 ```
@@ -454,16 +456,16 @@ Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, 
 | ------------------------------------------------------- | ------- | -------------------------------------------------------- |
 | `gravitino.server.rest.extensionPackages`               | none    | TMS Feature package.                                     |
 | `gravitino.auxService.names`                            | none    | Include `iceberg-rest` when using IRC.                   |
-| `gravitino.maintenance.scheduler.pollIntervalSecs`      | `60`    | Sleep when a worker finds no claimable due row (§5.3.1). |
+| `gravitino.maintenance.scheduler.pollIntervalSecs`      | `60`    | Sleep when SELECT returns 0 due rows (§5.3.1).           |
 | `gravitino.maintenance.scheduler.workerThreads`         | `8`     | Concurrent claim/submit workers per node (§5.3.1).       |
 | `gravitino.maintenance.scheduler.candidateWindow`       | `32`    | Max SELECT candidates per claim attempt (§5.3.1).        |
 | `gravitino.maintenance.scheduler.discoveryIntervalSecs` | `3600`  | Discovery interval for above-table attachments (§5.3.2). |
 | `gravitino.maintenance.scheduler.heartbeatTimeoutSecs`  | `300`   | Stale `heartbeat_at` → reclaim `RUNNING` (§6.1).         |
 
 Per-table **schedule cadence** is **`next_due_at`** (from policy crontab). `minIntervalMs` is only the
-min-gap gate before claim (§7.3). `pollIntervalSecs` = idle-worker sleep; `workerThreads` = max
-concurrent submits; `candidateWindow` = SELECT size (≥ workers); `discoveryIntervalSecs` =
-expansion frequency.
+min-gap gate before claim (§7.3). `pollIntervalSecs` = sleep when SELECT is empty;
+`workerThreads` = max concurrent submits; `candidateWindow` = SELECT size;
+`discoveryIntervalSecs` = expansion frequency.
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
