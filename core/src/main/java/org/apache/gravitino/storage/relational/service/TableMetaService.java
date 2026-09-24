@@ -50,10 +50,13 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TableMetaService.class);
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
 
@@ -123,13 +126,18 @@ public class TableMetaService {
               po.getSchemaId(),
               po.getCatalogId(),
               po.getMetalakeId(),
+              () -> {
+                if (overwrite) {
+                  deleteStaleTableWithSameName(tableEntity.nameIdentifier(), po);
+                }
+              },
               () ->
                   SessionUtils.doWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> {
                         ops.insertPO(mapper, po, overwrite);
                         if (overwrite) {
-                          // MySQL may preserve the existing table ID during an upsert. Read the
+                          // The upsert may update the existing row with the same table ID. Read the
                           // stored identity and database-generated version while the row is locked.
                           TablePO storedPO =
                               mapper.selectTableMetaBySchemaIdAndName(
@@ -410,9 +418,36 @@ public class TableMetaService {
     builder.withSchemaId(namespacedEntityId.entityId());
   }
 
+  /**
+   * Deletes the table stored under the same name as {@code po} when it has a different ID.
+   *
+   * <p>Such a row is a stale registration, for example a table dropped outside Gravitino and then
+   * created again. Upserting over it would keep the stale ID on MySQL and H2, so the new table
+   * would inherit the old table's tags, owner, privileges and statistics, and would fail on the
+   * name's unique key on PostgreSQL. The caller must hold the schema write lock and run this in the
+   * same transaction as the insert.
+   */
+  private void deleteStaleTableWithSameName(NameIdentifier identifier, TablePO po) {
+    TablePO storedPO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(po.getSchemaId(), po.getTableName()));
+    if (storedPO == null || storedPO.getTableId().equals(po.getTableId())) {
+      return;
+    }
+
+    LOG.warn(
+        "Replacing stale registration of table {} with ID {} by the table with ID {}",
+        identifier,
+        storedPO.getTableId(),
+        po.getTableId());
+    deleteTableWithVersion(identifier, storedPO);
+    deleteTableDependents(storedPO);
+  }
+
   private TablePO tablePOWithPersistedIdentityAndVersions(TablePO incomingPO, TablePO persistedPO) {
-    // The upsert derives the version inside the database and may preserve an existing table ID, so
-    // its dependent rows must carry the identity and versions the database ended up with.
+    // The upsert derives the version inside the database, so its dependent rows must carry the
+    // versions the database ended up with.
     return TablePO.builder(incomingPO)
         .withTableId(persistedPO.getTableId())
         .withCurrentVersion(persistedPO.getCurrentVersion())
