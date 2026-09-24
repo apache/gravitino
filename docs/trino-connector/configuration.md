@@ -44,7 +44,7 @@ legacy `catalog-backend` translation. Otherwise, non-REST `lakehouse-iceberg` ca
 unregistered until discovery succeeds. See
 [Iceberg catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog).
 
-Qualified catalog names (`gravitino.catalog-name-with-metalake=true`) are supported on Trino connector versions 440-445 and 469-478. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
+Qualified catalog names (`gravitino.catalog-name-with-metalake=true`) are supported on Trino connector versions 440-445 and 469-483. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
 
 **Note:** `gravitino.iceberg.rest-uri` is the default endpoint for every loaded metalake. Since a
 single Iceberg REST server serves exactly one metalake, override it per metalake with
