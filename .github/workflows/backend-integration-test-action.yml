@@ -69,9 +69,9 @@ jobs:
           ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
             -x :flink-connector:flink-common:test \
-            -x :flink-connector:flink-1.18:test -x :flink-connector:flink-runtime-1.18:test \
             -x :flink-connector:flink-1.19:test -x :flink-connector:flink-runtime-1.19:test \
             -x :flink-connector:flink-1.20:test -x :flink-connector:flink-runtime-1.20:test \
+            -x :flink-connector:flink-2.1:test -x :flink-connector:flink-runtime-2.1:test \
             -x :spark-connector:spark-3.5:test -x :spark-connector:spark-4.0:test \
             -x :spark-connector:spark-runtime-3.5:test -x :spark-connector:spark-runtime-4.0:test \
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \

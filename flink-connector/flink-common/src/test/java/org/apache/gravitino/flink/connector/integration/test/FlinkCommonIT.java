@@ -51,8 +51,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
@@ -583,6 +583,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   @Test
   @EnabledIf("supportColumnOperation")
+  @SuppressWarnings("deprecation")
   public void testAlterTableComment() {
     String databaseName = "test_alter_table_comment_database";
     String tableName = "test_alter_table_comment";
@@ -603,8 +604,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                       .column("test", DataTypes.INT())
                       .build();
               CatalogTable newTable =
-                  DefaultCatalogCompat.INSTANCE.createCatalogTable(
-                      schema, "test comment", ImmutableList.of(), ImmutableMap.of());
+                  ((BaseCatalog) currentFlinkCatalog)
+                      .newCatalogTable(
+                          schema, "test comment", ImmutableList.of(), ImmutableMap.of());
               List<org.apache.flink.table.catalog.Column> columns = Lists.newArrayList();
               columns.add(org.apache.flink.table.catalog.Column.physical("test", DataTypes.INT()));
               ResolvedSchema resolvedSchema = new ResolvedSchema(columns, new ArrayList<>(), null);
@@ -615,11 +617,12 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               // alter table comment
               currentFlinkCatalog.alterTable(
                   currentTablePath,
-                  DefaultCatalogCompat.INSTANCE.createCatalogTable(
-                      table.getUnresolvedSchema(),
-                      newComment,
-                      table.getPartitionKeys(),
-                      table.getOptions()),
+                  ((BaseCatalog) currentFlinkCatalog)
+                      .newCatalogTable(
+                          table.getUnresolvedSchema(),
+                          newComment,
+                          table.getPartitionKeys(),
+                          table.getOptions()),
                   false);
 
               CatalogTable loadedTable =

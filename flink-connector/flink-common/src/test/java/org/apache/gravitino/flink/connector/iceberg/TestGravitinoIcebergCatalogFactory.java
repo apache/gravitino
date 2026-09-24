@@ -21,14 +21,29 @@ package org.apache.gravitino.flink.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestGravitinoIcebergCatalogFactory {
 
-  private final GravitinoIcebergCatalogFactory factory = new GravitinoIcebergCatalogFactory();
+  private final GravitinoIcebergCatalogFactory factory =
+      new GravitinoIcebergCatalogFactory() {
+        @Override
+        protected Catalog newCatalog(
+            String catalogName,
+            String defaultDatabase,
+            SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+            PartitionConverter partitionConverter,
+            Map<String, String> catalogOptions,
+            Map<String, String> icebergCatalogProperties) {
+          throw new UnsupportedOperationException("not exercised by this test");
+        }
+      };
 
   @Test
   void testJdbcBackendTranslatedToCatalogImpl() {

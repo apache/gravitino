@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.factories.Factory;
 
 /** Typed compatibility hook that is implemented per Flink version. */
 public interface CatalogCompat {
@@ -47,4 +48,13 @@ public interface CatalogCompat {
    * @return serialized table properties
    */
   Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable);
+
+  /**
+   * Create the Flink JDBC connector's default table {@link Factory}. The concrete class moved
+   * packages across Flink versions (from {@code org.apache.flink.connector.jdbc.table} to {@code
+   * org.apache.flink.connector.jdbc.core.table}), so each Flink version supplies its own.
+   *
+   * @return a version-compatible JDBC dynamic table factory
+   */
+  Factory jdbcDynamicTableFactory();
 }

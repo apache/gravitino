@@ -52,11 +52,11 @@ Place the following JAR files in the lib directory of your Flink installation:
 - The Paimon Flink connector JAR that matches your Flink minor version
 - The Gravitino Flink connector runtime JAR that matches your Flink minor version
 
-| Flink version | Paimon connector artifact | Gravitino runtime artifact |
-|---------------|---------------------------|----------------------------|
-| 1.18          | `paimon-flink-1.18-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| Flink version | Paimon connector artifact                 | Gravitino runtime artifact                                             |
+|---------------|-------------------------------------------|------------------------------------------------------------------------|
 | 1.19          | `paimon-flink-1.19-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `paimon-flink-1.20-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+| 2.1           | `paimon-flink-2.1-${paimon-version}.jar`  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
 
 ### SQL Example
 
