@@ -71,6 +71,6 @@ public class TestDorisPropertiesConverter35 {
                     "jdbc-url", "jdbc:mysql://fe:9030/db",
                     "jdbc-driver", "com.mysql.cj.jdbc.Driver"));
 
-    assertEquals("100", converted.get("fetchSize"));
+    assertEquals("100", converted.get("fetchsize"));
   }
 }

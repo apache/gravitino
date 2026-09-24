@@ -59,14 +59,14 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
     converted.remove("user");
     converted.remove("password");
     if (options != null) {
-      options.forEach(
-          (key, value) -> {
-            if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
-              throw new IllegalArgumentException(
-                  "Doris specialized connection options must be catalog-managed: " + key);
-            }
-            converted.put(key, value);
-          });
+      for (Map.Entry<String, String> option : options.entrySet()) {
+        String key = option.getKey();
+        if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
+          throw new IllegalArgumentException(
+              "Doris specialized connection options must be catalog-managed: " + key);
+        }
+        converted.put(key, option.getValue());
+      }
     }
     return converted;
   }
