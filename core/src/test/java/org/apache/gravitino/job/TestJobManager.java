@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.sun.net.httpserver.HttpServer;
 import java.io.File;
@@ -53,6 +54,7 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -405,10 +407,7 @@ public class TestJobManager {
         .delete(
             NameIdentifierUtil.ofJobTemplate(metalake, "shell_job"),
             Entity.EntityType.JOB_TEMPLATE);
-    File directory =
-        new File(
-            testStagingDir,
-            metalake + File.separator + "shell_job" + File.separator + finishedJob.name());
+    File directory = jobManager.jobStagingDir(finishedJob.id());
     Assertions.assertTrue(directory.mkdirs() || directory.isDirectory());
     File artifact = new File(directory, "artifact");
     Assertions.assertTrue(artifact.createNewFile());
@@ -428,9 +427,7 @@ public class TestJobManager {
   @Test
   public void testDeletePreservesReplacementStaging() throws IOException {
     doReturn(Collections.emptyList()).when(jobManager).listJobs(metalake, Optional.of("shell_job"));
-    File replacementDir =
-        new File(
-            testStagingDir, metalake + File.separator + "shell_job" + File.separator + "job_999");
+    File replacementDir = jobManager.jobStagingDir(999L);
     File replacementArtifact = new File(replacementDir, "new-job-artifact");
     when(entityStore.delete(
             NameIdentifierUtil.ofJobTemplate(metalake, "shell_job"),
@@ -455,10 +452,7 @@ public class TestJobManager {
     doReturn(Collections.singletonList(finishedJob))
         .when(jobManager)
         .listJobs(metalake, Optional.of("shell_job"));
-    File directory =
-        new File(
-            testStagingDir,
-            metalake + File.separator + "shell_job" + File.separator + finishedJob.name());
+    File directory = jobManager.jobStagingDir(finishedJob.id());
     Assertions.assertTrue(directory.mkdirs());
     File artifact = new File(directory, "artifact");
     Assertions.assertTrue(artifact.createNewFile());
@@ -824,10 +818,9 @@ public class TestJobManager {
 
     // No job entity is registered and the staging directory of the rejected job is removed.
     verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
-    File templateStagingDir =
-        new File(testStagingDir, metalake + File.separator + shellJobTemplate.name());
-    String[] jobStagingDirs = templateStagingDir.list();
-    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+    File jobRunsDir = jobManager.jobStagingDir(0L).getParentFile();
+    Assertions.assertTrue(jobRunsDir.isDirectory(), "The job staging directory was never created");
+    Assertions.assertArrayEquals(new String[0], jobRunsDir.list());
   }
 
   @Test
@@ -1639,7 +1632,7 @@ public class TestJobManager {
     for (JobEntity job : ImmutableList.of(queuedJob, startedJob, cancellingJob, activeJob)) {
       stubEntityStoreUpdateToApply(job, job);
     }
-    File jobStagingDir = new File(testStagingDir, metalake + "/shell_job/" + startedJob.name());
+    File jobStagingDir = jobManager.jobStagingDir(startedJob.id());
     Assertions.assertTrue(jobStagingDir.mkdirs());
 
     long beforeCleanUp = System.currentTimeMillis();
@@ -1744,8 +1737,8 @@ public class TestJobManager {
         .thenThrow(new OptimisticLockException("job changed"))
         .thenReturn(true);
     when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File conflictedDir = new File(testStagingDir, metalake + "/shell_job/" + conflicted.name());
-    File otherDir = new File(testStagingDir, metalake + "/shell_job/" + other.name());
+    File conflictedDir = jobManager.jobStagingDir(conflicted.id());
+    File otherDir = jobManager.jobStagingDir(other.id());
     Assertions.assertTrue(conflictedDir.mkdirs());
     Assertions.assertTrue(otherDir.mkdirs());
     File artifact = new File(conflictedDir, "artifact");
@@ -1758,6 +1751,214 @@ public class TestJobManager {
     Assertions.assertFalse(conflictedDir.exists());
     verify(entityStore, times(2)).delete(conflictedIdent, Entity.EntityType.JOB);
     verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
+  }
+
+  @Test
+  public void testCleanUpStagingDirsDeletesLegacyStagingDirOfRenamedTemplate() throws IOException {
+    // The job ran from template "shell_job" before an upgrade, in the legacy layout, and the
+    // template was renamed afterwards, so the job now reports the new name.
+    JobEntity job = expiredJob();
+    JobEntity renamedJob =
+        JobEntity.builder()
+            .withId(job.id())
+            .withJobExecutionId(job.jobExecutionId())
+            .withNamespace(job.namespace())
+            .withJobTemplateName("renamed_shell_job")
+            .withStartedAt(job.startedAt())
+            .withFinishedAt(job.finishedAt())
+            .withStatus(job.status())
+            .withAuditInfo(job.auditInfo())
+            .build();
+    mockListActiveJobs(renamedJob);
+    when(entityStore.delete(NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB))
+        .thenReturn(true);
+    File legacyDir = new File(testStagingDir, metalake + "/shell_job/" + job.name());
+    Assertions.assertTrue(legacyDir.mkdirs());
+    Assertions.assertTrue(new File(legacyDir, "output.log").createNewFile());
+    File otherJobDir = new File(testStagingDir, metalake + "/shell_job/job-" + (job.id() + 1));
+    Assertions.assertTrue(otherJobDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(legacyDir.exists());
+    Assertions.assertTrue(otherJobDir.isDirectory());
+  }
+
+  @Test
+  public void testDeleteJobTemplateDeletesLegacyStagingDirOfRenamedMetalake() throws IOException {
+    // The job ran in the legacy layout under the metalake's former name.
+    JobEntity job = expiredJob();
+    doReturn(Collections.singletonList(job)).when(jobManager).listJobs(metalake, Optional.of("t"));
+    doReturn(true)
+        .when(entityStore)
+        .delete(NameIdentifierUtil.ofJobTemplate(metalake, "t"), Entity.EntityType.JOB_TEMPLATE);
+    File legacyDir = new File(testStagingDir, "old_metalake_name/t/" + job.name());
+    Assertions.assertTrue(legacyDir.mkdirs());
+
+    Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "t"));
+
+    Assertions.assertFalse(legacyDir.exists());
+    // Only the job's own directory is deleted, never the template or metalake directory.
+    Assertions.assertTrue(legacyDir.getParentFile().isDirectory());
+  }
+
+  @Test
+  public void testDeleteJobStagingDirPrefersCurrentLayout() throws IOException {
+    JobEntity job = expiredJob();
+    doReturn(Collections.singletonList(job)).when(jobManager).listJobs(metalake, Optional.of("t"));
+    doReturn(true)
+        .when(entityStore)
+        .delete(NameIdentifierUtil.ofJobTemplate(metalake, "t"), Entity.EntityType.JOB_TEMPLATE);
+    File jobStagingDir = jobManager.jobStagingDir(job.id());
+    Assertions.assertTrue(jobStagingDir.mkdirs());
+
+    Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "t"));
+
+    Assertions.assertFalse(jobStagingDir.exists());
+    verify(jobManager, never()).findLegacyJobStagingDirs(job.id());
+  }
+
+  @Test
+  public void testFindLegacyJobStagingDirs() throws IOException {
+    long jobId = idGenerator.nextId();
+    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
+    File stagingDir = new File(testStagingDir).getAbsoluteFile();
+    File legacyDir = new File(stagingDir, metalake + "/shell_job/" + jobDirName);
+    Assertions.assertTrue(legacyDir.mkdirs());
+
+    // Not the job's directory: a file of the same name, a directory at the wrong depth, a hidden
+    // top-level directory and the directory of the current layout.
+    File sameNameFile = new File(stagingDir, metalake + "/other_job/" + jobDirName);
+    Assertions.assertTrue(sameNameFile.getParentFile().mkdirs());
+    Assertions.assertTrue(sameNameFile.createNewFile());
+    Assertions.assertTrue(new File(stagingDir, metalake + "/" + jobDirName).mkdirs());
+    Assertions.assertTrue(new File(stagingDir, ".job-output-index/x/" + jobDirName).mkdirs());
+    Assertions.assertTrue(jobManager.jobStagingDir(jobId).mkdirs());
+    Assertions.assertTrue(
+        new File(jobManager.jobStagingDir(jobId).getParentFile(), "x/" + jobDirName).mkdirs());
+    Assertions.assertTrue(new File(stagingDir, "a_file").createNewFile());
+
+    // Symbolic links are never followed, so nothing outside the staging directory is found.
+    File outsideDir = Files.createTempDirectory("gravitino-test-outside-staging").toFile();
+    try {
+      Assertions.assertTrue(new File(outsideDir, "t/" + jobDirName).mkdirs());
+      Files.createSymbolicLink(
+          new File(stagingDir, "linked_metalake").toPath(), outsideDir.toPath());
+      Assertions.assertTrue(new File(stagingDir, "metalake_2").mkdirs());
+      Files.createSymbolicLink(
+          new File(stagingDir, "metalake_2/linked_template").toPath(),
+          new File(outsideDir, "t").toPath());
+      File linkedJobTemplateDir = new File(stagingDir, metalake + "/linked_job");
+      Assertions.assertTrue(linkedJobTemplateDir.mkdirs());
+      Files.createSymbolicLink(
+          new File(linkedJobTemplateDir, jobDirName).toPath(),
+          new File(outsideDir, "t/" + jobDirName).toPath());
+    } catch (IOException e) {
+      FileUtils.deleteDirectory(outsideDir);
+      throw e;
+    }
+
+    try {
+      Assertions.assertEquals(
+          ImmutableList.of(legacyDir.getAbsolutePath()),
+          jobManager.findLegacyJobStagingDirs(jobId).stream()
+              .map(File::getAbsolutePath)
+              .collect(Collectors.toList()));
+      Assertions.assertTrue(
+          jobManager.findLegacyJobStagingDirs(idGenerator.nextId()).isEmpty(),
+          "No directory of an unknown job");
+    } finally {
+      FileUtils.deleteDirectory(outsideDir);
+    }
+  }
+
+  @Test
+  public void testCleanUpStagingDirsDeletesLegacyStagingDirOfNestedTemplateName()
+      throws IOException {
+    // Template names may contain '/', which the legacy layout put in the path as is, so the job
+    // directory is nested deeper. The template was never renamed: this is an upgraded job.
+    JobEntity job = expiredJob();
+    JobEntity nestedTemplateJob =
+        JobEntity.builder()
+            .withId(job.id())
+            .withJobExecutionId(job.jobExecutionId())
+            .withNamespace(job.namespace())
+            .withJobTemplateName("team/etl")
+            .withStartedAt(job.startedAt())
+            .withFinishedAt(job.finishedAt())
+            .withStatus(job.status())
+            .withAuditInfo(job.auditInfo())
+            .build();
+    mockListActiveJobs(nestedTemplateJob);
+    when(entityStore.delete(NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB))
+        .thenReturn(true);
+    File legacyDir = new File(testStagingDir, metalake + "/team/etl/" + job.name());
+    Assertions.assertTrue(legacyDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(legacyDir.exists());
+  }
+
+  @Test
+  public void testFindLegacyJobStagingDirsOfNestedTemplateNames() throws IOException {
+    long jobId = idGenerator.nextId();
+    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
+    File stagingDir = new File(testStagingDir).getAbsoluteFile();
+    File nestedDir = new File(stagingDir, metalake + "/team/etl/" + jobDirName);
+    Assertions.assertTrue(nestedDir.mkdirs());
+    File deeplyNestedDir = new File(stagingDir, metalake + "/a/b/c/d/" + jobDirName);
+    Assertions.assertTrue(deeplyNestedDir.mkdirs());
+
+    // The staging directory of another job is not descended into: a directory of its own files
+    // named like this job is not this job's staging directory.
+    File otherJobDir =
+        new File(
+            stagingDir,
+            metalake
+                + "/shell_job/"
+                + JobHandle.JOB_ID_PREFIX
+                + (jobId + 1)
+                + File.separator
+                + jobDirName);
+    Assertions.assertTrue(otherJobDir.mkdirs());
+
+    // A template name nested deeper than the lookup goes keeps its directory.
+    StringBuilder tooDeepPath = new StringBuilder(metalake);
+    for (int i = 0; i < 20; i++) {
+      tooDeepPath.append(File.separator).append("d").append(i);
+    }
+    File tooDeepDir = new File(stagingDir, tooDeepPath + File.separator + jobDirName);
+    Assertions.assertTrue(tooDeepDir.mkdirs());
+
+    Assertions.assertEquals(
+        ImmutableSet.of(nestedDir.getAbsolutePath(), deeplyNestedDir.getAbsolutePath()),
+        jobManager.findLegacyJobStagingDirs(jobId).stream()
+            .map(File::getAbsolutePath)
+            .collect(Collectors.toSet()));
+  }
+
+  @Test
+  public void testFindLegacyJobStagingDirsSkipsUnreadableDirectory() throws IOException {
+    long jobId = idGenerator.nextId();
+    File stagingDir = new File(testStagingDir);
+    File legacyDir =
+        new File(stagingDir, metalake + "/shell_job/" + JobHandle.JOB_ID_PREFIX + jobId);
+    Assertions.assertTrue(legacyDir.mkdirs());
+    // E.g. "lost+found" when the staging directory is the root of a file system.
+    File unreadableDir = new File(stagingDir, "lost+found");
+    Assertions.assertTrue(unreadableDir.mkdirs());
+    Assertions.assertTrue(unreadableDir.setReadable(false, false));
+
+    try {
+      Assertions.assertEquals(
+          ImmutableList.of(legacyDir.getAbsolutePath()),
+          jobManager.findLegacyJobStagingDirs(jobId).stream()
+              .map(File::getAbsolutePath)
+              .collect(Collectors.toList()));
+    } finally {
+      Assertions.assertTrue(unreadableDir.setReadable(true, false));
+    }
   }
 
   @Test

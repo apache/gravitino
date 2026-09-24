@@ -27,7 +27,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,14 +88,20 @@ public class JobManager implements JobOperationDispatcher {
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
 
-  private static final String JOB_STAGING_DIR =
-      File.separator
-          + "%s"
-          + File.separator
-          + "%s"
-          + File.separator
-          + JobHandle.JOB_ID_PREFIX
-          + "%s";
+  // A job's staging directory is <stagingDir>/job-runs/job-<id>, derived from the job id alone:
+  // template and metalake names can change after the job runs, so a path built from them can't be
+  // rebuilt at cleanup time. The name contains '-', which metalake names can't, so it never
+  // collides with a metalake directory of the legacy <stagingDir>/<metalake>/<template>/job-<id>
+  // layout.
+  private static final String JOB_RUNS_DIR_NAME = "job-runs";
+
+  private static final Pattern JOB_DIR_PATTERN =
+      Pattern.compile(Pattern.quote(JobHandle.JOB_ID_PREFIX) + "\\d+");
+
+  // Bounds how deep a legacy staging directory is looked up below a job template's first path
+  // element. A template name nested deeper than this keeps its directory, which is better than
+  // walking an unrelated directory tree an operator put in the staging directory.
+  private static final int LEGACY_JOB_STAGING_DIR_MAX_DEPTH = 16;
 
   private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
 
@@ -312,16 +322,13 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     // Only remove directories belonging to the observed jobs. A same-name template can be
-    // recreated after the metadata transaction commits, so its parent directory is not ours to
-    // delete.
+    // recreated after the metadata transaction commits, so a legacy template directory is not ours
+    // to delete.
     for (JobEntity job : jobs) {
-      String jobStagingPath =
-          stagingDir.getAbsolutePath()
-              + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
       try {
-        FileUtils.deleteDirectory(new File(jobStagingPath));
+        deleteJobStagingDir(job);
       } catch (IOException e) {
-        LOG.error("Failed to delete job staging directory: {}", jobStagingPath, e);
+        LOG.error("Failed to delete the staging directory of job {}", job.name(), e);
       }
     }
 
@@ -496,10 +503,7 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create staging directory.
     long jobId = idGenerator.nextId();
-    String jobStagingPath =
-        stagingDir.getAbsolutePath()
-            + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
-    File jobStagingDir = new File(jobStagingPath);
+    File jobStagingDir = jobStagingDir(jobId);
     try {
       Files.createDirectories(jobStagingDir.toPath());
     } catch (IOException e) {
@@ -821,15 +825,7 @@ public class JobManager implements JobOperationDispatcher {
             try {
               entityStore.delete(
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
-
-              String jobStagingPath =
-                  stagingDir.getAbsolutePath()
-                      + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
-              File jobStagingDir = new File(jobStagingPath);
-              if (jobStagingDir.exists()) {
-                FileUtils.deleteDirectory(jobStagingDir);
-                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
-              }
+              deleteJobStagingDir(job);
             } catch (OptimisticLockException e) {
               // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
               // job and checks retention eligibility again; this batch can process other jobs.
@@ -1106,6 +1102,94 @@ public class JobManager implements JobOperationDispatcher {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  @VisibleForTesting
+  File jobStagingDir(long jobId) {
+    return new File(new File(stagingDir, JOB_RUNS_DIR_NAME), JobHandle.JOB_ID_PREFIX + jobId);
+  }
+
+  /**
+   * Finds the staging directory of a job submitted by an earlier Gravitino version, which used the
+   * {@code <stagingDir>/<metalake>/<template>/job-<id>} layout. It's looked up by the job id rather
+   * than rebuilt from the current names, because the template or metalake may have been renamed
+   * since the job ran. The job id is unique, so there is at most one match in practice. Called only
+   * for a job without a directory in the current layout, which after an upgrade are the jobs of the
+   * earlier version until they expire.
+   */
+  @VisibleForTesting
+  List<File> findLegacyJobStagingDirs(long jobId) throws IOException {
+    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
+    List<File> legacyJobStagingDirs = new ArrayList<>();
+    try (DirectoryStream<Path> metalakeDirs = Files.newDirectoryStream(stagingDir.toPath())) {
+      for (Path metalakeDir : metalakeDirs) {
+        String name = metalakeDir.getFileName().toString();
+        // Metalake names can't start with '.', so hidden entries, e.g. the job output index
+        // directory, are not metalake directories. Symbolic links are never followed, so nothing
+        // outside the staging directory can be deleted.
+        if (name.equals(JOB_RUNS_DIR_NAME)
+            || name.startsWith(".")
+            || !Files.isDirectory(metalakeDir, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+
+        // An unreadable directory, e.g. "lost+found" when the staging directory is the root of a
+        // file system, must not prevent finding the job under the other directories.
+        try (DirectoryStream<Path> templateDirs = Files.newDirectoryStream(metalakeDir)) {
+          for (Path templateDir : templateDirs) {
+            if (Files.isDirectory(templateDir, LinkOption.NOFOLLOW_LINKS)) {
+              collectLegacyJobStagingDirs(
+                  templateDir, jobDirName, LEGACY_JOB_STAGING_DIR_MAX_DEPTH, legacyJobStagingDirs);
+            }
+          }
+        } catch (IOException | DirectoryIteratorException e) {
+          LOG.warn(
+              "Failed to look up the legacy staging directory of job {} under {}, skip it",
+              jobDirName,
+              metalakeDir,
+              e);
+        }
+      }
+    }
+    return legacyJobStagingDirs;
+  }
+
+  // The legacy layout put the template name in the path as is, and a template name may contain
+  // '/', so the job directory can be nested deeper than <metalake>/<template>/job-<id>, e.g. under
+  // a template named "team/etl". The staging directory of another job is never descended into: its
+  // contents are that job's own files.
+  private static void collectLegacyJobStagingDirs(
+      Path dir, String jobDirName, int remainingDepth, List<File> legacyJobStagingDirs)
+      throws IOException {
+    try (DirectoryStream<Path> children = Files.newDirectoryStream(dir)) {
+      for (Path child : children) {
+        if (!Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+
+        String name = child.getFileName().toString();
+        if (name.equals(jobDirName)) {
+          legacyJobStagingDirs.add(child.toFile());
+        } else if (remainingDepth > 0 && !JOB_DIR_PATTERN.matcher(name).matches()) {
+          collectLegacyJobStagingDirs(child, jobDirName, remainingDepth - 1, legacyJobStagingDirs);
+        }
+      }
+    }
+  }
+
+  private void deleteJobStagingDir(JobEntity job) throws IOException {
+    File jobStagingDir = jobStagingDir(job.id());
+    if (jobStagingDir.exists()) {
+      FileUtils.deleteDirectory(jobStagingDir);
+      LOG.info("Deleted job staging directory {} for job {}", jobStagingDir, job.name());
+      return;
+    }
+
+    for (File legacyJobStagingDir : findLegacyJobStagingDirs(job.id())) {
+      FileUtils.deleteDirectory(legacyJobStagingDir);
+      LOG.info(
+          "Deleted legacy job staging directory {} for job {}", legacyJobStagingDir, job.name());
+    }
   }
 
   private void deleteStagingDirOfUnsubmittedJob(File jobStagingDir, long jobId) {

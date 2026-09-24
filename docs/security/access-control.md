@@ -73,6 +73,21 @@ Everything Gravitino manages is an object with a type and a name. The name is th
 below the metalake, so a table is `{catalog}.{schema}.{table}`, and requests identify an object by
 both type and name, since the same name can exist at more than one type.
 
+##### Local names containing one or more dots {#names-containing-dots}
+
+::::caution
+When authorization is enabled, Gravitino cannot authorize a federated object whose local name
+contains one or more dots (`.`), because dots separate the components of a qualified metadata object name.
+Loading such an object returns `400 Bad Request`. If a connector returns one of these objects in a
+list, Gravitino rejects the entire list request with `400 Bad Request` and identifies the unsupported
+name instead of returning a partial result. Consequently, one object with a dotted name can prevent
+all sibling objects from appearing in list APIs.
+
+Rename or recreate the object in the source system with a name that does not contain dots before
+using it with authorization. When authorization is disabled, existing source objects whose names
+are supported by the connector can still be listed and loaded.
+::::
+
 Access to an object is controlled by privileges, granted through roles, and by ownership. Ownership
 behaves like a privilege that arrives with the object rather than one you grant, and it carries the
 administrative rights, altering, dropping, and transferring, that no privilege name covers.
@@ -144,8 +159,9 @@ Note the third case. Granting `SELECT_TABLE` on a schema covers every table in t
 its own it authorizes nothing, because the traversal privileges are still missing.
 
 A failed check returns `403 Forbidden`. Some read paths return `404 Not Found` instead, so that a
-caller cannot infer the existence of an object they are not entitled to see. List operations do not
-fail; they return only the entries the caller is entitled to see.
+caller cannot infer the existence of an object they are not entitled to see. List operations
+normally do not fail; they return only the entries the caller is entitled to see. An object whose
+name contains a dot is an exception, as described in [Names containing dots](#names-containing-dots).
 
 #### Allow and Deny
 

@@ -230,6 +230,7 @@
    FastDoubleParser
    Schubfach
    SLF4J API Module
+   SLF4J JDK14 Binding
 
    This product bundles various third-party components also under the
    BSD license

@@ -16,6 +16,10 @@ Creating a table through Gravitino creates it in the source system, and listing 
 source at request time, so a table created directly in Hive appears the next time Gravitino is
 asked.
 
+When authorization is enabled, a table whose local name contains one or more dots is an exception:
+it can cause the entire table list request to fail. See
+[Local names containing one or more dots](./security/access-control.md#names-containing-dots).
+
 What Gravitino adds is a single shape across all of them. The same call describes a Hive table and
 an Iceberg table, columns carry the same type system, and tags, policies, ownership, and statistics
 attach the same way regardless of the system underneath.
