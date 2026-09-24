@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
@@ -68,7 +67,6 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
-import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -664,14 +662,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                       // case-distinct objects must still be rejected even if their ids are equal.
                       if (currentOwner.namespace().equals(identifier.namespace())
                           && currentOwner.name().equalsIgnoreCase(identifier.name())) {
-                        long matchingNames =
+                        List<String> matchingNames =
                             Arrays.stream(ops.listTables(identifier.namespace()))
                                 .map(NameIdentifier::name)
                                 .filter(name -> name.equalsIgnoreCase(identifier.name()))
                                 .distinct()
-                                .count();
-                        if (matchingNames == 1) {
-                          return Pair.of(false, true);
+                                .collect(Collectors.toList());
+                        if (matchingNames.size() == 1) {
+                          // The listing shows the real name. If it is the requested name, the
+                          // table was renamed by case only and the registration must follow it;
+                          // otherwise the requested name is an alias of the registered table.
+                          return Pair.of(false, !matchingNames.get(0).equals(identifier.name()));
                         }
                       }
                       return Pair.of(true, false);
@@ -740,31 +741,20 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         .build();
   }
 
-  /** Returns the live table that owns this id anywhere in the catalog, if any. */
+  /** Returns the live table in the same catalog that owns this id, if any. */
   @Nullable
   private NameIdentifier findRegisteredTableById(Namespace namespace, long id) {
     try {
-      for (TableEntity table : store.list(namespace, TableEntity.class, TABLE)) {
-        if (table.id() == id) {
-          return table.nameIdentifier();
-        }
-      }
-      // A table moved outside Gravitino remains registered under its old schema. Searching only
-      // the destination schema would miss that row and try to insert its already-used ID again.
-      Namespace catalogNamespace = Namespace.of(namespace.level(0), namespace.level(1));
-      for (SchemaEntity schema : store.list(catalogNamespace, SchemaEntity.class, SCHEMA)) {
-        Namespace schemaNamespace =
-            Namespace.of(namespace.level(0), namespace.level(1), schema.name());
-        if (schemaNamespace.equals(namespace)) {
-          continue;
-        }
-        for (TableEntity table : store.list(schemaNamespace, TableEntity.class, TABLE)) {
-          if (table.id() == id) {
-            return table.nameIdentifier();
-          }
-        }
-      }
-      return null;
+      // A point lookup by id: the owner may still be registered under another schema after an
+      // external move, and listing every schema in the catalog would make each import O(schemas).
+      // An owner in another catalog is left to the store, which rejects the insert.
+      return store
+          .findIdentifierById(id, TABLE)
+          .filter(
+              owner ->
+                  owner.namespace().level(0).equals(namespace.level(0))
+                      && owner.namespace().level(1).equals(namespace.level(1)))
+          .orElse(null);
     } catch (IOException e) {
       throw new GravitinoRuntimeException(
           e, "Failed to look up the table registered with id %d under %s", id, namespace);

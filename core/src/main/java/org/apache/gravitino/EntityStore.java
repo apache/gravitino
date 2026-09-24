@@ -170,6 +170,25 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
+   * Finds the identifier of the live entity that is registered with the given ID.
+   *
+   * <p>This is a point lookup by the stable entity ID. It lets a caller that only knows an ID, such
+   * as an import that found a {@link StringIdentifier} in external properties, locate the current
+   * registration without listing every parent that could hold it.
+   *
+   * @param id the stable entity ID
+   * @param entityType the type of the entity
+   * @return the identifier of the live entity with this ID, or empty if there is none
+   * @throws UnsupportedOperationException if the store cannot look this entity type up by ID
+   * @throws IOException if the lookup fails
+   */
+  default Optional<NameIdentifier> findIdentifierById(long id, EntityType entityType)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "Looking up " + entityType + " by ID is not supported by " + getClass().getSimpleName());
+  }
+
+  /**
    * Batch get the entity from the underlying storage.
    *
    * @param idents the unique identifier of the entity

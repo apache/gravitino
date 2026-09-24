@@ -190,6 +190,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public Optional<NameIdentifier> findIdentifierById(long id, Entity.EntityType entityType) {
+    switch (entityType) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().getSchemaIdentifierById(id);
+      case TABLE:
+        return TableMetaService.getInstance().getTableIdentifierById(id);
+      default:
+        throw new UnsupportedOperationException(
+            "Looking up " + entityType + " by ID is not supported");
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
     if (!overwritten || !BaseEntityCache.isCacheable(e.type())) {

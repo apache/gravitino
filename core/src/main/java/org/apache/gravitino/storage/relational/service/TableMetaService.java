@@ -23,8 +23,10 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
@@ -81,6 +83,34 @@ public class TableMetaService {
           tableName);
     }
     return tablePO.getTableId();
+  }
+
+  /**
+   * Returns the identifier of the live table registered with the given ID.
+   *
+   * @param tableId the table ID
+   * @return the table identifier, or empty if no live table has this ID
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableIdentifierById")
+  public Optional<NameIdentifier> getTableIdentifierById(long tableId) {
+    List<TablePO> tablePOs =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> ops.listPOs(mapper, Collections.singletonList(tableId)));
+    if (tablePOs == null || tablePOs.isEmpty()) {
+      return Optional.empty();
+    }
+    TablePO tablePO = tablePOs.get(0);
+    return SchemaMetaService.getInstance()
+        .getSchemaIdentifierById(tablePO.getSchemaId())
+        .map(
+            schema ->
+                NameIdentifier.of(
+                    NamespaceUtil.ofTable(
+                        schema.namespace().level(0), schema.namespace().level(1), schema.name()),
+                    tablePO.getTableName()));
   }
 
   @Monitored(

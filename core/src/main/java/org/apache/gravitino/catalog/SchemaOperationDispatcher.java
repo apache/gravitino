@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -732,14 +733,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       // Only accept an alias when listing confirms a single matching object; two
                       // case-distinct objects must still be rejected even if their ids are equal.
                       if (currentOwner.name().equalsIgnoreCase(identifier.name())) {
-                        long matchingNames =
+                        List<String> matchingNames =
                             Arrays.stream(ops.listSchemas(identifier.namespace()))
                                 .map(NameIdentifier::name)
                                 .filter(name -> name.equalsIgnoreCase(identifier.name()))
                                 .distinct()
-                                .count();
-                        if (matchingNames == 1) {
-                          return Pair.of(false, true);
+                                .collect(Collectors.toList());
+                        if (matchingNames.size() == 1) {
+                          // The listing shows the real name. If it is the requested name, the
+                          // schema was renamed by case only and the registration must follow it;
+                          // otherwise the requested name is an alias of the registered schema.
+                          return Pair.of(false, !matchingNames.get(0).equals(identifier.name()));
                         }
                       }
                       return Pair.of(true, false);
@@ -765,10 +769,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Nullable
   private NameIdentifier findRegisteredSchemaById(Namespace namespace, long id) {
     try {
-      return store.list(namespace, SchemaEntity.class, SCHEMA).stream()
-          .filter(s -> s.id() == id)
-          .map(SchemaEntity::nameIdentifier)
-          .findFirst()
+      // A point lookup by id avoids listing every schema in the catalog on each import. An owner in
+      // another catalog is left to the store, which rejects the insert.
+      return store
+          .findIdentifierById(id, SCHEMA)
+          .filter(owner -> owner.namespace().equals(namespace))
           .orElse(null);
     } catch (IOException e) {
       throw new GravitinoRuntimeException(

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -108,6 +109,30 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(schema, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+  }
+
+  @TestTemplate
+  public void testFindSchemaIdentifierById() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_id_lookup",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    Assertions.assertEquals(
+        Optional.of(schema.nameIdentifier()),
+        backend.findIdentifierById(schema.id(), Entity.EntityType.SCHEMA));
+    Assertions.assertEquals(
+        Optional.empty(),
+        backend.findIdentifierById(RandomIdGenerator.INSTANCE.nextId(), Entity.EntityType.SCHEMA));
+
+    Assertions.assertTrue(backend.delete(schema.nameIdentifier(), Entity.EntityType.SCHEMA, false));
+    Assertions.assertEquals(
+        Optional.empty(), backend.findIdentifierById(schema.id(), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate

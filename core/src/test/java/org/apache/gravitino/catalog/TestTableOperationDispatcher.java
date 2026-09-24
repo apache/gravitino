@@ -405,10 +405,15 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     ops.createTable(
         target, new Column[0], "comment", properties, new Transform[0], null, null, null);
 
+    clearInvocations(entityStore);
     tableOperationDispatcher.loadTable(target);
     Assertions.assertEquals(
         registered.id(), entityStore.get(target, TABLE, TableEntity.class).id());
     Assertions.assertFalse(entityStore.exists(source, TABLE));
+    // The old owner is found by id, not by listing every schema in the catalog.
+    verify(entityStore).findIdentifierById(registered.id(), TABLE);
+    verify(entityStore, never())
+        .list(eq(Namespace.of(metalake, catalog)), eq(SchemaEntity.class), eq(SCHEMA));
   }
 
   @Test
@@ -521,6 +526,44 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
     Assertions.assertEquals(oldEntity.id(), newEntity.id());
     Assertions.assertFalse(entityStore.exists(oldIdent, TABLE));
+  }
+
+  /**
+   * A case-insensitive backend still resolves the old name after a case-only rename, but its
+   * listing shows only the new name. The registration must follow the rename instead of staying
+   * under the old name as if the new name were an alias.
+   */
+  @Test
+  public void testLoadTableFollowsExternalCaseOnlyRename() throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCaseOnlyRename");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "orders");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "ORDERS");
+    tableOperationDispatcher.createTable(
+        oldIdent, new Column[0], "comment", props, new Transform[0]);
+    TableEntity oldEntity = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    TestCatalog catalogInstance =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = testCatalogOperations();
+    Map<String, String> movedProps = new HashMap<>(originalOps.loadTable(oldIdent).properties());
+    Assertions.assertTrue(originalOps.dropTable(oldIdent));
+    originalOps.createTable(
+        newIdent, new Column[0], "comment", movedProps, new Transform[0], null, null, null);
+    TestCatalogOperations ops = spy(originalOps);
+    doReturn(true).when(ops).tableExists(oldIdent);
+    FieldUtils.writeField(catalogInstance, "ops", ops, true);
+    try {
+      tableOperationDispatcher.loadTable(newIdent);
+
+      TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
+      Assertions.assertEquals(oldEntity.id(), newEntity.id());
+      Assertions.assertFalse(entityStore.exists(oldIdent, TABLE));
+    } finally {
+      FieldUtils.writeField(catalogInstance, "ops", originalOps, true);
+    }
   }
 
   @Test

@@ -368,6 +368,40 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(entityStore.exists(oldIdent, SCHEMA));
   }
 
+  /**
+   * A case-insensitive backend still resolves the old name after a case-only rename, but its
+   * listing shows only the new name. The registration must follow the rename instead of staying
+   * under the old name as if the new name were an alias.
+   */
+  @Test
+  public void testLoadSchemaFollowsExternalCaseOnlyRename() throws Exception {
+    Namespace schemaNs = Namespace.of(metalake, catalog);
+    NameIdentifier oldIdent = NameIdentifier.of(schemaNs, "schemaCaseRename");
+    NameIdentifier newIdent = NameIdentifier.of(schemaNs, "SCHEMACASERENAME");
+    dispatcher.createSchema(oldIdent, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity oldEntity = entityStore.get(oldIdent, SCHEMA, SchemaEntity.class);
+
+    TestCatalog catalogInstance =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = testCatalogOperations();
+    Map<String, String> movedProps = new HashMap<>(originalOps.loadSchema(oldIdent).properties());
+    Assertions.assertTrue(originalOps.dropSchema(oldIdent, false));
+    originalOps.createSchema(newIdent, "comment", movedProps);
+    TestCatalogOperations ops = spy(originalOps);
+    doReturn(true).when(ops).schemaExists(oldIdent);
+    FieldUtils.writeField(catalogInstance, "ops", ops, true);
+    try {
+      dispatcher.loadSchema(newIdent);
+
+      SchemaEntity newEntity = entityStore.get(newIdent, SCHEMA, SchemaEntity.class);
+      Assertions.assertEquals(oldEntity.id(), newEntity.id());
+      Assertions.assertFalse(entityStore.exists(oldIdent, SCHEMA));
+    } finally {
+      FieldUtils.writeField(catalogInstance, "ops", originalOps, true);
+    }
+  }
+
   @Test
   public void testLoadSchemaDoesNotRebindAfterOwnerChangesOnAnotherNode() throws IOException {
     Namespace schemaNs = Namespace.of(metalake, catalog);
