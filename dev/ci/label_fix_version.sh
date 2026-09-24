@@ -21,10 +21,11 @@
 # .github/workflows/label-fix-version.yml.
 #
 #   label_fix_version.sh merge  A PR was merged. Label its issues with the
-#                               release of the merge commit and assign
-#                               unassigned issues to the PR author.
-#                               Env: REPO, PR_TITLE, PR_BODY, MERGE_SHA,
-#                               PR_AUTHOR, PR_AUTHOR_TYPE.
+#                               release of the merge commit, and assign the
+#                               PR and its issues to the PR author if they
+#                               have no assignee.
+#                               Env: REPO, PR_NUMBER, PR_TITLE, PR_BODY,
+#                               MERGE_SHA, PR_AUTHOR, PR_AUTHOR_TYPE.
 #   label_fix_version.sh rc     A release candidate tag was pushed. Move the
 #                               issues fixed since the previous RC to this
 #                               release. Needs full git history.
@@ -114,8 +115,11 @@ release_of_commit() {
 }
 
 on_merge() {
-  : "${PR_TITLE:?}" "${MERGE_SHA:?}" "${PR_AUTHOR:?}" "${PR_AUTHOR_TYPE:?}"
-  local issues version issue info is_pr assignee_count assigned
+  : "${PR_NUMBER:?}" "${PR_TITLE:?}" "${MERGE_SHA:?}" "${PR_AUTHOR:?}" "${PR_AUTHOR_TYPE:?}"
+  local issues version issue info is_pr assignee_count
+  assign_author_if_unassigned "$PR_NUMBER" \
+    "$(gh api "repos/$REPO/issues/$PR_NUMBER" --jq '.assignees | length')"
+
   issues=$(extract_issues "$PR_TITLE" "${PR_BODY:-}")
   if [ -z "$issues" ]; then
     echo "No linked issue found, skipping."
@@ -135,27 +139,32 @@ on_merge() {
     fi
     write gh issue edit "$issue" --repo "$REPO" --add-label "$version"
     echo "Labeled issue #$issue with $version."
-
-    if [ "$assignee_count" != "0" ]; then
-      continue
-    fi
-    if [ "$PR_AUTHOR_TYPE" = "Bot" ]; then
-      echo "PR author $PR_AUTHOR is a bot, not assigning #$issue."
-      continue
-    fi
-    if [ "$DRY_RUN" = "true" ]; then
-      echo "[dry-run] assign #$issue to $PR_AUTHOR"
-      continue
-    fi
-    # GitHub silently drops assignees it doesn't accept, so check the result.
-    assigned=$(gh api -X POST "repos/$REPO/issues/$issue/assignees" -f "assignees[]=$PR_AUTHOR" \
-      --jq '[.assignees[].login] | index(env.PR_AUTHOR) != null')
-    if [ "$assigned" = "true" ]; then
-      echo "Assigned issue #$issue to $PR_AUTHOR."
-    else
-      echo "Could not assign issue #$issue to $PR_AUTHOR."
-    fi
+    assign_author_if_unassigned "$issue" "$assignee_count"
   done
+}
+
+# Assigns an issue or PR to the PR author if it has no assignee yet.
+assign_author_if_unassigned() {
+  local number=$1 assignee_count=$2 assigned
+  if [ "$assignee_count" != "0" ]; then
+    return 0
+  fi
+  if [ "$PR_AUTHOR_TYPE" = "Bot" ]; then
+    echo "PR author $PR_AUTHOR is a bot, not assigning #$number."
+    return 0
+  fi
+  if [ "$DRY_RUN" = "true" ]; then
+    echo "[dry-run] assign #$number to $PR_AUTHOR"
+    return 0
+  fi
+  # GitHub silently drops assignees it doesn't accept, so check the result.
+  assigned=$(gh api -X POST "repos/$REPO/issues/$number/assignees" -f "assignees[]=$PR_AUTHOR" \
+    --jq '[.assignees[].login] | index(env.PR_AUTHOR) != null')
+  if [ "$assigned" = "true" ]; then
+    echo "Assigned #$number to $PR_AUTHOR."
+  else
+    echo "Could not assign #$number to $PR_AUTHOR."
+  fi
 }
 
 # Prints the issues referenced by the commits in the given git log range.

@@ -21,8 +21,8 @@
 # dev/ci/label_fix_version.sh for details.
 #
 # - When a PR is merged, its issues get the version of the merge commit,
-#   e.g. main (2.0.0-SNAPSHOT) -> "2.0.0", and unassigned issues are assigned
-#   to the PR author.
+#   e.g. main (2.0.0-SNAPSHOT) -> "2.0.0". The PR and its issues are assigned
+#   to the PR author if they have no assignee.
 # - The release script bumps to the next SNAPSHOT right after tagging an RC,
 #   so when a later RC is tagged, the issues fixed since the previous RC are
 #   moved to that release, e.g. v1.3.1-rc2 moves them from "1.3.2" to "1.3.1".
@@ -43,6 +43,7 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: write
 
 jobs:
   label-on-merge:
@@ -56,10 +57,11 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - name: Label and assign linked issues
+      - name: Label linked issues and assign the PR author
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
