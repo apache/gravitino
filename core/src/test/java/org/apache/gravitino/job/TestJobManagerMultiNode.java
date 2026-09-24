@@ -24,9 +24,14 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -41,6 +46,7 @@ import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -154,7 +160,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Awaitility.await()
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.CANCELLED);
-    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    // The first pull may already see the job as CANCELLED if the process exits quickly.
+    Assertions.assertTrue(
+        EnumSet.of(JobHandle.Status.CANCELLING, JobHandle.Status.CANCELLED)
+            .contains(getJob(job.name()).status()));
 
     nodeA.pullAndUpdateJobStatus();
     JobEntity cancelled = getJob(job.name());
@@ -223,7 +232,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     String newName = ECHO_TEMPLATE + "_renamed";
     nodeA.alterJobTemplate(METALAKE, ECHO_TEMPLATE, JobTemplateChange.rename(newName));
 
-    // The job reports the new template name, while its staging directory keeps the old one.
+    // The job reports the new template name, which its staging directory doesn't depend on.
     JobEntity jobWithOutput = nodeB.getJob(METALAKE, job.name(), true);
     Assertions.assertEquals(newName, jobWithOutput.jobTemplateName());
     Assertions.assertEquals(ImmutableList.of("hello b"), jobWithOutput.stdout());
@@ -231,7 +240,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   @TestTemplate
   public void testGetJobOutputOfTemplateNamedWithSpecialCharacters() throws IOException {
-    // Template names are not restricted, and name a directory level of the job staging directory.
+    // Template names are not restricted, and must not affect running the job or reading its output.
     for (String templateName : ImmutableList.of("etl job \"v2\" 中文 #1", "team/etl")) {
       backend.insert(
           newScriptJobTemplateEntity(
@@ -294,6 +303,87 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
         .atMost(1, TimeUnit.MINUTES)
         .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
     return job;
+  }
+
+  @TestTemplate
+  public void testStagingDirIsCleanedUpAfterTemplateRenamed() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+    Assertions.assertTrue(jobStagingDir(job).isDirectory());
+
+    // Before the fix, the cleanup rebuilt the staging path from the new template name, missed the
+    // directory and deleted only the job entity, leaking the directory.
+    nodeA.alterJobTemplate(METALAKE, TEMPLATE, JobTemplateChange.rename("renamed_sleep_job"));
+    Assertions.assertEquals("renamed_sleep_job", getJob(job.name()).jobTemplateName());
+    moveJobTimestampsBack(job.name());
+    nodeB.cleanUpStagingDirs();
+
+    Assertions.assertFalse(jobExists(job.name()));
+    assertNoStagingDirLeft(job);
+  }
+
+  @TestTemplate
+  public void testStagingDirIsDeletedWithRenamedTemplate() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+
+    nodeA.alterJobTemplate(METALAKE, TEMPLATE, JobTemplateChange.rename("renamed_sleep_job"));
+    nodeA.alterJobTemplate(
+        METALAKE, "renamed_sleep_job", JobTemplateChange.rename("renamed_twice_sleep_job"));
+    Assertions.assertTrue(nodeB.deleteJobTemplate(METALAKE, "renamed_twice_sleep_job"));
+
+    Assertions.assertFalse(jobExists(job.name()));
+    assertNoStagingDirLeft(job);
+  }
+
+  @TestTemplate
+  public void testStagingDirIsCleanedUpAfterMetalakeRenamed() throws IOException {
+    JobEntity job = runFinishedJobOnNodeA();
+    moveJobTimestampsBack(job.name());
+
+    String newMetalake = METALAKE + "_renamed";
+    entityStore.update(
+        NameIdentifierUtil.ofMetalake(METALAKE),
+        BaseMetalake.class,
+        Entity.EntityType.METALAKE,
+        metalake ->
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(newMetalake)
+                .withComment(metalake.comment())
+                .withProperties(metalake.properties())
+                .withAuditInfo(metalake.auditInfo())
+                .withVersion(metalake.getVersion())
+                .build());
+    nodeB.cleanUpStagingDirs();
+
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> nodeB.getJob(newMetalake, job.name(), false));
+    assertNoStagingDirLeft(job);
+  }
+
+  private JobEntity runFinishedJobOnNodeA() throws IOException {
+    JobEntity job = nodeA.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0"));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+    nodeA.pullAndUpdateJobStatus();
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, getJob(job.name()).status());
+    return job;
+  }
+
+  private File jobStagingDir(JobEntity job) {
+    return new File(testDir, "staging/job-runs/" + job.name());
+  }
+
+  // Checks the whole staging directory rather than the expected path, so a directory left in any
+  // layout is caught.
+  private void assertNoStagingDirLeft(JobEntity job) throws IOException {
+    try (Stream<Path> paths = Files.walk(new File(testDir, "staging").toPath())) {
+      List<Path> left =
+          paths
+              .filter(path -> path.getFileName().toString().equals(job.name()))
+              .collect(Collectors.toList());
+      Assertions.assertTrue(left.isEmpty(), "Staging directory left behind: " + left);
+    }
   }
 
   private JobEntity runLongJobOnNodeA() throws IOException {

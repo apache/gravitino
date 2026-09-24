@@ -785,22 +785,23 @@ public class TestLocalJobExecutor {
 
   @Test
   public void testSubmitJobWritesOutputIndexRelativeToStagingDir() throws IOException {
-    // Laid out like the {metalake}/{template}/job-{id} staging directory of JobManager.
-    File jobDir = new File(workingDir, "metalake/template/job-1");
+    // Laid out like the job-runs/job-{id} staging directory of JobManager.
+    File jobDir = new File(workingDir, "job-runs/job-1");
     Assertions.assertTrue(jobDir.mkdirs());
     String jobId = runSucceededJob(jobDir);
 
     JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
     Assertions.assertEquals(1, index.get("version").intValue());
     Assertions.assertEquals(
-        workingDir.getName() + "/metalake/template/job-1", index.get("workingDir").textValue());
+        workingDir.getName() + "/job-runs/job-1", index.get("workingDir").textValue());
   }
 
   @Test
   public void testOutputIndexKeepsSpecialCharactersInWorkingDir() throws IOException {
-    // Job template names are not restricted, so the staging directory may contain any character a
-    // file name can. They must survive the JSON encoding and the '/'-joining unchanged. Some of
-    // these characters are only valid in POSIX file names, like the shell job itself.
+    // The working directory may contain any character a file name can, e.g. a staging directory of
+    // an earlier version, which was named after the job template. It must survive the JSON encoding
+    // and the '/'-joining unchanged. Some of these characters are only valid in POSIX file names,
+    // like the shell job itself.
     String specialName =
         "a b \"quoted\" back\\slash 中文 \t tab \n newline %20 #!$&'()*+,;=@[]{}~`^|<>?";
     File jobDir =

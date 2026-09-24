@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -150,6 +151,8 @@ public class ModelMetaService {
                         Entity.EntityType.MODEL.name(),
                         modelFullName,
                         OperateType.DROP));
+            EntityChangeLogDiagnostics.logAppended(
+                metalakeName, Entity.EntityType.MODEL.name(), OperateType.DROP, modelFullName);
           });
     } catch (NoSuchEntityException e) {
       // Another writer dropped the model between the read above and this transaction. A drop that
@@ -373,6 +376,8 @@ public class ModelMetaService {
                               Entity.EntityType.MODEL.name(),
                               oldFullName,
                               OperateType.ALTER));
+                  EntityChangeLogDiagnostics.logAppended(
+                      metalakeName, Entity.EntityType.MODEL.name(), OperateType.ALTER, oldFullName);
                 }
               });
     } catch (RuntimeException re) {

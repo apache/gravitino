@@ -19,6 +19,12 @@
 
 # Gravitino Cache Improvement Design
 
+This document records an earlier design proposal. Its change-log polling pseudocode and
+one-second defaults do not describe the current implementation. For current behavior and
+configuration, see [Multi-Node Support for the Entity Store Cache](gravitino-entity-cache-multinode-design.md),
+[Change Log Propagation](../docs/gravitino-server-config.md#change-log-propagation), and
+[Entity Change Log Metrics](../docs/metrics.md#entity-change-log-metrics).
+
 ---
 
 ## 1. Background
