@@ -104,17 +104,14 @@ public class TestDorisPhysicalSchemaValidator35 {
     StructType physicalSchema =
         DataTypes.createStructType(
             new StructField[] {
-              DataTypes.createStructField(
-                  "amount", DataTypes.createDecimalType(10, 2), false)
+              DataTypes.createStructField("amount", DataTypes.createDecimalType(10, 2), false)
             });
     List<DorisPhysicalSchemaValidator35.PhysicalColumn> jdbcColumns =
         Arrays.asList(
-            new DorisPhysicalSchemaValidator35.PhysicalColumn(
-                "amount", "DECIMAL(10,2)", false, 0));
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("amount", "DECIMAL(10,2)", false, 0));
     List<DorisPhysicalSchemaValidator35.PhysicalColumn> feColumns =
         Arrays.asList(
-            new DorisPhysicalSchemaValidator35.PhysicalColumn(
-                "amount", "DECIMAL(20,2)", false, 0));
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("amount", "DECIMAL(20,2)", false, 0));
 
     assertThrows(
         IllegalArgumentException.class,

@@ -33,6 +33,7 @@ public class GravitinoSparkConfig {
   /** Enables the specialized, read-only Apache Doris Spark catalog path. */
   public static final String GRAVITINO_ENABLE_DORIS_SUPPORT =
       GRAVITINO_PREFIX + "enableDorisSupport";
+
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
   /**

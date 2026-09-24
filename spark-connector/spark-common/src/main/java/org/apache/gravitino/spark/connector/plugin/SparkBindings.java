@@ -48,8 +48,7 @@ public final class SparkBindings {
    * Paimon catalog.
    */
   private static final Set<SparkCatalogKind> REQUIRED_KINDS =
-      EnumSet.complementOf(
-          EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON, SparkCatalogKind.DORIS));
+      EnumSet.complementOf(EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON, SparkCatalogKind.DORIS));
 
   private final Map<SparkCatalogKind, String> catalogClassNames;
   private final String authorizationExtension;

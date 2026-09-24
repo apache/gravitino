@@ -297,8 +297,7 @@ final class DorisPhysicalSchemaValidator35 {
       this(name, typeName, nullable, ordinal, typeSignature(typeName, null, null));
     }
 
-    PhysicalColumn(
-        String name, String typeName, Boolean nullable, int ordinal, String signature) {
+    PhysicalColumn(String name, String typeName, Boolean nullable, int ordinal, String signature) {
       this.name = name;
       this.typeName = typeName;
       this.signature = signature;
