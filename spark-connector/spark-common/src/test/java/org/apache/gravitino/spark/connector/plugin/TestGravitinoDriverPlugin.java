@@ -61,6 +61,7 @@ public class TestGravitinoDriverPlugin {
   private static final String PAIMON_CATALOG = "org.example.PaimonCatalog";
   private static final String GLUE_CATALOG = "org.example.GlueCatalog";
   private static final String JDBC_CATALOG = "org.example.JdbcCatalog";
+  private static final String DORIS_CATALOG = "org.example.DorisCatalog";
   private static final String POSTGRESQL_CATALOG = "org.example.PostgreSqlCatalog";
 
   @Test
@@ -152,6 +153,24 @@ public class TestGravitinoDriverPlugin {
     // Every other JDBC backend shares one catalog.
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-mysql"));
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-doris"));
+  }
+
+  @Test
+  void testDorisProviderUsesGenericCatalogByDefaultAndSpecializedCatalogWhenEnabled() {
+    Catalog dorisCatalog = catalogWithProvider("jdbc-doris");
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withDoris());
+
+    plugin.registerGravitinoCatalogs(sparkConf, ImmutableMap.of("doris", dorisCatalog));
+    assertEquals(JDBC_CATALOG, sparkConf.get("spark.sql.catalog.doris"));
+
+    SparkConf specializedConf = new SparkConf(false);
+    specializedConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, "true");
+    GravitinoDriverPlugin specializedPlugin = new GravitinoDriverPlugin(withDoris());
+    specializedPlugin.registerOptInExtensions(specializedConf);
+    specializedPlugin.registerGravitinoCatalogs(
+        specializedConf, ImmutableMap.of("doris", dorisCatalog));
+    assertEquals(DORIS_CATALOG, specializedConf.get("spark.sql.catalog.doris"));
   }
 
   @Test
@@ -301,6 +320,10 @@ public class TestGravitinoDriverPlugin {
 
   private static SparkBindings withPaimon() {
     return requiredCatalogs().catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG).build();
+  }
+
+  private static SparkBindings withDoris() {
+    return requiredCatalogs().catalog(SparkCatalogKind.DORIS, DORIS_CATALOG).build();
   }
 
   private static SparkBindings.Builder requiredCatalogs() {
