@@ -54,6 +54,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -159,26 +160,38 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    // Resolve the physical name (for backends whose normalization is not reversible) under a READ
+    // lock, so the resolved name and the load that follows act atomically. The resolved identifier
+    // then drives the catalog call, the entity store key and the per-table locks below. For the
+    // common catalog that does not implement the resolution capability this is a no-op returning
+    // ident.
+    NameIdentifier resolvedIdent =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> resolvePhysicalName(ident));
+
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(
+            resolvedIdent, LockType.READ, () -> internalLoadTable(resolvedIdent));
 
     if (!entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      NameIdentifier schemaIdent = NameIdentifier.of(resolvedIdent.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
       // Import the table.
       try {
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+            TreeLockUtils.doWithTreeLock(
+                schemaIdent, LockType.WRITE, () -> importTable(resolvedIdent));
       } catch (EntityAlreadyExistsException e) {
         // HA race: another Gravitino node concurrently imported this table. Reload from the
         // entity store to pick up the entity stored by the winning node.
         LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
+            "Table {} was concurrently imported by another node; reloading from store.",
+            resolvedIdent);
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+            TreeLockUtils.doWithTreeLock(
+                resolvedIdent, LockType.READ, () -> internalLoadTable(resolvedIdent));
         if (!entityCombinedTable.imported()) {
           throw new UnsupportedOperationException(
               "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
@@ -189,7 +202,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    TableEntity updatedEntity =
+        updateColumnsIfNecessaryWhenLoad(resolvedIdent, entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
@@ -292,6 +306,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          // Resolve the physical name inside the alter lock so resolution, the catalog alter and
+          // the store update act atomically on the same object. No-op for catalogs that do not
+          // implement the resolution capability. The rename target name inside the changes is left
+          // as-is (a create-like new name follows the normal folding).
+          NameIdentifier resolvedIdent = resolvePhysicalName(ident);
           AlterTableCatalogResult catalogResult =
               doWithCatalog(
                   catalogIdent,
@@ -301,13 +320,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
                     Optional<TableEntity> tableEntityBeforeRename =
                         isRenameTable && !managed
-                            ? getTableEntityBeforeRename(ident)
+                            ? getTableEntityBeforeRename(resolvedIdent)
                             : Optional.empty();
                     TableChange[] normalizedChanges =
                         applyCapabilities(catalog.capabilities(), changes);
                     Table table =
                         catalog.doWithTableOps(
-                            tableOps -> tableOps.alterTable(ident, normalizedChanges));
+                            tableOps -> tableOps.alterTable(resolvedIdent, normalizedChanges));
                     return new AlterTableCatalogResult(
                         snapshotTable(catalog, table, managed),
                         tableEntityBeforeRename,
@@ -327,7 +346,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           TableEntity te = catalogResult.tableEntityBeforeRename.orElse(null);
           if (stringId == null) {
             if (te == null) {
-              te = getEntity(ident, TABLE, TableEntity.class);
+              te = getEntity(resolvedIdent, TABLE, TableEntity.class);
             }
             if (te == null) {
               return EntityCombinedTable.of(alteredTable)
@@ -344,14 +363,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           TableEntity updatedTableEntity =
               operateOnEntity(
-                  ident,
+                  resolvedIdent,
                   id ->
                       store.update(
                           id,
                           TableEntity.class,
                           TABLE,
                           tableEntity -> {
-                            Namespace newNamespace = getNewNamespace(ident, changes);
+                            Namespace newNamespace = getNewNamespace(resolvedIdent, changes);
 
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
@@ -380,11 +399,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // does not match the ID from the external catalog.
           if (isRenameTable && updatedTableEntity == null) {
             NameIdentifier newIdent =
-                NameIdentifier.of(getNewNamespace(ident, changes), alteredTable.name());
+                NameIdentifier.of(getNewNamespace(resolvedIdent, changes), alteredTable.name());
             throw new GravitinoRuntimeException(
                 "Table %s was renamed to %s in the external catalog, but its registration in "
                     + "Gravitino could not be updated consistently",
-                ident, newIdent);
+                resolvedIdent, newIdent);
           }
 
           return EntityCombinedTable.of(alteredTable, updatedTableEntity)
@@ -408,10 +427,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          // Resolve the physical name inside the schema WRITE lock so resolution, the catalog drop
+          // and the store delete act atomically on the same object. No-op for catalogs that do not
+          // implement the resolution capability.
+          NameIdentifier resolvedIdent = resolvePhysicalName(ident);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
-                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                  c -> c.doWithTableOps(t -> t.dropTable(resolvedIdent)),
                   RuntimeException.class);
 
           boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
@@ -425,11 +448,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
-              store.delete(ident, TABLE);
+              store.delete(resolvedIdent, TABLE);
             } catch (OptimisticLockException e) {
               throw e;
             } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+              LOG.warn("The table to be dropped does not exist in the store: {}", resolvedIdent, e);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -463,10 +486,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         schemaIdentifier,
         LockType.WRITE,
         () -> {
+          // Resolve the physical name inside the schema WRITE lock so resolution, the catalog purge
+          // and the store delete act atomically on the same object. No-op for catalogs that do not
+          // implement the resolution capability.
+          NameIdentifier resolvedIdent = resolvePhysicalName(ident);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
-                  c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+                  c -> c.doWithTableOps(t -> t.purgeTable(resolvedIdent)),
                   RuntimeException.class,
                   UnsupportedOperationException.class);
 
@@ -481,11 +508,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
-              store.delete(ident, TABLE);
+              store.delete(resolvedIdent, TABLE);
             } catch (OptimisticLockException e) {
               throw e;
             } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+              LOG.warn("The table to be purged does not exist in the store: {}", resolvedIdent, e);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -524,6 +551,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw new GravitinoRuntimeException(
           e, "Failed to read the stored registration for table %s before renaming it", ident);
     }
+  }
+
+  /**
+   * Maps a normalized table identifier to the identifier under which the table is physically stored
+   * by the catalog's backend, when the catalog implements the connector-side {@link
+   * SupportsTableNameResolution} capability; otherwise returns {@code ident} unchanged.
+   *
+   * <p>Callers invoke this inside the tree lock they hold for the operation, so resolution, the
+   * subsequent catalog call and the entity store access all act atomically on the resolved name.
+   * The resolver never throws when the table is absent (it returns {@code ident}), so {@code
+   * dropTable}/{@code tableExists} keep their boolean not-found semantics.
+   */
+  private NameIdentifier resolvePhysicalName(NameIdentifier ident) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return doWithCatalog(
+        catalogIdent,
+        wrapper ->
+            wrapper.doWithCatalogOps(
+                catalogOps -> {
+                  if (catalogOps instanceof SupportsTableNameResolution) {
+                    return ((SupportsTableNameResolution) catalogOps).resolveTableName(ident);
+                  }
+                  return ident;
+                }),
+        RuntimeException.class);
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {

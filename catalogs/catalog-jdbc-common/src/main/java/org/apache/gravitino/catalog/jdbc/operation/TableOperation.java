@@ -150,24 +150,27 @@ public interface TableOperation {
   }
 
   /**
-   * Maps a normalized table name to the name under which the table is physically stored, when the
-   * two can differ for this backend.
+   * Maps a table name to the name under which the table is physically stored, when the two can
+   * differ for this backend.
    *
-   * <p>The default returns {@code tableName} unchanged: most backends store a table under exactly
-   * the normalized name. A backend whose name normalization is not reversible (for example one that
-   * folds unquoted names to a fixed case while also preserving case-sensitive names) may override
-   * this to look the real stored name up from its catalog, so a name returned by {@link
-   * #listTables(String)} round-trips through load/alter/drop.
+   * <p>The default returns {@code normalizedName} unchanged: most backends store a table under
+   * exactly the normalized name. A backend whose name normalization is not reversible (for example
+   * one that folds unquoted names to a fixed case while also preserving case-sensitive names) may
+   * override this so a name returned by {@link #listTables(String)} round-trips through
+   * load/alter/drop. See {@link
+   * org.apache.gravitino.connector.SupportsTableNameResolution#resolveTableName} for the resolution
+   * contract (exact match on the normalized name, then a unique case-insensitive match; otherwise
+   * keep the normalized name; never throw when absent).
    *
    * <p>Implementations must be side-effect free and reuse the operation's existing data source
    * rather than opening new connections.
    *
    * @param databaseName The name of the database (schema).
-   * @param tableName The normalized table name.
-   * @return The physically stored table name; {@code tableName} unchanged when no mapping is
-   *     needed.
+   * @param normalizedName The table name after Gravitino's case normalization.
+   * @return The physically stored table name; {@code normalizedName} unchanged when no unambiguous
+   *     mapping applies.
    */
-  default String resolveTableName(String databaseName, String tableName) {
-    return tableName;
+  default String resolveTableName(String databaseName, String normalizedName) {
+    return normalizedName;
   }
 }

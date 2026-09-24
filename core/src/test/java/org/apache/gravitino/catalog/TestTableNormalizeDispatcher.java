@@ -29,11 +29,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -49,7 +47,6 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -276,65 +273,6 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         ArgumentCaptor.forClass(NameIdentifier.class);
     Mockito.verify(mockDispatcher).loadTable(loadedIdentCaptor.capture());
     Assertions.assertEquals("My Table", loadedIdentCaptor.getValue().name());
-  }
-
-  @Test
-  public void testResolvePhysicalNameDrivesDownstreamIdentifier() throws Exception {
-    // When a catalog's TableCatalog.resolveTableName maps the normalized name to a different
-    // physically-stored name, TableNormalizeDispatcher must hand that resolved name to the
-    // downstream dispatcher for load/alter/drop/purge/exists — the same identifier then drives both
-    // the catalog call and the entity store key, so they cannot diverge.
-    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
-    NameIdentifier requested = NameIdentifier.of(tableNs, "PHYSICAL_UPPER");
-    NameIdentifier resolved = NameIdentifier.of(tableNs, "physical_lower");
-
-    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
-    Mockito.when(mockDispatcher.loadTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
-    Mockito.when(mockDispatcher.dropTable(Mockito.any())).thenReturn(true);
-
-    // A catalog whose capability leaves the name unchanged (so we isolate the resolve step), but
-    // whose TableCatalog maps PHYSICAL_UPPER -> physical_lower.
-    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
-    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
-    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
-
-    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    TableCatalog resolvingTableOps = Mockito.mock(TableCatalog.class);
-    Mockito.when(resolvingTableOps.resolveTableName(Mockito.any()))
-        .thenAnswer(
-            invocation -> {
-              NameIdentifier ident = invocation.getArgument(0);
-              return "PHYSICAL_UPPER".equals(ident.name()) ? resolved : ident;
-            });
-    Mockito.doAnswer(
-            invocation -> {
-              ThrowableFunction<TableCatalog, Object> fn = invocation.getArgument(0);
-              return fn.apply(resolvingTableOps);
-            })
-        .when(wrapper)
-        .doWithTableOps(Mockito.any());
-    Mockito.doAnswer(
-            invocation -> {
-              ThrowableFunction<CatalogManager.CatalogWrapper, Object> fn =
-                  invocation.getArgument(1);
-              return fn.apply(wrapper);
-            })
-        .when(mockCatalogManager)
-        .doWithCatalogWrapper(Mockito.any(), Mockito.any());
-
-    TableNormalizeDispatcher dispatcher =
-        new TableNormalizeDispatcher(mockDispatcher, mockCatalogManager);
-
-    dispatcher.loadTable(requested);
-    ArgumentCaptor<NameIdentifier> loadCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
-    Mockito.verify(mockDispatcher).loadTable(loadCaptor.capture());
-    Assertions.assertEquals("physical_lower", loadCaptor.getValue().name());
-
-    dispatcher.dropTable(requested);
-    ArgumentCaptor<NameIdentifier> dropCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
-    Mockito.verify(mockDispatcher).dropTable(dropCaptor.capture());
-    Assertions.assertEquals("physical_lower", dropCaptor.getValue().name());
   }
 
   private void assertTableCaseInsensitive(

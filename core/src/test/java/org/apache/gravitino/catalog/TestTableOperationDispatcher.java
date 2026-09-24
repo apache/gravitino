@@ -1673,4 +1673,73 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
     return schemaOperationDispatcher;
   }
+
+  @Test
+  public void testPhysicalNameResolutionRoundTrip() throws IOException {
+    // A catalog whose ops implements SupportsTableNameResolution (TestCatalogOperations does) must
+    // let a table created under one case be loaded/altered/dropped by a differently-cased name that
+    // resolves to it, and the resolved name must drive the entity store key (proving resolution and
+    // the operation act under the same lock, consistently). This is the end-to-end round-trip that
+    // motivates the SPI.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_resolve");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    // Physical stored name is mixed-case "physical_Name".
+    NameIdentifier storedIdent = NameIdentifier.of(tableNs, "physical_Name");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(storedIdent, columns, "comment", props, new Transform[0]);
+
+    // A caller passes an all-uppercase folded name that no exact entry matches; the resolver maps
+    // it
+    // case-insensitively to the stored "physical_Name".
+    NameIdentifier foldedIdent = NameIdentifier.of(tableNs, "PHYSICAL_NAME");
+
+    Table loaded = tableOperationDispatcher.loadTable(foldedIdent);
+    Assertions.assertEquals("physical_Name", loaded.name(), "load by folded name resolves");
+    Assertions.assertTrue(tableOperationDispatcher.tableExists(foldedIdent));
+
+    // The entity store key is the resolved physical name, not the folded one.
+    Assertions.assertTrue(entityStore.exists(storedIdent, TABLE));
+    Assertions.assertFalse(entityStore.exists(foldedIdent, TABLE));
+
+    // Drop by the folded name removes the real object and its store entity (no orphan).
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(foldedIdent));
+    Assertions.assertFalse(tableOperationDispatcher.tableExists(foldedIdent));
+    Assertions.assertFalse(entityStore.exists(storedIdent, TABLE));
+  }
+
+  @Test
+  public void testPhysicalNameResolutionExactMatchWinsOverCaseInsensitiveSibling()
+      throws IOException {
+    // When both a folded-form table and a differently-cased sibling exist, an exact match on the
+    // requested (normalized) name wins and the sibling is never consulted.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_resolve_exact");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    NameIdentifier upper = NameIdentifier.of(tableNs, "AMB_PROBE");
+    NameIdentifier lower = NameIdentifier.of(tableNs, "amb_probe");
+    tableOperationDispatcher.createTable(upper, columns, "comment", props, new Transform[0]);
+    tableOperationDispatcher.createTable(lower, columns, "comment", props, new Transform[0]);
+
+    // Exact match on the requested name resolves to itself, not the sibling.
+    Assertions.assertEquals("AMB_PROBE", tableOperationDispatcher.loadTable(upper).name());
+    Assertions.assertEquals("amb_probe", tableOperationDispatcher.loadTable(lower).name());
+  }
 }

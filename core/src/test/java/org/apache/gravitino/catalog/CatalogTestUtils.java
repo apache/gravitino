@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.mockito.Mockito;
 
@@ -66,34 +65,5 @@ public final class CatalogTestUtils {
             })
         .when(catalogManager)
         .doWithCatalog(Mockito.any(), Mockito.any());
-
-    // TableNormalizeDispatcher resolves the physical table name through
-    // doWithCatalogWrapper(...).doWithTableOps(tableCatalog ->
-    // tableCatalog.resolveTableName(ident)).
-    // Stub the wrapper so that path runs with the default identity resolveTableName, matching every
-    // catalog that does not override the hook, instead of returning null.
-    try {
-      CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-      TableCatalog identityTableOps = Mockito.mock(TableCatalog.class);
-      Mockito.when(identityTableOps.resolveTableName(Mockito.any()))
-          .thenAnswer(invocation -> invocation.getArgument(0));
-      Mockito.doAnswer(
-              invocation -> {
-                ThrowableFunction<TableCatalog, Object> fn = invocation.getArgument(0);
-                return fn.apply(identityTableOps);
-              })
-          .when(wrapper)
-          .doWithTableOps(Mockito.any());
-      Mockito.doAnswer(
-              invocation -> {
-                ThrowableFunction<CatalogManager.CatalogWrapper, Object> fn =
-                    invocation.getArgument(1);
-                return fn.apply(wrapper);
-              })
-          .when(catalogManager)
-          .doWithCatalogWrapper(Mockito.any(), Mockito.any());
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to stub doWithCatalogWrapper", e);
-    }
   }
 }
