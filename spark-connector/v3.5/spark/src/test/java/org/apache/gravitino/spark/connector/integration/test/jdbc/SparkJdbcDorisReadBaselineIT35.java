@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 
 /** Spark 3.5 integration tests for the governed Doris read baseline. */
 @Tag("gravitino-docker-test")
+@Tag("doris-multi-version")
 public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
 
   private static final String CATALOG_NAME = "jdbc_doris";
