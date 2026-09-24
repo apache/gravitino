@@ -141,10 +141,18 @@ it recognizes.
 ### Running More Than One Server
 
 Servers behind a load balancer share the entity store but keep local caches. Each server polls the
-entity change log and invalidates entries that another server has modified. The defaults are safe:
-a three second poll, and a server that cannot keep its caches current exits rather than serving
-metadata it knows to be stale. Point the load balancer's health check at `GET /health/ready` so a
-server that has lost its database stops receiving traffic.
+entity change log and invalidates entries that another server has modified. The default poll
+interval is three seconds. The poller delivers each batch to every registered listener once and
+then advances its cursor; a listener that cannot invalidate a key must clear its local cache. The
+poller logs query and listener failures and continues polling. Monitor the
+[entity change log metrics](metrics.md#entity-change-log-metrics), especially record lag, time
+since the last successful poll, listener failures, and fallback clears. Point the load balancer's
+health check at `GET /health/ready` so a server that has lost its database stops receiving traffic.
+
+Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
+that directory on storage shared by all servers, for example an NFS mount, so that a request for a
+job's output can be served by any server. Otherwise only the server that ran the job can return
+it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
 
 ## Server Configuration
 
@@ -541,12 +549,14 @@ server, are documented with those services. See
 
 #### Jobs
 
-| Configuration Item                     | Description                                                                                                | Default Value                 |
-|----------------------------------------|------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                  | `local`                       |
-| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs.                                                          | `/tmp/gravitino/jobs/staging` |
-| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
-| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
+| Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
+| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
+| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |
+| `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
+| `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
 
 ### Key Management
 

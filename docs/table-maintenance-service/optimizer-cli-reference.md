@@ -347,7 +347,7 @@ CALL `rest_catalog`.system.expire_snapshots(
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
-cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-expire-snapshots/{job_id}/stdout.log
+cat /tmp/gravitino/jobs/staging/job-runs/{job_id}/output.log
 ```
 
 A successful run reports its state as `SUCCEEDED` and logs the counts it removed:

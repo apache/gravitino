@@ -28,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -40,6 +41,10 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_MONTH_PATTERN =
       Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_START_OF_WEEK_PATTERN =
+      Pattern.compile("toStartOfWeek[(](.+)[)]", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_START_OF_MONTH_PATTERN =
+      Pattern.compile("toStartOfMonth[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
@@ -84,6 +89,10 @@ final class ClickHouseTableSqlUtils {
       case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case Transforms.NAME_OF_DAY -> "toDate(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case "tostartofweek" -> "toStartOfWeek(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case "tostartofmonth" -> "toStartOfMonth(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       default -> throw new IllegalArgumentException(
           "Unsupported partition transform: " + transform.name());
@@ -205,6 +214,22 @@ final class ClickHouseTableSqlUtils {
     if (toDateMatcher.matches()) {
       String identifier = extractPartitionIdentifier(toDateMatcher.group(1));
       return identifier == null ? null : Transforms.day(identifier);
+    }
+
+    Matcher toStartOfWeekMatcher = TO_START_OF_WEEK_PATTERN.matcher(trimmedExpression);
+    if (toStartOfWeekMatcher.matches()) {
+      String identifier = extractPartitionIdentifier(toStartOfWeekMatcher.group(1));
+      return identifier == null
+          ? null
+          : Transforms.apply("toStartOfWeek", new Expression[] {NamedReference.field(identifier)});
+    }
+
+    Matcher toStartOfMonthMatcher = TO_START_OF_MONTH_PATTERN.matcher(trimmedExpression);
+    if (toStartOfMonthMatcher.matches()) {
+      String identifier = extractPartitionIdentifier(toStartOfMonthMatcher.group(1));
+      return identifier == null
+          ? null
+          : Transforms.apply("toStartOfMonth", new Expression[] {NamedReference.field(identifier)});
     }
 
     String identifier = extractPartitionIdentifier(trimmedExpression);
