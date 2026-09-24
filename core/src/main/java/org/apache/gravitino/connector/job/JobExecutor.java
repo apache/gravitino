@@ -78,22 +78,15 @@ public interface JobExecutor extends Closeable {
    * </ul>
    *
    * <p>If the job runner can't tell when a job started or finished, leave the time null. Gravitino
-   * then records the time it observes the status change instead, which can be off by up to the job
-   * status pull interval.
-   *
-   * <p>The implementors must override this method, Gravitino tracks the jobs with it. The default
-   * implementation throws {@link UnsupportedOperationException}.
+   * then falls back to the time it observes the job running or finished, which can be off by up to
+   * the job status pull interval. A job that starts and finishes between two pulls is never
+   * observed running, so it has no started time in that case.
    *
    * @param jobId The unique identifier of the job.
    * @return The execution snapshot of the job.
    * @throws NoSuchJobException If the job with the given identifier does not exist.
    */
-  default JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {
-    throw new UnsupportedOperationException(
-        "getJobExecutionInfo() is not implemented by "
-            + getClass().getName()
-            + "; override this method");
-  }
+  JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException;
 
   /**
    * Get the status of a job by its unique identifier. It is a shortcut of {@link

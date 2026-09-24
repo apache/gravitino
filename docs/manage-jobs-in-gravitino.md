@@ -231,11 +231,20 @@ A job carries three timestamps:
 - `finishedAt`: when the job finished.
 
 Gravitino pulls job statuses from the job executor every `gravitino.job.statusPullIntervalInMs`,
-so a job's status can lag behind by up to this interval. The timestamps don't lag: the local job
-executor reports when each job actually started and finished, even for a job that starts and
+so a job's status can lag behind by up to this interval. The timestamps usually don't lag: the local
+job executor reports when each job actually started and finished, even for a job that starts and
 finishes between two pulls. A job executor that doesn't report these times gets the time Gravitino
 first observes the job running or finished instead. In that case, a job that finishes between two
 pulls has no `startedAt`.
+
+The local job executor only keeps a job's state in memory. When that state is lost before Gravitino
+records the finished job, the actual times are lost too, and the job's `finishedAt` is the time
+Gravitino marks it as finished instead:
+
+- If Gravitino can't pull the job within `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` after it
+  finished, the job is marked as `FAILED`, or `CANCELLED` if it was being cancelled, on the next pull.
+- If the server running the job exits, the job is expired as described in
+  [Configurations for Local Job Executor](#configurations-for-local-job-executor).
 
 ### Get a Job's Output
 

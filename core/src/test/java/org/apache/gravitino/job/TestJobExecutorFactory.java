@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
@@ -147,7 +148,7 @@ public class TestJobExecutorFactory {
     }
 
     @Override
-    public JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException {
+    public JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {
       throw new NoSuchJobException("No job found with ID: %s", jobId);
     }
 

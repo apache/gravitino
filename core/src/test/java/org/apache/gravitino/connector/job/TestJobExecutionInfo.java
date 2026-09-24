@@ -136,33 +136,4 @@ public class TestJobExecutionInfo {
 
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, jobExecutor.getJobStatus("job-1"));
   }
-
-  @Test
-  public void testGetJobExecutionInfoNotImplemented() {
-    // A job executor that doesn't override getJobExecutionInfo fails loudly instead of silently
-    // reporting no timestamps.
-    JobExecutor jobExecutor =
-        new JobExecutor() {
-          @Override
-          public void initialize(Map<String, String> configs) {}
-
-          @Override
-          public String submitJob(JobTemplate jobTemplate) {
-            return "job-1";
-          }
-
-          @Override
-          public void cancelJob(String jobId) {}
-
-          @Override
-          public void close() throws IOException {}
-        };
-
-    UnsupportedOperationException e =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> jobExecutor.getJobExecutionInfo("job-1"));
-    Assertions.assertTrue(e.getMessage().contains("getJobExecutionInfo()"), e.getMessage());
-    Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> jobExecutor.getJobStatus("job-1"));
-  }
 }

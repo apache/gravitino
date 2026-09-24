@@ -1315,6 +1315,9 @@ public class TestLocalJobExecutor {
                   LocalJobExecutorConfigs.MAX_RUNNING_JOBS,
                   "2")));
       String runningJobId = executor.submitJob(newSleepJobTemplate("sleep"));
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.STARTED);
       String finishedJobId = executor.submitJob(newScriptJobTemplate("finish", "exit 0"));
 
       // The finished job is removed once it has been kept for the keep time, while the running job

@@ -32,6 +32,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -87,6 +88,10 @@ import org.slf4j.LoggerFactory;
 public class JobManager implements JobOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(JobManager.class);
+
+  // How far a time reported by the job executor may be ahead of Gravitino's clock. It tolerates the
+  // clock of the job runner being ahead, while dropping obviously invalid times.
+  private static final Duration MAX_REPORTED_TIME_AHEAD = Duration.ofDays(1);
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
 
@@ -728,8 +733,20 @@ public class JobManager implements JobOperationDispatcher {
             // Only the job executor instance owning the job can query its status. The jobs
             // owned by other servers are skipped, and the jobs left behind by a server that has
             // exited are settled by cleanUpStagingDirs() once they expire.
-            if (jobExecutor.ownsJob(job.jobExecutionId())) {
+            if (!jobExecutor.ownsJob(job.jobExecutionId())) {
+              return;
+            }
+            // An exception escaping this scheduled task would cancel all its later runs, so a
+            // failure on one job must never stop the status pull of the others.
+            try {
               pullAndUpdateOwnedJobStatus(metalake, job);
+            } catch (RuntimeException e) {
+              LOG.error(
+                  "Failed to update the status of job {} with execution id {} under metalake {}",
+                  job.name(),
+                  job.jobExecutionId(),
+                  metalake,
+                  e);
             }
           });
     }
@@ -1231,15 +1248,16 @@ public class JobManager implements JobOperationDispatcher {
     return jobExecutor.getJobExecutionInfo(job.jobExecutionId());
   }
 
-  // Drops or corrects the timestamps reported by the job executor that are inconsistent with the
-  // status or with each other. A faulty job executor only gets a warning, and never fails the
-  // status pull.
+  // Drops or corrects the timestamps reported by the job executor that are unusable, or
+  // inconsistent
+  // with the status or with each other. A faulty job executor never fails the status pull. The
+  // corrections are only logged at debug level, as the same report is corrected on every pull.
   private JobExecutionInfo sanitizeExecutionInfo(JobEntity job, JobExecutionInfo observed) {
-    Instant startedAt = observed.startedAt();
-    Instant finishedAt = observed.finishedAt();
+    Instant startedAt = usableTime(job, "started", observed.startedAt());
+    Instant finishedAt = usableTime(job, "finished", observed.finishedAt());
 
     if (startedAt != null && observed.status() == JobHandle.Status.QUEUED) {
-      LOG.warn(
+      LOG.debug(
           "Job {} with execution id {} is reported as QUEUED with a started time {}, ignoring "
               + "the started time",
           job.name(),
@@ -1248,7 +1266,7 @@ public class JobManager implements JobOperationDispatcher {
       startedAt = null;
     }
     if (finishedAt != null && !isFinishedStatus(observed.status())) {
-      LOG.warn(
+      LOG.debug(
           "Job {} with execution id {} is reported as {} with a finished time {}, ignoring the "
               + "finished time",
           job.name(),
@@ -1263,7 +1281,7 @@ public class JobManager implements JobOperationDispatcher {
 
     if (startedAt != null && finishedAt != null && finishedAt.isBefore(startedAt)) {
       // The finished time is kept, as the cleanup of finished jobs relies on it.
-      LOG.warn(
+      LOG.debug(
           "Job {} with execution id {} is reported to finish at {} before it started at {}, "
               + "ignoring the started time",
           job.name(),
@@ -1274,6 +1292,33 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     return observed.toBuilder().withStartedAt(startedAt).withFinishedAt(finishedAt).build();
+  }
+
+  // A reported time is stored in epoch milliseconds, so a time that doesn't fit is dropped. So is a
+  // time far in the future, e.g. a sentinel like Instant.MAX, which would otherwise keep a finished
+  // job from ever being cleaned up.
+  @Nullable
+  private static Instant usableTime(JobEntity job, String event, @Nullable Instant reportedTime) {
+    if (reportedTime == null) {
+      return null;
+    }
+    boolean usable;
+    try {
+      reportedTime.toEpochMilli();
+      usable = !reportedTime.isAfter(Instant.now().plus(MAX_REPORTED_TIME_AHEAD));
+    } catch (ArithmeticException e) {
+      usable = false;
+    }
+    if (!usable) {
+      LOG.debug(
+          "Job {} with execution id {} is reported to be {} at an unusable time {}, ignoring it",
+          job.name(),
+          job.jobExecutionId(),
+          event,
+          reportedTime);
+      return null;
+    }
+    return reportedTime;
   }
 
   // The job executor may run on another host whose clock is behind Gravitino's, so a reported time
