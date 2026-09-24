@@ -146,7 +146,7 @@ Products close the gap from catalog/scope defaults to runnable table work differ
 | How  | Copy catalog default to table on Create/Update                                       | Runtime-merge catalog settings into managed tables                   | Each cron tick lists tables in scope and runs                       |
 | Cons | Catalog changes do not re-arm tables that already have table-level optimizers        | Tables not yet in AMS / unseen by the scheduler do not run           | Work waits for the next tick; each tick re-lists the scope          |
 
-**TMS decision — discovery (§5.2.5, §5.3.1):**
+**TMS decision — discovery (§5.2.5, §5.3.2):**
 
 1. **Create/Update/Drop hooks:** on IRC `createTable` / `updateTable` / `dropTable`, refresh or purge
    that table's maintenance state (nearest-wins → `table_maintenance_state` / `next_due_at`; drop
@@ -243,7 +243,7 @@ Each policy stores a **schedule** in `policy_meta.content`; TMS sets wall-clock 
 
 |                             | Table                                                                               | **Above table** (schema / catalog / metalake)                                                   |
 | --------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| When state rows are written | **Immediately** on policy change; IRC `createTable` / `updateTable`; detach deletes | **Timed discovery** (§5.3.1)                                                                    |
+| When state rows are written | **Immediately** on policy change; IRC `createTable` / `updateTable`; detach deletes | **Timed discovery** (§5.3.2)                                                                    |
 | Behavior                    | O(1) UPSERT/DELETE; set `next_due_at = nextOccurrence(schedule)`                    | Bind association only; discovery lists scope, nearest-wins, INSERT / UPDATE / DELETE state rows |
 
 ```text
@@ -256,7 +256,7 @@ UPSERT table_maintenance_state
 
 Only **one** state row per `(table, maintenance_type)` effective policy.
 
-**IRC table lifecycle hooks (§5.3.1, §6.3):** `createTable` and `updateTable` UPSERT / refresh state
+**IRC table lifecycle hooks (§5.3.2, §6.3):** `createTable` and `updateTable` UPSERT / refresh state
 for effective (ancestor) policies; `dropTable` purges state. Tables that never call IRC
 APIs rely on discovery.
 
@@ -266,12 +266,36 @@ APIs rely on discovery.
 
 `selectDueWork` vs discovery:
 
-|        | Claim due work                                                       | Discovery                                                                                             |
-| ------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Config | `gravitino.maintenance.scheduler.pollIntervalSecs` (default **300**) | `gravitino.maintenance.scheduler.discoveryIntervalSecs` (default **3600**)                            |
-| Work   | Select existing state rows with `next_due_at <= now`                 | Reconcile scope: **INSERT** missing, **UPDATE** wrong (`policy_id` / `next_due_at`), **DELETE** stale |
+|        | Claim due work                                                      | Discovery                                                                                             |
+| ------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Config | `gravitino.maintenance.scheduler.pollIntervalSecs` (default **60**) | `gravitino.maintenance.scheduler.discoveryIntervalSecs` (default **3600**)                            |
+| Work   | Select existing state rows with `next_due_at <= now`                | Reconcile scope: **INSERT** missing, **UPDATE** wrong (`policy_id` / `next_due_at`), **DELETE** stale |
 
-#### 5.3.1 Scope discovery (above-table attachments)
+#### 5.3.1 Worker pool and claim (no pending queue)
+
+Each node runs a **fixed worker pool** (`workerThreads`, default **8**). Workers do **not** batch-load
+due rows into an in-memory queue.
+
+```text
+worker loop (× workerThreads):
+  SELECT up to candidateWindow due candidates   // IDLE or stale RUNNING; next_due_at <= now
+  try CAS claim one row (§6.1)                  // only if this worker is free
+  if claim wins → heartbeat → submit Spark → release IDLE when done
+  if no claimable row → sleep pollIntervalSecs
+```
+
+| Concept            | Meaning                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| `workerThreads`    | Max **concurrent** claims / in-flight submits on this node (default **8**).                           |
+| `candidateWindow`  | Max rows per **SELECT** for CAS retries (default **32**). May be **>** `workerThreads`.               |
+| `pollIntervalSecs` | Sleep when a worker finds **no** claimable row (default **60**). Not “flush a batch every N seconds”. |
+
+**Claim at most free capacity:** if 8 workers are busy, do **not** claim more rows. Extra due rows stay
+`IDLE` (or reclaimable stale `RUNNING`) in `table_maintenance_state` until a worker is free or another
+node claims them. Do **not** mark them `RUNNING` and park them in a process queue (that breaks
+heartbeat reclaim and loses work on crash).
+
+#### 5.3.2 Scope discovery (above-table attachments)
 
 Discovery expands schema / catalog / metalake attachments into **table-level** state rows (§5.2.5).
 It does **not** replace `selectDueWork`.
@@ -306,7 +330,7 @@ Compaction is the **only** type with two wake sources: IRC commit (§5.4.1) and 
 IRC commit succeeded → post-commit hook (§5.1.1)
   └─ async IcebergCommitEventHandler:
         resolve effective compaction policy (§5.2.3); skip if disabled
-        skip if state row missing (hooks / discovery own `next_due_at` — §5.2.5, §5.3.1)
+        skip if state row missing (hooks / discovery own `next_due_at` — §5.2.5, §5.3.2)
         minIntervalMs gate (last_job_id — §7.3)
         claim row (§6.1) + register heartbeats
         submit one job; record job_run_meta (§6.4); release to IDLE when job finishes
@@ -362,11 +386,12 @@ Every node polls; **per-row CAS** picks the winner. PK: `(metalake_id, table_ide
 **Scheduler** (same CAS as `iceberg_cleanup_job.markRunning`):
 
 ```text
-Both nodes SELECT due candidates → both CAS claim (IDLE or stale RUNNING):
+Both nodes SELECT up to candidateWindow due candidates → each free worker CAS-claims one:
   UPDATE … SET state=RUNNING, heartbeat_at=:now
   WHERE … AND (state=IDLE OR (state=RUNNING AND heartbeat_at < :heartbeatExpiry))
   winner (rows_affected=1) → heartbeat → submit → IDLE when job finishes
-  loser → next candidate
+  loser / no free worker → leave row due in DB; try next candidate or sleep pollIntervalSecs
+Never claim more rows than free workers; unclaimed due rows stay in table_maintenance_state
 Heartbeats cover scheduler + commit-path claims (same pattern as iceberg_cleanup_job.heartbeat_at)
 ```
 
@@ -429,13 +454,15 @@ Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, 
 | ------------------------------------------------------- | ------- | -------------------------------------------------------- |
 | `gravitino.server.rest.extensionPackages`               | none    | TMS Feature package.                                     |
 | `gravitino.auxService.names`                            | none    | Include `iceberg-rest` when using IRC.                   |
-| `gravitino.maintenance.scheduler.pollIntervalSecs`      | `300`   | Sleep when no due row claimed.                           |
-| `gravitino.maintenance.scheduler.discoveryIntervalSecs` | `3600`  | Discovery interval for above-table attachments (§5.3.1). |
+| `gravitino.maintenance.scheduler.pollIntervalSecs`      | `60`    | Sleep when a worker finds no claimable due row (§5.3.1). |
+| `gravitino.maintenance.scheduler.workerThreads`         | `8`     | Concurrent claim/submit workers per node (§5.3.1).       |
+| `gravitino.maintenance.scheduler.candidateWindow`       | `32`    | Max SELECT candidates per claim attempt (§5.3.1).        |
+| `gravitino.maintenance.scheduler.discoveryIntervalSecs` | `3600`  | Discovery interval for above-table attachments (§5.3.2). |
 | `gravitino.maintenance.scheduler.heartbeatTimeoutSecs`  | `300`   | Stale `heartbeat_at` → reclaim `RUNNING` (§6.1).         |
-| `gravitino.maintenance.scheduler.candidateWindow`       | `8`     | Max candidates per `selectDueWork`.                      |
 
 Per-table **schedule cadence** is **`next_due_at`** (from policy crontab). `minIntervalMs` is only the
-min-gap gate before claim (§7.3). `pollIntervalSecs` = claim frequency; `discoveryIntervalSecs` =
+min-gap gate before claim (§7.3). `pollIntervalSecs` = idle-worker sleep; `workerThreads` = max
+concurrent submits; `candidateWindow` = SELECT size (≥ workers); `discoveryIntervalSecs` =
 expansion frequency.
 
 ```properties
@@ -465,7 +492,7 @@ any other listener
 | `tms-lifecycle` | `IcebergCreateTableEvent` / `IcebergUpdateTableEvent` / `IcebergDropTableEvent` / rename | UPSERT / refresh / `DELETE` `table_maintenance_state` (§5.2.5, §6.3)                     |
 
 Omit TMS names from `gravitino.eventListener.names` → no TMS hooks; above-table scope still relies
-on discovery (§5.3.1).
+on discovery (§5.3.2).
 
 ### 7.3 Task types and minimum interval (per policy type)
 
@@ -507,7 +534,7 @@ on discovery (§5.3.1).
 
 |           | Deployment                                     | Policy                                                                          | Trigger                                                                           | Discovery                                                       | Multi-node                                                        | Commit callback                             | Durability                       | Orchestration                         | Industry                             |
 | --------- | ---------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------------------------- | ------------------------------------ |
-| Checklist | `extensionPackages`; IRC same JVM on **8090**. | Four types; nearest-wins; table attach immediate; above-table discovery (§5.2). | Compaction: commit + scheduler; others: scheduler + `next_due_at` (§5.4, §5.2.4). | Iceberg/HMS list; separate from `selectDueWork` (§5.3.1, §4.4). | No leader; per-row CAS like `IcebergCleanupManager` (§5.3, §4.3). | Async `IcebergCommitEventHandler` (§5.4.1). | State for claim/schedule (§6.2). | Track A; orphan separate (§5.5–§5.6). | §4.2 / §4.3 / §4.4 (row CAS chosen). |
+| Checklist | `extensionPackages`; IRC same JVM on **8090**. | Four types; nearest-wins; table attach immediate; above-table discovery (§5.2). | Compaction: commit + scheduler; others: scheduler + `next_due_at` (§5.4, §5.2.4). | Iceberg/HMS list; separate from `selectDueWork` (§5.3.2, §4.4). | No leader; per-row CAS like `IcebergCleanupManager` (§5.3, §4.3). | Async `IcebergCommitEventHandler` (§5.4.1). | State for claim/schedule (§6.2). | Track A; orphan separate (§5.5–§5.6). | §4.2 / §4.3 / §4.4 (row CAS chosen). |
 
 ---
 
