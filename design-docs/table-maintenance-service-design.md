@@ -111,17 +111,15 @@ are **not** run on every commit.
 |                        | [AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-table-optimizers.html) | [Amoro](https://cwiki.apache.org/confluence/display/AMORO/AIP-3%3A+Event-Triggered+Optimization+of+Iceberg+Tables+in+Amoro) | [Databricks](https://docs.databricks.com/aws/en/tables/tune-file-size) | [Floe](https://github.com/nssalian/floe/blob/main/docs/policies.md) |
 | ---------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Write / commit trigger | —                                                                                         | compaction                                                                                                                  | compaction                                                             | compaction                                                          |
-| What stays scheduled   | compaction; snapshot expire; orphan clean                                                 | snapshot expire; orphan clean                                                                                               | compaction; manifest rewrite; snapshot expire; orphan clean            | compaction; manifest rewrite; snapshot expire; orphan clean         |
+| What stays scheduled   | compaction; snapshot expire; orphan clean                                                 | compaction; snapshot expire; orphan clean                                                                                   | compaction; manifest rewrite; snapshot expire; orphan clean            | compaction; manifest rewrite; snapshot expire; orphan clean         |
 
 **Why TMS limits the commit path to compaction:**
 
-1. Manifest rewrite, snapshot expire, and orphan clean are too heavy for the commit path (listing /
-   scans hurt latency).
-2. Inactive tables still need scheduled compaction when commits stop; expire / orphan must not depend
+1. Inactive tables still need scheduled compaction when commits stop; expire / orphan must not depend
    on successful commits (orphans can appear without one).
-3. Expire / orphan need fresh table-wide metadata; industry products keep them on a separate
+2. Expire / orphan need fresh table-wide metadata; industry products keep them on a separate
    schedule, with only compaction on the write path.
-4. Manifest rewrite is typically run about once a day; the scheduler schedule already covers it, so
+3. Manifest rewrite is typically run about once a day; the scheduler schedule already covers it, so
    a commit-path trigger is unnecessary.
 
 **TMS decision:** IRC commit path runs **`system_iceberg_compaction` only** (§5.4.1). Scheduler runs
