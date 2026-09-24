@@ -20,16 +20,59 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
+  antlr
 }
 
 dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.commons.collections4)
   implementation(libs.guava)
+  antlr(libs.antlr4)
+  implementation(libs.antlr4.runtime)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+configurations.named("runtimeClasspath") {
+  exclude(group = "org.antlr", module = "antlr4")
+}
+
+val antlrSourcePath = "build/generated/java/org/apache/gravitino/policy/expression/antlr"
+
+sourceSets {
+  main {
+    java {
+      srcDir("build/generated/java")
+    }
+  }
+}
+
+tasks.generateGrammarSource {
+  maxHeapSize = "64m"
+  arguments =
+    arguments +
+    listOf(
+      "-visitor",
+      "-long-messages",
+      "-package",
+      "org.apache.gravitino.policy.expression.antlr"
+    )
+  outputDirectory = file(antlrSourcePath)
+  setSource("src/main/antlr")
+}
+
+tasks.spotlessJava {
+  dependsOn(tasks.generateGrammarSource)
+}
+
+tasks.sourcesJar {
+  dependsOn(tasks.generateGrammarSource)
+}
+
+tasks.javadoc {
+  exclude("org/apache/gravitino/policy/expression/antlr/**")
 }
 
 tasks.build {
