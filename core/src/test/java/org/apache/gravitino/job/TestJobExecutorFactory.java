@@ -21,8 +21,13 @@ package org.apache.gravitino.job;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -126,6 +131,106 @@ public class TestJobExecutorFactory {
       Map<String, String> configs = ((RecordingJobExecutor) executor).configs;
       Assertions.assertEquals("bar", configs.get("foo"));
       Assertions.assertFalse(configs.containsKey(LocalJobExecutorConfigs.STAGING_DIR));
+    }
+  }
+
+  @Test
+  public void testRejectJobExecutorBuiltAgainstOldSpi() throws Exception {
+    // A job executor plugin built before getJobExecutionInfo was added to the SPI only
+    // implements getJobStatus. Loaded against the current SPI, it would throw AbstractMethodError
+    // on every status pull, so it must be rejected when the job executor is created.
+    Class<?> oldJobExecutorClass = compileAgainstOldSpi();
+    try {
+      JobExecutor oldJobExecutor =
+          (JobExecutor) oldJobExecutorClass.getDeclaredConstructor().newInstance();
+      Assertions.assertThrows(
+          AbstractMethodError.class, () -> oldJobExecutor.getJobExecutionInfo("job-1"));
+
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> JobExecutorFactory.checkJobExecutorClass(oldJobExecutorClass));
+      Assertions.assertTrue(e.getMessage().contains("getJobExecutionInfo"), e.getMessage());
+    } finally {
+      ((URLClassLoader) oldJobExecutorClass.getClassLoader()).close();
+    }
+
+    Assertions.assertDoesNotThrow(
+        () -> JobExecutorFactory.checkJobExecutorClass(RecordingJobExecutor.class));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobExecutorFactory.checkJobExecutorClass(String.class));
+  }
+
+  // Compiles a job executor against the SPI as it was before getJobExecutionInfo was added, and
+  // loads it against the current SPI, like a plugin jar built for an older Gravitino version.
+  private Class<?> compileAgainstOldSpi() throws IOException {
+    File sourceDir = new File(testDir, "old-spi-src");
+    File classDir = new File(testDir, "old-spi-classes");
+    Assertions.assertTrue(classDir.mkdirs());
+
+    File oldSpi = new File(sourceDir, "org/apache/gravitino/connector/job/JobExecutor.java");
+    FileUtils.writeStringToFile(
+        oldSpi,
+        String.join(
+            "\n",
+            "package org.apache.gravitino.connector.job;",
+            "import java.util.Map;",
+            "import org.apache.gravitino.job.JobHandle;",
+            "import org.apache.gravitino.job.JobTemplate;",
+            "public interface JobExecutor extends java.io.Closeable {",
+            "  void initialize(Map<String, String> configs);",
+            "  String submitJob(JobTemplate jobTemplate);",
+            "  JobHandle.Status getJobStatus(String jobId);",
+            "  void cancelJob(String jobId);",
+            "}"),
+        StandardCharsets.UTF_8);
+    File oldExecutor = new File(sourceDir, "com/example/OldJobExecutor.java");
+    FileUtils.writeStringToFile(
+        oldExecutor,
+        String.join(
+            "\n",
+            "package com.example;",
+            "import java.util.Map;",
+            "import org.apache.gravitino.connector.job.JobExecutor;",
+            "import org.apache.gravitino.job.JobHandle;",
+            "import org.apache.gravitino.job.JobTemplate;",
+            "public class OldJobExecutor implements JobExecutor {",
+            "  public void initialize(Map<String, String> configs) {}",
+            "  public String submitJob(JobTemplate jobTemplate) { return \"job-1\"; }",
+            "  public JobHandle.Status getJobStatus(String jobId) {",
+            "    return JobHandle.Status.SUCCEEDED;",
+            "  }",
+            "  public void cancelJob(String jobId) {}",
+            "  public void close() {}",
+            "}"),
+        StandardCharsets.UTF_8);
+
+    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    Assertions.assertNotNull(compiler, "The tests must run on a JDK");
+    int result =
+        compiler.run(
+            null,
+            null,
+            null,
+            "-classpath",
+            System.getProperty("java.class.path"),
+            "-d",
+            classDir.getAbsolutePath(),
+            oldSpi.getAbsolutePath(),
+            oldExecutor.getAbsolutePath());
+    Assertions.assertEquals(0, result);
+
+    // Only the plugin class is loaded from the compiled classes: the class loader delegates to its
+    // parent first, so JobExecutor resolves to the current SPI.
+    URLClassLoader classLoader =
+        new URLClassLoader(
+            new URL[] {classDir.toURI().toURL()}, TestJobExecutorFactory.class.getClassLoader());
+    try {
+      return classLoader.loadClass("com.example.OldJobExecutor");
+    } catch (ClassNotFoundException e) {
+      classLoader.close();
+      throw new IOException(e);
     }
   }
 
