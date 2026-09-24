@@ -159,18 +159,20 @@ public interface TableOperation {
    * override this so a name returned by {@link #listTables(String)} round-trips through
    * load/alter/drop. See {@link
    * org.apache.gravitino.connector.SupportsTableNameResolution#resolveTableName} for the resolution
-   * contract (exact match on the normalized name, then a unique case-insensitive match; otherwise
-   * keep the normalized name; never throw when absent).
+   * contract (prefer the requested name exactly, then the normalized name, then a unique
+   * case-insensitive match; otherwise keep the normalized name; never throw when absent).
    *
    * <p>Implementations must be side-effect free and reuse the operation's existing data source
    * rather than opening new connections.
    *
    * @param databaseName The name of the database (schema).
+   * @param requestedName The table name as requested by the caller, before case normalization.
    * @param normalizedName The table name after Gravitino's case normalization.
    * @return The physically stored table name; {@code normalizedName} unchanged when no unambiguous
    *     mapping applies.
    */
-  default String resolveTableName(String databaseName, String normalizedName) {
+  default String resolveTableName(
+      String databaseName, String requestedName, String normalizedName) {
     return normalizedName;
   }
 }

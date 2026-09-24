@@ -23,9 +23,9 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.TableCatalog;
 
 /**
- * A server-internal, connector-side capability that maps a normalized table identifier to the
- * identifier under which the table is physically stored by the underlying source, for backends
- * whose name normalization is not reversible.
+ * A server-internal, connector-side capability that maps a table identifier to the identifier under
+ * which the table is physically stored by the underlying source, for backends whose name
+ * normalization is not reversible.
  *
  * <p>Most catalogs store a table under exactly the name Gravitino normalized it to, so they do not
  * implement this. A catalog whose {@link org.apache.gravitino.connector.capability.Capability}
@@ -36,22 +36,20 @@ import org.apache.gravitino.rel.TableCatalog;
  *
  * <p>This is a {@link CatalogOperations} mixin, not part of the user-facing {@link TableCatalog}
  * API: it is only consulted by the server on the load/alter/drop path and is never exposed to
- * clients.
+ * clients. The server resolves the name before the operation runs, so the resolved identifier
+ * drives the downstream authorization hooks, the underlying catalog call and the Gravitino entity
+ * store key consistently.
  *
- * <p><b>The identifier passed in is the normalized one.</b> That is the correct key even though the
- * caller's original spelling is not passed: a case-folding capability already encodes the caller's
- * case intent in the normalized name. For example a backend that folds unquoted names but preserves
- * quoted ones normalizes an unquoted {@code foo} to the folded form (say {@code FOO}) and a quoted
- * {@code "foo"} to {@code foo}; the resolver therefore receives the exact stored-name intent and
- * does not need the raw request string.
- *
- * <p><b>Resolution contract.</b> Given the normalized identifier, an implementation must:
+ * <p><b>Resolution contract.</b> Implementations receive both the identifier the caller requested
+ * and the identifier after Gravitino's case normalization, and must:
  *
  * <ul>
- *   <li>return {@code normalizedIdent} unchanged if a table with that exact stored name exists (the
- *       common case; no differently-cased object is consulted);
+ *   <li>prefer an object whose stored name equals {@code requestedIdent}'s name exactly, so a
+ *       case-sensitive name the caller supplied verbatim is honored even when a differently-cased
+ *       sibling exists;
+ *   <li>otherwise use an object whose stored name equals {@code normalizedIdent}'s name exactly;
  *   <li>otherwise, if exactly one stored name matches {@code normalizedIdent} case-insensitively,
- *       return that stored name;
+ *       use that stored name;
  *   <li>otherwise — no match, or several case-insensitive matches with no exact match — return
  *       {@code normalizedIdent} unchanged, so the operation proceeds against the normalized name
  *       and the usual not-found behavior surfaces. An ambiguous name must never be resolved to an
@@ -61,19 +59,20 @@ import org.apache.gravitino.rel.TableCatalog;
  * <p>Implementations must be side-effect free, must not open connections beyond what the catalog
  * already holds, and must not throw when the table is absent (they return {@code normalizedIdent}
  * so callers such as {@code tableExists} and {@code dropTable} keep their boolean not-found
- * semantics). The server calls this inside the same tree lock it takes for the load/alter/drop
- * operation, so resolution and the operation act atomically on the resolved name.
+ * semantics). Resolution is best-effort: it runs before the server acquires its per-table lock, so
+ * a concurrent rename/recreate simply surfaces as the normal {@code NoSuchTableException} from the
+ * subsequent locked operation, never as an action on a different object.
  */
 @Evolving
 public interface SupportsTableNameResolution {
 
   /**
-   * Resolves a normalized table identifier to the identifier under which the table is physically
-   * stored.
+   * Resolves a table identifier to the identifier under which the table is physically stored.
    *
-   * @param normalizedIdent The table identifier after Gravitino's case normalization.
+   * @param requestedIdent The identifier as requested by the caller, before case normalization.
+   * @param normalizedIdent The identifier after Gravitino's case normalization.
    * @return The identifier under which the table is physically stored, or {@code normalizedIdent}
    *     unchanged when no unambiguous mapping applies.
    */
-  NameIdentifier resolveTableName(NameIdentifier normalizedIdent);
+  NameIdentifier resolveTableName(NameIdentifier requestedIdent, NameIdentifier normalizedIdent);
 }

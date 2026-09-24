@@ -111,8 +111,7 @@ public class TestCatalogOperations
         FilesetCatalog,
         TopicCatalog,
         ModelCatalog,
-        SupportsSchemas,
-        SupportsTableNameResolution {
+        SupportsSchemas {
   private static final Logger LOG = LoggerFactory.getLogger(TestCatalogOperations.class);
 
   private final Map<NameIdentifier, TestTable> tables;
@@ -169,26 +168,6 @@ public class TestCatalogOperations
     return tables.keySet().stream()
         .filter(testTable -> testTable.namespace().equals(namespace))
         .toArray(NameIdentifier[]::new);
-  }
-
-  @Override
-  public NameIdentifier resolveTableName(NameIdentifier normalizedIdent) {
-    // Exact match wins.
-    if (tables.containsKey(normalizedIdent)) {
-      return normalizedIdent;
-    }
-    // Unique case-insensitive match, otherwise keep the normalized name (ambiguous or absent).
-    NameIdentifier match = null;
-    for (NameIdentifier stored : tables.keySet()) {
-      if (stored.namespace().equals(normalizedIdent.namespace())
-          && stored.name().equalsIgnoreCase(normalizedIdent.name())) {
-        if (match != null) {
-          return normalizedIdent;
-        }
-        match = stored;
-      }
-    }
-    return match != null ? match : normalizedIdent;
   }
 
   @Override
