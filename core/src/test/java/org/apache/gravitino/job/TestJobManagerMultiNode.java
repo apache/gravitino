@@ -40,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
@@ -144,6 +145,28 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     JobEntity afterNodeAPull = getJob(job.name());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, afterNodeAPull.status());
     Assertions.assertTrue(afterNodeAPull.finishedAt() > 0);
+  }
+
+  @TestTemplate
+  public void testShortJobRecordsActualTimestamps() throws IOException {
+    // The job starts and finishes between two polls, so it is never observed as STARTED.
+    JobEntity job = nodeA.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "1"));
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> executorA.getJobStatus(job.jobExecutionId()) == JobHandle.Status.SUCCEEDED);
+    JobExecutionInfo info = executorA.getJobExecutionInfo(job.jobExecutionId());
+
+    // The job is polled after it finished, the recorded times are still when it actually ran.
+    nodeA.pullAndUpdateJobStatus();
+
+    JobEntity finished = getJob(job.name());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, finished.status());
+    // The metadata store keeps the timestamps in milliseconds.
+    Assertions.assertEquals(info.startedAt().toEpochMilli(), finished.startedAt());
+    Assertions.assertEquals(info.finishedAt().toEpochMilli(), finished.finishedAt());
+    Assertions.assertTrue(
+        finished.startedAt() >= job.auditInfo().createTime().toEpochMilli(), finished.toString());
+    Assertions.assertTrue(finished.finishedAt() - finished.startedAt() >= 900, finished.toString());
   }
 
   @TestTemplate

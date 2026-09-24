@@ -63,7 +63,8 @@ class JobHandle(ABC):
 
     def started_at(self) -> Optional[datetime]:
         """Returns the time the job started execution, or ``None`` if the job has not started
-        execution yet.
+        execution yet. A finished job may also have no started time, if the job executor doesn't
+        report when the job started and Gravitino didn't observe the job running.
         """
         raise NotImplementedError("started_at is not implemented")
 

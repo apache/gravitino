@@ -61,7 +61,11 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     super(catalogManager, store, idGenerator, secretManager);
     this.catalogManager = catalogManager;
     this.schemaDispatcher = schemaDispatcher;
-    this.managedOperations = new ManagedSemanticModelOperations(store, idGenerator);
+    this.managedOperations =
+        new ManagedSemanticModelOperations(
+            store,
+            idGenerator,
+            (ident, definition) -> SemanticModelValidator.validateDefinition(definition));
   }
 
   @Override
@@ -89,7 +93,6 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       Map<String, String> properties)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    Preconditions.checkArgument(definition != null, "Definition must not be null");
     Preconditions.checkArgument(properties != null, "Properties must not be null");
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
