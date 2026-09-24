@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -838,6 +839,49 @@ class TestRoleMetaService extends TestJDBCBackend {
     assertEquals("creator", revokeMultipleRole.auditInfo().creator());
     assertEquals("revokeMultiple", revokeMultipleRole.auditInfo().lastModifier());
     Assertions.assertTrue(revokeMultipleRole.securableObjects().isEmpty());
+  }
+
+  @TestTemplate
+  void testUpdateRoleReportsMissingSecurableObject() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName = "catalog";
+    createAndInsertCatalog(METALAKE_NAME, catalogName);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role",
+            AUDIT_INFO,
+            catalogName);
+    roleMetaService.insertRole(role, false);
+
+    String missingCatalog = "missing_catalog";
+    NoSuchMetadataObjectException exception =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                roleMetaService.updateRole(
+                    role.nameIdentifier(),
+                    (RoleEntity current) ->
+                        RoleEntity.builder()
+                            .withId(current.id())
+                            .withName(current.name())
+                            .withNamespace(current.namespace())
+                            .withProperties(current.properties())
+                            .withSecurableObjects(
+                                Lists.newArrayList(
+                                    SecurableObjects.ofCatalog(
+                                        missingCatalog,
+                                        Lists.newArrayList(Privileges.UseCatalog.allow()))))
+                            .withAuditInfo(current.auditInfo())
+                            .build()));
+
+    Assertions.assertEquals(
+        "Metadata object missing_catalog type CATALOG doesn't exist", exception.getMessage());
+    Assertions.assertInstanceOf(NoSuchEntityException.class, exception.getCause());
+    Assertions.assertEquals(role, roleMetaService.getRoleByIdentifier(role.nameIdentifier()));
   }
 
   @TestTemplate
