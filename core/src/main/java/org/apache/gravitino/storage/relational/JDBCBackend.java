@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -46,6 +47,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
@@ -110,7 +112,10 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
+public class JDBCBackend
+    implements RelationalBackend,
+        SupportsOrphanedRelationCleanup,
+        SupportsConditionalCatalogDelete {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -384,6 +389,32 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       boolean deleted = deleteEntity(ident, entityType, cascade);
       if (deleted) {
         insertEntityChange(ident, entityType, OperateType.DROP);
+      }
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return deleted;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  @Override
+  public boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+      throws IOException {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      boolean deleted =
+          CatalogMetaService.getInstance().deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+      if (deleted) {
+        insertEntityChange(ident, Entity.EntityType.CATALOG, OperateType.DROP);
       }
       if (transactionOwner) {
         SessionUtils.commitTransaction();

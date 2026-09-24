@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -33,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
@@ -128,6 +130,47 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testAllowedSchemasDeleteInvalidatesCacheAfterBackendDelete()
+      throws IOException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    Set<Long> allowedSchemaIds = Set.of(123L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    RelationalBackend conditionalBackend =
+        Mockito.mock(
+            RelationalBackend.class,
+            Mockito.withSettings().extraInterfaces(SupportsConditionalCatalogDelete.class));
+    FieldUtils.writeField(store, "backend", conditionalBackend, true);
+    SupportsConditionalCatalogDelete catalogDeleteBackend =
+        (SupportsConditionalCatalogDelete) conditionalBackend;
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+              return true;
+            })
+        .when(catalogDeleteBackend)
+        .deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+
+    Assertions.assertTrue(store.deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds));
+
+    InOrder inOrder = Mockito.inOrder(conditionalBackend, cache);
+    inOrder.verify(catalogDeleteBackend).deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testAllowedSchemasDeleteFailsClosedForUnsupportedBackend() throws IllegalAccessException {
+    RelationalBackend unsupportedBackend = Mockito.mock(RelationalBackend.class);
+    FieldUtils.writeField(store, "backend", unsupportedBackend, true);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> store.deleteCatalogWithAllowedSchemas(ident, Set.of(123L)));
+    Mockito.verifyNoInteractions(unsupportedBackend);
   }
 
   @Test

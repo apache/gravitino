@@ -375,14 +375,15 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                   "Metalake %s is in use, please disable it first or use force option", ident);
             }
 
-            List<CatalogEntity> catalogEntities =
-                store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
-            if (!catalogEntities.isEmpty() && !force) {
+            if (force) {
+              return store.delete(ident, EntityType.METALAKE, true);
+            }
+            try {
+              return store.delete(ident, EntityType.METALAKE, false);
+            } catch (NonEmptyEntityException e) {
               throw new NonEmptyMetalakeException(
                   "Metalake %s has catalogs, please drop them first or use force option", ident);
             }
-
-            return store.delete(ident, EntityType.METALAKE, true);
           } catch (NoSuchMetalakeException | NoSuchEntityException e) {
             // Another server may have completed the drop after the initial existence check.
             // Dropping an already-removed metalake remains an idempotent false result.

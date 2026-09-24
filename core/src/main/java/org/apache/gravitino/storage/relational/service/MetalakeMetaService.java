@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -217,128 +218,19 @@ public class MetalakeMetaService {
     Long metalakeId = metalakePO.getMetalakeId();
     Long currentVersion = metalakePO.getCurrentVersion();
     if (metalakeId != null) {
+      List<Runnable> operations = new ArrayList<>();
       if (cascade) {
-        SessionUtils.doMultipleWithCommit(
+        operations.add(
             () -> {
               // Take the parent lock before the child snapshot, so catalog creation cannot add a
               // child after the snapshot. A later failure rolls back this soft delete as well.
               deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
               deleteCatalogsWithVersions(ident, metalakeId);
               deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
-            },
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableVersionMapper.class,
-                    mapper -> mapper.softDeleteTableVersionsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableColumnMapper.class,
-                    mapper -> mapper.softDeleteColumnsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FunctionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FunctionVersionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionVersionMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserRoleRelMapper.class,
-                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetaMapper.class,
-                    mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyVersionMapper.class,
-                    mapper -> mapper.softDeletePolicyVersionsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionAliasRelMapper.class,
-                    mapper -> mapper.softDeleteModelVersionAliasRelsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionMetaMapper.class,
-                    mapper -> mapper.softDeleteModelVersionMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelMetaMapper.class,
-                    mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    JobTemplateMetaMapper.class,
-                    mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ViewMetaMapper.class,
-                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ViewVersionInfoMapper.class,
-                    mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)));
+            });
+        operations.addAll(catalogScopedCleanups(metalakeId));
       } else {
-        SessionUtils.doMultipleWithCommit(
+        operations.add(
             () -> {
               // Delete the metalake before checking its children. The UPDATE takes an exclusive
               // lock on the metalake row, and catalog creation locks the same row before inserting.
@@ -355,61 +247,132 @@ public class MetalakeMetaService {
                 throw new NonEmptyEntityException(
                     "Entity %s has sub-entities, you should remove sub-entities first", ident);
               }
-            },
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserRoleRelMapper.class,
-                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    JobTemplateMetaMapper.class,
-                    mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
+            });
       }
+      // Entities owned by the metalake itself go with it whether or not the drop cascades. Both
+      // branches share this list so neither can leave such an entity behind.
+      operations.addAll(metalakeScopedCleanups(metalakeId));
+      SessionUtils.doMultipleWithCommit(operations.toArray(new Runnable[0]));
     }
     return true;
+  }
+
+  /** Soft deletes everything that lives under the metalake's catalogs. */
+  private static List<Runnable> catalogScopedCleanups(Long metalakeId) {
+    return List.of(
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableMetaMapper.class,
+                mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableVersionMapper.class,
+                mapper -> mapper.softDeleteTableVersionsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableColumnMapper.class,
+                mapper -> mapper.softDeleteColumnsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetVersionMapper.class,
+                mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TopicMetaMapper.class,
+                mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper -> mapper.softDeleteFunctionMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FunctionVersionMetaMapper.class,
+                mapper -> mapper.softDeleteFunctionVersionMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionAliasRelMapper.class,
+                mapper -> mapper.softDeleteModelVersionAliasRelsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.softDeleteModelVersionMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelMetaMapper.class,
+                mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ViewVersionInfoMapper.class,
+                mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)));
+  }
+
+  /**
+   * Soft deletes the entities that belong to the metalake itself rather than to one of its
+   * catalogs, together with the relations that point at any object in the metalake.
+   */
+  private static List<Runnable> metalakeScopedCleanups(Long metalakeId) {
+    return List.of(
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class,
+                mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                GroupRoleRelMapper.class,
+                mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                GroupMetaMapper.class,
+                mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetaMapper.class, mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyMetaMapper.class,
+                mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyVersionMapper.class,
+                mapper -> mapper.softDeletePolicyVersionsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                JobTemplateMetaMapper.class,
+                mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                JobMetaMapper.class, mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
   }
 
   void deleteMetalakeWithVersion(NameIdentifier identifier, Long metalakeId, Long currentVersion) {

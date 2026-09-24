@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -270,6 +271,27 @@ public class CatalogMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteCatalog")
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
+    return deleteCatalog(identifier, cascade, Set.of());
+  }
+
+  /**
+   * Delete a catalog after checking under the catalog row lock that every remaining schema is among
+   * those classified as safe to discard by the manager.
+   *
+   * @param identifier the catalog identifier
+   * @param allowedSchemaIds IDs of schema entities that may be deleted with the catalog
+   * @return true if the catalog was deleted
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteCatalog")
+  public boolean deleteCatalogWithAllowedSchemas(
+      NameIdentifier identifier, Set<Long> allowedSchemaIds) {
+    return deleteCatalog(identifier, false, allowedSchemaIds);
+  }
+
+  private boolean deleteCatalog(
+      NameIdentifier identifier, boolean cascade, Set<Long> allowedSchemaIds) {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
@@ -277,7 +299,7 @@ public class CatalogMetaService {
     CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
     long catalogId = catalogPO.getCatalogId();
 
-    if (cascade) {
+    if (cascade || !allowedSchemaIds.isEmpty()) {
       SessionUtils.doMultipleWithCommit(
           () -> {
             // Delete the parent first, then its children. The parent delete locks the catalog row,
@@ -285,6 +307,14 @@ public class CatalogMetaService {
             // added or removed after this point. Anything that goes wrong later in this
             // transaction rolls this soft delete back with it.
             deleteCatalogWithVersion(identifier, catalogPO);
+            if (!cascade) {
+              List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
+              if (schemaPOs.stream()
+                  .anyMatch(schema -> !allowedSchemaIds.contains(schema.getSchemaId()))) {
+                throw new NonEmptyEntityException(
+                    "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+              }
+            }
             deleteSchemasWithVersions(identifier, catalogId);
           },
           () ->

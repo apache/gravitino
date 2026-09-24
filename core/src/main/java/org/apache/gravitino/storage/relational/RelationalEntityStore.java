@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -47,6 +48,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
@@ -69,7 +71,10 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsEntityChangeLog,
+        SupportsConditionalCatalogDelete {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -308,6 +313,23 @@ public class RelationalEntityStore
       return false;
     } finally {
       invalidateCache(ident, entityType);
+    }
+  }
+
+  @Override
+  public boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+      throws IOException {
+    if (!(backend instanceof SupportsConditionalCatalogDelete)) {
+      throw new UnsupportedOperationException(
+          "Atomic catalog delete with allowed schemas is not supported by this backend");
+    }
+    try {
+      return ((SupportsConditionalCatalogDelete) backend)
+          .deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+    } catch (NoSuchEntityException e) {
+      return false;
+    } finally {
+      invalidateCache(ident, Entity.EntityType.CATALOG);
     }
   }
 

@@ -45,9 +45,12 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -424,6 +427,39 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
     Assertions.assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
     assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+  }
+
+  /**
+   * A non-force drop takes the non-cascading path once the metalake has no catalogs. Entities that
+   * belong to the metalake itself must still go with it, exactly as in a cascading delete.
+   */
+  @TestTemplate
+  public void testNonCascadeDeleteRemovesMetalakeScopedEntities() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofUser(METALAKE_NAME),
+            "user",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    TagEntity tag = createAndInsertTagEntity("tag", "comment", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    assertFalse(listPolicyVersions(policy.id()).isEmpty());
+
+    assertTrue(MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+
+    assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
+    assertTrue(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
+    assertTrue(legacyRecordExistsInDB(policy.id(), Entity.EntityType.POLICY));
+    assertTrue(
+        listPolicyVersions(policy.id()).values().stream().allMatch(deletedAt -> deletedAt != 0));
   }
 
   @TestTemplate

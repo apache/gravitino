@@ -26,10 +26,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -214,6 +216,24 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         Entity.EntityType.SCHEMA,
         NameIdentifierUtil.ofSchema(METALAKE_NAME, schemaCatalog.name(), renamedSchema.name())
             .toString(),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testAllowedSchemasCatalogDropWritesChangeLog() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    long maxIdBeforeDrop = maxEntityChangeId();
+
+    Assertions.assertTrue(
+        ((SupportsConditionalCatalogDelete) backend)
+            .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(schema.id())));
+    assertEntityChange(
+        maxIdBeforeDrop,
+        METALAKE_NAME,
+        Entity.EntityType.CATALOG,
+        catalog.nameIdentifier().toString(),
         OperateType.DROP);
   }
 
