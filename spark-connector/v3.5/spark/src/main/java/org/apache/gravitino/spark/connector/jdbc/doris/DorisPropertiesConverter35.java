@@ -41,7 +41,11 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
           "jdbc-url",
           "jdbc-user",
           "jdbc-password",
-          "jdbc-driver");
+          "jdbc-driver",
+          "dbtable",
+          "query",
+          "preparequery",
+          "sessioninitstatement");
 
   private DorisPropertiesConverter35() {}
 
@@ -58,17 +62,25 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
     // jdbc-user and jdbc-password remain available to the generic JDBC path.
     converted.remove("user");
     converted.remove("password");
+    validateReadOptions(options);
     if (options != null) {
       for (Map.Entry<String, String> option : options.entrySet()) {
         String key = option.getKey();
-        if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
-          throw new IllegalArgumentException(
-              "Doris specialized connection options must be catalog-managed: " + key);
-        }
         converted.put(key, option.getValue());
       }
     }
     return converted;
+  }
+
+  static void validateReadOptions(CaseInsensitiveStringMap options) {
+    if (options == null) {
+      return;
+    }
+    for (String key : options.keySet()) {
+      if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
+        throw new IllegalArgumentException("Protected Doris Spark option is not allowed: " + key);
+      }
+    }
   }
 
   @Override

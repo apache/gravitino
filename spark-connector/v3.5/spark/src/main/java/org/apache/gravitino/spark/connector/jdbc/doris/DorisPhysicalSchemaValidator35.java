@@ -35,6 +35,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.types.DataType;
@@ -186,6 +188,7 @@ final class DorisPhysicalSchemaValidator35 {
       if (!expected.equals(spark.dataType())) {
         throw mismatch(identifier, "logical and Spark physical types differ for " + logical.name());
       }
+      validateLogicalTypeSignature(identifier, logical, fe.signature());
       if (!jdbc.nullabilityKnown() || !fe.nullabilityKnown()) {
         throw mismatch(identifier, "FE or JDBC nullability is unknown for " + logical.name());
       }
@@ -196,6 +199,29 @@ final class DorisPhysicalSchemaValidator35 {
         throw mismatch(
             identifier, "logical and physical nullability differs for " + logical.name());
       }
+    }
+  }
+
+  private static void validateLogicalTypeSignature(
+      Identifier identifier, Column logical, String physicalSignature) {
+    Type logicalType = logical.dataType();
+    String expectedSignature = null;
+    if (logicalType instanceof Types.VarCharType) {
+      expectedSignature = "varchar(" + ((Types.VarCharType) logicalType).length() + ")";
+    } else if (logicalType instanceof Types.FixedCharType) {
+      expectedSignature = "char(" + ((Types.FixedCharType) logicalType).length() + ")";
+    } else if (logicalType instanceof Types.DecimalType) {
+      Types.DecimalType decimalType = (Types.DecimalType) logicalType;
+      expectedSignature = "decimal(" + decimalType.precision() + "," + decimalType.scale() + ")";
+    } else if (logicalType instanceof Types.TimestampType) {
+      Types.TimestampType timestampType = (Types.TimestampType) logicalType;
+      if (timestampType.hasPrecisionSet()) {
+        expectedSignature = "datetime(" + timestampType.precision() + ")";
+      }
+    }
+    if (expectedSignature != null && !expectedSignature.equals(physicalSignature)) {
+      throw mismatch(
+          identifier, "logical and physical type signatures differ for " + logical.name());
     }
   }
 

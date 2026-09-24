@@ -29,6 +29,7 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35;
+import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTypeConverter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -89,14 +90,17 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
         jdbcUser,
         jdbcPassword,
         sparkTypeConverter);
-    return super.createSparkTable(
-        identifier,
-        gravitinoTable,
-        sparkTable,
-        sparkCatalog,
-        propertiesConverter,
-        sparkTransformConverter,
-        sparkTypeConverter);
+    SparkJdbcTable jdbcTable =
+        (SparkJdbcTable)
+            super.createSparkTable(
+                identifier,
+                gravitinoTable,
+                sparkTable,
+                sparkCatalog,
+                propertiesConverter,
+                sparkTransformConverter,
+                sparkTypeConverter);
+    return new DorisReadOnlyTable35(jdbcTable);
   }
 
   @Override
