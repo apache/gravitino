@@ -361,37 +361,46 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     // Mirror CatalogManager.dropCatalog → ops.dropSchema: force-drop children through the real
     // drop path so FilesetCatalogOperations / CatalogManager clean write-through secrets (and
     // managed storage). Do this before the metalake root lock to avoid nesting tree locks.
+    boolean temporarilyEnabled = false;
     if (force) {
-      dropCatalogsUnderMetalake(ident);
+      temporarilyEnabled = dropCatalogsUnderMetalake(ident);
     }
 
-    return TreeLockUtils.doWithRootTreeLock(
-        LockType.WRITE,
-        () -> {
-          try {
-            boolean inUse = metalakeInUse(store, ident);
-            if (inUse && !force) {
-              throw new MetalakeInUseException(
-                  "Metalake %s is in use, please disable it first or use force option", ident);
+    try {
+      return TreeLockUtils.doWithRootTreeLock(
+          LockType.WRITE,
+          () -> {
+            try {
+              boolean inUse = metalakeInUse(store, ident);
+              if (inUse && !force) {
+                throw new MetalakeInUseException(
+                    "Metalake %s is in use, please disable it first or use force option", ident);
+              }
+
+              List<CatalogEntity> catalogEntities =
+                  store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
+              if (!catalogEntities.isEmpty() && !force) {
+                throw new NonEmptyMetalakeException(
+                    "Metalake %s has catalogs, please drop them first or use force option", ident);
+              }
+
+              return store.delete(ident, EntityType.METALAKE, true);
+            } catch (NoSuchMetalakeException | NoSuchEntityException e) {
+              // Another server may have completed the drop after the initial existence check.
+              // Dropping an already-removed metalake remains an idempotent false result.
+              return false;
+
+            } catch (IOException e) {
+              throw new RuntimeException(e);
             }
-
-            List<CatalogEntity> catalogEntities =
-                store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
-            if (!catalogEntities.isEmpty() && !force) {
-              throw new NonEmptyMetalakeException(
-                  "Metalake %s has catalogs, please drop them first or use force option", ident);
-            }
-
-            return store.delete(ident, EntityType.METALAKE, true);
-          } catch (NoSuchMetalakeException | NoSuchEntityException e) {
-            // Another server may have completed the drop after the initial existence check.
-            // Dropping an already-removed metalake remains an idempotent false result.
-            return false;
-
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        });
+          });
+    } catch (RuntimeException e) {
+      // Phase 1 briefly re-enabled a user-disabled metalake to clean up its catalogs. If the
+      // metalake delete above then fails, the metalake still exists, so restore its disabled
+      // state rather than leaving the user's disable silently undone.
+      restoreDisabledState(ident, temporarilyEnabled);
+      throw e;
+    }
   }
 
   /**
@@ -401,13 +410,18 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    *
    * <p>Callers typically {@code disableMetalake} before force-drop. {@link
    * CatalogManager#dropCatalog} requires catalog {@code metalake-in-use=true}, so a disabled
-   * metalake is briefly re-enabled for child cleanup. On success the metalake entity is deleted
-   * immediately afterward, so the temporary enable is not restored; if the cleanup fails, the
-   * metalake is re-disabled (best effort) so a user-disabled metalake does not stay enabled.
+   * metalake is briefly re-enabled for child cleanup. If the cleanup fails it is re-disabled here
+   * (best effort); if the cleanup succeeds this returns whether the metalake was temporarily
+   * enabled, so {@code dropMetalake} can re-disable it should the metalake delete then fail. Either
+   * way a user-disabled metalake does not stay enabled after a failed force drop.
+   *
+   * @param metalakeIdent the metalake whose child catalogs are force-dropped
+   * @return {@code true} if this temporarily enabled a user-disabled metalake, so the caller must
+   *     restore the disabled state if the subsequent metalake delete fails
    */
-  private void dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
+  private boolean dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
     if (catalogManager == null) {
-      return;
+      return false;
     }
     try {
       boolean wasDisabled = !metalakeInUse(store, metalakeIdent);
@@ -421,6 +435,9 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
           catalogManager.dropCatalog(
               NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
         }
+        // Report whether we temporarily enabled the metalake so the caller can restore it if the
+        // metalake delete that follows fails.
+        return wasDisabled;
       } catch (NoSuchMetalakeException e) {
         // Metalake is already gone; dropMetalake will return false. Nothing to restore.
         throw e;
@@ -430,6 +447,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
       }
     } catch (NoSuchMetalakeException e) {
       // Metalake is already gone; dropMetalake will return false.
+      return false;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

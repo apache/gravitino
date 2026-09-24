@@ -394,6 +394,38 @@ public class TestMetalakeManager {
     }
   }
 
+  @Test
+  public void testForceDropRestoresDisabledMetalakeWhenDeleteFails() throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Object originalEnvCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      EntityStore spyStore = Mockito.spy(entityStore);
+      MetalakeManager manager =
+          new MetalakeManager(spyStore, new RandomIdGenerator(), catalogManager);
+      NameIdentifier ident = NameIdentifier.of("metalake_force_drop_delete_failure");
+      manager.createMetalake(ident, "comment", ImmutableMap.of());
+      manager.disableMetalake(ident);
+      Assertions.assertFalse(MetalakeManager.metalakeInUse(spyStore, ident));
+
+      // No catalogs, so phase-1 catalog cleanup succeeds and re-enables the metalake; make the
+      // phase-2 metalake delete fail so the temporary enable outlives the cleanup handler.
+      Mockito.doThrow(new IOException("metalake delete failed"))
+          .when(spyStore)
+          .delete(ident, EntityType.METALAKE, true);
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      Assertions.assertFalse(
+          MetalakeManager.metalakeInUse(spyStore, ident),
+          "a force drop whose metalake delete fails must keep the user-disabled metalake disabled");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);
+    }
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
