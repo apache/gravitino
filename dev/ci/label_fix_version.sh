@@ -51,8 +51,9 @@ write() {
 extract_issues() {
   local subject=$1 body=$2
   {
-    printf '%s\n' "$subject" | grep -oE '\[[#0-9,[:space:]]*#[0-9]+[#0-9,[:space:]]*\]' \
-      | grep -oE '[0-9]+' || true
+    printf '%s\n' "$subject" \
+      | grep -oE '\[[[:space:]]*#[0-9]+([[:space:]]*,?[[:space:]]*#[0-9]+)*[[:space:]]*\]' \
+      | grep -oE '#[0-9]+' | tr -d '#' || true
     printf '%s\n' "$body" \
       | grep -oiE '(^|[^[:alnum:]_])(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+#[0-9]+' \
       | grep -oE '[0-9]+$' || true
@@ -158,10 +159,25 @@ on_merge() {
 }
 
 # Prints the issues referenced by the commits in the given git log range.
+# Each commit is resolved to the PR that merged it, the same source the
+# merge job uses, since rebase-merged commits don't carry the PR title.
+# Commits pushed without a PR fall back to their own message.
 issues_in_range() {
-  local sha
+  local sha prs pr json
+  local seen_prs=" "
   for sha in $(git rev-list "$@"); do
-    extract_issues "$(git log -1 --format=%s "$sha")" "$(git log -1 --format=%b "$sha")"
+    json=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '[.[] | select(.merged_at != null)]')
+    prs=$(jq -r '.[].number' <<< "$json")
+    if [ -z "$prs" ]; then
+      extract_issues "$(git log -1 --format=%s "$sha")" "$(git log -1 --format=%b "$sha")"
+      continue
+    fi
+    for pr in $prs; do
+      [[ "$seen_prs" == *" $pr "* ]] && continue
+      seen_prs="$seen_prs$pr "
+      extract_issues "$(jq -r --argjson n "$pr" '.[] | select(.number == $n) | .title' <<< "$json")" \
+        "$(jq -r --argjson n "$pr" '.[] | select(.number == $n) | .body // ""' <<< "$json")"
+    done
   done | sort -un
 }
 
