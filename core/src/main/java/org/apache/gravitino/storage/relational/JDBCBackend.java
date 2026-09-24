@@ -231,6 +231,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     boolean committed = false;
     try {
       E updatedEntity = updateEntity(ident, entityType, updater);
+      // Peer caches know a renamed entity by its old name. The new name had no stored entity
+      // before this update, so one change record for the old name is enough to evict stale data.
       insertEntityChange(ident, entityType, OperateType.ALTER);
       if (transactionOwner) {
         SessionUtils.commitTransaction();

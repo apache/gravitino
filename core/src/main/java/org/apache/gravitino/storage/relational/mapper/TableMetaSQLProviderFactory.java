@@ -99,6 +99,20 @@ public class TableMetaSQLProviderFactory {
     return getProvider().selectTableMetaByIdForUpdate(tableId);
   }
 
+  /** Returns SQL that locks a table row by ID, including a soft-deleted row. */
+  public static String selectTableMetaByIdIncludingDeletedForUpdate(
+      @Param("tableId") Long tableId) {
+    return getProvider().selectTableMetaByIdIncludingDeletedForUpdate(tableId);
+  }
+
+  /** Returns SQL that restores the observed soft-deleted table row. */
+  public static String restoreDeletedTableMeta(
+      @Param("tableMeta") TablePO tablePO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt) {
+    return getProvider().restoreDeletedTableMeta(tablePO, oldVersion, oldDeletedAt);
+  }
+
   public static String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return getProvider().insertTableMeta(tablePO);
   }

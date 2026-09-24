@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
@@ -29,6 +30,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,6 +68,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -180,6 +184,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
+          StringIdentifier conflictingId =
+              getStringIdFromProperties(entityCombinedTable.tableFromCatalog().properties());
+          if (conflictingId != null) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Table %s could not be imported because its Gravitino identifier %d "
+                        + "conflicts with an existing registration. Check the property '%s' on this table "
+                        + "and remove a copied identifier before loading it again",
+                    ident, conflictingId.id(), StringIdentifier.ID_KEY),
+                e);
+          }
           throw new UnsupportedOperationException(
               "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
                   + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
@@ -189,7 +204,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    TableEntity updatedEntity =
+        updateColumnsIfNecessaryWhenLoad(
+            entityCombinedTable.tableFromGravitino() == null
+                ? ident
+                : entityCombinedTable.tableFromGravitino().nameIdentifier(),
+            entityCombinedTable);
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
@@ -541,14 +561,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
 
     long uid;
+    NameIdentifier observedOwner = null;
+    boolean caseAlias = false;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
-      LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
+      LOG.info(
+          "Table {} has external identifier {}; checking for a rename, alias, or copied ID",
+          identifier,
           stringId);
+      Pair<NameIdentifier, Boolean> owner = checkImportedIdNotCopied(identifier, stringId.id());
+      observedOwner = owner.getLeft();
+      caseAlias = owner.getRight();
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -573,16 +595,183 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
-    } catch (EntityAlreadyExistsException e) {
+      if (caseAlias) {
+        TableEntity registered = store.get(observedOwner, TABLE, TableEntity.class);
+        if (registered.id() != uid) {
+          throw new OptimisticLockException(
+              "The registered owner of table ID %d changed during import; retry the load", uid);
+        }
+        return EntityCombinedTable.of(table.tableFromCatalog(), registered)
+            .withHiddenProperties(table.hiddenProperties());
+      }
+      if (observedOwner != null && !observedOwner.equals(identifier)) {
+        // Updating the observed row uses the store's version check. A second server that observed
+        // the same old name cannot move the row again after the first import commits.
+        store.update(
+            observedOwner,
+            TableEntity.class,
+            TABLE,
+            current -> withReusedColumnIds(tableEntity, current));
+      } else {
+        // Import a new name without overwrite so a concurrent import of the same ID cannot move
+        // its row. Preserve overwrite when repairing a registration already stored at this name.
+        boolean overwriteByName = stringId == null || store.exists(identifier, TABLE);
+        store.put(tableEntity, overwriteByName);
+      }
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       throw e;
+    } catch (NoSuchEntityException e) {
+      throw new OptimisticLockException(
+          e, "The registered owner of table ID %d changed during import; retry the load", uid);
     } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "import", identifier, e);
       throw new RuntimeException("Failed to import the table entity to the store", e);
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
         .withHiddenProperties(table.hiddenProperties());
+  }
+
+  /**
+   * Tells an external rename or case alias apart from a copied id before import.
+   *
+   * <p>An import that finds a {@link StringIdentifier} but no row under this name overwrites the
+   * row that owns the id. That is right after an external rename: the old name is gone and the row
+   * should follow the table. It is wrong when the id was copied ({@code CREATE TABLE t2 LIKE t1}
+   * carries {@code TBLPROPERTIES}, so does a copy tool or a restored backup): the source table is
+   * still there, and re-binding would move its row and every attachment keyed by that id (owner,
+   * tags, policies, role grants) to the copy. The store cannot tell the two apart; only the
+   * external catalog can, so this asks it whether the id's current owner still exists.
+   */
+  private Pair<NameIdentifier, Boolean> checkImportedIdNotCopied(
+      NameIdentifier identifier, long id) {
+    NameIdentifier currentOwner = findRegisteredTableById(identifier.namespace(), id);
+    if (currentOwner == null || currentOwner.equals(identifier)) {
+      return Pair.of(currentOwner, false);
+    }
+    NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
+    Pair<Boolean, Boolean> ownerStatus =
+        doWithCatalog(
+            catalogIdent,
+            c ->
+                c.doWithTableOps(
+                    ops -> {
+                      if (!ops.tableExists(currentOwner)) {
+                        return Pair.of(false, false);
+                      }
+                      // REST backends may resolve case aliases without advertising this capability.
+                      // Only accept an alias when listing confirms a single matching object; two
+                      // case-distinct objects must still be rejected even if their ids are equal.
+                      if (currentOwner.namespace().equals(identifier.namespace())
+                          && currentOwner.name().equalsIgnoreCase(identifier.name())) {
+                        List<String> matchingNames =
+                            Arrays.stream(ops.listTables(identifier.namespace()))
+                                .map(NameIdentifier::name)
+                                .filter(name -> name.equalsIgnoreCase(identifier.name()))
+                                .distinct()
+                                .collect(Collectors.toList());
+                        if (matchingNames.size() == 1) {
+                          // The listing shows the real name. If it is the requested name, the
+                          // table was renamed by case only and the registration must follow it;
+                          // otherwise the requested name is an alias of the registered table.
+                          return Pair.of(false, !matchingNames.get(0).equals(identifier.name()));
+                        }
+                      }
+                      return Pair.of(true, false);
+                    }),
+            RuntimeException.class);
+    if (ownerStatus.getLeft()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Table %s carries the Gravitino identifier %d of table %s, which still exists. The "
+                  + "identifier was most likely copied with the table properties. Remove the "
+                  + "property '%s' from %s and load it again",
+              identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier));
+    }
+    LOG.info(
+        "Table {} resolves to {} after an external rename or case-alias lookup; registration {}",
+        currentOwner,
+        identifier,
+        id);
+    return Pair.of(currentOwner, ownerStatus.getRight());
+  }
+
+  /**
+   * Re-registers an externally renamed table under its new name without disturbing its column ids.
+   *
+   * <p>The import builds its columns from the external catalog, so each one carries a freshly
+   * generated id. The store diffs columns by id, so handing those over would retire every stored
+   * column and insert a replacement. Tags, owners, and privileges are keyed by the column id, so
+   * they would be dropped even though nothing about the columns changed. Match the imported columns
+   * back to the observed rows by name, the same rule {@link
+   * org.apache.gravitino.storage.relational.service.TableColumnMetaService} applies when an
+   * overwrite re-registers a table under its existing name.
+   */
+  private TableEntity withReusedColumnIds(TableEntity imported, TableEntity observed) {
+    List<ColumnEntity> importedColumns = imported.columns();
+    if (importedColumns == null || importedColumns.isEmpty() || observed.columns() == null) {
+      return imported;
+    }
+    Map<String, Long> storedIdsByName = Maps.newHashMap();
+    observed.columns().forEach(c -> storedIdsByName.putIfAbsent(c.name(), c.id()));
+    List<ColumnEntity> reused = Lists.newArrayListWithCapacity(importedColumns.size());
+    for (ColumnEntity column : importedColumns) {
+      // Remove the id as it is handed out, so two columns sharing a name cannot claim the same one.
+      Long storedId = storedIdsByName.remove(column.name());
+      reused.add(storedId == null ? column : withColumnId(column, storedId));
+    }
+    return TableEntity.builder()
+        .withId(imported.id())
+        .withName(imported.name())
+        .withNamespace(imported.namespace())
+        .withColumns(reused)
+        .withAuditInfo(imported.auditInfo())
+        .build();
+  }
+
+  private ColumnEntity withColumnId(ColumnEntity column, Long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(column.name())
+        .withPosition(column.position())
+        .withDataType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .withAuditInfo((AuditInfo) column.auditInfo())
+        .build();
+  }
+
+  /** Returns the live table that owns this id anywhere in the catalog, if any. */
+  @Nullable
+  private NameIdentifier findRegisteredTableById(Namespace namespace, long id) {
+    try {
+      for (TableEntity table : store.list(namespace, TableEntity.class, TABLE)) {
+        if (table.id() == id) {
+          return table.nameIdentifier();
+        }
+      }
+      // A table moved outside Gravitino remains registered under its old schema. Searching only
+      // the destination schema would miss that row and try to insert its already-used ID again.
+      Namespace catalogNamespace = Namespace.of(namespace.level(0), namespace.level(1));
+      for (SchemaEntity schema : store.list(catalogNamespace, SchemaEntity.class, SCHEMA)) {
+        Namespace schemaNamespace =
+            Namespace.of(namespace.level(0), namespace.level(1), schema.name());
+        if (schemaNamespace.equals(namespace)) {
+          continue;
+        }
+        for (TableEntity table : store.list(schemaNamespace, TableEntity.class, TABLE)) {
+          if (table.id() == id) {
+            return table.nameIdentifier();
+          }
+        }
+      }
+      return null;
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to look up the table registered with id %d under %s", id, namespace);
+    }
   }
 
   private SchemaDispatcher getSchemaDispatcher() {

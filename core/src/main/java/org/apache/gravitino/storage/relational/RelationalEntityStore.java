@@ -230,6 +230,9 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     invalidateCache(ident, entityType);
+    if (!ident.equals(updatedEntity.nameIdentifier())) {
+      invalidateCache(updatedEntity.nameIdentifier(), entityType);
+    }
     return updatedEntity;
   }
 

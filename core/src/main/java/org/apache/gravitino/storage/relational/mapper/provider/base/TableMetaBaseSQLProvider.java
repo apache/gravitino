@@ -202,6 +202,37 @@ public class TableMetaBaseSQLProvider {
         + " WHERE table_id = #{tableId} AND deleted_at = 0 FOR UPDATE";
   }
 
+  /** Selects and locks a table row by ID even when it has been soft deleted. */
+  public String selectTableMetaByIdIncludingDeletedForUpdate(@Param("tableId") Long tableId) {
+    return "SELECT table_id as tableId, table_name as tableName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} FOR UPDATE";
+  }
+
+  /** Restores a deleted table only if its version and deletion marker still match. */
+  public String restoreDeletedTableMeta(
+      @Param("tableMeta") TablePO tablePO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET table_name = #{tableMeta.tableName},"
+        + " metalake_id = #{tableMeta.metalakeId},"
+        + " catalog_id = #{tableMeta.catalogId},"
+        + " schema_id = #{tableMeta.schemaId},"
+        + " audit_info = #{tableMeta.auditInfo},"
+        + " current_version = #{tableMeta.currentVersion},"
+        + " last_version = #{tableMeta.lastVersion},"
+        + " deleted_at = 0"
+        + " WHERE table_id = #{tableMeta.tableId}"
+        + " AND last_version = #{oldVersion}"
+        + " AND deleted_at = #{oldDeletedAt} AND deleted_at <> 0";
+  }
+
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME

@@ -116,6 +116,20 @@ public class SchemaPO {
       schemaPO = new SchemaPO();
     }
 
+    private Builder(SchemaPO source) {
+      schemaPO = new SchemaPO();
+      schemaPO.schemaId = source.schemaId;
+      schemaPO.schemaName = source.schemaName;
+      schemaPO.metalakeId = source.metalakeId;
+      schemaPO.catalogId = source.catalogId;
+      schemaPO.schemaComment = source.schemaComment;
+      schemaPO.properties = source.properties;
+      schemaPO.auditInfo = source.auditInfo;
+      schemaPO.currentVersion = source.currentVersion;
+      schemaPO.lastVersion = source.lastVersion;
+      schemaPO.deletedAt = source.deletedAt;
+    }
+
     public Builder withSchemaId(Long schemaId) {
       schemaPO.schemaId = schemaId;
       return this;
@@ -189,5 +203,15 @@ public class SchemaPO {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Creates a builder initialized with every field of an existing schema row.
+   *
+   * @param source the row to copy
+   * @return a builder containing the copied fields
+   */
+  public static Builder builder(SchemaPO source) {
+    return new Builder(source);
   }
 }

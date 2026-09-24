@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -214,7 +215,50 @@ public class SchemaMetaService {
                     SchemaPO leafPO =
                         POConverters.initializeSchemaPOWithVersion(
                             leafRow, newSchemaPOBuilder(catalogPO));
-                    ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), overwrite);
+                    if (overwrite) {
+                      // A copied StringIdentifier must not move another catalog's schema here.
+                      OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
+                          () -> mapper.selectSchemaMetaByIdForUpdate(leafPO.getSchemaId()),
+                          owner -> Objects.equals(owner.getCatalogId(), leafPO.getCatalogId()),
+                          owner ->
+                              String.format(
+                                  "Schema ID %d belongs to catalog ID %d, not catalog ID %d",
+                                  leafPO.getSchemaId(),
+                                  owner.getCatalogId(),
+                                  leafPO.getCatalogId()));
+                    }
+                    if (!overwrite) {
+                      SchemaPO prior =
+                          mapper.selectSchemaMetaByIdIncludingDeletedForUpdate(
+                              leafPO.getSchemaId());
+                      if (prior != null) {
+                        if (prior.getDeletedAt() == 0
+                            || !Objects.equals(prior.getMetalakeId(), leafPO.getMetalakeId())) {
+                          throw new EntityAlreadyExistsException(
+                              "Schema ID %d is already used by another registration",
+                              leafPO.getSchemaId());
+                        }
+                        // A detached external schema may retain its ID. Restore only the deleted
+                        // row with that ID so a live schema at the new name cannot be overwritten.
+                        SchemaPO revived =
+                            SchemaPO.builder(leafPO)
+                                .withCurrentVersion(prior.getLastVersion() + 1)
+                                .withLastVersion(prior.getLastVersion() + 1)
+                                .build();
+                        Preconditions.checkState(
+                            mapper.restoreDeletedSchemaMeta(
+                                    logicalToPhysicalSchemaPO(revived),
+                                    prior.getLastVersion(),
+                                    prior.getDeletedAt())
+                                == 1,
+                            "Schema ID %s changed while restoring its registration",
+                            leafPO.getSchemaId());
+                      } else {
+                        ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), false);
+                      }
+                    } else {
+                      ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), true);
+                    }
                   }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(

@@ -116,6 +116,130 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testReimportAfterCatalogDropRestoresDeletedIds() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity oldCatalog = createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity oldSchema = createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity oldTable =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_after_catalog_drop",
+            AUDIT_INFO);
+    backend.insert(oldTable, false);
+    TablePO oldTablePO =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMetaMapper.class, mapper -> mapper.selectTableMetaByIdForUpdate(oldTable.id()));
+
+    CatalogMetaService.getInstance().deleteCatalog(oldCatalog.nameIdentifier(), true);
+    CatalogEntity newCatalog = createAndInsertCatalog(metalakeName, catalogName);
+    Assertions.assertNotEquals(oldCatalog.id(), newCatalog.id());
+
+    // The external schema and table still carry their original StringIdentifiers.
+    backend.insert(oldSchema, false);
+    backend.insert(oldTable, false);
+    SchemaEntity restoredSchema =
+        SchemaMetaService.getInstance().getSchemaByIdentifier(oldSchema.nameIdentifier());
+    TableEntity restoredTable =
+        TableMetaService.getInstance().getTableByIdentifier(oldTable.nameIdentifier());
+    Assertions.assertEquals(oldSchema.id(), restoredSchema.id());
+    Assertions.assertEquals(oldTable.id(), restoredTable.id());
+
+    TablePO restoredPO =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMetaMapper.class, mapper -> mapper.selectTableMetaByIdForUpdate(oldTable.id()));
+    Assertions.assertEquals(newCatalog.id(), restoredPO.getCatalogId());
+    Assertions.assertTrue(restoredPO.getCurrentVersion() > oldTablePO.getCurrentVersion());
+
+    TableEntity copiedId =
+        createTableEntity(
+            oldTable.id(), oldTable.namespace(), "another_table_with_copied_id", AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, false));
+    Assertions.assertFalse(backend.exists(copiedId.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testRestoringDeletedIdDoesNotOverwriteLiveTableAtSameName() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    Namespace namespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    TableEntity deleted =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "reused_name", AUDIT_INFO);
+    backend.insert(deleted, false);
+    Assertions.assertTrue(backend.delete(deleted.nameIdentifier(), Entity.EntityType.TABLE, false));
+
+    TableEntity current =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "reused_name", AUDIT_INFO);
+    backend.insert(current, false);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(deleted, false));
+    Assertions.assertEquals(
+        current.id(),
+        TableMetaService.getInstance().getTableByIdentifier(current.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  public void testOverwriteRejectsIdOwnedByTableInAnotherSchema() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    String otherSchemaName = "other_schema_for_table_test";
+    createAndInsertSchema(metalakeName, catalogName, otherSchemaName);
+
+    TableEntity original =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_id_owner",
+            AUDIT_INFO);
+    backend.insert(original, false);
+
+    // An import that carries a copied StringIdentifier must not move the row that owns the id.
+    TableEntity copiedId =
+        createTableEntity(
+            original.id(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, otherSchemaName),
+            "table_with_copied_id",
+            AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, false));
+    EntityAlreadyExistsException error =
+        assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copiedId, true));
+    assertTrue(error.getMessage().contains("Table ID " + original.id()));
+    assertTrue(error.getMessage().contains("schema ID"));
+
+    TableEntity stored =
+        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals(original.name(), stored.name());
+    Assertions.assertFalse(backend.exists(copiedId.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testOverwriteRebindsIdWithinTheSameSchema() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    Namespace tableNs = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+
+    TableEntity original =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "table_before", AUDIT_INFO);
+    backend.insert(original, false);
+
+    // Same parent, other name: this is how an external rename is re-registered, so the id keeps
+    // its row and the row takes the new name. The dispatcher is responsible for telling a rename
+    // apart from a copied id before it gets here.
+    TableEntity renamed = createTableEntity(original.id(), tableNs, "table_after", AUDIT_INFO);
+    backend.insert(renamed, true);
+
+    TableEntity stored =
+        TableMetaService.getInstance().getTableByIdentifier(renamed.nameIdentifier());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertFalse(backend.exists(original.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -432,8 +556,10 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable.auditInfo(), retrievedTable.auditInfo());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
+    List<EntityChangeRecord> renameChanges = listEntityChanges(maxIdBeforeRename);
+    Assertions.assertEquals(1, renameChanges.size());
     Assertions.assertTrue(
-        listEntityChanges(maxIdBeforeRename).stream()
+        renameChanges.stream()
             .anyMatch(
                 record ->
                     record.getMetalakeName().equals(metalakeName)
@@ -445,7 +571,6 @@ public class TestTableMetaService extends TestJDBCBackend {
                                         metalakeName, catalogName, schemaName, "table1")
                                     .toString())
                         && record.getOperateType() == OperateType.ALTER));
-
     // test update table with changing schema name to a non-existing schema
     String newSchemaName = "schema2";
     TableEntity updatedTable2 =

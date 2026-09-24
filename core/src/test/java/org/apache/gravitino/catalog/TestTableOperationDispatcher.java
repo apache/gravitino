@@ -28,11 +28,15 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -312,6 +316,352 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         exception.getMessage());
   }
 
+  /** A REST backend may accept case aliases while exposing only the canonical name in listings. */
+  @Test
+  public void testLoadTableAcceptsCaseAlias() throws Exception {
+    Namespace namespace = Namespace.of(metalake, catalog, "schemaAlias");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(namespace.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier original = NameIdentifier.of(namespace, "original");
+    NameIdentifier alias = NameIdentifier.of(namespace, "ORIGINAL");
+    tableOperationDispatcher.createTable(
+        original, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity registered = entityStore.get(original, TABLE, TableEntity.class);
+    TestCatalog catalogInstance =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations ops = spy(testCatalogOperations());
+    // Like Iceberg REST, load returns the requested name even for an alias.
+    Table aliasObject = mock(Table.class);
+    Table originalObject = ops.loadTable(original);
+    doReturn(alias.name()).when(aliasObject).name();
+    doReturn(originalObject.properties()).when(aliasObject).properties();
+    doReturn(originalObject.auditInfo()).when(aliasObject).auditInfo();
+    doReturn(new Column[0]).when(aliasObject).columns();
+    doReturn(aliasObject).when(ops).loadTable(alias);
+    FieldUtils.writeField(catalogInstance, "ops", ops, true);
+
+    clearInvocations(entityStore);
+    tableOperationDispatcher.loadTable(alias);
+    tableOperationDispatcher.loadTable(original);
+    tableOperationDispatcher.loadTable(alias);
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(original, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(alias, TABLE));
+    verify(entityStore, never()).update(eq(original), eq(TableEntity.class), eq(TABLE), any());
+    verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+  }
+
+  @Test
+  public void testLoadTableReportsCrossSchemaCopiedIdentifier() throws IOException {
+    Namespace sourceNs = Namespace.of(metalake, catalog, "schemaCrossCopySource");
+    Namespace targetNs = Namespace.of(metalake, catalog, "schemaCrossCopyTarget");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(sourceNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(targetNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier source = NameIdentifier.of(sourceNs, "orders");
+    NameIdentifier copy = NameIdentifier.of(targetNs, "orders");
+    tableOperationDispatcher.createTable(
+        source, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity registered = entityStore.get(source, TABLE, TableEntity.class);
+    Assertions.assertTrue(
+        entityStore.list(Namespace.of(metalake, catalog), SchemaEntity.class, SCHEMA).stream()
+            .anyMatch(schema -> schema.name().equals(sourceNs.level(2))));
+    Map<String, String> copiedProperties =
+        new HashMap<>(testCatalogOperations().loadTable(source).properties());
+    testCatalogOperations()
+        .createTable(
+            copy, new Column[0], "copy", copiedProperties, new Transform[0], null, null, null);
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copy));
+    Assertions.assertTrue(error.getMessage().contains(copy.toString()));
+    Assertions.assertTrue(error.getMessage().contains(Long.toString(registered.id())));
+    Assertions.assertTrue(error.getMessage().contains(ID_KEY));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(source, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copy, TABLE));
+  }
+
+  @Test
+  public void testLoadTableRebindsIdentifierAfterExternalCrossSchemaMove() throws IOException {
+    Namespace sourceNs = Namespace.of(metalake, catalog, "schemaMoveSource");
+    Namespace targetNs = Namespace.of(metalake, catalog, "schemaMoveTarget");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(sourceNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(targetNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier source = NameIdentifier.of(sourceNs, "orders");
+    NameIdentifier target = NameIdentifier.of(targetNs, "orders");
+    tableOperationDispatcher.createTable(
+        source, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity registered = entityStore.get(source, TABLE, TableEntity.class);
+
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> properties = new HashMap<>(ops.loadTable(source).properties());
+    Assertions.assertTrue(ops.dropTable(source));
+    ops.createTable(
+        target, new Column[0], "comment", properties, new Transform[0], null, null, null);
+
+    tableOperationDispatcher.loadTable(target);
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(target, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(source, TABLE));
+  }
+
+  @Test
+  public void testLoadTableRejectsCopiedIdentifierWhileSourceStillExists() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCopiedId");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier sourceIdent = NameIdentifier.of(tableNs, "source");
+    NameIdentifier copyIdent = NameIdentifier.of(tableNs, "copy");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(sourceIdent, columns, "comment", props, new Transform[0]);
+    TableEntity sourceEntity = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+
+    // CREATE TABLE copy LIKE source outside Gravitino: the copy carries source's properties,
+    // including the Gravitino identifier.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> copiedProps =
+        new HashMap<>(testCatalogOperations.loadTable(sourceIdent).properties());
+    Assertions.assertTrue(copiedProps.containsKey(ID_KEY));
+    testCatalogOperations.createTable(
+        copyIdent, columns, "copy", copiedProps, new Transform[0], null, null, null);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+    Assertions.assertTrue(e.getMessage().contains(ID_KEY), e.getMessage());
+
+    // The source keeps its registration; nothing was moved to the copy.
+    TableEntity sourceAfter = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(sourceEntity.id(), sourceAfter.id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, TABLE));
+  }
+
+  /** Case-sensitive backends may contain two distinct objects differing only in case. */
+  @Test
+  public void testLoadTableRejectsCaseDistinctCopiedIdentifier() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCaseCopiedId");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier sourceIdent = NameIdentifier.of(tableNs, "source");
+    NameIdentifier copyIdent = NameIdentifier.of(tableNs, "SOURCE");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(sourceIdent, columns, "comment", props, new Transform[0]);
+    TableEntity sourceEntity = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+
+    // CREATE TABLE copy LIKE source outside Gravitino: the copy carries source's properties,
+    // including the Gravitino identifier.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> copiedProps =
+        new HashMap<>(testCatalogOperations.loadTable(sourceIdent).properties());
+    Assertions.assertTrue(copiedProps.containsKey(ID_KEY));
+    testCatalogOperations.createTable(
+        copyIdent, columns, "copy", copiedProps, new Transform[0], null, null, null);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+    Assertions.assertTrue(e.getMessage().contains(ID_KEY), e.getMessage());
+
+    // The source keeps its registration; nothing was moved to the copy.
+    TableEntity sourceAfter = entityStore.get(sourceIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(sourceEntity.id(), sourceAfter.id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, TABLE));
+  }
+
+  @Test
+  public void testLoadTableRebindsIdentifierAfterExternalRename() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaExternalRename");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "after");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(oldIdent, columns, "comment", props, new Transform[0]);
+    TableEntity oldEntity = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    // Renamed outside Gravitino: the old name is gone, the new one carries the identifier. The
+    // test catalog's alterTable keeps the old key, so the rename is simulated as drop + create.
+    TestCatalogOperations testCatalogOperations = testCatalogOperations();
+    Map<String, String> movedProps =
+        new HashMap<>(testCatalogOperations.loadTable(oldIdent).properties());
+    Assertions.assertTrue(testCatalogOperations.dropTable(oldIdent));
+    testCatalogOperations.createTable(
+        newIdent, columns, "comment", movedProps, new Transform[0], null, null, null);
+    Assertions.assertFalse(testCatalogOperations.tableExists(oldIdent));
+
+    Table loaded = tableOperationDispatcher.loadTable(newIdent);
+    Assertions.assertEquals(newIdent.name(), loaded.name());
+    TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(oldEntity.id(), newEntity.id());
+    Assertions.assertFalse(entityStore.exists(oldIdent, TABLE));
+  }
+
+  /**
+   * A case-insensitive backend still resolves the old name after a case-only rename, but its
+   * listing shows only the new name. The registration must follow the rename instead of staying
+   * under the old name as if the new name were an alias.
+   */
+  @Test
+  public void testLoadTableFollowsExternalCaseOnlyRename() throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCaseOnlyRename");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "orders");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "ORDERS");
+    tableOperationDispatcher.createTable(
+        oldIdent, new Column[0], "comment", props, new Transform[0]);
+    TableEntity oldEntity = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    TestCatalog catalogInstance =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = testCatalogOperations();
+    Map<String, String> movedProps = new HashMap<>(originalOps.loadTable(oldIdent).properties());
+    Assertions.assertTrue(originalOps.dropTable(oldIdent));
+    originalOps.createTable(
+        newIdent, new Column[0], "comment", movedProps, new Transform[0], null, null, null);
+    TestCatalogOperations ops = spy(originalOps);
+    doReturn(true).when(ops).tableExists(oldIdent);
+    FieldUtils.writeField(catalogInstance, "ops", ops, true);
+    try {
+      tableOperationDispatcher.loadTable(newIdent);
+
+      TableEntity newEntity = entityStore.get(newIdent, TABLE, TableEntity.class);
+      Assertions.assertEquals(oldEntity.id(), newEntity.id());
+      Assertions.assertFalse(entityStore.exists(oldIdent, TABLE));
+    } finally {
+      FieldUtils.writeField(catalogInstance, "ops", originalOps, true);
+    }
+  }
+
+  @Test
+  public void testLoadTableKeepsColumnIdsAfterExternalRename() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaExternalRenameColumns");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier newIdent = NameIdentifier.of(tableNs, "after");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(oldIdent, columns, "comment", props, new Transform[0]);
+    Map<String, Long> idsBeforeRename = columnIds(oldIdent);
+
+    // Renamed outside Gravitino: the old name is gone, the new one carries the identifier.
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> movedProps = new HashMap<>(ops.loadTable(oldIdent).properties());
+    Assertions.assertTrue(ops.dropTable(oldIdent));
+    ops.createTable(newIdent, columns, "comment", movedProps, new Transform[0], null, null, null);
+
+    tableOperationDispatcher.loadTable(newIdent);
+
+    // Tags, owners, and privileges are keyed by the column id, so re-registering the table under
+    // its new name must keep the ids rather than replace every column.
+    Assertions.assertEquals(idsBeforeRename, columnIds(newIdent));
+  }
+
+  @Test
+  public void testLoadTableDoesNotRebindAfterOwnerChangesOnAnotherNode() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaConcurrentCopiedId");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier oldIdent = NameIdentifier.of(tableNs, "before");
+    NameIdentifier renamedIdent = NameIdentifier.of(tableNs, "renamed");
+    NameIdentifier copyIdent = NameIdentifier.of(tableNs, "copy");
+    tableOperationDispatcher.createTable(
+        oldIdent, new Column[0], "comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    TableEntity original = entityStore.get(oldIdent, TABLE, TableEntity.class);
+
+    TestCatalogOperations ops = testCatalogOperations();
+    Map<String, String> copiedProperties = new HashMap<>(ops.loadTable(oldIdent).properties());
+    Assertions.assertTrue(ops.dropTable(oldIdent));
+    ops.createTable(
+        renamedIdent,
+        new Column[0],
+        "renamed",
+        copiedProperties,
+        new Transform[0],
+        null,
+        null,
+        null);
+    ops.createTable(
+        copyIdent, new Column[0], "copy", copiedProperties, new Transform[0], null, null, null);
+
+    // Both nodes saw the old registration and an absent external old name. Simulate the first
+    // node committing its rename after this request's check but before its store update.
+    AtomicBoolean moved = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              if (moved.compareAndSet(false, true)) {
+                entityStore.update(
+                    oldIdent,
+                    TableEntity.class,
+                    TABLE,
+                    current ->
+                        TableEntity.builder()
+                            .withId(current.id())
+                            .withName(renamedIdent.name())
+                            .withNamespace(current.namespace())
+                            .withColumns(current.columns())
+                            .withAuditInfo(current.auditInfo())
+                            .build());
+              }
+              return invocation.callRealMethod();
+            })
+        .when(entityStore)
+        .update(eq(oldIdent), eq(TableEntity.class), eq(TABLE), any());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.loadTable(copyIdent));
+    Assertions.assertEquals(
+        original.id(), entityStore.get(renamedIdent, TABLE, TableEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copyIdent, TABLE));
+  }
+
+  private TestCatalogOperations testCatalogOperations() {
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    return (TestCatalogOperations) testCatalog.ops();
+  }
+
   @Test
   public void testConcurrentImportTableReusesExistingEntity() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema52");
@@ -416,9 +766,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(concurrentAudit)
             .build();
 
-    // Simulate genuine multi-catalog conflict: put fails, and the dispatcher-level retry finds
-    // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
-    // thrown).
+    // A failed insert followed by a mismatched ID must tell the caller which property to check.
     reset(entityStore);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
@@ -429,11 +777,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .when(entityStore)
         .put(any(), anyBoolean());
 
-    UnsupportedOperationException exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> tableOperationDispatcher.loadTable(tableIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Table managed by multiple catalogs"));
+            IllegalArgumentException.class, () -> tableOperationDispatcher.loadTable(tableIdent));
+    Assertions.assertTrue(exception.getMessage().contains(ID_KEY));
   }
 
   @Test
