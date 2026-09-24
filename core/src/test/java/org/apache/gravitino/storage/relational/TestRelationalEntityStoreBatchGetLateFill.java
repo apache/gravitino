@@ -37,6 +37,7 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.TestUtil;
@@ -126,6 +127,25 @@ public class TestRelationalEntityStoreBatchGetLateFill {
     store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
 
     Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testBatchGetSkipsWriteBackWhenVersionCheckedDeleteInvalidatesDuringBackendRead()
+      throws IOException {
+    TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    NameIdentifier ident = table.nameIdentifier();
+    EntityVersion expected = EntityVersion.of(table.id(), 1L);
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE)))
+        .thenAnswer(
+            invocation -> {
+              store.delete(ident, Entity.EntityType.TABLE, false, expected);
+              return List.of(table);
+            });
+
+    store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
+
+    Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+    Mockito.verify(backend).delete(ident, Entity.EntityType.TABLE, false, expected);
   }
 
   @Test

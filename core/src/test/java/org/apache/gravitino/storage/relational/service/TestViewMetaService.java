@@ -53,6 +53,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -65,6 +66,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -79,6 +81,27 @@ public class TestViewMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
+  }
+
+  @TestTemplate
+  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+    Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewMetaService service = ViewMetaService.getInstance();
+
+    ViewEntity first = createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "v");
+    service.insertView(first, false);
+    EntityVersion observed = service.getViewVersion(first.nameIdentifier());
+
+    Assertions.assertTrue(service.deleteView(first.nameIdentifier()));
+    ViewEntity second = createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "v");
+    service.insertView(second, false);
+
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteView(first.nameIdentifier(), observed));
+    Assertions.assertEquals(second.id(), service.getViewByIdentifier(second.nameIdentifier()).id());
+    Assertions.assertTrue(
+        service.deleteView(
+            second.nameIdentifier(), service.getViewVersion(second.nameIdentifier())));
   }
 
   /** Dropping the old parent after a move must preserve every historical version. */

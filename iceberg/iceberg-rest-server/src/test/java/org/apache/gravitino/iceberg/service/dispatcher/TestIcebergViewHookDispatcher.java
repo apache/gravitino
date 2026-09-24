@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -319,11 +320,13 @@ public class TestIcebergViewHookDispatcher {
         .thenReturn(false);
     when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
         .thenReturn(false);
+    EntityVersion observed = EntityVersion.of(1L, 0L);
+    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropView(mockContext, viewIdent);
 
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
-    verify(mockEntityStore, times(1)).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
+    verify(mockEntityStore, times(1)).delete(schemaIdent, Entity.EntityType.SCHEMA, true, observed);
   }
 
   @Test

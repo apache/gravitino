@@ -48,6 +48,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
@@ -254,11 +255,13 @@ public class TestIcebergTableHookDispatcher {
         .thenReturn(false);
     when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
         .thenReturn(false);
+    EntityVersion observed = EntityVersion.of(1L, 0L);
+    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropTable(mockContext, tableId, false);
 
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
-    verify(mockEntityStore).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
+    verify(mockEntityStore).delete(schemaIdent, Entity.EntityType.SCHEMA, true, observed);
   }
 
   @Test

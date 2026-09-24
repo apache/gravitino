@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -36,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -277,9 +279,40 @@ public class TopicMetaService {
     return POConverters.fromTopicPO(topicPO, identifier.namespace());
   }
 
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
-  public boolean deleteTopic(NameIdentifier identifier) {
+  /**
+   * Reads the id and store version of the topic under this name.
+   *
+   * @param identifier the topic identifier
+   * @return the id and version
+   * @throws NoSuchEntityException if the topic does not exist
+   */
+  public EntityVersion getTopicVersion(NameIdentifier identifier) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
+    return EntityVersion.of(topicPO.getTopicId(), topicPO.getCurrentVersion());
+  }
+
+  public boolean deleteTopic(NameIdentifier identifier) {
+    return deleteTopic(identifier, null);
+  }
+
+  /**
+   * Deletes the topic under this name only if it is still the observed one.
+   *
+   * @param identifier the topic identifier
+   * @param expected the id and version read before the operation started, or null to delete
+   *     whatever row is under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no topic exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
+  public boolean deleteTopic(NameIdentifier identifier, @Nullable EntityVersion expected) {
+    TopicPO topicPO = getTopicPOByIdentifier(identifier);
+    if (expected != null) {
+      OccWriteSupport.checkExpectedIdentity(
+          identifier, Entity.EntityType.TOPIC, topicPO.getTopicId(), expected);
+    }
     deleteTopicWithVersion(identifier, topicPO);
     return true;
   }

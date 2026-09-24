@@ -59,7 +59,6 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -76,6 +75,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -299,10 +299,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     validateAlterProperties(
                         catalog, HasPropertyMetadata::tablePropertiesMetadata, changes);
                     boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
-                    Optional<TableEntity> tableEntityBeforeRename =
-                        isRenameTable && !managed
-                            ? getTableEntityBeforeRename(ident)
-                            : Optional.empty();
+                    // Read the registration before the external call. Its id is the one the store
+                    // update below must still find; reading it after the call could pick up an
+                    // entity re-created under the same name in between.
+                    Optional<TableEntity> tableEntityBeforeAlter =
+                        managed ? Optional.empty() : getTableEntityBeforeAlter(ident);
                     TableChange[] normalizedChanges =
                         applyCapabilities(catalog.capabilities(), changes);
                     Table table =
@@ -310,7 +311,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             tableOps -> tableOps.alterTable(ident, normalizedChanges));
                     return new AlterTableCatalogResult(
                         snapshotTable(catalog, table, managed),
-                        tableEntityBeforeRename,
+                        tableEntityBeforeAlter,
                         resolveColumnNameChanges(normalizedChanges));
                   },
                   NoSuchTableException.class,
@@ -324,15 +325,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
-          TableEntity te = catalogResult.tableEntityBeforeRename.orElse(null);
-          if (stringId == null) {
-            if (te == null) {
-              te = getEntity(ident, TABLE, TableEntity.class);
-            }
-            if (te == null) {
-              return EntityCombinedTable.of(alteredTable)
-                  .withHiddenProperties(catalogResult.hiddenProperties);
-            }
+          TableEntity te = catalogResult.tableEntityBeforeAlter.orElse(null);
+          if (stringId == null && te == null) {
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenProperties(catalogResult.hiddenProperties);
           }
 
           long tableId;
@@ -350,29 +346,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                           id,
                           TableEntity.class,
                           TABLE,
-                          tableEntity -> {
-                            Namespace newNamespace = getNewNamespace(ident, changes);
+                          requireEntityId(
+                              tableId,
+                              tableEntity -> {
+                                Namespace newNamespace = getNewNamespace(ident, changes);
 
-                            // Update the columns
-                            Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
-                                updateColumnsIfNecessary(
-                                    alteredTable, tableEntity, catalogResult.columnNameChanges);
+                                // Update the columns
+                                Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+                                    updateColumnsIfNecessary(
+                                        alteredTable, tableEntity, catalogResult.columnNameChanges);
 
-                            return TableEntity.builder()
-                                .withId(tableEntity.id())
-                                .withName(alteredTable.name())
-                                .withNamespace(newNamespace)
-                                .withColumns(columnsUpdateResult.getRight())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(tableEntity.auditInfo().creator())
-                                        .withCreateTime(tableEntity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build();
-                          }),
+                                return TableEntity.builder()
+                                    .withId(tableEntity.id())
+                                    .withName(alteredTable.name())
+                                    .withNamespace(newNamespace)
+                                    .withColumns(columnsUpdateResult.getRight())
+                                    .withAuditInfo(
+                                        AuditInfo.builder()
+                                            .withCreator(tableEntity.auditInfo().creator())
+                                            .withCreateTime(tableEntity.auditInfo().createTime())
+                                            .withLastModifier(
+                                                PrincipalUtils.getCurrentPrincipal().getName())
+                                            .withLastModifiedTime(Instant.now())
+                                            .build())
+                                    .build();
+                              })),
                   "UPDATE",
                   tableId);
 
@@ -408,13 +406,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          // Read the registration before the external call, so the store delete below can only
+          // remove the row this drop started with and never one re-created under the same name.
+          EntityVersion observed = isManagedTable ? null : observeRegistration(ident, TABLE);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
                   c -> c.doWithTableOps(t -> t.dropTable(ident)),
                   RuntimeException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
           if (isManagedTable) {
             return droppedFromCatalog;
           }
@@ -424,15 +425,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
+            deleteObservedRegistration(ident, TABLE, false, observed);
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -463,6 +456,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         schemaIdentifier,
         LockType.WRITE,
         () -> {
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          EntityVersion observed = isManagedTable ? null : observeRegistration(ident, TABLE);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -470,7 +465,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   RuntimeException.class,
                   UnsupportedOperationException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
           if (isManagedTable) {
             return droppedFromCatalog;
           }
@@ -480,15 +474,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // Gravitino-only metadata. A true out-of-band purge can therefore leave a stale
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
+            deleteObservedRegistration(ident, TABLE, false, observed);
           }
           // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -515,14 +501,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         .orElse(tableIdent.namespace());
   }
 
-  private Optional<TableEntity> getTableEntityBeforeRename(NameIdentifier ident) {
+  private Optional<TableEntity> getTableEntityBeforeAlter(NameIdentifier ident) {
     try {
       return Optional.of(store.get(ident, TABLE, TableEntity.class));
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          e, "Failed to read the stored registration for table %s before renaming it", ident);
+          e, "Failed to read the stored registration for table %s before altering it", ident);
     }
   }
 
@@ -720,7 +706,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
 
     try {
-      store.put(tableEntity, true /* overwrite */);
+      putCreatedEntity(tableEntity, false /* cascade */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
@@ -1027,30 +1013,32 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         id,
                         TableEntity.class,
                         TABLE,
-                        entity ->
-                            TableEntity.builder()
-                                .withId(entity.id())
-                                .withName(entity.name())
-                                .withNamespace(entity.namespace())
-                                .withComment(entity.comment())
-                                .withProperties(entity.properties())
-                                .withColumns(
-                                    updateColumnsIfNecessary(
-                                            tableFromCatalog, entity, Collections.emptyMap())
-                                        .getRight())
-                                .withPartitioning(entity.partitioning())
-                                .withDistribution(entity.distribution())
-                                .withSortOrders(entity.sortOrders())
-                                .withIndexes(entity.indexes())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(entity.auditInfo().creator())
-                                        .withCreateTime(entity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build()),
+                        requireEntityId(
+                            combinedTable.tableFromGravitino().id(),
+                            entity ->
+                                TableEntity.builder()
+                                    .withId(entity.id())
+                                    .withName(entity.name())
+                                    .withNamespace(entity.namespace())
+                                    .withComment(entity.comment())
+                                    .withProperties(entity.properties())
+                                    .withColumns(
+                                        updateColumnsIfNecessary(
+                                                tableFromCatalog, entity, Collections.emptyMap())
+                                            .getRight())
+                                    .withPartitioning(entity.partitioning())
+                                    .withDistribution(entity.distribution())
+                                    .withSortOrders(entity.sortOrders())
+                                    .withIndexes(entity.indexes())
+                                    .withAuditInfo(
+                                        AuditInfo.builder()
+                                            .withCreator(entity.auditInfo().creator())
+                                            .withCreateTime(entity.auditInfo().createTime())
+                                            .withLastModifier(
+                                                PrincipalUtils.getCurrentPrincipal().getName())
+                                            .withLastModifiedTime(Instant.now())
+                                            .build())
+                                    .build())),
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
   }
@@ -1070,15 +1058,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
   private static final class AlterTableCatalogResult extends TableCatalogResult {
 
-    private final Optional<TableEntity> tableEntityBeforeRename;
+    private final Optional<TableEntity> tableEntityBeforeAlter;
     private final Map<String, String> columnNameChanges;
 
     private AlterTableCatalogResult(
         TableCatalogResult tableResult,
-        Optional<TableEntity> tableEntityBeforeRename,
+        Optional<TableEntity> tableEntityBeforeAlter,
         Map<String, String> columnNameChanges) {
       super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
-      this.tableEntityBeforeRename = tableEntityBeforeRename;
+      this.tableEntityBeforeAlter = tableEntityBeforeAlter;
       this.columnNameChanges = columnNameChanges;
     }
   }

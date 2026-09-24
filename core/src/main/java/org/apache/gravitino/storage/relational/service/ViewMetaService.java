@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -39,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -219,11 +221,42 @@ public class ViewMetaService {
     }
   }
 
+  public boolean deleteView(NameIdentifier ident) {
+    return deleteView(ident, null);
+  }
+
+  /**
+   * Reads the id and store version of the view under this name.
+   *
+   * @param ident the view identifier
+   * @return the id and version
+   * @throws NoSuchEntityException if the view does not exist
+   */
+  public EntityVersion getViewVersion(NameIdentifier ident) {
+    ViewPO viewPO = getViewPOByIdentifier(ident);
+    return EntityVersion.of(viewPO.getViewId(), viewPO.getCurrentVersion());
+  }
+
+  /**
+   * Deletes the view under this name only if it is still the observed one.
+   *
+   * @param ident the view identifier
+   * @param expected the id and version read before the operation started, or null to delete
+   *     whatever row is under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no view exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewByIdentifier")
-  public boolean deleteView(NameIdentifier ident) {
+  public boolean deleteView(NameIdentifier ident, @Nullable EntityVersion expected) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
+    if (expected != null) {
+      OccWriteSupport.checkExpectedIdentity(
+          ident, Entity.EntityType.VIEW, viewPO.getViewId(), expected);
+    }
 
     deleteViewWithVersion(ident, viewPO);
     return true;

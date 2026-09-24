@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -41,6 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -139,11 +141,42 @@ public class FunctionMetaService {
     }
   }
 
+  public boolean deleteFunction(NameIdentifier ident) {
+    return deleteFunction(ident, null);
+  }
+
+  /**
+   * Reads the id and store version of the function under this name.
+   *
+   * @param ident the function identifier
+   * @return the id and version
+   * @throws NoSuchEntityException if the function does not exist
+   */
+  public EntityVersion getFunctionVersion(NameIdentifier ident) {
+    FunctionPO functionPO = getFunctionPOByIdentifier(ident);
+    return EntityVersion.of(functionPO.functionId(), functionPO.functionCurrentVersion());
+  }
+
+  /**
+   * Deletes the function under this name only if it is still the observed one.
+   *
+   * @param ident the function identifier
+   * @param expected the id and version read before the operation started, or null to delete
+   *     whatever row is under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no function exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteFunction")
-  public boolean deleteFunction(NameIdentifier ident) {
+  public boolean deleteFunction(NameIdentifier ident, @Nullable EntityVersion expected) {
     FunctionPO functionPO = getFunctionPOByIdentifier(ident);
+    if (expected != null) {
+      OccWriteSupport.checkExpectedIdentity(
+          ident, Entity.EntityType.FUNCTION, functionPO.functionId(), expected);
+    }
 
     deleteFunctionWithVersion(ident, functionPO);
     return true;

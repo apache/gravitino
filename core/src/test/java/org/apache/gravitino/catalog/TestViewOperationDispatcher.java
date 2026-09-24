@@ -67,6 +67,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.storage.EntityVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -519,6 +520,30 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
     // Dropping again returns false (underlying catalog reports missing).
     Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+  }
+
+  @Test
+  void testDropViewKeepsRegistrationRecreatedDuringExternalDrop() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_drop_aba");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+    ViewEntity registered = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    reset(entityStore);
+    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .doCallRealMethod()
+        .when(entityStore)
+        .getVersion(viewIdent, VIEW);
+
+    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(viewIdent, VIEW, ViewEntity.class).id());
   }
 
   @Test

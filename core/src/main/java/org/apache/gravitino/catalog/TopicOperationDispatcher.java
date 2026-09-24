@@ -33,7 +33,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
@@ -45,6 +44,7 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -181,6 +181,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   NoSuchTopicException.class,
                   IllegalArgumentException.class);
 
+          long topicId = getStringIdFromProperties(alteredTopic.properties()).id();
           TopicEntity updatedTopicEntity =
               operateOnEntity(
                   ident,
@@ -189,26 +190,28 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                           id,
                           TopicEntity.class,
                           TOPIC,
-                          topicEntity ->
-                              TopicEntity.builder()
-                                  .withId(topicEntity.id())
-                                  .withName(topicEntity.name())
-                                  .withNamespace(ident.namespace())
-                                  .withComment(
-                                      StringUtils.isBlank(alteredTopic.comment())
-                                          ? topicEntity.comment()
-                                          : alteredTopic.comment())
-                                  .withAuditInfo(
-                                      AuditInfo.builder()
-                                          .withCreator(topicEntity.auditInfo().creator())
-                                          .withCreateTime(topicEntity.auditInfo().createTime())
-                                          .withLastModifier(
-                                              PrincipalUtils.getCurrentPrincipal().getName())
-                                          .withLastModifiedTime(Instant.now())
-                                          .build())
-                                  .build()),
+                          requireEntityId(
+                              topicId,
+                              topicEntity ->
+                                  TopicEntity.builder()
+                                      .withId(topicEntity.id())
+                                      .withName(topicEntity.name())
+                                      .withNamespace(ident.namespace())
+                                      .withComment(
+                                          StringUtils.isBlank(alteredTopic.comment())
+                                              ? topicEntity.comment()
+                                              : alteredTopic.comment())
+                                      .withAuditInfo(
+                                          AuditInfo.builder()
+                                              .withCreator(topicEntity.auditInfo().creator())
+                                              .withCreateTime(topicEntity.auditInfo().createTime())
+                                              .withLastModifier(
+                                                  PrincipalUtils.getCurrentPrincipal().getName())
+                                              .withLastModifiedTime(Instant.now())
+                                              .build())
+                                      .build())),
                   "UPDATE",
-                  getStringIdFromProperties(alteredTopic.properties()).id());
+                  topicId);
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
               .withHiddenProperties(
@@ -233,6 +236,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          // Read the registration before the external call, so the store delete below can only
+          // remove the row this drop started with and never one re-created under the same name.
+          EntityVersion observed = observeRegistration(ident, TOPIC);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -249,14 +255,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
           // catalog into account.
           //
           // For managed topic, we should take the return value of the store operation into account.
-          boolean droppedFromStore = false;
-          try {
-            droppedFromStore = store.delete(ident, TOPIC);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
+          boolean droppedFromStore = deleteObservedRegistration(ident, TOPIC, false, observed);
 
           return isManagedEntity(catalogIdent, Capability.Scope.TOPIC)
               ? droppedFromStore
@@ -397,7 +396,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, true /* overwrite */);
+      putCreatedEntity(topicEntity, false /* cascade */);
     } catch (Exception e) {
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)

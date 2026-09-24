@@ -57,6 +57,7 @@ import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -69,6 +70,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -98,6 +100,31 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     for (String parent : new String[] {"schema", "catalog", "metalake"}) {
       assertMovedFunctionHistoryCascade(parent, false);
     }
+  }
+
+  @TestTemplate
+  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+    Namespace ns = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionMetaService service = FunctionMetaService.getInstance();
+
+    FunctionEntity first =
+        createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "f", AUDIT_INFO);
+    service.insertFunction(first, false);
+    EntityVersion observed = service.getFunctionVersion(first.nameIdentifier());
+
+    Assertions.assertTrue(service.deleteFunction(first.nameIdentifier()));
+    FunctionEntity second =
+        createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "f", AUDIT_INFO);
+    service.insertFunction(second, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteFunction(first.nameIdentifier(), observed));
+    Assertions.assertEquals(
+        second.id(), service.getFunctionByIdentifier(second.nameIdentifier()).id());
+    Assertions.assertTrue(
+        service.deleteFunction(
+            second.nameIdentifier(), service.getFunctionVersion(second.nameIdentifier())));
   }
 
   @TestTemplate

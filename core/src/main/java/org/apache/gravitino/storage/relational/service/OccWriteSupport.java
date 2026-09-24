@@ -30,6 +30,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 
 /**
@@ -66,6 +68,26 @@ public class OccWriteSupport {
       throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
     }
     return current;
+  }
+
+  /**
+   * Checks that the row a caller is about to delete is still the one it observed earlier.
+   *
+   * <p>The caller read {@code expected} before an external-catalog call; by now the name may point
+   * at a different entity (re-created under the same name). An update of the same entity does not
+   * change its identity. The delete uses the current row's version for its own compare-and-swap.
+   *
+   * @param identifier the name identifier of the entity
+   * @param type the entity type
+   * @param actualId the id of the row currently under the name
+   * @param expected the id and version observed by the caller
+   * @throws OptimisticLockException if the row has a different id
+   */
+  public static void checkExpectedIdentity(
+      NameIdentifier identifier, Entity.EntityType type, long actualId, EntityVersion expected) {
+    if (actualId != expected.id()) {
+      throw ExceptionUtils.concurrentModification(type, identifier);
+    }
   }
 
   /**

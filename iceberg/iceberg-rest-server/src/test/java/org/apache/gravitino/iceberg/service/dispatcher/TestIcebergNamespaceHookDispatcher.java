@@ -50,6 +50,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
+import org.apache.gravitino.storage.EntityVersion;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
@@ -504,6 +505,8 @@ public class TestIcebergNamespaceHookDispatcher {
     Namespace leaf = Namespace.of("A", "B", "C");
     Namespace parent = Namespace.of("A", "B");
     Namespace grandparent = Namespace.of("A");
+    EntityVersion observed = EntityVersion.of(1L, 0L);
+    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropNamespace(mockContext, leaf);
 
@@ -515,7 +518,7 @@ public class TestIcebergNamespaceHookDispatcher {
     // empty ancestor (A) removes the whole stale chain in one batched operation.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
     verify(mockEntityStore, times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true), eq(observed));
     Assertions.assertEquals("A", captor.getValue().name());
   }
 
@@ -526,6 +529,8 @@ public class TestIcebergNamespaceHookDispatcher {
     Namespace grandparent = Namespace.of("A");
 
     when(mockDispatcher.namespaceExists(mockContext, parent)).thenReturn(true);
+    EntityVersion observed = EntityVersion.of(1L, 0L);
+    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropNamespace(mockContext, leaf);
 
@@ -538,7 +543,7 @@ public class TestIcebergNamespaceHookDispatcher {
     // The parent still exists, so only the leaf is stale; it is cascade-deleted on its own.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
     verify(mockEntityStore, times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true), eq(observed));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
   }
 }
