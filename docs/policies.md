@@ -70,7 +70,9 @@ the new selector. Removing an association leaves the policy, tag, and tag assign
 Deleting a policy removes its associations.
 
 Object policy lookup covers `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`,
-`MODEL`, and `FUNCTION`. This includes columns, which did not support direct policy associations.
+`MODEL`, `MODEL_VERSION`, and `FUNCTION`. A model version cannot carry a tag directly, but it can
+inherit tags from its model and higher ancestors, so their policies appear in model version lookups.
+This also includes columns, which did not support direct policy associations.
 A tag assigned to a catalog or schema can therefore make its policies appear in descendant column
 lookups. Because lookup does not filter by `supportedObjectTypes`, a policy whose content lists
 only `TABLE` can still appear in a column lookup; consumers must enforce the intended scope.
