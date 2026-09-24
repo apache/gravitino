@@ -47,6 +47,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
@@ -111,7 +112,10 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
+public class JDBCBackend
+    implements RelationalBackend,
+        SupportsOrphanedRelationCleanup,
+        SupportsConditionalCatalogDelete {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 

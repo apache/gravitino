@@ -81,6 +81,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -1424,7 +1425,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 } else {
                   Set<Long> allowedSchemaIds =
                       schemaEntities.stream().map(SchemaEntity::id).collect(Collectors.toSet());
-                  deleted = store.deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+                  if (!(store instanceof SupportsConditionalCatalogDelete)) {
+                    throw new UnsupportedOperationException(
+                        "Atomic catalog delete with allowed schemas is not supported by this store");
+                  }
+                  deleted =
+                      ((SupportsConditionalCatalogDelete) store)
+                          .deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
                 }
               } catch (NonEmptyEntityException e) {
                 throw new NonEmptyCatalogException(

@@ -31,6 +31,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -226,7 +227,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     long maxIdBeforeDrop = maxEntityChangeId();
 
     Assertions.assertTrue(
-        backend.deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(schema.id())));
+        ((SupportsConditionalCatalogDelete) backend)
+            .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(schema.id())));
     assertEntityChange(
         maxIdBeforeDrop,
         METALAKE_NAME,

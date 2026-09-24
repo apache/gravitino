@@ -22,7 +22,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
@@ -140,21 +139,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
-
-  /**
-   * Delete a catalog if its remaining schemas are in the allowlist, checking under the catalog
-   * write lock in the delete transaction.
-   *
-   * @param ident the catalog identifier
-   * @param allowedSchemaIds IDs of schemas that may be deleted with the catalog
-   * @return true if the catalog was deleted
-   * @throws IOException if the store operation fails
-   */
-  default boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "Atomic catalog delete with allowed schemas is not supported by this backend");
-  }
 
   /**
    * Deletes an entity and returns the snapshot used by that delete.

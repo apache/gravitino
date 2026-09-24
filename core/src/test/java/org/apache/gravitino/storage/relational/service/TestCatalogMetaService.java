@@ -43,6 +43,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -449,7 +450,9 @@ public class TestCatalogMetaService extends TestJDBCBackend {
 
     assertThrows(
         NonEmptyEntityException.class,
-        () -> backend.deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), allowedIds));
+        () ->
+            ((SupportsConditionalCatalogDelete) backend)
+                .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), allowedIds));
     assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertTrue(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
     assertTrue(backend.exists(newSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
@@ -473,7 +476,8 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     backend.insert(allowed, false);
 
     assertTrue(
-        backend.deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(allowed.id())));
+        ((SupportsConditionalCatalogDelete) backend)
+            .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(allowed.id())));
     assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
