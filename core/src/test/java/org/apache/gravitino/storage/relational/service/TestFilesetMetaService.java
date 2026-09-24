@@ -451,8 +451,34 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     assertEquals(1, listFilesetVersions(fileset.id()).size());
     assertEquals(2, countFilesetVersionRows(fileset.id()));
 
+    // A second rename still writes no snapshot, while every write advances the OCC token.
+    String renamedAgain = renamed + "_again";
+    FilesetMetaService.getInstance()
+        .updateFileset(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, renamed),
+            entity -> {
+              FilesetEntity current = (FilesetEntity) entity;
+              return FilesetEntity.builder()
+                  .withId(current.id())
+                  .withName(renamedAgain)
+                  .withNamespace(current.namespace())
+                  .withFilesetType(current.filesetType())
+                  .withStorageLocations(current.storageLocations())
+                  .withComment(current.comment())
+                  .withProperties(current.properties())
+                  .withAuditInfo(current.auditInfo())
+                  .build();
+            });
+    FilesetPO afterSecondRename = getFilesetPO(fileset.id());
+    assertEquals(afterRename.getOccVersion() + 1, afterSecondRename.getOccVersion().longValue());
+    assertEquals(afterRename.getCurrentVersion(), afterSecondRename.getCurrentVersion());
+    assertEquals(afterRename.getLastVersion(), afterSecondRename.getLastVersion());
+    assertEquals(1, listFilesetVersions(fileset.id()).size());
+    assertEquals(2, countFilesetVersionRows(fileset.id()));
+
     // Changing the comment does change stored content, so it allocates a snapshot per location.
-    NameIdentifier renamedIdent = NameIdentifier.of(metalakeName, catalogName, schemaName, renamed);
+    NameIdentifier renamedIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, renamedAgain);
     FilesetMetaService.getInstance()
         .updateFileset(
             renamedIdent,
@@ -471,8 +497,9 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             });
 
     FilesetPO afterComment = getFilesetPO(fileset.id());
-    assertEquals(afterRename.getOccVersion() + 1, afterComment.getOccVersion().longValue());
-    assertEquals(afterRename.getCurrentVersion() + 1, afterComment.getCurrentVersion().longValue());
+    assertEquals(afterSecondRename.getOccVersion() + 1, afterComment.getOccVersion().longValue());
+    assertEquals(
+        afterSecondRename.getCurrentVersion() + 1, afterComment.getCurrentVersion().longValue());
     assertEquals(afterComment.getCurrentVersion(), afterComment.getLastVersion());
     assertEquals(2, listFilesetVersions(fileset.id()).size());
     assertEquals(4, countFilesetVersionRows(fileset.id()));

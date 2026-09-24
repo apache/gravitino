@@ -64,6 +64,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -1861,7 +1862,8 @@ public class POConverters {
     if (storedVersionPO != null
         && Objects.equals(storedVersionPO.getPolicyComment(), policyComment)
         && storedVersionPO.isEnabled() == enabled
-        && Objects.equals(storedVersionPO.getContent(), content)) {
+        && Objects.equals(oldPolicyPO.getPolicyType(), policyType)
+        && policyContentUnchanged(storedVersionPO.getContent(), content, policyType)) {
       return PolicyPO.builder()
           .withPolicyId(oldPolicyPO.getPolicyId())
           .withPolicyName(policyName)
@@ -1899,6 +1901,25 @@ public class POConverters {
         .withDeletedAt(DEFAULT_DELETED_AT)
         .withPolicyVersionPO(newPolicyVersionPO)
         .build();
+  }
+
+  private static boolean policyContentUnchanged(
+      String storedContent, String newContent, String policyType) {
+    if (Objects.equals(storedContent, newContent)) {
+      return true;
+    }
+
+    // Sets in policy content can serialize in a different order after a read/write round trip.
+    // Compare the content objects so an audit-only update does not allocate a redundant snapshot.
+    try {
+      Class<? extends PolicyContent> contentClass =
+          Policy.BuiltInType.fromPolicyType(policyType).contentClass();
+      return Objects.equals(
+          JsonUtils.anyFieldMapper().readValue(storedContent, contentClass),
+          JsonUtils.anyFieldMapper().readValue(newContent, contentClass));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize policy content:", e);
+    }
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {

@@ -482,12 +482,29 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(policy, false);
     PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
 
+    PolicyEntity metadataUpdate =
+        copyPolicy(
+            policy,
+            policy.name(),
+            policy.comment(),
+            AuditInfo.builder()
+                .withCreator("updated-creator")
+                .withCreateTime(Instant.now())
+                .build());
+    policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataUpdate);
+    PolicyPO afterMetadataUpdate = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion(), afterMetadataUpdate.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterMetadataUpdate.getLastVersion());
+    assertEquals(initialPO.getOccVersion() + 1, afterMetadataUpdate.getOccVersion().longValue());
+
     PolicyEntity replacement = copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement");
     policyMetaService.insertPolicy(replacement, true);
 
     PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    assertEquals(
+        afterMetadataUpdate.getOccVersion() + 1, overwrittenPO.getOccVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
     assertEquals(
         replacement, policyMetaService.getPolicyByIdentifier(replacement.nameIdentifier()));
@@ -565,6 +582,43 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(
         0,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+  }
+
+  @TestTemplate
+  public void testStalePolicyDeleteAfterMetadataOnlyAlter() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_delete_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(
+        policy.content(),
+        policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).content());
+
+    AuditInfo updatedAudit =
+        AuditInfo.builder().withCreator("updated-creator").withCreateTime(Instant.now()).build();
+    policyMetaService.updatePolicy(
+        policy.nameIdentifier(),
+        entity ->
+            copyPolicy(
+                (PolicyEntity) entity,
+                ((PolicyEntity) entity).name(),
+                ((PolicyEntity) entity).comment(),
+                updatedAudit));
+
+    PolicyPO afterAlter = getPolicyPO(policy.nameIdentifier());
+    assertEquals(stalePO.getCurrentVersion(), afterAlter.getCurrentVersion());
+    assertEquals(stalePO.getOccVersion() + 1, afterAlter.getOccVersion().longValue());
+    assertThrows(
+        OptimisticLockException.class,
+        () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
