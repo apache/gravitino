@@ -69,7 +69,9 @@ TMS uses a **dual trigger model** (§5.4–§5.6):
 8. **Govern Policy reuse**: Policies stay on `policy_meta` and metalake Policy APIs. No parallel
    policy store or `/api/maintenance/table/policies` CRUD.
 9. **Multi-node safe**: Shared DB **per-policy claims** so only one replica runs claim → submit
-   for a `(table, policy)` (§6). Replicas stay **peers**; no maintenance **leader** (§5.3).
+   for a `(table, policy)` (§6). **At most one** maintenance activity `RUNNING` per table
+   (table-level mutual exclusion; different tables may run concurrently). Replicas stay **peers**;
+   no maintenance **leader** (§5.3).
 
 ---
 
@@ -197,7 +199,8 @@ resolve, Recommender, or submit on the IRC thread.
 
 #### 5.2.1 Four built-in policy types
 
-Each activity is a **separate** built-in policy type with its own `content` and `minIntervalMs`:
+Each activity is a **separate** built-in policy type with its own `content` (including
+`schedule` and `minIntervalMs`):
 
 |                          | Compaction                                   | Manifest rewrite                    | Snapshot expiry                      | Orphan cleanup                        |
 | ------------------------ | -------------------------------------------- | ----------------------------------- | ------------------------------------ | ------------------------------------- |
@@ -215,26 +218,31 @@ effective_policy(table, maintenance_type) =
 
 Only **one** policy per maintenance type is evaluated for a table.
 
-#### 5.2.3 Policy schedule
+#### 5.2.3 Policy schedule and `minIntervalMs`
 
-Each policy stores a **schedule** in `policy_meta.content`; TMS sets wall-clock **`next_due_at`** from it.
+Each policy stores **`schedule`** and **`minIntervalMs`** in `policy_meta.content`. TMS sets
+wall-clock **`next_due_at`** from `schedule`; claim gates on `minIntervalMs` from the **effective**
+policy (§5.2.2, §7.3).
 
-**Illustrative `content.schedule` (crontab):**
+**Illustrative `content` fields:**
 
-|                             | `nightly_compaction` | `nightly_snapshot_expiry` | `nightly_manifest_rewrite` | `weekly_orphan_cleanup` |
-| --------------------------- | -------------------- | ------------------------- | -------------------------- | ----------------------- |
-| `content.schedule` (stored) | `0 2 * * *`          | `0 3 * * *`               | `0 4 * * *`                | `0 5 * * 0`             |
+|                         | `nightly_compaction` | `nightly_snapshot_expiry` | `nightly_manifest_rewrite` | `weekly_orphan_cleanup` |
+| ----------------------- | -------------------- | ------------------------- | -------------------------- | ----------------------- |
+| `content.schedule`      | `0 2 * * *`          | `0 3 * * *`               | `0 4 * * *`                | `0 5 * * 0`             |
+| `content.minIntervalMs` | `3600000`            | `3600000`                 | `3600000`                  | `3600000`               |
 
-**Commit vs scheduler:** `schedule` / `next_due_at` are **scheduler only**; commit neither reads nor advances them.
+**Commit vs scheduler:** `schedule` / `next_due_at` are **scheduler only**; commit neither reads nor
+advances them. Commit and scheduler both apply `minIntervalMs` from effective policy content before
+claim (§5.4.1, §6.1).
 
 #### 5.2.4 Writing `table_maintenance_policy_state`
 
 `next_due_at` lives only on table-level `table_maintenance_policy_state` rows.
 
-|                             | Table                                                                               | **Above table** (schema / catalog)                                                              |
-| --------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| When state rows are written | **Immediately** on policy change; IRC `createTable` / `updateTable`; detach deletes | **Timed discovery** (§5.3.2)                                                                    |
-| Behavior                    | O(1) UPSERT/DELETE; set `next_due_at = nextOccurrence(schedule)`                    | Bind association only; discovery lists scope, nearest-wins, INSERT / UPDATE / DELETE state rows |
+|                             | Table                                                                                                                     | **Above table** (schema / catalog)                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| When state rows are written | **Immediately** on policy change; IRC `createTable` / `updateTable`; detach deletes; **after a successful scheduler run** | **Timed discovery** (§5.3.2)                                                                    |
+| Behavior                    | O(1) UPSERT/DELETE; set `next_due_at = nextOccurrence(schedule)` (also on successful scheduler completion)                | Bind association only; discovery lists scope, nearest-wins, INSERT / UPDATE / DELETE state rows |
 
 ```text
 effective_policy(table, type) → policy_id   // nearest Active along table → schema → catalog
@@ -271,8 +279,9 @@ worker loop (× workerThreads):
   SELECT up to candidateWindow due candidates   // IDLE or stale RUNNING; next_due_at <= now
   if SELECT returns 0 rows → sleep pollIntervalSecs; continue
   try CAS claim one row (§6.1)                  // only if this worker is free
+                                              // and no other activity RUNNING on same table
   if claim wins → heartbeat → submit Spark → release IDLE when done
-  if CAS loses → try next candidate in the batch (do not sleep)
+  if CAS loses / table busy → try next candidate in the batch (do not sleep)
 ```
 
 | Concept            | Meaning                                                                                           |
@@ -285,6 +294,10 @@ worker loop (× workerThreads):
 `IDLE` (or reclaimable stale `RUNNING`) in `table_maintenance_policy_state` until a worker is free or another
 node claims them. Do **not** mark them `RUNNING` and park them in a process queue (that breaks
 heartbeat reclaim and loses work on crash).
+
+**Table-level mutual exclusion:** keep one state row per `(table, policy)`, but **at most one**
+activity may be `RUNNING` on a given `(catalog_id, table_identifier)` at a time (compaction vs
+expire vs manifest vs orphan). Different tables may run concurrently. See §6.1.
 
 #### 5.3.2 Scope discovery (above-table attachments)
 
@@ -343,16 +356,18 @@ next commit or scheduler can still drive. Multi-node: claim (§6.1) prevents dou
 #### 5.4.2 Scheduler path (scheduled compaction)
 
 Scheduler: `minIntervalMs` → claim rows with `next_due_at <= now` → submit the **same** one-job
-pipeline (update-stats → decision → compaction); after success release to `IDLE` without changing
-`next_due_at` (§5.2.4). Inactive tables still run when due; active ones may no-op inside the job
-after update-stats. Manifest / expire / orphan: **scheduler only**.
+pipeline (update-stats → decision → compaction); after **success** release to `IDLE` and set
+`next_due_at = nextOccurrence(schedule)` (§5.2.3, §5.2.4). Inactive tables still run when due;
+active ones may no-op inside the job after update-stats. Manifest / expire / orphan: **scheduler
+only** (same advance-`next_due_at`-on-success rule).
 
 ---
 
 ### 5.5 Hot pipeline (scheduled — Track A)
 
-Track A: **manifest** and **expire** as **separate** scheduled policies (own state row / claim each).
-Compaction uses the compaction track (§5.4.2). Per-type `minIntervalMs` (§7.3).
+Track A: **manifest** and **expire** as **separate** scheduled policies (own state row / claim each;
+table-level mutex in §6.1 still applies). Compaction uses the compaction track (§5.4.2). Per-policy
+`minIntervalMs` in `content` (§7.3).
 
 ---
 
@@ -386,22 +401,34 @@ Identity for policy rows is `catalog_id` + `table_identifier` (`schema.table`), 
 
 ### 6.1 Claim flow (`selectDueWork` / commit path)
 
-**Scheduler** (same CAS as `iceberg_cleanup_job.markRunning`):
+**Scheduler** (same CAS as `iceberg_cleanup_job.markRunning`), plus **table-level exclusion**:
 
 ```text
 Both nodes SELECT up to candidateWindow due candidates → each free worker CAS-claims one:
+  // Table mutex: skip candidate if another policy row for same (catalog_id, table_identifier)
+  // is RUNNING with fresh heartbeat (any maintenance type).
   UPDATE … SET state=RUNNING, heartbeat_at=:now
   WHERE … AND (state=IDLE OR (state=RUNNING AND heartbeat_at < :heartbeatExpiry))
-  winner (rows_affected=1) → heartbeat → submit → IDLE when job finishes
-  CAS loser → try next candidate in the batch (do not sleep)
+    AND NOT EXISTS (
+      SELECT 1 FROM table_maintenance_policy_state t2
+      WHERE t2.catalog_id = … AND t2.table_identifier = …
+        AND t2.policy_id <> …
+        AND t2.state = 'RUNNING' AND t2.heartbeat_at >= :heartbeatExpiry)
+  winner (rows_affected=1) → heartbeat → submit
+    → on success: IDLE + next_due_at = nextOccurrence(schedule)   // scheduler path
+    → commit path: IDLE only (does not advance next_due_at)
+  CAS loser / table busy → try next candidate in the batch (do not sleep)
   SELECT returned 0 rows → sleep pollIntervalSecs
 Never claim more rows than free workers; unclaimed due rows stay in table_maintenance_policy_state
 Heartbeats cover scheduler + commit-path claims (same pattern as iceberg_cleanup_job.heartbeat_at)
 ```
 
-**Commit path** uses the same CAS and **must** register heartbeats; it does **not** read/advance
-`next_due_at`. Gate with `minIntervalMs` **before** claim; **claim is the write lock**. Submitted
-compaction job runs **update-stats → decision → compaction** in one Spark job (§5.4.1).
+**Same-table rule:** compaction rewriting data files and expiry deleting snapshots must **not** run
+concurrently on one table. Cross-table concurrency is allowed and desired.
+
+**Commit path** uses the same CAS + table mutex and **must** register heartbeats; it does **not**
+read/advance `next_due_at`. Gate with `minIntervalMs` **before** claim; **claim is the write lock**.
+Submitted compaction job runs **update-stats → decision → compaction** in one Spark job (§5.4.1).
 
 ### 6.2 State tables (shared store)
 
@@ -492,7 +519,8 @@ Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, 
 | `gravitino.maintenance.scheduler.heartbeatTimeoutSecs`           | `300`   | Stale `heartbeat_at` → reclaim `RUNNING` (§6.1, §6.2).                  |
 
 Per-table **schedule cadence** is **`next_due_at`** on `table_maintenance_policy_state` (from policy
-crontab). `minIntervalMs` is only the min-gap gate before claim (§7.3).
+crontab). `minIntervalMs` is only the min-gap gate before claim; it lives in policy `content`
+(§7.3), not in `gravitino.conf`.
 `pollIntervalSecs` = sleep when due-work SELECT is empty; `discoveryLeasePollIntervalSecs` = how
 often nodes try to claim discovery; `discoveryIntervalSecs` = how often discovery is due after a
 run; `workerThreads` = max concurrent submits; `candidateWindow` = SELECT size.
@@ -526,20 +554,22 @@ any other listener
 Omit TMS names from `gravitino.eventListener.names` → no TMS hooks; above-table scope still relies
 on discovery (§5.3.2).
 
-### 7.3 Task types and minimum interval (per policy type)
+### 7.3 Minimum interval (`minIntervalMs` in policy content)
 
 `minIntervalMs` is the **minimum gap between consecutive runs** of the same `(table, policy_id)`
 (compared via `last_job_id` → `job_run_meta.job_finished_at`). It is **not** the scheduler poll /
 `next_due_at` cadence. Null `last_job_id` → gate passes.
 
-| Key                                                    | Default            | Description                                       |
-| ------------------------------------------------------ | ------------------ | ------------------------------------------------- |
-| `gravitino.maintenance.compaction.minIntervalMs`       | `3600000` (1 hour) | Min gap for `system_iceberg_compaction`.          |
-| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | `3600000` (1 hour) | Min gap for `system_iceberg_snapshot_expiration`. |
-| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | `3600000` (1 hour) | Min gap for `system_iceberg_rewrite_manifests`.   |
-| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | `3600000` (1 hour) | Min gap for `system_iceberg_orphan_file_removal`. |
+It lives in **`policy_meta.content`** (with `schedule` and other type-specific fields) — **not** in
+`gravitino.conf`. That way it varies per attachment, is UI-visible, and follows **nearest-wins**
+like the rest of the effective policy (§5.2.2).
 
-**Resolution order:** table property override → global `gravitino.conf` key → code default.
+| Field in `content` | Default            | Description                                |
+| ------------------ | ------------------ | ------------------------------------------ |
+| `minIntervalMs`    | `3600000` (1 hour) | Min gap for that policy type / attachment. |
+
+**Resolution:** effective policy for the table (§5.2.2) → read `content.minIntervalMs` → if absent,
+code default `3600000`. No per-type `gravitino.maintenance.*.minIntervalMs` server keys.
 
 ---
 
