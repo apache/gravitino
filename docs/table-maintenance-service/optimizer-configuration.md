@@ -135,3 +135,30 @@ Four things are worth confirming before assuming a configuration problem is a co
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
+
+## Orphan File Cleanup Job Configuration
+
+Submit `builtin-iceberg-remove-orphan-files` with the same Spark and catalog
+settings described above. Its job-specific `jobConf` keys are:
+
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+
+For direct template submission, supply `older_than: ""` and `location: ""` to
+use the defaults, `dry_run: "false"` (or `"true"` to preview), and
+`spark_conf: "{}"` when no overrides are needed.
+
+Keep the three-day default unless your workload needs a longer retention window.
+The 24-hour minimum also applies to dry runs; passing the current timestamp is
+not supported. For a secured Iceberg REST catalog, supply its authentication
+settings explicitly in `spark_conf`, as described above.
+
+See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
+complete submission example. Orphan cleanup has no built-in scheduling policy
+in this release.
