@@ -424,10 +424,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
       } catch (NoSuchMetalakeException e) {
         // Metalake is already gone; dropMetalake will return false. Nothing to restore.
         throw e;
-      } catch (IOException e) {
-        restoreDisabledState(metalakeIdent, wasDisabled);
-        throw e;
-      } catch (RuntimeException e) {
+      } catch (IOException | RuntimeException e) {
         restoreDisabledState(metalakeIdent, wasDisabled);
         throw e;
       }
