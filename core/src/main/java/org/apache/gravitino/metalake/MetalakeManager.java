@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -423,26 +424,28 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     if (catalogManager == null) {
       return false;
     }
+    // True once this call has flipped the metalake to in-use. Set under the metalake write lock
+    // right after the store update (before the non-atomic catalog-status update), so a failure in
+    // either the enable itself or the later drops re-disables a metalake this operation enabled,
+    // while a concurrent enable leaves it false so we never re-disable one we did not enable.
+    AtomicBoolean weEnabled = new AtomicBoolean(false);
     try {
-      boolean wasDisabled = !metalakeInUse(store, metalakeIdent);
       try {
-        if (wasDisabled) {
-          enableMetalake(metalakeIdent);
-        }
+        enableMetalakeIfDisabled(metalakeIdent, weEnabled);
         List<CatalogEntity> catalogs =
             store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
         for (CatalogEntity catalog : catalogs) {
           catalogManager.dropCatalog(
               NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
         }
-        // Report whether we temporarily enabled the metalake so the caller can restore it if the
-        // metalake delete that follows fails.
-        return wasDisabled;
+        // Report whether we enabled the metalake so the caller can re-disable it if the metalake
+        // delete that follows fails.
+        return weEnabled.get();
       } catch (NoSuchMetalakeException e) {
         // Metalake is already gone; dropMetalake will return false. Nothing to restore.
         throw e;
       } catch (IOException | RuntimeException e) {
-        restoreDisabledState(metalakeIdent, wasDisabled);
+        restoreDisabledState(metalakeIdent, weEnabled.get());
         throw e;
       }
     } catch (NoSuchMetalakeException e) {
@@ -453,9 +456,14 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     }
   }
 
-  /** Best effort: undo the temporary enable so a failed force drop keeps a disabled metalake. */
-  private void restoreDisabledState(NameIdentifier metalakeIdent, boolean wasDisabled) {
-    if (!wasDisabled) {
+  /**
+   * Best effort: undo a temporary enable this force drop performed, so a failed force drop keeps a
+   * user-disabled metalake disabled. Only re-disables when {@code weEnabled} is true, i.e. this
+   * operation is the one that enabled the metalake, so it never overwrites a concurrent user's
+   * enable.
+   */
+  private void restoreDisabledState(NameIdentifier metalakeIdent, boolean weEnabled) {
+    if (!weEnabled) {
       return;
     }
     try {
@@ -471,6 +479,25 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    enableMetalakeIfDisabled(ident, new AtomicBoolean());
+  }
+
+  /**
+   * Enables the metalake only if it is currently disabled, deciding and writing atomically under
+   * the metalake write lock.
+   *
+   * <p>{@code enabledByUs} is set to true the moment this call flips the metalake to in-use, before
+   * the non-atomic catalog-status update. A force-drop caller reads it to decide whether it must
+   * re-disable the metalake on failure: keying that on this flag (rather than a prior {@code
+   * metalakeInUse} read) means a concurrent enable cannot make the caller claim, and later undo, an
+   * enable it did not perform, and a failure partway through the enable still leaves the caller
+   * able to re-disable.
+   *
+   * @param ident the metalake to enable
+   * @param enabledByUs set to true iff this call performed the disabled to in-use flip
+   */
+  private void enableMetalakeIfDisabled(NameIdentifier ident, AtomicBoolean enabledByUs)
+      throws NoSuchMetalakeException {
     TreeLockUtils.doWithTreeLock(
         ident,
         LockType.WRITE,
@@ -497,6 +524,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
                   return builder.build();
                 });
+            enabledByUs.set(true);
 
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction. If any catalog property update fails, the metalake is already

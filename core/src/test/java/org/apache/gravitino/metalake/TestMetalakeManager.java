@@ -426,6 +426,122 @@ public class TestMetalakeManager {
     }
   }
 
+  @Test
+  public void testFailedForceDropDoesNotDisableMetalakeItDidNotEnable() throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Object originalEnvCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      MetalakeManager manager =
+          new MetalakeManager(entityStore, new RandomIdGenerator(), catalogManager);
+      NameIdentifier ident = NameIdentifier.of("metalake_force_drop_already_enabled");
+      manager.createMetalake(ident, "comment", ImmutableMap.of());
+      // Left enabled: this stands in for a metalake a concurrent user has enabled. The force drop
+      // does not enable it, so a failure must not re-disable it and clobber that user's enable.
+      Assertions.assertTrue(MetalakeManager.metalakeInUse(entityStore, ident));
+
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(new RandomIdGenerator().nextId())
+              .withName("catalog1")
+              .withNamespace(Namespace.of(ident.name()))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("hive")
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build(),
+          false);
+
+      Mockito.doThrow(new RuntimeException("catalog drop failed"))
+          .when(catalogManager)
+          .dropCatalog(Mockito.any(), Mockito.anyBoolean());
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      Assertions.assertTrue(
+          MetalakeManager.metalakeInUse(entityStore, ident),
+          "a failed force drop must not disable a metalake it did not enable");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);
+    }
+  }
+
+  @Test
+  public void testFailedForceDropRestoresWhenTemporaryEnableFailsMidway() throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Object originalEnvCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      MetalakeManager manager =
+          new MetalakeManager(entityStore, new RandomIdGenerator(), catalogManager);
+      NameIdentifier ident = NameIdentifier.of("metalake_force_drop_enable_midfail");
+      manager.createMetalake(ident, "comment", ImmutableMap.of());
+      manager.disableMetalake(ident);
+      Assertions.assertFalse(MetalakeManager.metalakeInUse(entityStore, ident));
+
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(new RandomIdGenerator().nextId())
+              .withName("catalog1")
+              .withNamespace(Namespace.of(ident.name()))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("hive")
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build(),
+          false);
+
+      // The temporary enable flips the metalake in-use, then fails while propagating that to the
+      // catalog. A metalake this force drop enabled must not be left enabled.
+      Mockito.doThrow(new RuntimeException("catalog in-use update failed"))
+          .when(catalogManager)
+          .setMetalakeInUseStatus(Mockito.any(), Mockito.anyBoolean());
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      Assertions.assertFalse(
+          MetalakeManager.metalakeInUse(entityStore, ident),
+          "a temporary enable that fails partway must not leave the metalake enabled");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);
+    }
+  }
+
+  @Test
+  public void testForceDropDeleteFailureDoesNotDisableAlreadyEnabledMetalake() throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Object originalEnvCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      EntityStore spyStore = Mockito.spy(entityStore);
+      MetalakeManager manager =
+          new MetalakeManager(spyStore, new RandomIdGenerator(), catalogManager);
+      NameIdentifier ident = NameIdentifier.of("metalake_force_drop_enabled_delete_fail");
+      manager.createMetalake(ident, "comment", ImmutableMap.of());
+      // Left enabled (a concurrent user's enable); no catalogs, so phase 1 succeeds without this
+      // operation enabling it, then the phase-2 metalake delete fails.
+      Assertions.assertTrue(MetalakeManager.metalakeInUse(spyStore, ident));
+
+      Mockito.doThrow(new IOException("metalake delete failed"))
+          .when(spyStore)
+          .delete(ident, EntityType.METALAKE, true);
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      Assertions.assertTrue(
+          MetalakeManager.metalakeInUse(spyStore, ident),
+          "a delete-failed force drop must not disable a metalake it did not enable");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);
+    }
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
