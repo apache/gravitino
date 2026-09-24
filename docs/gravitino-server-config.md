@@ -56,6 +56,13 @@ gravitino.entity.store.relational.jdbcUrl      = jdbc:mysql://{db_host}:3306/{da
 gravitino.entity.store.relational.jdbcDriver   = com.mysql.cj.jdbc.Driver
 gravitino.entity.store.relational.jdbcUser     = {username}
 gravitino.entity.store.relational.jdbcPassword = {password}
+# To use an encrypted password instead of plain text:
+# 1. Encrypt your password: python3 scripts/encrypt_password.py encrypt "{password}" --key "{master_key}"
+# 2. Set the master key: export GRAVITINO_PASSWORD_ENCRYPTION_KEY="{master_key}"
+# 3. Replace the value with the ENC(...) output:
+#    gravitino.entity.store.relational.jdbcPassword = ENC(base64data)
+# For production, always set a custom master key via GRAVITINO_PASSWORD_ENCRYPTION_KEY.
+# The default master key "gravitino" should only be used for quick testing.
 
 # Transport
 gravitino.server.webserver.enableHttps      = true
@@ -286,7 +293,7 @@ The driver, user, and password properties are required whenever the URL is not `
 | `gravitino.entity.store.relational.jdbcUrl`        | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
 | `gravitino.entity.store.relational.jdbcDriver`     | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
 | `gravitino.entity.store.relational.jdbcUser`       | Database username.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.jdbcPassword`   | Database password.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.jdbcPassword`   | Database password. Supports encrypted `ENC(...)` format. Use `scripts/encrypt_password.py` to generate encrypted values. Set `GRAVITINO_PASSWORD_ENCRYPTION_KEY` env var to the master key. The default value is the encrypted form of `gravitino` using the default master key `gravitino`. For production, always set a custom master key.          | `ENC(...)` (encrypted `gravitino`)                   |
 | `gravitino.entity.store.relational.storagePath`    | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
 | `gravitino.entity.store.relational.maxConnections` | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
 | `gravitino.entity.store.relational.maxWaitMillis`  | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
@@ -692,7 +699,7 @@ means the property is left alone.
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER`          | `gravitino.entity.store.relational.jdbcDriver`       | `org.h2.Driver`                                      |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_USER`            | `gravitino.entity.store.relational.jdbcUser`         | `gravitino`                                          |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`        | `gravitino.entity.store.relational.jdbcPassword`     | `gravitino`                                          |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`        | `gravitino.entity.store.relational.jdbcPassword`     | `ENC(...)` (encrypted `gravitino`)                   |
 | `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`           | `gravitino.catalog.cache.evictionIntervalMs`         | `3600000`                                            |
 | `GRAVITINO_AUTHORIZATION_ENABLE`                         | `gravitino.authorization.enable`                     | `false`                                              |
 | `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                 | `gravitino.authorization.serviceAdmins`              | `anonymous`                                          |
@@ -728,6 +735,8 @@ means the property is left alone.
 | `GRAVITINO_ICEBERG_REST_OSS_REGION`                      | `gravitino.iceberg-rest.oss-region`                  | (none)                                               |
 | `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                    | `gravitino.iceberg-rest.oss-role-arn`                | (none)                                               |
 | `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                 | `gravitino.iceberg-rest.oss-external-id`             | (none)                                               |
+
+> **Note:** `GRAVITINO_PASSWORD_ENCRYPTION_KEY` is not mapped to a config key — the Java process reads it directly via `System.getenv()`. When running the container, pass it with `docker run -e GRAVITINO_PASSWORD_ENCRYPTION_KEY=your-key` and the Java process inherits it automatically. If you set a custom key, you must also provide a matching encrypted password via `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`, otherwise the default `ENC(...)` value will fail to decrypt.
 
 The image bundles MySQL and PostgreSQL JDBC drivers in `jdbc-drivers/` and links them into `libs/`
 and `iceberg-rest-server/libs/` at startup. For cloud storage backends, put the matching Iceberg

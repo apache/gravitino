@@ -28,6 +28,14 @@ gravitino.entity.store.relational.jdbcUser     = {username}
 gravitino.entity.store.relational.jdbcPassword = {password}
 ```
 
+The password can be plain text or encrypted. To use encryption:
+
+1. Encrypt your password: `python3 scripts/encrypt_password.py encrypt "{password}" --key "{master_key}"`
+2. Set the master key: `export GRAVITINO_PASSWORD_ENCRYPTION_KEY="{master_key}"`
+3. Use the `ENC(...)` output in the config: `gravitino.entity.store.relational.jdbcPassword = ENC(base64data)`
+
+For production, always set a custom master key. The default key `gravitino` should only be used for quick testing.
+
 `gravitino.entity.store` and `gravitino.entity.store.relational` already default to `relational`
 and `JDBCBackend`. Leave them alone.
 

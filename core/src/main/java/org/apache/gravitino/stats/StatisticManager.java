@@ -52,6 +52,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PasswordEncryptor;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,9 +114,19 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
       options.put("jdbcUser", entityJdbcUser);
     }
 
-    String entityJdbcPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    String rawEntityJdbcPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    String entityJdbcPassword = PasswordEncryptor.decryptIfNeeded(rawEntityJdbcPassword);
     if (entityJdbcPassword != null && !entityJdbcPassword.isEmpty()) {
       options.put("jdbcPassword", entityJdbcPassword);
+    }
+
+    if (PasswordEncryptor.shouldWarnDefaultKey(rawEntityJdbcPassword)) {
+      LOG.warn(
+          "Using default master encryption key \"{}\" for password decryption. Set a custom key"
+              + " via environment variable {} or system property {} for production use.",
+          PasswordEncryptor.DEFAULT_ENCRYPTION_KEY,
+          PasswordEncryptor.ENCRYPTION_KEY_ENV,
+          PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
     }
 
     Integer entityMaxConnections =
@@ -132,6 +143,9 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
     // Then, overlay partition-specific configs (these override entity store configs)
     Map<String, String> partitionOptions = config.getConfigsWithPrefix(OPTIONS_PREFIX);
     options.putAll(partitionOptions);
+
+    // Ensure any overridden password (from partition-specific configs) is also decrypted
+    options.computeIfPresent("jdbcPassword", (k, v) -> PasswordEncryptor.decryptIfNeeded(v));
 
     return options;
   }

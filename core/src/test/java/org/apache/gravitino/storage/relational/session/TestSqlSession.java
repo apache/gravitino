@@ -42,10 +42,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.utils.PasswordEncryptor;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -168,5 +170,60 @@ public class TestSqlSession {
     SqlSessions.rollbackAndCloseSqlSession();
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testInitWithEncryptedPassword() throws SQLException {
+    String testKey = "test-enc-key-for-sqlsession";
+    String plainPassword = "gravitino";
+    String encryptedPassword = PasswordEncryptor.encrypt(plainPassword, testKey);
+    String jdbcUrl = config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+
+    // Explicitly set the master key to avoid environment-dependent test failures
+    String prevKey = System.getProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+    System.setProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY, testKey);
+
+    try {
+      Config encryptedConfig = Mockito.mock(Config.class);
+      Mockito.when(encryptedConfig.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_STORE))
+          .thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(jdbcUrl);
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+          .thenReturn(encryptedPassword);
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+          .thenReturn("org.h2.Driver");
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS))
+          .thenReturn(100);
+      Mockito.when(encryptedConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
+          .thenReturn(1000L);
+      Mockito.when(encryptedConfig.getAllConfig()).thenReturn(Collections.emptyMap());
+
+      SqlSessionFactoryHelper.getInstance().close();
+      SqlSessionFactoryHelper.getInstance().init(encryptedConfig);
+      assertNotNull(SqlSessionFactoryHelper.getInstance().getSqlSessionFactory());
+
+      BasicDataSource dataSource =
+          (BasicDataSource)
+              SqlSessionFactoryHelper.getInstance()
+                  .getSqlSessionFactory()
+                  .getConfiguration()
+                  .getEnvironment()
+                  .getDataSource();
+      // The data source should receive the decrypted password, not the ENC(...) value
+      assertEquals(plainPassword, dataSource.getPassword());
+    } finally {
+      // Restore system property
+      if (prevKey != null) {
+        System.setProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY, prevKey);
+      } else {
+        System.clearProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+      }
+      SqlSessionFactoryHelper.getInstance().close();
+      // Re-init with original config so other tests can proceed
+      SqlSessionFactoryHelper.getInstance().init(config);
+    }
   }
 }
