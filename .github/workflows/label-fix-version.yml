@@ -59,8 +59,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 1. Collect issue numbers from the title and closing keywords.
-          TITLE_ISSUES=$(printf '%s' "$PR_TITLE" | grep -oE '\[#[0-9]+\]' | grep -oE '[0-9]+' || true)
+          # 1. Collect issue numbers from the title and closing keywords. Title
+          #    ids may come as "[#1][#2]", "[#1 ][#2]" or "[#1, #2]"; the trailing
+          #    "(#PR)" is not in brackets and is ignored.
+          TITLE_ISSUES=$(printf '%s' "$PR_TITLE" | grep -oE '\[[^]]*\]' | grep -oE '#[0-9]+' \
+            | tr -d '#' || true)
           CLOSING_ISSUES=$(gh api graphql \
             -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR_NUMBER" \
             -f query='
