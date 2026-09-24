@@ -17,6 +17,7 @@
 
 import copy
 import math
+from decimal import Decimal
 from typing import Any, Final, Optional
 
 from gravitino.exceptions.base import IllegalArgumentException
@@ -33,7 +34,9 @@ class AIContextObject:
     """The structured form of AI context attached to a Semantic Model member.
 
     Unknown JSON-compatible properties are exposed through
-    :meth:`additional_properties` and are retained losslessly.
+    :meth:`additional_properties` and are retained losslessly. Finite
+    :class:`~decimal.Decimal` values retain their precision without conversion
+    to floating point.
     """
 
     def __init__(
@@ -43,6 +46,10 @@ class AIContextObject:
         examples: Optional[list[str]] = None,
         additional_properties: Optional[dict[str, Any]] = None,
     ):
+        Precondition.check_argument(
+            instructions is None or isinstance(instructions, str),
+            "instructions must be a string or null",
+        )
         _check_string_elements("synonyms", synonyms)
         _check_string_elements("examples", examples)
 
@@ -121,6 +128,13 @@ def _normalize_json_value(
     value: Any, path: str, visiting: set[int], container_depth: int
 ) -> Any:
     if value is None or isinstance(value, (str, bool)):
+        return value
+
+    if isinstance(value, Decimal):
+        Precondition.check_argument(
+            value.is_finite(),
+            f"Additional property {path} must contain a finite number",
+        )
         return value
 
     if isinstance(value, (int, float)):

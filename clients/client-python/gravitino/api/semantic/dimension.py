@@ -17,11 +17,17 @@
 
 from typing import Optional
 
+from gravitino.utils.precondition import Precondition
+
 
 class Dimension:
     """Marks a Semantic Model field as a dimension."""
 
     def __init__(self, is_time: Optional[bool] = None):
+        Precondition.check_argument(
+            is_time is None or isinstance(is_time, bool),
+            "isTime must be a boolean or null",
+        )
         self._is_time = is_time
 
     def is_time(self) -> Optional[bool]:

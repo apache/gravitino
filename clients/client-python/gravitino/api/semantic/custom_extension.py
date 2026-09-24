@@ -27,9 +27,12 @@ class CustomExtension:
 
     def __init__(self, vendor_name: str, data: str):
         Precondition.check_argument(
-            vendor_name is not None, "vendorName must not be null"
+            isinstance(vendor_name, str),
+            "vendorName must not be null and must be a string",
         )
-        Precondition.check_argument(data is not None, "data must not be null")
+        Precondition.check_argument(
+            isinstance(data, str), "data must not be null and must be a string"
+        )
         self._vendor_name = vendor_name
         self._data = data
 

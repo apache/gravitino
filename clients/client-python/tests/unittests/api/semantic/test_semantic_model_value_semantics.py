@@ -17,10 +17,13 @@
 
 
 import unittest
+from decimal import Decimal, localcontext
 
 from gravitino.api.semantic.ai_context import AIContext
 from gravitino.api.semantic.ai_context_object import AIContextObject
 from gravitino.api.semantic.dataset import Dataset
+from gravitino.api.semantic.custom_extension import CustomExtension
+from gravitino.api.semantic.dimension import Dimension
 from gravitino.api.semantic.relationship import Relationship
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
@@ -122,3 +125,60 @@ class TestSemanticModelValueSemantics(unittest.TestCase):
         self.assertEqual(
             "UPDATECOMMENT null", str(SemanticModelChange.update_comment(None))
         )
+
+    def test_scalar_types_are_validated(self):
+        for value in ([], {}, 1, True):
+            for build in (
+                lambda value=value: AIContextObject(instructions=value),
+                lambda value=value: CustomExtension(value, "data"),
+                lambda value=value: CustomExtension("vendor", value),
+            ):
+                with self.subTest(value=value, build=build):
+                    with self.assertRaises(IllegalArgumentException):
+                        build()
+        for value in ([], {}, 0, 1, 1.0, "true"):
+            with self.subTest(is_time=value):
+                with self.assertRaises(IllegalArgumentException):
+                    Dimension(value)
+        for value in (None, "", "instructions"):
+            self.assertEqual(value, AIContextObject(instructions=value).instructions())
+        self.assertEqual("", CustomExtension("", "").data())
+        for value in (None, False, True):
+            self.assertIs(value, Dimension(value).is_time())
+
+    def test_decimal_precision_and_value_semantics(self):
+        value = Decimal("123456789.123456789012345678901234567890123456789")
+        with localcontext() as context:
+            context.prec = 6
+            left = AIContextObject(additional_properties={"value": [{"nested": value}]})
+            right = AIContextObject(
+                additional_properties={"value": [{"nested": Decimal(str(value))}]}
+            )
+            returned = left.additional_properties()["value"][0]["nested"]
+            self.assertIsInstance(returned, Decimal)
+            self.assertEqual(value.as_tuple(), returned.as_tuple())
+            self.assertEqual(left, right)
+            self.assertEqual(hash(left), hash(right))
+            self.assertEqual("saved", {left: "saved"}[right])
+            changed = AIContextObject(
+                additional_properties={
+                    "value": [
+                        {
+                            "nested": Decimal(
+                                "123456789.123456789012345678901234567890123456788"
+                            )
+                        }
+                    ]
+                }
+            )
+            self.assertNotEqual(left, changed)
+        self.assertNotEqual(
+            AIContextObject(additional_properties={"value": Decimal(1)}),
+            AIContextObject(additional_properties={"value": True}),
+        )
+
+    def test_non_finite_decimals_are_rejected(self):
+        for value in ("NaN", "sNaN", "Infinity", "-Infinity"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(IllegalArgumentException, "finite number"):
+                    AIContextObject(additional_properties={"nested": [Decimal(value)]})
