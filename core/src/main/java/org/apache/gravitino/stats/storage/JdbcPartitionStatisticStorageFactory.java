@@ -68,9 +68,6 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
   // Default values
   private static final String DEFAULT_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
 
-  // Keep reference to DataSource for cleanup
-  private BasicDataSource dataSource;
-
   @Override
   public PartitionStatisticStorage create(Map<String, String> properties) {
     LOG.info(
@@ -79,16 +76,20 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
 
     validateRequiredProperties(properties);
 
+    // The created storage owns the DataSource and closes it on its own close().
+    BasicDataSource localDataSource;
     try {
-      dataSource = createDataSource(properties);
-      return new JdbcPartitionStatisticStorage(dataSource);
+      localDataSource = createDataSource(properties);
     } catch (Exception e) {
-      if (dataSource != null) {
-        try {
-          dataSource.close();
-        } catch (SQLException closeException) {
-          LOG.error("Failed to close data source after creation error", closeException);
-        }
+      throw new GravitinoRuntimeException(e, "Failed to create JdbcPartitionStatisticStorage");
+    }
+    try {
+      return new JdbcPartitionStatisticStorage(localDataSource);
+    } catch (Exception e) {
+      try {
+        localDataSource.close();
+      } catch (SQLException closeException) {
+        LOG.error("Failed to close data source after creation error", closeException);
       }
       throw new GravitinoRuntimeException(e, "Failed to create JdbcPartitionStatisticStorage");
     }
@@ -183,18 +184,5 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
       masked.put(JDBC_PASSWORD, "***");
     }
     return masked;
-  }
-
-  /**
-   * Closes the data source if it was created by this factory.
-   *
-   * @throws SQLException if closing fails
-   */
-  public void close() throws SQLException {
-    if (dataSource != null) {
-      LOG.info("Closing JDBC DataSource");
-      dataSource.close();
-      dataSource = null;
-    }
   }
 }

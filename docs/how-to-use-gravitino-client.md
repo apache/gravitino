@@ -72,3 +72,23 @@ gravitino_client = GravitinoClient(
 | `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10`          | No       |
 
 **Note:** Invalid configuration properties will result in exceptions. 
+
+## Retrying concurrent metadata changes
+
+If another writer changes metadata during an alter or drop, the server returns HTTP 409
+with error code `1012`. The Java and Python clients raise `OptimisticLockException`.
+Import the exception in Java:
+
+```java
+import org.apache.gravitino.exceptions.OptimisticLockException;
+```
+
+Or in Python:
+
+```python
+from gravitino.exceptions.base import OptimisticLockException
+```
+
+Catch this exception, reload the latest metadata, reconsider your intended change, and
+retry with a bounded number of attempts. Do not replay a stale update unchanged or
+retry every HTTP 409 response, since other conflicts may require a different action.
