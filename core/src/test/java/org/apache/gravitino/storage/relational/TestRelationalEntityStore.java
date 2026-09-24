@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -127,6 +128,28 @@ public class TestRelationalEntityStore {
 
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
+    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testAllowedSchemasDeleteInvalidatesCacheAfterBackendDelete()
+      throws IOException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    Set<Long> allowedSchemaIds = Set.of(123L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+              return true;
+            })
+        .when(backend)
+        .deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+
+    Assertions.assertTrue(store.deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds));
+
+    InOrder inOrder = Mockito.inOrder(backend, cache);
+    inOrder.verify(backend).deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
   }
 

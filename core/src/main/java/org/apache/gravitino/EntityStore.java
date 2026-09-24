@@ -24,11 +24,14 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -222,6 +225,32 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the delete operation fails
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
+
+  /**
+   * Delete a catalog only if every remaining schema was classified as safe to discard by the
+   * caller. The check and deletion must be atomic with schema creation.
+   *
+   * @param ident the catalog identifier
+   * @param allowedSchemaIds IDs of schema entities that may be deleted with the catalog
+   * @return true if the catalog was deleted
+   * @throws IOException if the store operation fails
+   */
+  default boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+      throws IOException {
+    return executeInTransaction(
+        () -> {
+          List<SchemaEntity> schemas =
+              list(
+                  Namespace.of(ident.namespace().level(0), ident.name()),
+                  SchemaEntity.class,
+                  EntityType.SCHEMA);
+          if (schemas.stream().anyMatch(schema -> !allowedSchemaIds.contains(schema.id()))) {
+            throw new NonEmptyEntityException(
+                "Entity %s has sub-entities, you should remove sub-entities first", ident);
+          }
+          return delete(ident, EntityType.CATALOG, true);
+        });
+  }
 
   /**
    * The only post-delete action an implementation that cannot run it before commit accepts.

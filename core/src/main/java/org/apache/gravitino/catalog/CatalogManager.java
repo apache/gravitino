@@ -1414,7 +1414,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // the cache with stale data between invalidate and delete.
             Map<String, String> catalogProperties =
                 copyProperties(catalogWrapper.catalog().entity().getProperties());
-            boolean deleted = store.delete(ident, EntityType.CATALOG, true);
+            boolean deleted;
+            if (force) {
+              deleted = store.delete(ident, EntityType.CATALOG, true);
+            } else {
+              try {
+                if (schemaEntities.isEmpty()) {
+                  deleted = store.delete(ident, EntityType.CATALOG, false);
+                } else {
+                  Set<Long> allowedSchemaIds =
+                      schemaEntities.stream().map(SchemaEntity::id).collect(Collectors.toSet());
+                  deleted = store.deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+                }
+              } catch (NonEmptyEntityException e) {
+                throw new NonEmptyCatalogException(
+                    "Catalog %s has schemas, please drop them first or use force option", ident);
+              }
+            }
             if (deleted) {
               markLocalMutation(ident);
               try {

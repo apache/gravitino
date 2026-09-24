@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -384,6 +385,32 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       boolean deleted = deleteEntity(ident, entityType, cascade);
       if (deleted) {
         insertEntityChange(ident, entityType, OperateType.DROP);
+      }
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return deleted;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  @Override
+  public boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+      throws IOException {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      boolean deleted =
+          CatalogMetaService.getInstance().deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+      if (deleted) {
+        insertEntityChange(ident, Entity.EntityType.CATALOG, OperateType.DROP);
       }
       if (transactionOwner) {
         SessionUtils.commitTransaction();

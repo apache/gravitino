@@ -50,6 +50,8 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -238,6 +240,23 @@ public class TestMetalakeManager {
         .delete(ident, EntityType.METALAKE, true);
 
     Assertions.assertFalse(manager.dropMetalake(ident, true));
+    store.close();
+  }
+
+  @Test
+  public void testNonForceDropMetalakeUsesStoreEmptinessCheck() throws IOException {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator());
+    NameIdentifier ident = NameIdentifier.of("non_empty_metalake");
+    manager.createMetalake(ident, "comment", ImmutableMap.of());
+    manager.disableMetalake(ident);
+    Mockito.doThrow(new NonEmptyEntityException("Concurrent catalog was created"))
+        .when(store)
+        .delete(ident, EntityType.METALAKE, false);
+
+    Assertions.assertThrows(NonEmptyMetalakeException.class, () -> manager.dropMetalake(ident));
+    Assertions.assertTrue(store.exists(ident, EntityType.METALAKE));
     store.close();
   }
 

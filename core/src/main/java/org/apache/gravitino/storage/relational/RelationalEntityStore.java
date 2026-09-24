@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -308,6 +309,18 @@ public class RelationalEntityStore
       return false;
     } finally {
       invalidateCache(ident, entityType);
+    }
+  }
+
+  @Override
+  public boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+      throws IOException {
+    try {
+      return backend.deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+    } catch (NoSuchEntityException e) {
+      return false;
+    } finally {
+      invalidateCache(ident, Entity.EntityType.CATALOG);
     }
   }
 
