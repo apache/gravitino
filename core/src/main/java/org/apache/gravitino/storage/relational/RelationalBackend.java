@@ -76,18 +76,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException;
 
   /**
-   * Finds the identifier of the live entity that is registered with the given ID.
-   *
-   * @param id The stable entity ID.
-   * @param entityType The type of the entity.
-   * @return The identifier of the live entity with this ID, or empty if there is none.
-   * @throws UnsupportedOperationException If this entity type cannot be looked up by ID.
-   * @throws IOException If the store operation fails
-   */
-  Optional<NameIdentifier> findIdentifierById(long id, Entity.EntityType entityType)
-      throws IOException;
-
-  /**
    * Stores the entity, possibly overwriting an existing entity if specified.
    *
    * @param <E> The type of the entity returned.

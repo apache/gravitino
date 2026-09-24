@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -51,7 +50,6 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -67,7 +65,6 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -113,41 +110,6 @@ public class SchemaMetaService {
     }
 
     return new SchemaIds(schemaPO.getMetalakeId(), schemaPO.getCatalogId(), schemaPO.getSchemaId());
-  }
-
-  /**
-   * Returns the identifier of the live schema registered with the given ID.
-   *
-   * @param schemaId the schema ID
-   * @return the schema identifier, or empty if no live schema has this ID
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getSchemaIdentifierById")
-  public Optional<NameIdentifier> getSchemaIdentifierById(long schemaId) {
-    List<SchemaPO> schemaPOs =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> ops.listPOs(mapper, Collections.singletonList(schemaId)));
-    if (schemaPOs == null || schemaPOs.isEmpty()) {
-      return Optional.empty();
-    }
-    SchemaPO schemaPO = schemaPOs.get(0);
-    CatalogPO catalogPO =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaById(schemaPO.getCatalogId()));
-    MetalakePO metalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaById(schemaPO.getMetalakeId()));
-    // A live schema under a deleted parent is not reachable by name, so report it as absent.
-    if (catalogPO == null || metalakePO == null) {
-      return Optional.empty();
-    }
-    return Optional.of(
-        NameIdentifier.of(
-            metalakePO.getMetalakeName(), catalogPO.getCatalogName(), schemaPO.getSchemaName()));
   }
 
   @Monitored(

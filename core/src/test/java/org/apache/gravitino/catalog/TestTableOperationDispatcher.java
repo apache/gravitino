@@ -405,15 +405,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     ops.createTable(
         target, new Column[0], "comment", properties, new Transform[0], null, null, null);
 
-    clearInvocations(entityStore);
     tableOperationDispatcher.loadTable(target);
     Assertions.assertEquals(
         registered.id(), entityStore.get(target, TABLE, TableEntity.class).id());
     Assertions.assertFalse(entityStore.exists(source, TABLE));
-    // The old owner is found by id, not by listing every schema in the catalog.
-    verify(entityStore).findIdentifierById(registered.id(), TABLE);
-    verify(entityStore, never())
-        .list(eq(Namespace.of(metalake, catalog)), eq(SchemaEntity.class), eq(SCHEMA));
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
@@ -67,6 +68,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -741,20 +743,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         .build();
   }
 
-  /** Returns the live table in the same catalog that owns this id, if any. */
+  /** Returns the live table that owns this id anywhere in the catalog, if any. */
   @Nullable
   private NameIdentifier findRegisteredTableById(Namespace namespace, long id) {
     try {
-      // A point lookup by id: the owner may still be registered under another schema after an
-      // external move, and listing every schema in the catalog would make each import O(schemas).
-      // An owner in another catalog is left to the store, which rejects the insert.
-      return store
-          .findIdentifierById(id, TABLE)
-          .filter(
-              owner ->
-                  owner.namespace().level(0).equals(namespace.level(0))
-                      && owner.namespace().level(1).equals(namespace.level(1)))
-          .orElse(null);
+      for (TableEntity table : store.list(namespace, TableEntity.class, TABLE)) {
+        if (table.id() == id) {
+          return table.nameIdentifier();
+        }
+      }
+      // A table moved outside Gravitino remains registered under its old schema. Searching only
+      // the destination schema would miss that row and try to insert its already-used ID again.
+      Namespace catalogNamespace = Namespace.of(namespace.level(0), namespace.level(1));
+      for (SchemaEntity schema : store.list(catalogNamespace, SchemaEntity.class, SCHEMA)) {
+        Namespace schemaNamespace =
+            Namespace.of(namespace.level(0), namespace.level(1), schema.name());
+        if (schemaNamespace.equals(namespace)) {
+          continue;
+        }
+        for (TableEntity table : store.list(schemaNamespace, TableEntity.class, TABLE)) {
+          if (table.id() == id) {
+            return table.nameIdentifier();
+          }
+        }
+      }
+      return null;
     } catch (IOException e) {
       throw new GravitinoRuntimeException(
           e, "Failed to look up the table registered with id %d under %s", id, namespace);

@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -114,36 +113,6 @@ public class TestTableMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(table, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(tableCopy, false));
-  }
-
-  @TestTemplate
-  public void testFindTableIdentifierById() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    createAndInsertCatalog(metalakeName, catalogName);
-    createAndInsertSchema(metalakeName, catalogName, schemaName);
-    Namespace tableNs = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
-    TableEntity table =
-        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "id_lookup", AUDIT_INFO);
-    backend.insert(table, false);
-
-    Assertions.assertEquals(
-        Optional.of(table.nameIdentifier()),
-        backend.findIdentifierById(table.id(), Entity.EntityType.TABLE));
-    Assertions.assertEquals(
-        Optional.empty(),
-        backend.findIdentifierById(RandomIdGenerator.INSTANCE.nextId(), Entity.EntityType.TABLE));
-
-    NameIdentifier renamed = NameIdentifier.of(tableNs, "id_lookup_renamed");
-    backend.update(
-        table.nameIdentifier(),
-        Entity.EntityType.TABLE,
-        e -> createTableEntity(table.id(), tableNs, renamed.name(), AUDIT_INFO));
-    Assertions.assertEquals(
-        Optional.of(renamed), backend.findIdentifierById(table.id(), Entity.EntityType.TABLE));
-
-    Assertions.assertTrue(backend.delete(renamed, Entity.EntityType.TABLE, false));
-    Assertions.assertEquals(
-        Optional.empty(), backend.findIdentifierById(table.id(), Entity.EntityType.TABLE));
   }
 
   @TestTemplate

@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -95,18 +94,6 @@ public class TestMemoryEntityStore {
     @Override
     public boolean exists(NameIdentifier nameIdentifier, EntityType type) throws IOException {
       return entityMap.containsKey(nameIdentifier);
-    }
-
-    @Override
-    public Optional<NameIdentifier> findIdentifierById(long id, EntityType type) {
-      return entityMap.entrySet().stream()
-          .filter(
-              e ->
-                  e.getValue().type() == type
-                      && e.getValue() instanceof HasIdentifier
-                      && Long.valueOf(id).equals(((HasIdentifier) e.getValue()).id()))
-          .map(Map.Entry::getKey)
-          .findFirst();
     }
 
     @Override

@@ -769,11 +769,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Nullable
   private NameIdentifier findRegisteredSchemaById(Namespace namespace, long id) {
     try {
-      // A point lookup by id avoids listing every schema in the catalog on each import. An owner in
-      // another catalog is left to the store, which rejects the insert.
-      return store
-          .findIdentifierById(id, SCHEMA)
-          .filter(owner -> owner.namespace().equals(namespace))
+      return store.list(namespace, SchemaEntity.class, SCHEMA).stream()
+          .filter(s -> s.id() == id)
+          .map(SchemaEntity::nameIdentifier)
+          .findFirst()
           .orElse(null);
     } catch (IOException e) {
       throw new GravitinoRuntimeException(

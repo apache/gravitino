@@ -211,13 +211,6 @@ public class RelationalEntityStore
   }
 
   @Override
-  public Optional<NameIdentifier> findIdentifierById(long id, Entity.EntityType entityType)
-      throws IOException {
-    // The cache is keyed by name, so an ID lookup always reads the backend.
-    return backend.findIdentifierById(id, entityType);
-  }
-
-  @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
