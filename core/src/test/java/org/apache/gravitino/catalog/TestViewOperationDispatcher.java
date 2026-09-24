@@ -57,7 +57,6 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -538,11 +537,11 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     reset(entityStore);
     doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .doCallRealMethod()
         .when(entityStore)
         .getVersion(viewIdent, VIEW);
 
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
     Assertions.assertEquals(
         registered.id(), entityStore.get(viewIdent, VIEW, ViewEntity.class).id());
   }

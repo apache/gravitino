@@ -51,7 +51,6 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
@@ -276,11 +275,11 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
     reset(entityStore);
     doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .doCallRealMethod()
         .when(entityStore)
         .getVersion(topicIdent, TOPIC);
 
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+    Assertions.assertTrue(topicOperationDispatcher.dropTopic(topicIdent));
     Assertions.assertEquals(
         registered.id(), entityStore.get(topicIdent, TOPIC, TopicEntity.class).id());
   }

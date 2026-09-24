@@ -299,10 +299,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     validateAlterProperties(
                         catalog, HasPropertyMetadata::tablePropertiesMetadata, changes);
                     boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
-                    Optional<TableEntity> tableEntityBeforeRename =
-                        isRenameTable && !managed
-                            ? getTableEntityBeforeRename(ident)
-                            : Optional.empty();
+                    // Read the registration before the external call. Its id is the one the store
+                    // update below must still find; reading it after the call could pick up an
+                    // entity re-created under the same name in between.
+                    Optional<TableEntity> tableEntityBeforeAlter =
+                        managed ? Optional.empty() : getTableEntityBeforeAlter(ident);
                     TableChange[] normalizedChanges =
                         applyCapabilities(catalog.capabilities(), changes);
                     Table table =
@@ -310,7 +311,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             tableOps -> tableOps.alterTable(ident, normalizedChanges));
                     return new AlterTableCatalogResult(
                         snapshotTable(catalog, table, managed),
-                        tableEntityBeforeRename,
+                        tableEntityBeforeAlter,
                         resolveColumnNameChanges(normalizedChanges));
                   },
                   NoSuchTableException.class,
@@ -324,15 +325,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
-          TableEntity te = catalogResult.tableEntityBeforeRename.orElse(null);
-          if (stringId == null) {
-            if (te == null) {
-              te = getEntity(ident, TABLE, TableEntity.class);
-            }
-            if (te == null) {
-              return EntityCombinedTable.of(alteredTable)
-                  .withHiddenProperties(catalogResult.hiddenProperties);
-            }
+          TableEntity te = catalogResult.tableEntityBeforeAlter.orElse(null);
+          if (stringId == null && te == null) {
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenProperties(catalogResult.hiddenProperties);
           }
 
           long tableId;
@@ -505,14 +501,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         .orElse(tableIdent.namespace());
   }
 
-  private Optional<TableEntity> getTableEntityBeforeRename(NameIdentifier ident) {
+  private Optional<TableEntity> getTableEntityBeforeAlter(NameIdentifier ident) {
     try {
       return Optional.of(store.get(ident, TABLE, TableEntity.class));
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          e, "Failed to read the stored registration for table %s before renaming it", ident);
+          e, "Failed to read the stored registration for table %s before altering it", ident);
     }
   }
 
@@ -710,7 +706,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .build();
 
     try {
-      store.put(tableEntity, true /* overwrite */);
+      putCreatedEntity(tableEntity, false /* cascade */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
@@ -1062,15 +1058,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
   private static final class AlterTableCatalogResult extends TableCatalogResult {
 
-    private final Optional<TableEntity> tableEntityBeforeRename;
+    private final Optional<TableEntity> tableEntityBeforeAlter;
     private final Map<String, String> columnNameChanges;
 
     private AlterTableCatalogResult(
         TableCatalogResult tableResult,
-        Optional<TableEntity> tableEntityBeforeRename,
+        Optional<TableEntity> tableEntityBeforeAlter,
         Map<String, String> columnNameChanges) {
       super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
-      this.tableEntityBeforeRename = tableEntityBeforeRename;
+      this.tableEntityBeforeAlter = tableEntityBeforeAlter;
       this.columnNameChanges = columnNameChanges;
     }
   }

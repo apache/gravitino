@@ -34,6 +34,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
@@ -57,6 +58,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
@@ -336,17 +338,171 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // and by the time it reaches the store another node has re-created t under a new id.
     reset(entityStore);
     doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .doCallRealMethod()
         .when(entityStore)
         .getVersion(tableIdent, TABLE);
 
-    // The drop reports the conflict instead of deleting whatever is under the name now.
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+    // The external drop succeeded, so the drop reports success instead of a conflict that would
+    // invite a retry against the new incarnation, and it does not delete what is under the name.
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
 
     // The external table is gone, but the newer registration was not deleted under it.
     Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
     Assertions.assertEquals(
         registered.id(), entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+  }
+
+  /**
+   * Another node re-creates a table through Gravitino while this node's drop of the same name is
+   * between its external drop and its store delete. The relational store's overwrite (ON DUPLICATE
+   * KEY UPDATE on MySQL and H2) keeps the stored id when the name matches, so an overwrite would
+   * hand the new table the observed id and the drop's identity fence would delete it.
+   */
+  @Test
+  public void testTableRecreatedDuringDropKeepsItsOwnRegistration() throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRecreate");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    long droppedId = entityStore.get(tableIdent, TABLE, TableEntity.class).id();
+
+    // Model the relational overwrite: a row already stored under the name keeps its id.
+    doAnswer(
+            invocation -> {
+              TableEntity incoming = invocation.getArgument(0);
+              NameIdentifier ident = incoming.nameIdentifier();
+              if (entityStore.exists(ident, TABLE)) {
+                long storedId = entityStore.get(ident, TABLE, TableEntity.class).id();
+                entityStore.delete(ident, TABLE, false);
+                incoming =
+                    TableEntity.builder()
+                        .withId(storedId)
+                        .withName(incoming.name())
+                        .withNamespace(incoming.namespace())
+                        .withColumns(incoming.columns())
+                        .withAuditInfo(incoming.auditInfo())
+                        .build();
+              }
+              entityStore.put(incoming, false);
+              return null;
+            })
+        .when(entityStore)
+        .put(any(TableEntity.class), eq(true));
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    TestCatalogOperations ops = spy(realOps);
+    doAnswer(
+            invocation -> {
+              Object dropped = invocation.callRealMethod();
+              // The other node re-creates t before this drop reaches the store.
+              tableOperationDispatcher.createTable(
+                  tableIdent, columns, "recreated", props, new Transform[0]);
+              return dropped;
+            })
+        .when(ops)
+        .dropTable(tableIdent);
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+
+      long recreatedId =
+          StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()).id();
+      Assertions.assertNotEquals(droppedId, recreatedId);
+      Assertions.assertEquals(
+          recreatedId, entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * An imported table carries no identifier in its external properties, so the id the store update
+   * is fenced on must come from the registration read before the external alter, not after it.
+   */
+  @Test
+  public void testAlterImportedTableDoesNotUpdateRegistrationRecreatedDuringAlter()
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaAlterRecreate");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "imported");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    realOps.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0], null, null, null);
+    tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertNull(
+        StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()));
+    TableEntity imported = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Another node replaces the registration while the external alter runs.
+    TableEntity recreated =
+        TableEntity.builder()
+            .withId(imported.id() + 1)
+            .withName(tableIdent.name())
+            .withNamespace(tableNs)
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("other").withCreateTime(Instant.now()).build())
+            .build();
+    TestCatalogOperations ops = spy(realOps);
+    doAnswer(
+            invocation -> {
+              Object altered = invocation.callRealMethod();
+              entityStore.delete(tableIdent, TABLE, false);
+              entityStore.put(recreated, false);
+              return altered;
+            })
+        .when(ops)
+        .alterTable(eq(tableIdent), any(TableChange[].class));
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k2", "v2"));
+
+      TableEntity stored = entityStore.get(tableIdent, TABLE, TableEntity.class);
+      Assertions.assertEquals(recreated.id(), stored.id());
+      Assertions.assertNull(stored.auditInfo().lastModifier());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * A concurrent store write to the same table during its drop moves the row version. The external
+   * table is already gone, so the delete is retried instead of reporting a conflict that a retried
+   * drop could never resolve.
+   */
+  @Test
+  public void testDropTableRetriesDeleteAfterConcurrentUpdateOfTheSameTable() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRetry");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+
+    reset(entityStore);
+    doThrow(new OptimisticLockException("concurrent update"))
+        .doCallRealMethod()
+        .when(entityStore)
+        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
   }
 
   @Test

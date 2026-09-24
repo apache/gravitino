@@ -25,10 +25,12 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -48,11 +50,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -398,14 +400,53 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     reset(entityStore);
     doReturn(EntityVersion.of(registered.id() - 1, 0L))
+        .doCallRealMethod()
         .when(entityStore)
         .getVersion(schemaIdent, SCHEMA);
 
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> dispatcher.dropSchema(schemaIdent, true));
+    Assertions.assertTrue(dispatcher.dropSchema(schemaIdent, true));
     Assertions.assertEquals(
         registered.id(), entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class).id());
     Assertions.assertTrue(entityStore.exists(child.nameIdentifier(), TABLE));
+  }
+
+  /**
+   * The schema is re-created in the catalog while its cascading drop runs, and a child is
+   * registered under the still-stored row. The identity fence on the schema cannot tell that child
+   * apart from the dropped schema's children, so the drop keeps the registrations instead of
+   * cascading.
+   */
+  @Test
+  void testCascadingDropKeepsChildrenOfSchemaRecreatedDuringExternalDrop() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_recreated");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+    TableEntity child =
+        TestUtil.getTestTableEntity(
+            idGenerator.nextId(), "child", Namespace.of(metalake, catalog, schemaIdent.name()));
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    TestCatalogOperations ops = spy(realOps);
+    doAnswer(
+            invocation -> {
+              Object dropped = invocation.callRealMethod();
+              // Re-created outside Gravitino; a child is then registered under the old row.
+              realOps.createSchema(schemaIdent, "recreated", ImmutableMap.of());
+              entityStore.put(child, false);
+              return dropped;
+            })
+        .when(ops)
+        .dropSchema(schemaIdent, true);
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      Assertions.assertTrue(dispatcher.dropSchema(schemaIdent, true));
+      Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+      Assertions.assertTrue(entityStore.exists(child.nameIdentifier(), TABLE));
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
   }
 
   @Test

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -60,6 +61,12 @@ import org.slf4j.LoggerFactory;
 public abstract class OperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(OperationDispatcher.class);
+
+  /**
+   * How many times a fenced delete is retried while the observed entity keeps being updated by
+   * concurrent store writes.
+   */
+  private static final int MAX_FENCED_DELETE_ATTEMPTS = 3;
 
   private final CatalogManager catalogManager;
 
@@ -295,10 +302,17 @@ public abstract class OperationDispatcher {
   /**
    * Deletes the registration observed before an external-catalog call, and only that one.
    *
-   * <p>A registration that changed in between belongs to a newer incarnation of the entity, or to a
-   * concurrent writer; it is left alone and the conflict is reported, so a reconcile pass can
-   * decide what to do with it. Deleting it by name would remove a live entity's row and every
-   * attachment on it.
+   * <p>The external drop has already succeeded when this runs, so a conflict is not reported to the
+   * caller: a failed request would invite a retry, and by now the name may belong to a newly
+   * created object that the retry would drop. Instead:
+   *
+   * <ul>
+   *   <li>A registration with another id belongs to a newer incarnation. It is kept, and a
+   *       reconcile pass, not this drop, decides what happens to it.
+   *   <li>The same id with a newer version means a concurrent store write to the entity that was
+   *       just dropped. The fenced delete is retried, because giving up would leave a registration
+   *       whose external object is gone, and a retried drop would no longer reach the store.
+   * </ul>
    *
    * @param ident the entity identifier
    * @param type the entity type
@@ -306,7 +320,7 @@ public abstract class OperationDispatcher {
    * @param observed the id and version read before the external call, or null when there was no
    *     registration to delete
    * @return true if the observed registration was deleted
-   * @throws OptimisticLockException if the registration under the name is not the observed one
+   * @throws OptimisticLockException if the observed entity kept changing on every attempt
    * @throws UnsupportedOperationException if the store cannot delete with a version check
    */
   protected boolean deleteObservedRegistration(
@@ -321,25 +335,87 @@ public abstract class OperationDispatcher {
           ident);
       return false;
     }
-    try {
-      return store.delete(ident, type, cascade, observed);
-    } catch (OptimisticLockException e) {
-      // The row under the name is not the one this drop started with: a newer incarnation, or a
-      // concurrent write. It stays in the store and the caller learns that the registration was
-      // not cleaned up; a reconcile pass, not this drop, decides what happens to the row.
-      LOG.warn(
-          "The {} registration of {} changed while the external drop ran (expected {}); it is "
-              + "kept instead of being deleted under the new incarnation",
-          type.name().toLowerCase(Locale.ROOT),
-          ident,
-          observed);
-      throw e;
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The {} to be dropped does not exist in the store: {}", type, ident, e);
-      return false;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return store.delete(ident, type, cascade, observed);
+      } catch (OptimisticLockException e) {
+        EntityVersion current = observeRegistration(ident, type);
+        if (current == null) {
+          LOG.warn(
+              "The {} registration of {} was removed concurrently while the external drop ran",
+              type.name().toLowerCase(Locale.ROOT),
+              ident);
+          return false;
+        }
+        if (current.id() != observed.id()) {
+          LOG.warn(
+              "The {} registration of {} changed while the external drop ran (expected {}, found"
+                  + " {}); it is kept instead of being deleted under the new incarnation",
+              type.name().toLowerCase(Locale.ROOT),
+              ident,
+              observed,
+              current);
+          return false;
+        }
+        if (attempt >= MAX_FENCED_DELETE_ATTEMPTS) {
+          throw e;
+        }
+        LOG.info(
+            "The {} registration of {} was updated concurrently; retrying the delete (attempt {})",
+            type.name().toLowerCase(Locale.ROOT),
+            ident,
+            attempt + 1);
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The {} to be dropped does not exist in the store: {}", type, ident, e);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
+  }
+
+  /**
+   * Stores the registration of an entity that the external catalog has just created.
+   *
+   * <p>A successful external create proves that no object currently lives under the name, so a
+   * registration still stored there with another id is stale: its object was dropped out of band,
+   * or by a drop on another server that has not reached the store yet. An upsert by name would keep
+   * that row's id and hand its owner, tags, and grants to the new object, and the pending drop's
+   * identity fence would then pass and delete the new registration. The stale row is replaced
+   * instead: deleted fenced on its own id, then the new registration is inserted.
+   *
+   * @param entity the registration of the newly created object
+   * @param cascade whether a stale registration is deleted with its children
+   * @param <E> the entity type
+   * @throws IOException if a store operation fails
+   * @throws OptimisticLockException if the stale registration changed while it was replaced
+   */
+  protected <E extends Entity & HasIdentifier> void putCreatedEntity(E entity, boolean cascade)
+      throws IOException {
+    try {
+      store.put(entity, false /* overwrite */);
+      return;
+    } catch (EntityAlreadyExistsException e) {
+      // A registration already sits under the name; decide below whether it is stale.
+    }
+
+    NameIdentifier ident = entity.nameIdentifier();
+    EntityVersion existing = observeRegistration(ident, entity.type());
+    if (existing != null && existing.id() == entity.id()) {
+      // The same object is already registered, for example by a retried create.
+      store.put(entity, true /* overwrite */);
+      return;
+    }
+    if (existing != null) {
+      LOG.warn(
+          "Replacing the stale {} registration {} of {} with the newly created object {}",
+          entity.type().name().toLowerCase(Locale.ROOT),
+          existing,
+          ident,
+          entity.id());
+      store.delete(ident, entity.type(), cascade, existing);
+    }
+    store.put(entity, false /* overwrite */);
   }
 
   /**

@@ -238,8 +238,11 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
-          Optional<ViewEntity> viewEntityBeforeRename =
-              isRenameView && !isManagedView ? getViewEntityBeforeRename(ident) : Optional.empty();
+          // Read the registration before the external call. Its id is the one the store update
+          // below must still find; reading it after the call could pick up a view re-created
+          // under the same name in between.
+          Optional<ViewEntity> viewEntityBeforeAlter =
+              isManagedView ? Optional.empty() : getViewEntityBeforeAlter(ident);
           View alteredView =
               doWithCatalog(
                   catalogIdent,
@@ -260,19 +263,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           StringIdentifier stringId = getStringIdFromProperties(alteredView.properties());
           // Case 1: The view is not created by Gravitino and this view is never imported.
-          ViewEntity existing = viewEntityBeforeRename.orElse(null);
-          if (stringId == null) {
-            if (existing == null) {
-              existing = getEntity(ident, VIEW, ViewEntity.class);
-            }
-            if (existing == null) {
-              return EntityCombinedView.of(alteredView)
-                  .withHiddenProperties(
-                      getMaskAndOmitKeys(
-                          catalogIdent,
-                          HasPropertyMetadata::tablePropertiesMetadata,
-                          alteredView.properties()));
-            }
+          ViewEntity existing = viewEntityBeforeAlter.orElse(null);
+          if (stringId == null && existing == null) {
+            return EntityCombinedView.of(alteredView)
+                .withHiddenProperties(
+                    getMaskAndOmitKeys(
+                        catalogIdent,
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredView.properties()));
           }
 
           long viewId = stringId != null ? stringId.id() : existing.id();
@@ -431,7 +429,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .build();
 
     try {
-      store.put(viewEntity, true /* overwrite */);
+      putCreatedEntity(viewEntity, false /* cascade */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)
@@ -451,14 +449,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                 catalogView.properties()));
   }
 
-  private Optional<ViewEntity> getViewEntityBeforeRename(NameIdentifier ident) {
+  private Optional<ViewEntity> getViewEntityBeforeAlter(NameIdentifier ident) {
     try {
       return Optional.of(store.get(ident, VIEW, ViewEntity.class));
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          e, "Failed to read the stored registration for view %s before renaming it", ident);
+          e, "Failed to read the stored registration for view %s before altering it", ident);
     }
   }
 

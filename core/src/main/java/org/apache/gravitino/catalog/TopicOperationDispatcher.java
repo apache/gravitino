@@ -396,7 +396,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, true /* overwrite */);
+      putCreatedEntity(topicEntity, false /* cascade */);
     } catch (Exception e) {
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)

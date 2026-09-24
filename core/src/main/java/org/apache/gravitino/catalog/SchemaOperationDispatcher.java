@@ -226,7 +226,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build();
 
             try {
-              store.put(schemaEntity, true /* overwrite */);
+              putCreatedEntity(schemaEntity, true /* cascade */);
             } catch (Exception e) {
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
               return EntityCombinedSchema.of(schema)
@@ -311,13 +311,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
+          // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
+          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+          // Read the registration before the external call. Its id is the one the store update
+          // below must still find; reading it after the call could pick up a schema re-created
+          // under the same name in between.
+          SchemaEntity se = isManagedSchema ? null : getEntity(ident, SCHEMA, SchemaEntity.class);
           Pair<Schema, SchemaChange[]> alterResult =
               alterSchemaUnderLock(ident, catalogIdent, changes);
           Schema alteredSchema = alterResult.getLeft();
           SchemaChange[] effectiveChanges = alterResult.getRight();
 
-          // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
-          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
@@ -329,17 +333,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
           StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
           // Case 1: The schema is not created by Gravitino and this schema is never imported.
-          SchemaEntity se = null;
-          if (stringId == null) {
-            se = getEntity(ident, SCHEMA, SchemaEntity.class);
-            if (se == null) {
-              return EntityCombinedSchema.of(alteredSchema)
-                  .withHiddenProperties(
-                      getMaskAndOmitKeys(
-                          catalogIdent,
-                          HasPropertyMetadata::schemaPropertiesMetadata,
-                          alteredSchema.properties()));
-            }
+          if (stringId == null && se == null) {
+            return EntityCombinedSchema.of(alteredSchema)
+                .withHiddenProperties(
+                    getMaskAndOmitKeys(
+                        catalogIdent,
+                        HasPropertyMetadata::schemaPropertiesMetadata,
+                        alteredSchema.properties()));
           }
 
           long schemaId;
@@ -583,7 +583,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // registration is still the one observed before the external call.
           boolean droppedFromStore = false;
           if (droppedFromCatalog || cascade) {
-            droppedFromStore = deleteObservedRegistration(ident, SCHEMA, true, observed);
+            // The cascade removes every child registered under the observed row, including one
+            // registered after the observation, which the identity fence on the schema cannot
+            // tell apart. A child can only be created while the schema exists in the catalog, so
+            // if it exists again the name was re-created meanwhile: keep its registrations.
+            if (schemaRecreatedInCatalog(catalogIdent, ident)) {
+              LOG.warn(
+                  "Schema {} exists in the catalog again after it was dropped; keeping its"
+                      + " registration and children instead of deleting them",
+                  ident);
+            } else {
+              droppedFromStore = deleteObservedRegistration(ident, SCHEMA, true, observed);
+            }
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(
@@ -672,6 +683,20 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import schema entity to the store", e);
+    }
+  }
+
+  /**
+   * Checks whether a dropped schema exists in the catalog again. A failed check is treated as "not
+   * re-created", so the store delete proceeds as it did before this check existed.
+   */
+  private boolean schemaRecreatedInCatalog(NameIdentifier catalogIdent, NameIdentifier ident) {
+    try {
+      return doWithCatalog(
+          catalogIdent, c -> c.doWithSchemaOps(s -> s.schemaExists(ident)), RuntimeException.class);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to check whether schema {} was re-created after its drop", ident, e);
+      return false;
     }
   }
 
