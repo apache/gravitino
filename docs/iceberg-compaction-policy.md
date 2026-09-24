@@ -128,7 +128,11 @@ Policy policy =
 </TabItem>
 </Tabs>
 
-## Attach Policy to Metadata Objects
+## Apply the Policy Through a Tag
 
-After the policy is created, associate it with a catalog, schema, or table through standard policy association APIs.
-The optimizer will read the generated rules and properties to evaluate strategy triggering and job submission context.
+After creating the policy, create or reuse a tag, associate the policy with that tag using the
+`ALL_VALUES` selector, and assign the tag to a table or one of its ancestors. The optimizer reads
+the table's derived policies to evaluate strategy triggering and job submission context. See
+[Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) for association
+operations and the [Table maintenance service walkthrough](./table-maintenance-service/optimizer.md#step-4-configure-a-compaction-policy-through-a-tag)
+for a complete REST example.
