@@ -301,19 +301,3 @@ jobs:
         run: |
           echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
-
-  # Single status check that summarizes every build shard, so branch protection does not need to
-  # track individual shard names.
-  build-result:
-    runs-on: ubuntu-latest
-    needs: [ changes, compile-check, spark-connector-build, build, coverage ]
-    if: always()
-    steps:
-      - name: Check build results
-        run: |
-          results='${{ toJSON(needs.*.result) }}'
-          echo "${results}"
-          if echo "${results}" | grep -Eq '"(failure|cancelled)"'; then
-            echo "At least one build job failed or was cancelled."
-            exit 1
-          fi

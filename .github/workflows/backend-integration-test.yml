@@ -83,19 +83,3 @@ jobs:
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
       shard: ${{ matrix.shard }}
-
-  # Single status check that summarizes every backend integration test shard, so branch protection
-  # does not need to track individual shard names.
-  BackendIT-result:
-    runs-on: ubuntu-22.04
-    needs: [ changes, BackendIT ]
-    if: always()
-    steps:
-      - name: Check backend integration test results
-        run: |
-          results='${{ toJSON(needs.*.result) }}'
-          echo "${results}"
-          if echo "${results}" | grep -Eq '"(failure|cancelled)"'; then
-            echo "At least one backend integration test shard failed or was cancelled."
-            exit 1
-          fi

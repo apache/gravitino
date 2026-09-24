@@ -67,16 +67,12 @@ BUILD_DOCKER=(
 )
 
 # ---- backend-it suite --------------------------------------------------------------------------
+# client-java, catalog-fileset and filesystem-hadoop3 stay in `others`: together with the remaining
+# modules they still finish before the slowest shard, and one less shard saves a job per backend.
 BACKEND_IT_HIVE=(
   :catalogs:catalog-hive
   :catalogs:catalog-glue
   :catalogs:catalog-lakehouse-hudi
-)
-
-BACKEND_IT_CLIENT=(
-  :clients:client-java
-  :catalogs:catalog-fileset
-  :clients:filesystem-hadoop3
 )
 
 BACKEND_IT_LAKEHOUSE=(
@@ -95,7 +91,7 @@ usage() {
 shards_of() {
   case "$1" in
     build) echo "core docker others" ;;
-    backend-it) echo "hive client lakehouse others" ;;
+    backend-it) echo "hive lakehouse others" ;;
     *) echo "Unknown suite: $1" >&2; usage ;;
   esac
 }
@@ -106,7 +102,6 @@ projects_var() {
     build/core) echo BUILD_CORE ;;
     build/docker) echo BUILD_DOCKER ;;
     backend-it/hive) echo BACKEND_IT_HIVE ;;
-    backend-it/client) echo BACKEND_IT_CLIENT ;;
     backend-it/lakehouse) echo BACKEND_IT_LAKEHOUSE ;;
     *) echo "Unknown shard '$2' for suite '$1'" >&2; usage ;;
   esac
