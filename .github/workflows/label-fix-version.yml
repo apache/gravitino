@@ -17,133 +17,69 @@
 # under the License.
 #
 
-# Label the issues fixed by a merged PR with the version that the PR's base
-# branch is going to release, e.g. main (2.0.0-SNAPSHOT) -> "2.0.0",
-# branch-1.2 (1.2.2-SNAPSHOT) -> "1.2.2". If a release on the base branch is
-# still in progress (RC tagged but not released), that release is used
-# instead, e.g. branch-1.3 (1.3.2-SNAPSHOT, v1.3.1-rc2 only) -> "1.3.1".
-# Unassigned issues are also assigned to the PR author.
+# Label issues with the release their fix ships in, see
+# dev/ci/label_fix_version.sh for details.
 #
-# Issues are taken only from "[#123]" in the PR title and from the PR's
-# closing keywords (e.g. "Fix: #123"). PRs without an issue are skipped.
+# - When a PR is merged, its issues get the version of the merge commit,
+#   e.g. main (2.0.0-SNAPSHOT) -> "2.0.0", and unassigned issues are assigned
+#   to the PR author.
+# - The release script bumps to the next SNAPSHOT right after tagging an RC,
+#   so when a later RC is tagged, the issues fixed since the previous RC are
+#   moved to that release, e.g. v1.3.1-rc2 moves them from "1.3.2" to "1.3.1".
 #
-# This uses pull_request_target so that PRs from forks get a token that can
-# write labels. It never checks out PR code, and all PR-controlled values are
-# passed through env to avoid script injection.
+# The merge job uses pull_request_target so that PRs from forks get a token
+# that can write labels. It never checks out PR code, and all PR-controlled
+# values are passed through env to avoid script injection.
 
-name: Label issues with fix version and assign author
+name: Label issues with fix version
 
 on:
   pull_request_target:
     types: [closed]
+  push:
+    tags:
+      - 'v*-rc*'
 
 permissions:
-  issues: write
-  pull-requests: read
   contents: read
+  issues: write
 
 jobs:
-  label-fix-version:
-    if: github.event.pull_request.merged == true
+  label-on-merge:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Label linked issues
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Only the trusted default branch, never the PR head.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Label and assign linked issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
-        run: |
-          set -euo pipefail
+        run: dev/ci/label_fix_version.sh merge
 
-          # 1. Collect issue numbers from the title and closing keywords. Title
-          #    ids may come as "[#1][#2]", "[#1 ][#2]" or "[#1, #2]"; the trailing
-          #    "(#PR)" is not in brackets and is ignored.
-          TITLE_ISSUES=$(printf '%s' "$PR_TITLE" | grep -oE '\[[^]]*\]' | grep -oE '#[0-9]+' \
-            | tr -d '#' || true)
-          CLOSING_ISSUES=$(gh api graphql \
-            -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR_NUMBER" \
-            -f query='
-              query($owner: String!, $name: String!, $number: Int!) {
-                repository(owner: $owner, name: $name) {
-                  pullRequest(number: $number) {
-                    closingIssuesReferences(first: 50) {
-                      nodes { number repository { nameWithOwner } }
-                    }
-                  }
-                }
-              }' \
-            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[]
-                  | select(.repository.nameWithOwner == env.REPO) | .number' || true)
-          ISSUES=$(printf '%s\n%s\n' "$TITLE_ISSUES" "$CLOSING_ISSUES" | grep -E '^[0-9]+$' | sort -un || true)
+  label-on-rc:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-          if [ -z "$ISSUES" ]; then
-            echo "No linked issue found for PR #$PR_NUMBER, skipping."
-            exit 0
-          fi
-
-          # 2. Resolve the version to be released from the base branch.
-          VERSION=$(gh api "repos/$REPO/contents/gradle.properties?ref=$BASE_REF" --jq '.content' \
-            | base64 -d | sed -n 's/^version[[:space:]]*=[[:space:]]*//p' | tr -d '[:space:]' \
-            | sed 's/-SNAPSHOT$//')
-          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Unexpected version '$VERSION' on $BASE_REF, skipping."
-            exit 0
-          fi
-
-          # The release script bumps to the next SNAPSHOT right after tagging an
-          # RC, so while a release is being voted (RC tag exists but the final
-          # tag doesn't), fixes still target that release, e.g. 1.3.2-SNAPSHOT
-          # with v1.3.1-rc2 but no v1.3.1 -> "1.3.1".
-          TAGS=$(gh api --paginate "repos/$REPO/git/matching-refs/tags/v${VERSION%.*}." \
-            --jq '.[].ref | sub("^refs/tags/v"; "")')
-          PENDING=$(printf '%s\n' "$TAGS" | sed -n 's/-rc[0-9]*$//p' | sort -uV \
-            | while read -r V; do grep -qxF "$V" <<< "$TAGS" || echo "$V"; done | head -1)
-          if [ -n "$PENDING" ] && [ "$PENDING" != "$VERSION" ] \
-              && [ "$(printf '%s\n%s\n' "$PENDING" "$VERSION" | sort -V | head -1)" = "$PENDING" ]; then
-            echo "Release $PENDING is in progress on $BASE_REF."
-            VERSION="$PENDING"
-          fi
-          echo "PR #$PR_NUMBER merged into $BASE_REF, fix version: $VERSION"
-
-          # 3. Make sure the label exists, following the existing convention.
-          if ! gh label list --repo "$REPO" --search "$VERSION" --limit 100 --json name \
-              --jq '.[].name' | grep -qxF "$VERSION"; then
-            gh label create "$VERSION" --repo "$REPO" \
-              --description "Release v$VERSION" --color "$(openssl rand -hex 3)" \
-              || echo "Label $VERSION may already exist."
-          fi
-
-          # 4. Label each linked issue, skipping PR numbers, and assign it to
-          #    the PR author if it has no assignee yet.
-          for ISSUE in $ISSUES; do
-            INFO=$(gh api "repos/$REPO/issues/$ISSUE" \
-              --jq '"\(has("pull_request")) \(.assignees | length)"' || echo "error")
-            read -r IS_PR ASSIGNEE_COUNT <<< "$INFO"
-            if [ "$IS_PR" != "false" ]; then
-              echo "#$ISSUE is not an issue in $REPO, skipping."
-              continue
-            fi
-            gh issue edit "$ISSUE" --repo "$REPO" --add-label "$VERSION"
-            echo "Labeled issue #$ISSUE with $VERSION."
-
-            if [ "$ASSIGNEE_COUNT" != "0" ]; then
-              continue
-            fi
-            if [ "$PR_AUTHOR_TYPE" = "Bot" ]; then
-              echo "PR author $PR_AUTHOR is a bot, not assigning #$ISSUE."
-              continue
-            fi
-            # GitHub silently drops assignees it doesn't accept, so check the result.
-            ASSIGNED=$(gh api -X POST "repos/$REPO/issues/$ISSUE/assignees" \
-              -f "assignees[]=$PR_AUTHOR" --jq '[.assignees[].login] | index(env.PR_AUTHOR) != null' \
-              || echo "false")
-            if [ "$ASSIGNED" = "true" ]; then
-              echo "Assigned issue #$ISSUE to $PR_AUTHOR."
-            else
-              echo "Could not assign issue #$ISSUE to $PR_AUTHOR."
-            fi
-          done
+      - name: Move issues fixed since the previous RC to this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: dev/ci/label_fix_version.sh rc
