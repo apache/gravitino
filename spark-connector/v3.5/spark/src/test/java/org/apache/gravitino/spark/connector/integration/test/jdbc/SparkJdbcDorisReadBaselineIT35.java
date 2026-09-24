@@ -51,6 +51,8 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   private static final String CATALOG_NAME = "jdbc_doris";
   private static final String DATABASE_NAME = "doris_spark_baseline_it";
   private static final String TABLE_NAME = "read_baseline";
+  private static final String PATTERN_MATCH_TABLE_NAME = "readxbaseline";
+  private static final String OTHER_DATABASE_NAME = "doris_spark_baseline_other_it";
   private static final String UNSUPPORTED_TABLE_NAME = "unsupported_json";
   private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
   private static final DorisImageName DORIS_IMAGE = DorisImageName.VERSION_3_0;
@@ -146,6 +148,54 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertEquals("one", rows.get(0)[1]);
     Assertions.assertEquals(2, rows.get(1)[0]);
     Assertions.assertEquals("two", rows.get(1)[1]);
+  }
+
+  @Test
+  void testReadIgnoresColumnsFromOtherTablesAndDatabases() throws Exception {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+        Statement statement = connection.createStatement()) {
+      statement.execute("CREATE DATABASE IF NOT EXISTS " + OTHER_DATABASE_NAME);
+      statement.execute("DROP TABLE IF EXISTS " + OTHER_DATABASE_NAME + "." + TABLE_NAME);
+      statement.execute(
+          "CREATE TABLE "
+              + OTHER_DATABASE_NAME
+              + "."
+              + TABLE_NAME
+              + " (unrelated INT) DISTRIBUTED BY HASH(unrelated) BUCKETS 1");
+      statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + PATTERN_MATCH_TABLE_NAME);
+      statement.execute(
+          "CREATE TABLE "
+              + DATABASE_NAME
+              + "."
+              + PATTERN_MATCH_TABLE_NAME
+              + " (unrelated INT) DISTRIBUTED BY HASH(unrelated) BUCKETS 1");
+
+      GravitinoDorisCatalogSpark35 sparkCatalog =
+          (GravitinoDorisCatalogSpark35)
+              getSparkSession().sessionState().catalogManager().catalog(CATALOG_NAME);
+      sparkCatalog.invalidateTable(Identifier.of(new String[] {DATABASE_NAME}, TABLE_NAME));
+      List<Object[]> rows =
+          sql(
+              "SELECT id, name FROM "
+                  + CATALOG_NAME
+                  + "."
+                  + DATABASE_NAME
+                  + "."
+                  + TABLE_NAME
+                  + " ORDER BY id");
+      Assertions.assertEquals(2, rows.size());
+      Assertions.assertEquals(1, rows.get(0)[0]);
+      Assertions.assertEquals("one", rows.get(0)[1]);
+      Assertions.assertEquals(2, rows.get(1)[0]);
+      Assertions.assertEquals("two", rows.get(1)[1]);
+    } finally {
+      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+          Statement statement = connection.createStatement()) {
+        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + PATTERN_MATCH_TABLE_NAME);
+        statement.execute("DROP TABLE IF EXISTS " + OTHER_DATABASE_NAME + "." + TABLE_NAME);
+        statement.execute("DROP DATABASE IF EXISTS " + OTHER_DATABASE_NAME);
+      }
+    }
   }
 
   @Test

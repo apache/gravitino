@@ -99,10 +99,16 @@ final class DorisPhysicalSchemaValidator35 {
   private static List<PhysicalColumn> loadJdbcColumns(Connection connection, Identifier identifier)
       throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
+    String database = identifier.namespace()[0];
+    String table = identifier.name();
     List<PhysicalColumn> columns = new ArrayList<>();
-    try (ResultSet resultSet =
-        metadata.getColumns(null, identifier.namespace()[0], identifier.name(), "%")) {
+    try (ResultSet resultSet = metadata.getColumns(database, database, table, "%")) {
       while (resultSet.next()) {
+        if (!table.equals(resultSet.getString("TABLE_NAME"))
+            || (!database.equals(resultSet.getString("TABLE_CAT"))
+                && !database.equals(resultSet.getString("TABLE_SCHEM")))) {
+          continue;
+        }
         String typeName = resultSet.getString("TYPE_NAME");
         columns.add(
             new PhysicalColumn(
