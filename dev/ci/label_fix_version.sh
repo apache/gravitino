@@ -36,6 +36,9 @@
 # "Fix: #1". Set DRY_RUN=true to print writes instead of running them.
 
 set -euo pipefail
+# Fail on errors inside command substitutions too (bash >= 4.4). The API calls
+# below also handle failures explicitly, so older bash still fails loudly.
+shopt -s inherit_errexit 2> /dev/null || true
 
 : "${REPO:?REPO must be set}"
 DRY_RUN=${DRY_RUN:-false}
@@ -87,9 +90,9 @@ ensure_label() {
 
 # Prints the release that contains the given merge commit.
 release_of_commit() {
-  local sha=$1 version tag status
+  local sha=$1 version tags tag status
   version=$(gh api "repos/$REPO/contents/gradle.properties?ref=$sha" --jq '.content' \
-    | base64 -d | parse_version)
+    | base64 -d | parse_version) || return 1
   if ! is_version "$version"; then
     echo "Unexpected version '$version' at $sha." >&2
     return 1
@@ -98,14 +101,15 @@ release_of_commit() {
   # The release script bumps to the next SNAPSHOT right after tagging an RC,
   # so a commit is in an earlier release only if a later RC of that release
   # was cut after it. Check the latest RC of each earlier release on this line.
-  for tag in $(gh api --paginate "repos/$REPO/git/matching-refs/tags/v${version%.*}." \
+  tags=$(gh api --paginate "repos/$REPO/git/matching-refs/tags/v${version%.*}." \
       --jq '.[].ref | sub("^refs/tags/"; "") | select(test("-rc[0-9]+$"))' \
-      | sort -V | awk -F'-rc' '!($1 in last) { order[++n] = $1 } { last[$1] = $0 }
-          END { for (i = 1; i <= n; i++) print last[order[i]] }'); do
+    | sort -V | awk -F'-rc' '!($1 in last) { order[++n] = $1 } { last[$1] = $0 }
+        END { for (i = 1; i <= n; i++) print last[order[i]] }') || return 1
+  for tag in $tags; do
     local tag_version=${tag#v}
     tag_version=${tag_version%-rc*}
     version_lt "$tag_version" "$version" || continue
-    status=$(gh api "repos/$REPO/compare/$tag...$sha" --jq '.status')
+    status=$(gh api "repos/$REPO/compare/$tag...$sha" --jq '.status') || return 1
     if [ "$status" = "behind" ] || [ "$status" = "identical" ]; then
       echo "$tag_version"
       return 0
@@ -117,8 +121,8 @@ release_of_commit() {
 on_merge() {
   : "${PR_NUMBER:?}" "${PR_TITLE:?}" "${MERGE_SHA:?}" "${PR_AUTHOR:?}" "${PR_AUTHOR_TYPE:?}"
   local issues version issue info is_pr assignee_count
-  assign_author_if_unassigned "$PR_NUMBER" \
-    "$(gh api "repos/$REPO/issues/$PR_NUMBER" --jq '.assignees | length')"
+  assignee_count=$(gh api "repos/$REPO/issues/$PR_NUMBER" --jq '.assignees | length')
+  assign_author_if_unassigned "$PR_NUMBER" "$assignee_count"
 
   issues=$(extract_issues "$PR_TITLE" "${PR_BODY:-}")
   if [ -z "$issues" ]; then
@@ -172,10 +176,14 @@ assign_author_if_unassigned() {
 # merge job uses, since rebase-merged commits don't carry the PR title.
 # Commits pushed without a PR fall back to their own message.
 issues_in_range() {
-  local sha prs pr json
+  local shas sha prs pr json
   local seen_prs=" "
-  for sha in $(git rev-list "$@"); do
-    json=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '[.[] | select(.merged_at != null)]')
+  shas=$(git rev-list "$@") || return 1
+  # The loop runs in a pipeline subshell, so a failed API call exits it and
+  # pipefail fails the caller instead of falling back to the commit message.
+  for sha in $shas; do
+    json=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '[.[] | select(.merged_at != null)]') \
+      || exit 1
     prs=$(jq -r '.[].number' <<< "$json")
     if [ -z "$prs" ]; then
       extract_issues "$(git log -1 --format=%s "$sha")" "$(git log -1 --format=%b "$sha")"
