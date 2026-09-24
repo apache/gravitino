@@ -264,31 +264,31 @@ APIs rely on discovery.
 
 `selectDueWork` vs discovery:
 
-|        | Claim due work (`table_maintenance_policy_state`)           | Discovery (`table_maintenance_discovery_state`)                                                |
-| ------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Config | `pollIntervalSecs` (default **60**)                         | `discoveryLeasePollIntervalSecs` (default **600**); `discoveryIntervalSecs` (default **3600**) |
-| Work   | Select existing policy-state rows with `next_due_at <= now` | Cluster-wide CAS claim → reconcile scope into `table_maintenance_policy_state`                 |
+|        | Claim due work (`table_maintenance_policy_state`)           | Discovery (`table_maintenance_discovery_state`)                                                    |
+| ------ | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Config | `scheduler.policy.poll-interval-secs` (default **60**)      | `scheduler.discovery.poll-interval-secs` (**600**); `scheduler.discovery.interval-secs` (**3600**) |
+| Work   | Select existing policy-state rows with `next_due_at <= now` | Cluster-wide CAS claim → reconcile scope into `table_maintenance_policy_state`                     |
 
 #### 5.3.1 Worker pool and claim (no pending queue)
 
-Each node runs a **fixed worker pool** (`workerThreads`, default **8**). Workers do **not** batch-load
-due rows into an in-memory queue.
+Each node runs a **fixed worker pool** (`policy.worker-threads`, default **8**). Workers do **not**
+batch-load due rows into an in-memory queue.
 
 ```text
-worker loop (× workerThreads):
-  SELECT up to candidateWindow due candidates   // IDLE or stale RUNNING; next_due_at <= now
-  if SELECT returns 0 rows → sleep pollIntervalSecs; continue
+worker loop (× policy.worker-threads):
+  SELECT up to policy.candidate-window due candidates   // IDLE or stale RUNNING; next_due_at <= now
+  if SELECT returns 0 rows → sleep policy.poll-interval-secs; continue
   try CAS claim one row (§6.1)                  // only if this worker is free
                                               // and no other activity RUNNING on same table
   if claim wins → heartbeat → submit Spark → release IDLE when done
   if CAS loses / table busy → try next candidate in the batch (do not sleep)
 ```
 
-| Concept            | Meaning                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------- |
-| `workerThreads`    | Max **concurrent** claims / in-flight submits on this node (default **8**).                       |
-| `candidateWindow`  | Max rows per **SELECT** for CAS retries (default **32**).                                         |
-| `pollIntervalSecs` | Sleep only when **SELECT returns 0 rows** (default **60**). CAS losses do not trigger this sleep. |
+| Concept                     | Meaning                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `policy.worker-threads`     | Max **concurrent** claims / in-flight submits on this node (default **8**).                       |
+| `policy.candidate-window`   | Max rows per **SELECT** for CAS retries (default **32**).                                         |
+| `policy.poll-interval-secs` | Sleep only when **SELECT returns 0 rows** (default **60**). CAS losses do not trigger this sleep. |
 
 **Claim at most free capacity:** if 8 workers are busy, do **not** claim more rows. Extra due rows stay
 `IDLE` (or reclaimable stale `RUNNING`) in `table_maintenance_policy_state` until a worker is free or another
@@ -307,9 +307,10 @@ Discovery expands schema / catalog attachments into **table-level**
 **Multi-node:** only **one** node runs a discovery round per due interval. Coordination uses
 `table_maintenance_discovery_state` with the **same** `IDLE` / `RUNNING` + `heartbeat_at` CAS as
 policy-state claim (§6.2). Each node polls this **one-row** table every
-`discoveryLeasePollIntervalSecs` (default **600** / 10 minutes). Winner runs reconcile; losers
-skip. On success: release to `IDLE` and set `next_due_at = now + discoveryIntervalSecs`
-(default **3600**). Stale `RUNNING` (missed heartbeats) is reclaimable like policy-state rows.
+`discovery.poll-interval-secs` (default **600** / 10 minutes). Winner runs reconcile; losers
+skip. On success: release to `IDLE` and set `next_due_at = now + discovery.interval-secs`
+(default **3600**). Stale `RUNNING` uses `discovery.heartbeat-timeout-secs` (default **300**),
+separate from `policy.heartbeat-timeout-secs`.
 
 **Catalog source:** list tables from the **Iceberg/HMS** backend used by IRC — not only Gravitino
 `table_meta`.
@@ -322,7 +323,7 @@ skip. On success: release to `IDLE` and set `next_due_at = now + discoveryInterv
 3. For each above-table attachment: listTables(scope) via Iceberg/HMS
 4. policy_id = effective_policy(table, type)  // nearest-wins
 5. INSERT / UPDATE / DELETE table_maintenance_policy_state rows for the scope
-6. Release discovery row → IDLE; next_due_at = now + discoveryIntervalSecs
+6. Release discovery row → IDLE; next_due_at = now + discovery.interval-secs
 ```
 
 **IRC table lifecycle hooks:** `createTable` / `updateTable` UPSERT or refresh ancestor state;
@@ -404,7 +405,7 @@ Identity for policy rows is `catalog_id` + `table_identifier` (`schema.table`), 
 **Scheduler** (same CAS as `iceberg_cleanup_job.markRunning`), plus **table-level exclusion**:
 
 ```text
-Both nodes SELECT up to candidateWindow due candidates → each free worker CAS-claims one:
+Both nodes SELECT up to policy.candidate-window due candidates → each free worker CAS-claims one:
   // Table mutex: skip candidate if another policy row for same (catalog_id, table_identifier)
   // is RUNNING with fresh heartbeat (any maintenance type).
   UPDATE … SET state=RUNNING, heartbeat_at=:now
@@ -418,7 +419,7 @@ Both nodes SELECT up to candidateWindow due candidates → each free worker CAS-
     → on success: IDLE + next_due_at = nextOccurrence(schedule)   // scheduler path
     → commit path: IDLE only (does not advance next_due_at)
   CAS loser / table busy → try next candidate in the batch (do not sleep)
-  SELECT returned 0 rows → sleep pollIntervalSecs
+  SELECT returned 0 rows → sleep policy.poll-interval-secs
 Never claim more rows than free workers; unclaimed due rows stay in table_maintenance_policy_state
 Heartbeats cover scheduler + commit-path claims (same pattern as iceberg_cleanup_job.heartbeat_at)
 ```
@@ -466,10 +467,10 @@ One seeded row (`id = 1`) for cluster-wide discovery. Same claim fields as polic
 `job_id` / `last_job_id` (discovery is not a Spark job). Follows entity-store convention: PK is
 `id` (`BIGINT`), not a string lease name.
 
-|       | `id`                       | `state`                | `next_due_at`                                                   | `heartbeat_at`                                     |
-| ----- | -------------------------- | ---------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
-| Type  | `BIGINT UNSIGNED NOT NULL` | `VARCHAR(16) NOT NULL` | `BIGINT NOT NULL`                                               | `BIGINT NOT NULL`                                  |
-| Notes | Singleton row; seed `1`    | `IDLE` / `RUNNING`     | Next discovery eligibility; advanced by `discoveryIntervalSecs` | Last discovery-worker heartbeat; stale reclaimable |
+|       | `id`                       | `state`                | `next_due_at`                                                     | `heartbeat_at`                                     |
+| ----- | -------------------------- | ---------------------- | ----------------------------------------------------------------- | -------------------------------------------------- |
+| Type  | `BIGINT UNSIGNED NOT NULL` | `VARCHAR(16) NOT NULL` | `BIGINT NOT NULL`                                                 | `BIGINT NOT NULL`                                  |
+| Notes | Singleton row; seed `1`    | `IDLE` / `RUNNING`     | Next discovery eligibility; advanced by `discovery.interval-secs` | Last discovery-worker heartbeat; stale reclaimable |
 
 ```sql
 CREATE TABLE IF NOT EXISTS `table_maintenance_discovery_state` (
@@ -482,9 +483,9 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_discovery_state` (
   COMMENT 'TMS cluster-wide discovery claim (one row)';
 ```
 
-**Claim loop (every node):** every `discoveryLeasePollIntervalSecs`, try CAS when
-`next_due_at <= now`; on win run §5.3.2 reconcile with heartbeats; on lose or not due, sleep until
-the next poll.
+**Claim loop (every node):** every `discovery.poll-interval-secs`, try CAS when
+`next_due_at <= now`; on win run §5.3.2 reconcile with heartbeats (stale reclaim via
+`discovery.heartbeat-timeout-secs`); on lose or not due, sleep until the next poll.
 
 ### 6.3 Table rename / drop lifecycle (required with string keys)
 
@@ -507,23 +508,24 @@ Every submission creates a `job_run_meta` row. On finish: update `last_job_id`, 
 
 ### 7.1 Enablement keys (`gravitino.conf`)
 
-| Key                                                              | Default | Description                                                             |
-| ---------------------------------------------------------------- | ------- | ----------------------------------------------------------------------- |
-| `gravitino.server.rest.extensionPackages`                        | none    | TMS Feature package.                                                    |
-| `gravitino.auxService.names`                                     | none    | Include `iceberg-rest` when using IRC.                                  |
-| `gravitino.maintenance.scheduler.pollIntervalSecs`               | `60`    | Sleep when SELECT returns 0 due policy-state rows (§5.3.1).             |
-| `gravitino.maintenance.scheduler.workerThreads`                  | `8`     | Concurrent claim/submit workers per node (§5.3.1).                      |
-| `gravitino.maintenance.scheduler.candidateWindow`                | `32`    | Max SELECT candidates per claim attempt (§5.3.1).                       |
-| `gravitino.maintenance.scheduler.discoveryLeasePollIntervalSecs` | `600`   | How often each node polls `table_maintenance_discovery_state` (§5.3.2). |
-| `gravitino.maintenance.scheduler.discoveryIntervalSecs`          | `3600`  | Advance discovery `next_due_at` after a successful round (§5.3.2).      |
-| `gravitino.maintenance.scheduler.heartbeatTimeoutSecs`           | `300`   | Stale `heartbeat_at` → reclaim `RUNNING` (§6.1, §6.2).                  |
+| Key                                                                | Default | Description                                                                |
+| ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------- |
+| `gravitino.server.rest.extensionPackages`                          | none    | TMS Feature package.                                                       |
+| `gravitino.auxService.names`                                       | none    | Include `iceberg-rest` when using IRC.                                     |
+| `gravitino.maintenance.scheduler.policy.poll-interval-secs`        | `60`    | Sleep when SELECT returns 0 due policy-state rows (§5.3.1).                |
+| `gravitino.maintenance.scheduler.policy.worker-threads`            | `8`     | Concurrent claim/submit workers per node (§5.3.1).                         |
+| `gravitino.maintenance.scheduler.policy.candidate-window`          | `32`    | Max SELECT candidates per claim attempt (§5.3.1).                          |
+| `gravitino.maintenance.scheduler.policy.heartbeat-timeout-secs`    | `300`   | Stale policy-state `heartbeat_at` → reclaim `RUNNING` (§6.1).              |
+| `gravitino.maintenance.scheduler.discovery.poll-interval-secs`     | `600`   | How often each node polls `table_maintenance_discovery_state` (§5.3.2).    |
+| `gravitino.maintenance.scheduler.discovery.interval-secs`          | `3600`  | Advance discovery `next_due_at` after a successful round (§5.3.2).         |
+| `gravitino.maintenance.scheduler.discovery.heartbeat-timeout-secs` | `300`   | Stale discovery-state `heartbeat_at` → reclaim `RUNNING` (§5.3.2, §6.2.2). |
+
+`scheduler.policy.*` is due-work claim; `scheduler.discovery.*` is scope discovery. Naming follows
+`gravitino.iceberg-rest.async-cleanup.*` kebab-case. Each side has its own `heartbeat-timeout-secs`.
 
 Per-table **schedule cadence** is **`next_due_at`** on `table_maintenance_policy_state` (from policy
-crontab). `minIntervalMs` is only the min-gap gate before claim; it lives in policy `content`
-(§7.3), not in `gravitino.conf`.
-`pollIntervalSecs` = sleep when due-work SELECT is empty; `discoveryLeasePollIntervalSecs` = how
-often nodes try to claim discovery; `discoveryIntervalSecs` = how often discovery is due after a
-run; `workerThreads` = max concurrent submits; `candidateWindow` = SELECT size.
+crontab). `minIntervalMs` is the min-gap gate before claim: policy `content` overrides per-type
+`gravitino.conf` defaults (§7.3).
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
@@ -554,22 +556,24 @@ any other listener
 Omit TMS names from `gravitino.eventListener.names` → no TMS hooks; above-table scope still relies
 on discovery (§5.3.2).
 
-### 7.3 Minimum interval (`minIntervalMs` in policy content)
+### 7.3 Minimum interval (`minIntervalMs`)
 
 `minIntervalMs` is the **minimum gap between consecutive runs** of the same `(table, policy_id)`
 (compared via `last_job_id` → `job_run_meta.job_finished_at`). It is **not** the scheduler poll /
 `next_due_at` cadence. Null `last_job_id` → gate passes.
 
-It lives in **`policy_meta.content`** (with `schedule` and other type-specific fields) — **not** in
-`gravitino.conf`. That way it varies per attachment, is UI-visible, and follows **nearest-wins**
-like the rest of the effective policy (§5.2.2).
+Each **policy** may set its **own** `minIntervalMs` in **`policy_meta.content`** (§5.2.3). Server
+keys below supply the **default** when `content` omits the field (per policy type).
 
-| Field in `content` | Default            | Description                                |
-| ------------------ | ------------------ | ------------------------------------------ |
-| `minIntervalMs`    | `3600000` (1 hour) | Min gap for that policy type / attachment. |
+| Key                                                      | Default            | Description                                               |
+| -------------------------------------------------------- | ------------------ | --------------------------------------------------------- |
+| `gravitino.maintenance.compaction.min-interval-ms`       | `3600000` (1 hour) | Default min gap for `system_iceberg_compaction`.          |
+| `gravitino.maintenance.snapshot-expiry.min-interval-ms`  | `3600000` (1 hour) | Default min gap for `system_iceberg_snapshot_expiration`. |
+| `gravitino.maintenance.manifest-rewrite.min-interval-ms` | `3600000` (1 hour) | Default min gap for `system_iceberg_rewrite_manifests`.   |
+| `gravitino.maintenance.orphan-cleanup.min-interval-ms`   | `3600000` (1 hour) | Default min gap for `system_iceberg_orphan_file_removal`. |
 
-**Resolution:** effective policy for the table (§5.2.2) → read `content.minIntervalMs` → if absent,
-code default `3600000`. No per-type `gravitino.maintenance.*.minIntervalMs` server keys.
+**Resolution:** effective policy `content.minIntervalMs` (§5.2.2) → matching
+`gravitino.maintenance.<type>.min-interval-ms` → code default `3600000`.
 
 ---
 
