@@ -47,7 +47,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
     if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
-      return toGravitinoArrayType(typeName);
+      return toGravitinoArrayType(typeName, typeBean);
     }
     switch (typeName) {
       case BOOL:
@@ -173,9 +173,16 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     return elementTypeString + ARRAY_TOKEN;
   }
 
-  private ListType toGravitinoArrayType(String typeName) {
+  private ListType toGravitinoArrayType(String typeName, JdbcTypeBean columnBean) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
+    // PostgreSQL has no dedicated element metadata for array columns: the driver reports the
+    // element's type information (length, scale, precision) on the array column itself, encoded
+    // through atttypmod. Propagate it to the element bean, otherwise length-driven element types
+    // such as BPCHAR unbox a null column size and table loading fails with an NPE.
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
+    bean.setColumnSize(columnBean.getColumnSize());
+    bean.setScale(columnBean.getScale());
+    bean.setDatetimePrecision(columnBean.getDatetimePrecision());
     return ListType.nullable(toGravitino(bean));
   }
 }
