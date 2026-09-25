@@ -50,6 +50,31 @@ public class TestTablePO {
         dropped.isEmpty(), () -> "TablePO.builder(TablePO) does not copy these fields: " + dropped);
   }
 
+  @Test
+  void testEqualsIncludesPayloadColumns() throws Exception {
+    // Two rows of the same table identity whose payload differs must not compare
+    // equal, otherwise payload-only updates look like no-ops to PO equality.
+    String[] payloadFields = {
+      "format", "properties", "partitions", "sortOrders", "distribution", "indexes", "comment"
+    };
+    for (String fieldName : payloadFields) {
+      TablePO po1 = fullyPopulated();
+      TablePO po2 = fullyPopulated();
+      Field field = TablePO.class.getDeclaredField(fieldName);
+      field.setAccessible(true);
+      field.set(po2, "different-" + fieldName);
+      Assertions.assertNotEquals(po1, po2, "payload field " + fieldName + " must affect equals");
+    }
+  }
+
+  @Test
+  void testEqualsAndHashCodeConsistent() throws Exception {
+    TablePO po1 = fullyPopulated();
+    TablePO po2 = fullyPopulated();
+    Assertions.assertEquals(po1, po2);
+    Assertions.assertEquals(po1.hashCode(), po2.hashCode());
+  }
+
   /** Every field set to a distinct value, so a missed copy cannot pass by coincidence. */
   private TablePO fullyPopulated() throws Exception {
     TablePO.Builder builder =
