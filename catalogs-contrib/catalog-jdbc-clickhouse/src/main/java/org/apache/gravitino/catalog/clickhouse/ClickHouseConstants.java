@@ -95,5 +95,23 @@ public class ClickHouseConstants {
 
     /** Property key for the n-gram size in ngrambf_v1 index properties. */
     public static final String NGRAM_SIZE = "ngram_size";
+
+    // The name of the legacy data skipping index type for Annoy vector indexes in ClickHouse.
+    // Replaced by vector_similarity in v24.8 and unsupported since v25.5, but tables created by
+    // earlier servers still carry it in system.data_skipping_indices.
+    public static final String DATA_SKIPPING_ANNOY = "annoy";
+
+    // The name of the legacy data skipping index type for USearch vector indexes in ClickHouse.
+    public static final String DATA_SKIPPING_USEARCH = "usearch";
+
+    // Property key holding the verbatim legacy index type clause as returned by ClickHouse for
+    // legacy annoy/usearch indexes (e.g. "annoy('distance', 'dimensions')").
+    public static final String LEGACY_TYPE = "legacy_type";
+
+    // Property key identifying the vector similarity metric of a legacy annoyance/usearch index.
+    public static final String DISTANCE_FUNCTION = "distance_function";
+
+    // Property key identifying the vector dimension of a legacy annoy/usearch index.
+    public static final String DIMENSIONS = "dimensions";
   }
 }

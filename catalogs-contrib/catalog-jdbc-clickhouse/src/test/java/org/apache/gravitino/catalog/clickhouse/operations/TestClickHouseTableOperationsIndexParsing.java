@@ -17,6 +17,12 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DIMENSIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.LEGACY_TYPE;
+
+import java.util.Map;
+import org.apache.gravitino.rel.indexes.Index;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +67,53 @@ public class TestClickHouseTableOperationsIndexParsing {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.parseIndexFields("tuple(lower(name), id)"));
+  }
+
+  @Test
+  public void testLegacyAnnoyAndUSearchIndexTypesArePreserved() {
+    // Legacy types must stay distinguishable from the current vector_similarity HNSW index.
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, operations.getClickHouseIndexType("annoy"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, operations.getClickHouseIndexType("annoy('L2', 128)"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH, operations.getClickHouseIndexType("usearch"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH,
+        operations.getClickHouseIndexType("usearch('cosineDistance', 512)"));
+    Assertions.assertNotEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, operations.getClickHouseIndexType("ngrambf_v1"));
+    Assertions.assertNotEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH, operations.getClickHouseIndexType("bloom_filter"));
+  }
+
+  @Test
+  public void testParseLegacyVectorIndexProperties() {
+    Map<String, String> annoy =
+        ClickHouseTableOperations.parseLegacyVectorIndexProperties(
+            Index.IndexType.DATA_SKIPPING_ANNOY, "annoy('L2Distance', 128)");
+    Assertions.assertEquals("annoy('L2Distance', 128)", annoy.get(LEGACY_TYPE));
+    Assertions.assertEquals("L2Distance", annoy.get(DISTANCE_FUNCTION));
+    Assertions.assertEquals("128", annoy.get(DIMENSIONS));
+
+    Map<String, String> usearch =
+        ClickHouseTableOperations.parseLegacyVectorIndexProperties(
+            Index.IndexType.DATA_SKIPPING_USEARCH, "usearch('cosineDistance', 512)");
+    Assertions.assertEquals("usearch('cosineDistance', 512)", usearch.get(LEGACY_TYPE));
+    Assertions.assertEquals("cosineDistance", usearch.get(DISTANCE_FUNCTION));
+    Assertions.assertEquals("512", usearch.get(DIMENSIONS));
+
+    // A bare legacy type still preserves the type name and never loses the metadata.
+    Assertions.assertEquals(
+        "usearch",
+        ClickHouseTableOperations.parseLegacyVectorIndexProperties(
+                Index.IndexType.DATA_SKIPPING_USEARCH, "usearch")
+            .get(LEGACY_TYPE));
+
+    // Non-legacy index types are not affected.
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseLegacyVectorIndexProperties(
+                Index.IndexType.DATA_SKIPPING_MINMAX, "minmax")
+            .isEmpty());
   }
 }
