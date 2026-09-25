@@ -42,6 +42,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockType;
@@ -465,8 +466,15 @@ class PermissionManager {
       authorizationPluginCallbackWrapper.execute();
       return updatedRole;
     } catch (NoSuchEntityException nse) {
+      if (nse.getMessage() != null
+          && !nse.getMessage().contains(Entity.EntityType.ROLE.name().toLowerCase())) {
+        LOG.error(
+            "Failed to grant privilege to role {}, metadata object does not exist", role, nse);
+        throw new NoSuchMetadataObjectException(
+            nse, "Metadata object does not exist: %s", nse.getMessage());
+      }
       LOG.error("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
-      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+      throw new NoSuchRoleException(nse, ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
       LOG.error("Grant privileges to {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
@@ -576,8 +584,15 @@ class PermissionManager {
 
       return updatedRole;
     } catch (NoSuchEntityException nse) {
+      if (nse.getMessage() != null
+          && !nse.getMessage().contains(Entity.EntityType.ROLE.name().toLowerCase())) {
+        LOG.error(
+            "Failed to revoke privilege from role {}, metadata object does not exist", role, nse);
+        throw new NoSuchMetadataObjectException(
+            nse, "Metadata object does not exist: %s", nse.getMessage());
+      }
       LOG.error("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
-      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+      throw new NoSuchRoleException(nse, ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
       LOG.error("Revoke privileges from {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
@@ -706,9 +721,16 @@ class PermissionManager {
           "Updating role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
       throw new RuntimeException(ioe);
     } catch (NoSuchEntityException nse) {
+      if (nse.getMessage() != null
+          && !nse.getMessage().contains(Entity.EntityType.ROLE.name().toLowerCase())) {
+        LOG.error(
+            "Failed to override privileges in role {}, metadata object does not exist", role, nse);
+        throw new NoSuchMetadataObjectException(
+            nse, "Metadata object does not exist: %s", nse.getMessage());
+      }
       LOG.error(
           "Failed to override, role {} does not exist in the metalake {}", role, metalake, nse);
-      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+      throw new NoSuchRoleException(nse, ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     }
   }
 

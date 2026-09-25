@@ -311,7 +311,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException {
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException {
     Role grantedRole = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
     notifyRoleUserRelChange(metalake, role);
     return grantedRole;
@@ -320,7 +320,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException {
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException {
     Role revokedRole = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
     notifyRoleUserRelChange(metalake, role);
     return revokedRole;
@@ -329,7 +329,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)
-      throws NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     Role overriddenRole =
         dispatcher.overridePrivilegesInRole(metalake, role, securableObjectsToOverride);
     notifyRoleUserRelChange(metalake, role);

@@ -714,7 +714,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException {
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(
@@ -737,7 +737,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException {
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(
@@ -759,7 +759,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)
-      throws NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(

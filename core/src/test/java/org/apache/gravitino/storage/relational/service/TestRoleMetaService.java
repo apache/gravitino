@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -838,6 +839,66 @@ class TestRoleMetaService extends TestJDBCBackend {
     assertEquals("creator", revokeMultipleRole.auditInfo().creator());
     assertEquals("revokeMultiple", revokeMultipleRole.auditInfo().lastModifier());
     Assertions.assertTrue(revokeMultipleRole.securableObjects().isEmpty());
+  }
+
+  @TestTemplate
+  public void testInsertAndUpdateRoleWithNonExistentMetadataObject() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    SecurableObject nonExistentCatalog =
+        SecurableObjects.ofCatalog(
+            "non_existent_catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    RoleEntity roleEntity =
+        createRoleEntity(
+            100L,
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "test_role_with_non_existent_object",
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build(),
+            nonExistentCatalog,
+            Collections.emptyMap());
+
+    NoSuchMetadataObjectException exceptionOnInsert =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () -> RoleMetaService.getInstance().insertRole(roleEntity, false));
+    Assertions.assertTrue(exceptionOnInsert.getMessage().contains("non_existent_catalog"));
+    Assertions.assertTrue(exceptionOnInsert.getCause() instanceof NoSuchEntityException);
+
+    // Now insert a valid role
+    createAndInsertCatalog(METALAKE_NAME, "catalog_valid");
+    SecurableObject validCatalog =
+        SecurableObjects.ofCatalog(
+            "catalog_valid", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    RoleEntity validRoleEntity =
+        createRoleEntity(
+            101L,
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "valid_role",
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build(),
+            validCatalog,
+            Collections.emptyMap());
+    RoleMetaService.getInstance().insertRole(validRoleEntity, false);
+
+    // Update with non-existent securable object
+    Function<RoleEntity, RoleEntity> updateWithNonExistent =
+        oldRole ->
+            RoleEntity.builder()
+                .withId(oldRole.id())
+                .withName(oldRole.name())
+                .withNamespace(oldRole.namespace())
+                .withAuditInfo(oldRole.auditInfo())
+                .withProperties(oldRole.properties())
+                .withSecurableObjects(Lists.newArrayList(validCatalog, nonExistentCatalog))
+                .build();
+
+    NoSuchMetadataObjectException exceptionOnUpdate =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                RoleMetaService.getInstance()
+                    .updateRole(validRoleEntity.nameIdentifier(), updateWithNonExistent));
+    Assertions.assertTrue(exceptionOnUpdate.getMessage().contains("non_existent_catalog"));
+    Assertions.assertTrue(exceptionOnUpdate.getCause() instanceof NoSuchEntityException);
   }
 
   @TestTemplate

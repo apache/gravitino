@@ -421,7 +421,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofRole(metalake, role),
         LockType.WRITE,
@@ -431,7 +431,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofRole(metalake, role),
         LockType.WRITE,
@@ -441,7 +441,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)
-      throws NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofRole(metalake, role),
         LockType.WRITE,

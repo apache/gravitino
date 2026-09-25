@@ -43,6 +43,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -178,7 +179,12 @@ public class RoleMetaService {
                 roleEntity.id(), object, getType(object));
         NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
-        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(identifier, entityType));
+        try {
+          objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(identifier, entityType));
+        } catch (NoSuchEntityException nse) {
+          throw new NoSuchMetadataObjectException(
+              nse, "Metadata object %s does not exist", object.fullName());
+        }
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -326,16 +332,21 @@ public class RoleMetaService {
   }
 
   private List<SecurableObjectPO> toSecurableObjectPOs(
-      Set<SecurableObject> deleteObjects, RoleEntity oldRoleEntity, String metalake) {
+      Set<SecurableObject> objects, RoleEntity oldRoleEntity, String metalake) {
     List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
-    for (SecurableObject object : deleteObjects) {
+    for (SecurableObject object : objects) {
       SecurableObjectPO.Builder objectBuilder =
           POConverters.initializeSecurablePOBuilderWithVersion(
               oldRoleEntity.id(), object, getType(object));
       NameIdentifier nameIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
 
-      objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(nameIdentifier, entityType));
+      try {
+        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(nameIdentifier, entityType));
+      } catch (NoSuchEntityException nse) {
+        throw new NoSuchMetadataObjectException(
+            nse, "Metadata object %s does not exist", object.fullName());
+      }
       securableObjectPOs.add(objectBuilder.build());
     }
     return securableObjectPOs;

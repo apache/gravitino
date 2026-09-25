@@ -46,7 +46,9 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
@@ -479,15 +481,17 @@ public class TestAccessControlManagerForPermissions {
 
     Assertions.assertEquals(2, objects.size());
 
-    // Throw IllegalRoleException
-    Assertions.assertThrows(
-        NoSuchRoleException.class,
-        () ->
-            accessControlManager.grantPrivilegeToRole(
-                METALAKE,
-                notExist,
-                MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-                Sets.newHashSet(Privileges.CreateTable.allow())));
+    // Throw NoSuchRoleException
+    NoSuchRoleException grantRoleException =
+        Assertions.assertThrows(
+            NoSuchRoleException.class,
+            () ->
+                accessControlManager.grantPrivilegeToRole(
+                    METALAKE,
+                    notExist,
+                    MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+                    Sets.newHashSet(Privileges.CreateTable.allow())));
+    Assertions.assertTrue(grantRoleException.getCause() instanceof NoSuchEntityException);
   }
 
   @Test
@@ -520,14 +524,16 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertTrue(objects.isEmpty());
 
     // Throw NoSuchRoleException
-    Assertions.assertThrows(
-        NoSuchRoleException.class,
-        () ->
-            accessControlManager.revokePrivilegesFromRole(
-                METALAKE,
-                notExist,
-                MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
-                Sets.newHashSet(Privileges.CreateTable.allow())));
+    NoSuchRoleException revokeRoleException =
+        Assertions.assertThrows(
+            NoSuchRoleException.class,
+            () ->
+                accessControlManager.revokePrivilegesFromRole(
+                    METALAKE,
+                    notExist,
+                    MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+                    Sets.newHashSet(Privileges.CreateTable.allow())));
+    Assertions.assertTrue(revokeRoleException.getCause() instanceof NoSuchEntityException);
   }
 
   @Test
@@ -570,13 +576,112 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertEquals(1, objects.size());
     Assertions.assertEquals(catalogAnother, objects.get(0));
 
-    // Throw IllegalRoleException
+    // Throw NoSuchRoleException
     String notExist = "not-exist";
+    NoSuchRoleException overrideRoleException =
+        Assertions.assertThrows(
+            NoSuchRoleException.class,
+            () ->
+                accessControlManager.overridePrivilegesInRole(
+                    METALAKE, notExist, Lists.newArrayList()));
+    Assertions.assertTrue(overrideRoleException.getCause() instanceof NoSuchEntityException);
+  }
+
+  @Test
+  public void testMissingSecurableObjectThrowsNoSuchMetadataObjectException() throws Exception {
+    EntityStore mockStore = Mockito.mock(EntityStore.class);
+    AccessControlManager mockAcm =
+        new AccessControlManager(mockStore, new RandomIdGenerator(), config);
+
+    // 1. When store.update throws NoSuchMetadataObjectException directly
+    Mockito.doThrow(new NoSuchMetadataObjectException("Metadata object catalog does not exist"))
+        .when(mockStore)
+        .update(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
+
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        NoSuchMetadataObjectException.class,
         () ->
-            accessControlManager.overridePrivilegesInRole(
-                METALAKE, notExist, Lists.newArrayList()));
+            mockAcm.grantPrivilegeToRole(
+                METALAKE,
+                "role",
+                MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                Sets.newHashSet(Privileges.UseCatalog.allow())));
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            mockAcm.revokePrivilegesFromRole(
+                METALAKE,
+                "role",
+                MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                Sets.newHashSet(Privileges.UseCatalog.allow())));
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            mockAcm.overridePrivilegesInRole(
+                METALAKE,
+                "role",
+                Lists.newArrayList(
+                    SecurableObjects.ofCatalog(
+                        "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))));
+
+    // 2. When store.update throws NoSuchEntityException for a non-role entity (e.g. catalog)
+    NoSuchEntityException catalogNse = new NoSuchEntityException("No such entity: catalog.catalog");
+    Mockito.doThrow(catalogNse)
+        .when(mockStore)
+        .update(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
+
+    NoSuchMetadataObjectException ex1 =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                mockAcm.grantPrivilegeToRole(
+                    METALAKE,
+                    "role",
+                    MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                    Sets.newHashSet(Privileges.UseCatalog.allow())));
+    Assertions.assertSame(catalogNse, ex1.getCause());
+
+    NoSuchMetadataObjectException ex2 =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                mockAcm.revokePrivilegesFromRole(
+                    METALAKE,
+                    "role",
+                    MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                    Sets.newHashSet(Privileges.UseCatalog.allow())));
+    Assertions.assertSame(catalogNse, ex2.getCause());
+
+    NoSuchMetadataObjectException ex3 =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                mockAcm.overridePrivilegesInRole(
+                    METALAKE,
+                    "role",
+                    Lists.newArrayList(
+                        SecurableObjects.ofCatalog(
+                            "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))));
+    Assertions.assertSame(catalogNse, ex3.getCause());
+
+    // 3. When store.update throws NoSuchEntityException for a role
+    NoSuchEntityException roleNse = new NoSuchEntityException("No such entity: role.test_role");
+    Mockito.doThrow(roleNse)
+        .when(mockStore)
+        .update(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
+
+    NoSuchRoleException roleEx =
+        Assertions.assertThrows(
+            NoSuchRoleException.class,
+            () ->
+                mockAcm.grantPrivilegeToRole(
+                    METALAKE,
+                    "test_role",
+                    MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                    Sets.newHashSet(Privileges.UseCatalog.allow())));
+    Assertions.assertSame(roleNse, roleEx.getCause());
   }
 
   private RoleEntity membershipRole(long id, String name) {

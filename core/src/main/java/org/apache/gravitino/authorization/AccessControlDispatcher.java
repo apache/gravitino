@@ -384,7 +384,7 @@ public interface AccessControlDispatcher {
 
   Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)
-      throws NoSuchRoleException, NoSuchMetalakeException;
+      throws NoSuchRoleException, NoSuchMetalakeException, NoSuchMetadataObjectException;
 
   /**
    * Lists the role names.
@@ -418,11 +418,12 @@ public interface AccessControlDispatcher {
    * @return The role after granted.
    * @throws NoSuchRoleException If the role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object does not exist.
    * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException;
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException;
 
   /**
    * Revoke privileges from a role.
@@ -434,9 +435,10 @@ public interface AccessControlDispatcher {
    * @return The role after revoked.
    * @throws NoSuchRoleException If the role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object does not exist.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchMetalakeException, NoSuchRoleException;
+      throws NoSuchMetalakeException, NoSuchRoleException, NoSuchMetadataObjectException;
 }
