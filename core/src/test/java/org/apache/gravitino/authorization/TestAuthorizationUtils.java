@@ -517,6 +517,35 @@ class TestAuthorizationUtils {
   }
 
   @Test
+  void testSemanticModelPrivilegesAreNotPushedToAuthorizationPlugin() {
+    // Semantic Models exist only in Gravitino, so underlying connectors have nothing to revoke or
+    // rename. Rename and remove must leave the authorization plugin untouched.
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "sales_model");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.SEMANTIC_MODEL, "renamed_model");
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.SEMANTIC_MODEL, null);
+    }
+
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
   void testRemoveCatalogPrivilegesUsesLeasedCatalogName() {
     NameIdentifier requestedIdent = NameIdentifier.of("metalake", "requested_catalog");
     List<String> locations = List.of("/warehouse/catalog");

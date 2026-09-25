@@ -103,7 +103,8 @@ Metalake (top level)
 │       ├── Topic
 │       ├── Fileset
 │       ├── Model
-│       └── Function
+│       ├── Function
+│       └── Semantic Model
 ├── Tag
 ├── Policy
 ├── Job Template
@@ -206,6 +207,9 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
+| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
+| `SELECT_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
@@ -276,6 +280,7 @@ return only the entries the caller is entitled to see, which for a metalake owne
 | Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
 | Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Semantic Model | `CREATE_SEMANTIC_MODEL` | `SELECT_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
 
 Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
 `CREATE_CATALOG`. Testing an existing catalog with its stored configuration takes `USE_CATALOG`, the

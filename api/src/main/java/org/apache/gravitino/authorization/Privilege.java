@@ -164,7 +164,13 @@ public interface Privilege {
      * The privilege to retrieve plaintext secrets and vend credentials for a metadata object via
      * {@code getSecrets} / {@code getCredentials}.
      */
-    USE_SECRET(0L, 1L << 37);
+    USE_SECRET(0L, 1L << 37),
+    /** The privilege to create a semantic model. */
+    CREATE_SEMANTIC_MODEL(0L, 1L << 38),
+    /** The privilege to discover a semantic model and load its definition. */
+    SELECT_SEMANTIC_MODEL(0L, 1L << 39),
+    /** The privilege to rename a semantic model or alter its definition and metadata. */
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 40);
 
     private final long highBits;
     private final long lowBits;

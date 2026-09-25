@@ -70,6 +70,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.PolicyHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
@@ -1004,10 +1005,6 @@ public class GravitinoEnv {
   }
 
   private void initSemanticModelDispatcher(SchemaOperationDispatcher schemaOperationDispatcher) {
-    // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
-    // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
-    // TODO(#12595): Add Semantic Model event dispatching before server integration.
-    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
@@ -1136,6 +1133,21 @@ public class GravitinoEnv {
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
+
+    // Semantic Model operation chain: Normalize -> Hook -> Operation.
+    // TODO(#12595): Add an outer SemanticModelEventDispatcher.
+    SemanticModelOperationDispatcher semanticModelOperationDispatcher =
+        new SemanticModelOperationDispatcher(
+            catalogManager,
+            metadataOperations.schemaOperationDispatcher,
+            entityStore,
+            idGenerator,
+            secretManager);
+    SemanticModelHookDispatcher semanticModelHookDispatcher =
+        new SemanticModelHookDispatcher(
+            semanticModelOperationDispatcher, this::internalOwnerDispatcher);
+    this.semanticModelDispatcher =
+        new SemanticModelNormalizeDispatcher(semanticModelHookDispatcher, catalogManager);
 
     this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 

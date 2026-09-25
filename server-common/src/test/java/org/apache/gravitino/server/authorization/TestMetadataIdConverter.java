@@ -53,6 +53,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
@@ -73,6 +74,7 @@ public class TestMetadataIdConverter {
   private NameIdentifier ident6;
   private NameIdentifier ident7;
   private NameIdentifier ident8;
+  private NameIdentifier ident9;
 
   // Test Entities
   private BaseMetalake entity1;
@@ -83,6 +85,7 @@ public class TestMetadataIdConverter {
   private FilesetEntity entity6;
   private TopicEntity entity7;
   private GroupEntity entity8;
+  private SemanticModelEntity entity9;
 
   @BeforeAll
   void initTest() throws IOException {
@@ -153,6 +156,12 @@ public class TestMetadataIdConverter {
                   MetadataIdConverter.normalizeCaseSensitive(
                       eq(ident8), eq(null), eq(mockCatalogManager)))
           .thenReturn(ident8);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident9), eq(Capability.Scope.SEMANTIC_MODEL), eq(mockCatalogManager)))
+          .thenReturn(ident9);
 
       Optional<Long> metalakeConvertedId =
           MetadataIdConverter.getID(
@@ -186,6 +195,12 @@ public class TestMetadataIdConverter {
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake");
+      Optional<Long> semanticModelConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "sales_model"),
+                  MetadataObject.Type.SEMANTIC_MODEL),
+              "metalake");
 
       Assertions.assertEquals(Optional.of(1L), metalakeConvertedId);
       Assertions.assertEquals(Optional.of(2L), catalogConvertedId);
@@ -194,6 +209,7 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(Optional.of(5L), modelConvertedId);
       Assertions.assertEquals(Optional.of(6L), filesetConvertedId);
       Assertions.assertEquals(Optional.of(7L), topicConvertedId);
+      Assertions.assertEquals(Optional.of(9L), semanticModelConvertedId);
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
@@ -241,6 +257,7 @@ public class TestMetadataIdConverter {
     ident6 = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
     ident7 = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     ident8 = NameIdentifier.of("metalake", "group");
+    ident9 = NameIdentifier.of("metalake", "catalog", "schema", "sales_model");
   }
 
   private void initTestEntities() {
@@ -261,6 +278,8 @@ public class TestMetadataIdConverter {
         getTestTopicEntity(
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
     entity8 = getTestGroupEntity(8L, "group", Namespace.of("metalake"));
+    entity9 = mock(SemanticModelEntity.class);
+    when(entity9.id()).thenReturn(9L);
   }
 
   private void initMockCache() throws IOException {
@@ -274,6 +293,8 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
     when(mockStore.get(ident8, Entity.EntityType.GROUP, GroupEntity.class)).thenReturn(entity8);
+    when(mockStore.get(ident9, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
+        .thenReturn(entity9);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {
