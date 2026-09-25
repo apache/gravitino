@@ -45,6 +45,10 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toStartOfWeek[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_START_OF_MONTH_PATTERN =
       Pattern.compile("toStartOfMonth[(](.+)[)]", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_START_OF_QUARTER_PATTERN =
+      Pattern.compile("toStartOfQuarter[(](.+)[)]", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_START_OF_YEAR_PATTERN =
+      Pattern.compile("toStartOfYear[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
@@ -93,6 +97,10 @@ final class ClickHouseTableSqlUtils {
       case "tostartofweek" -> "toStartOfWeek(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case "tostartofmonth" -> "toStartOfMonth(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case "tostartofquarter" -> "toStartOfQuarter(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case "tostartofyear" -> "toStartOfYear(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       default -> throw new IllegalArgumentException(
           "Unsupported partition transform: " + transform.name());
@@ -230,6 +238,23 @@ final class ClickHouseTableSqlUtils {
       return identifier == null
           ? null
           : Transforms.apply("toStartOfMonth", new Expression[] {NamedReference.field(identifier)});
+    }
+
+    Matcher toStartOfQuarterMatcher = TO_START_OF_QUARTER_PATTERN.matcher(trimmedExpression);
+    if (toStartOfQuarterMatcher.matches()) {
+      String identifier = extractPartitionIdentifier(toStartOfQuarterMatcher.group(1));
+      return identifier == null
+          ? null
+          : Transforms.apply(
+              "toStartOfQuarter", new Expression[] {NamedReference.field(identifier)});
+    }
+
+    Matcher toStartOfYearMatcher = TO_START_OF_YEAR_PATTERN.matcher(trimmedExpression);
+    if (toStartOfYearMatcher.matches()) {
+      String identifier = extractPartitionIdentifier(toStartOfYearMatcher.group(1));
+      return identifier == null
+          ? null
+          : Transforms.apply("toStartOfYear", new Expression[] {NamedReference.field(identifier)});
     }
 
     String identifier = extractPartitionIdentifier(trimmedExpression);

@@ -639,7 +639,7 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadAndCreateWithStartOfWeekAndMonthPartitionTransforms() {
+  void testLoadAndCreateWithStartOfDatePartitionTransforms() {
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Column[] columns =
         new Column[] {
@@ -652,7 +652,8 @@ public class CatalogClickHouseIT extends BaseIT {
               DEFAULT_VALUE_NOT_SET)
         };
 
-    for (String functionName : new String[] {"toStartOfWeek", "toStartOfMonth"}) {
+    for (String functionName :
+        new String[] {"toStartOfWeek", "toStartOfMonth", "toStartOfQuarter", "toStartOfYear"}) {
       String nativeTableName = GravitinoITUtils.genRandomName("native_start_partition");
       String createdTableName = GravitinoITUtils.genRandomName("created_start_partition");
       String createNativeSql =
