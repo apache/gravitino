@@ -105,6 +105,21 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
+  public void testConstrainedNumericOutsideDecimalLimits() {
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(39,0)"), NUMERIC, 39, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(1000,0)"), NUMERIC, 1000, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, -3, 0);
+    // PostgreSQL JDBC metadata can expose a negative scale as an unsigned 11-bit value.
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, 2045, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(3,5)"), NUMERIC, 3, 5, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 38), NUMERIC, 38, 38, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 0), NUMERIC, 38, null, 0);
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      checkGravitinoTypeToJdbcType(declaration, Types.ExternalType.of(declaration));
+    }
+  }
+
+  @Test
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());
