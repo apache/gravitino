@@ -313,8 +313,7 @@ class CatalogChange(ABC):
             if not isinstance(other, CatalogChange.SetSecretBinding):
                 return False
             return (
-                self._property == other.property()
-                and self._binding == other.binding()
+                self._property == other.property() and self._binding == other.binding()
             )
 
         def __hash__(self):
