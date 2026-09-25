@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -43,7 +44,8 @@ class TestSchemaMetaBaseSQLProvider {
             FilesetMetaMapper.META_TABLE_NAME,
             FunctionMetaMapper.TABLE_NAME,
             ModelMetaMapper.TABLE_NAME,
-            TopicMetaMapper.TABLE_NAME);
+            TopicMetaMapper.TABLE_NAME,
+            SemanticModelMetaMapper.TABLE_NAME);
 
     childTables.forEach(
         tableName ->

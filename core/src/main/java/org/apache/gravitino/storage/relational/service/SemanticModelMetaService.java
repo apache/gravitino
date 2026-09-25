@@ -210,6 +210,11 @@ public class SemanticModelMetaService {
         "The updated Semantic Model entity id: %s should be same with the entity id before: %s",
         newEntity.id(),
         oldSemanticModelEntity.id());
+    Preconditions.checkArgument(
+        oldSemanticModelEntity.namespace().equals(newEntity.namespace()),
+        "Semantic Model namespace cannot change from %s to %s",
+        oldSemanticModelEntity.namespace(),
+        newEntity.namespace());
 
     AtomicInteger updateResult = new AtomicInteger(-1);
     try {

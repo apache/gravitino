@@ -195,6 +195,54 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateRejectsNamespaceChange() throws IOException {
+    String semanticModelName = GravitinoITUtils.genRandomName("namespace_change_model");
+    SemanticModelEntity original =
+        semanticModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            semanticModelName,
+            "orders",
+            "original comment",
+            "original");
+    SemanticModelMetaService.getInstance().insertSemanticModel(original, false);
+
+    String targetSchemaName = GravitinoITUtils.genRandomName("target_semantic_schema");
+    createAndInsertSchema(metalakeName, catalogName, targetSchemaName);
+    Namespace targetNamespace =
+        NamespaceUtil.ofSemanticModel(metalakeName, catalogName, targetSchemaName);
+    SemanticModelEntity moved =
+        SemanticModelEntity.builder()
+            .withId(original.id())
+            .withName(original.name())
+            .withNamespace(targetNamespace)
+            .withComment(original.comment())
+            .withDefinition(original.definition())
+            .withProperties(original.properties())
+            .withAuditInfo(original.auditInfo())
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                SemanticModelMetaService.getInstance()
+                    .updateSemanticModel(original.nameIdentifier(), ignored -> moved));
+    assertEquals(
+        "Semantic Model namespace cannot change from " + namespace + " to " + targetNamespace,
+        exception.getMessage());
+    assertEquals(
+        original,
+        SemanticModelMetaService.getInstance()
+            .getSemanticModelByIdentifier(original.nameIdentifier()));
+    assertTrue(
+        SemanticModelMetaService.getInstance()
+            .listSemanticModelsByNamespace(targetNamespace)
+            .isEmpty());
+    assertEquals(1L, semanticModelIdentityVersions(original.id())[0]);
+    assertEquals(1, listSemanticModelVersions(original.id()).size());
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaCascadeDelete() throws Exception {
     String semanticModelName = GravitinoITUtils.genRandomName("concurrent_create_model");
     SemanticModelEntity semanticModel =
