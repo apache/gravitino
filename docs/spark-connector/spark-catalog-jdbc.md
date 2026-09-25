@@ -15,7 +15,15 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 ## Capabilities
 
-Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround. Doris, which does not support MySQL dialects, is not supported.
+Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround. Apache Doris supports an opt-in, read-only governed path described below; when that path is disabled, `jdbc-doris` keeps the generic JDBC behavior.
+
+### Governed Apache Doris batch reads
+
+Set `spark.sql.gravitino.enableDorisSupport=true` to select the specialized Spark 3.5 / Scala 2.12 Doris read path for a `jdbc-doris` catalog. The specialized path requires a catalog-managed `jdbc-url` and `jdbc-driver`, plus a vended JDBC credential. The generic JDBC credential behavior remains unchanged for other providers and when specialized Doris support is disabled.
+
+The first read baseline validates the Gravitino logical schema against Doris FE and JDBC metadata, supports ordinary scalar batch reads, rejects schema drift and unsupported Doris types, and keeps Gravitino authorization ahead of specialized physical access. The specialized table is read-only and rejects Spark writes and catalog DDL. Aggregate, Top-N, limit, offset, partitioned-read, native-tablet, and special-type normalization lanes are added only by follow-up contributions.
+
+This baseline uses the MySQL Connector/J driver for Doris FE's MySQL protocol; it does not bundle a separate Doris Spark connector. MySQL Connector/J and any required external runtime dependencies must be available on the Spark driver and executors. Do not pass connection credentials or protected catalog settings through Spark catalog options.
 
 ### DML and DDL Operations
 
@@ -24,6 +32,8 @@ Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the
 - `ALTER TABLE`
 - `SELECT`
 - `INSERT`
+
+For the specialized Doris path, only `SELECT` batch reads are supported. Spark writes and catalog DDL are rejected. The generic MySQL and PostgreSQL JDBC paths retain their existing behavior.
 
   :::info
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
@@ -75,4 +85,3 @@ Gravitino spark connector will transform below property names which are defined 
 | `jdbc-driver`                   | `driver`                           | The driver of the JDBC connection. For example, com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark JDBC connector.
-
