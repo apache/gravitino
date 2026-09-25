@@ -29,8 +29,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * The GravitinoFTransactionHandle is used to make Apache Gravitino metadata operations
- * transactional and wrap the inner connector transaction for data access.
+ * The GravitinoSplitSource wraps an internal connector's {@link ConnectorSplitSource} and rewraps
+ * each emitted split as a Gravitino handle so workers can unwrap it.
  */
 public class GravitinoSplitSource implements ConnectorSplitSource {
 

@@ -25,11 +25,7 @@ trino-connector/
 │   └── src/main/java/
 ├── trino-connector-469-472/      # Version-specific adapters for Trino 469-472
 │   └── src/main/java/
-├── trino-connector-473-478/      # Version-specific adapters for Trino 473-478
-│   └── src/main/java/
-├── trino-connector-479-479/      # Version-specific adapters for Trino 479
-│   └── src/main/java/
-├── trino-connector-480-480/      # Version-specific adapters for Trino 480
+├── trino-connector-473-480/      # Version-specific adapters for Trino 473-480
 │   └── src/main/java/
 ├── trino-connector-481-481/      # Version-specific adapters for Trino 481
 │   └── src/main/java/
@@ -81,9 +77,7 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
    | 446-451       | `trino-connector-446-451` |
    | 452-468       | `trino-connector-452-468` |
    | 469-472       | `trino-connector-469-472` |
-   | 473-478       | `trino-connector-473-478` |
-   | 479           | `trino-connector-479-479` |
-   | 480           | `trino-connector-480-480` |
+   | 473-480       | `trino-connector-473-480` |
    | 481           | `trino-connector-481-481` |
    | 482-483       | `trino-connector-482-483` |
 

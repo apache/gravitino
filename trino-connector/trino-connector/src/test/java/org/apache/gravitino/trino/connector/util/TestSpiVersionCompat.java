@@ -128,11 +128,19 @@ class TestSpiVersionCompat {
   }
 
   @Test
-  void testInvokeWrapsTargetException() {
+  void testInvokePropagatesRuntimeExceptionFromTarget() {
     ReflectiveTarget target = new ReflectiveTarget();
 
+    // The seam must preserve direct-invocation semantics: a RuntimeException thrown by the SPI
+    // implementation (e.g. TrinoException from getSplits/createPageSink) reaches the caller
+    // unchanged so Trino keeps its error code.
     assertThatThrownBy(() -> SpiVersionCompat.invoke(target, "boom", new Class<?>[] {}))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Failed invoking Trino SPI method");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("boom");
+  }
+
+  @Test
+  void testTypeSignatureReturnsSignature() {
+    assertThat(SpiVersionCompat.typeSignature(BigintType.BIGINT)).isEqualTo("bigint");
   }
 }

@@ -23,22 +23,23 @@ import io.trino.spi.connector.Constraint;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.predicate.NullableValue;
 import io.trino.spi.predicate.TupleDomain;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /** The GravitinoConstraint is used to warp Constraint */
 public class GravitinoConstraint extends Constraint {
 
-  // Cache of the reflectively resolved Constraint accessors (predicate/getPredicateColumns), which
-  // only exist up to Trino 481. Resolved lazily so the 482+ modules (where they are absent and
-  // never
-  // invoked) never look them up.
-  private static final Map<String, Method> CONSTRAINT_METHODS = new ConcurrentHashMap<>();
+  // The Constraint accessors (predicate/getPredicateColumns) only exist up to Trino 481. Resolved
+  // once at class load: absent on Trino 482+, where the miss is a cheap branch and the methods are
+  // never invoked by the SPI anyway.
+  private static final Optional<Method> PREDICATE_METHOD = findConstraintMethod("predicate");
+  private static final Optional<Method> PREDICATE_COLUMNS_METHOD =
+      findConstraintMethod("getPredicateColumns");
 
   private final Constraint delegate;
 
@@ -68,7 +69,8 @@ public class GravitinoConstraint extends Constraint {
   // no longer exists to override) and is kept only so the shared source compiles across versions.
   @SuppressWarnings("unchecked")
   public Optional<Predicate<Map<ColumnHandle, NullableValue>>> predicate() {
-    return ((Optional<Predicate<Map<ColumnHandle, NullableValue>>>) invokeOptional("predicate"))
+    return ((Optional<Predicate<Map<ColumnHandle, NullableValue>>>)
+            invokeOptional(PREDICATE_METHOD, "predicate"))
         .map(GravitinoPredicate::new);
   }
 
@@ -76,7 +78,8 @@ public class GravitinoConstraint extends Constraint {
   // removed in Trino 482.
   @SuppressWarnings("unchecked")
   public Optional<Set<ColumnHandle>> getPredicateColumns() {
-    return ((Optional<Set<ColumnHandle>>) invokeOptional("getPredicateColumns"))
+    return ((Optional<Set<ColumnHandle>>)
+            invokeOptional(PREDICATE_COLUMNS_METHOD, "getPredicateColumns"))
         .map(result -> result.stream().map(GravitinoHandle::unWrap).collect(Collectors.toSet()));
   }
 
@@ -85,24 +88,33 @@ public class GravitinoConstraint extends Constraint {
     return delegate.toString();
   }
 
-  private Optional<?> invokeOptional(String methodName) {
-    Method method =
-        CONSTRAINT_METHODS.computeIfAbsent(
-            methodName, GravitinoConstraint::resolveConstraintMethod);
+  private Optional<?> invokeOptional(Optional<Method> method, String methodName) {
+    if (method.isEmpty()) {
+      return Optional.empty();
+    }
     try {
-      return (Optional<?>) method.invoke(delegate);
+      return (Optional<?>) method.get().invoke(delegate);
+    } catch (InvocationTargetException e) {
+      Throwable cause = e.getTargetException();
+      if (cause instanceof RuntimeException runtimeException) {
+        throw runtimeException;
+      }
+      if (cause instanceof Error error) {
+        throw error;
+      }
+      throw new IllegalStateException(
+          "Trino SPI method Constraint#" + methodName + " threw", cause);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(
           "Failed invoking Trino SPI method Constraint#" + methodName, e);
     }
   }
 
-  private static Method resolveConstraintMethod(String methodName) {
+  private static Optional<Method> findConstraintMethod(String methodName) {
     try {
-      return Constraint.class.getMethod(methodName);
+      return Optional.of(Constraint.class.getMethod(methodName));
     } catch (NoSuchMethodException e) {
-      throw new IllegalStateException(
-          "Trino SPI method Constraint#" + methodName + " was not found", e);
+      return Optional.empty();
     }
   }
 }

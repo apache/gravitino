@@ -20,6 +20,8 @@ package org.apache.gravitino.trino.connector.util;
 
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.function.SchemaFunctionName;
+import io.trino.spi.type.Type;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,8 @@ public final class SpiVersionCompat {
       resolveFirst(SchemaFunctionName.class, "schemaName", "getSchemaName");
   private static final Method SCHEMA_FUNCTION_FUNCTION_NAME =
       resolveFirst(SchemaFunctionName.class, "functionName", "getFunctionName");
+  private static final Method TYPE_SIGNATURE =
+      resolveFirst(Type.class, "getTypeSignature", "getTypeDescriptor");
 
   private static final Map<MethodKey, Method> METHOD_CACHE = new ConcurrentHashMap<>();
 
@@ -93,6 +97,19 @@ public final class SpiVersionCompat {
   }
 
   /**
+   * Returns the string signature of a Trino {@link Type}, quoting row field names unlike {@link
+   * Type#getDisplayName()}. Trino versions up to 481 expose {@code getTypeSignature()}; Trino 482
+   * and later replace it with {@code getTypeDescriptor()}, whose {@code toString()} produces the
+   * equivalent representation.
+   *
+   * @param type the Trino type
+   * @return the string signature of the type
+   */
+  public static String typeSignature(Type type) {
+    return invoke(TYPE_SIGNATURE, type).toString();
+  }
+
+  /**
    * Invokes a Trino SPI method reflectively on the given target. This is used for outbound calls to
    * SPI overloads whose signatures differ across supported Trino versions (for example split and
    * page-source/page-sink methods reworked in Trino 482), so the shared connector source compiles
@@ -115,6 +132,18 @@ public final class SpiVersionCompat {
             SpiVersionCompat::resolve);
     try {
       return method.invoke(target, args);
+    } catch (InvocationTargetException e) {
+      // Preserve the direct-invocation semantics: what the SPI implementation threw must reach the
+      // caller unchanged (e.g. TrinoException from getSplits/createPageSink keeps its error code).
+      Throwable cause = e.getTargetException();
+      if (cause instanceof RuntimeException runtimeException) {
+        throw runtimeException;
+      }
+      if (cause instanceof Error error) {
+        throw error;
+      }
+      throw new IllegalStateException(
+          "Trino SPI method " + target.getClass().getName() + "#" + methodName + " threw", cause);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(
           "Failed invoking Trino SPI method " + target.getClass().getName() + "#" + methodName, e);
@@ -123,8 +152,11 @@ public final class SpiVersionCompat {
 
   private static Method resolve(MethodKey key) {
     try {
-      return key.targetClass()
-          .getMethod(key.methodName(), key.parameterTypes().toArray(new Class<?>[0]));
+      Method method =
+          key.targetClass()
+              .getMethod(key.methodName(), key.parameterTypes().toArray(new Class<?>[0]));
+      method.setAccessible(true);
+      return method;
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException(
           "Trino SPI method "
@@ -138,7 +170,9 @@ public final class SpiVersionCompat {
 
   private static Method resolve(Class<?> type, String method) {
     try {
-      return type.getMethod(method);
+      Method resolved = type.getMethod(method);
+      resolved.setAccessible(true);
+      return resolved;
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException(
           "Trino SPI method " + type.getName() + "#" + method + " was not found", e);
@@ -148,7 +182,9 @@ public final class SpiVersionCompat {
   private static Method resolveFirst(Class<?> type, String... candidates) {
     for (String candidate : candidates) {
       try {
-        return type.getMethod(candidate);
+        Method method = type.getMethod(candidate);
+        method.setAccessible(true);
+        return method;
       } catch (NoSuchMethodException ignored) {
         // try the next candidate name
       }
@@ -163,6 +199,15 @@ public final class SpiVersionCompat {
   private static Object invoke(Method method, Object target) {
     try {
       return method.invoke(target);
+    } catch (InvocationTargetException e) {
+      Throwable cause = e.getTargetException();
+      if (cause instanceof RuntimeException runtimeException) {
+        throw runtimeException;
+      }
+      if (cause instanceof Error error) {
+        throw error;
+      }
+      throw new IllegalStateException("Trino SPI method " + method + " threw", cause);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("Failed invoking Trino SPI method " + method, e);
     }

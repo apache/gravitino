@@ -85,8 +85,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   private static final String CLIENT_CREDENTIAL = "test-client:test-secret";
   private static final String STORE_PASSWORD = "changeit";
   // Deliberately not TrinoContainer.DEFAULT_IMAGE / GRAVITINO_CI_TRINO_DOCKER_IMAGE: that CI image
-  // identifies itself as Trino SPI version 435, which trino-connector-473-478 rejects outright.
-  // This test needs an actual Trino 473-478 build, so it pins the upstream image directly.
+  // identifies itself as Trino SPI version 435, which trino-connector-473-480 rejects outright.
+  // This test needs an actual Trino 473-480 build, so it pins the upstream image directly.
   private static final String TRINO_IMAGE = "trinodb/trino:478";
   private static final String CONTAINER_TRUSTSTORE = "/etc/trino/tls/truststore.p12";
 
@@ -394,7 +394,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     String connectorDirectory = System.getenv("TRINO_CONNECTOR_DIR");
     if (connectorDirectory == null || connectorDirectory.isBlank()) {
       connectorDirectory =
-          Path.of(root, "trino-connector", "trino-connector-473-478", "build", "libs").toString();
+          Path.of(root, "trino-connector", "trino-connector-473-480", "build", "libs").toString();
     }
     Path truststore = trinoConfigDirectory.resolve("tls/truststore.p12");
     trinoContainer =

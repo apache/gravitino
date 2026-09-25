@@ -25,55 +25,44 @@ import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorSplitSource;
 
 /**
- * Trino 481 split manager that wraps internal splits so Gravitino can unwrap them on the workers.
+ * Trino 480+ split manager that wraps internal splits so Gravitino can unwrap them on the workers.
  */
-public class GravitinoSplitManager481 extends GravitinoSplitManager {
+public class GravitinoSplitManager480 extends GravitinoSplitManager {
 
   /**
-   * Constructs a new GravitinoSplitManager481 with the specified split manager.
+   * Constructs a new GravitinoSplitManager480.
    *
-   * <p>internalSplitManager the internal connector split manager
+   * @param internalSplitManager the internal connector split manager
    */
-  public GravitinoSplitManager481(ConnectorSplitManager internalSplitManager) {
+  public GravitinoSplitManager480(ConnectorSplitManager internalSplitManager) {
     super(internalSplitManager);
   }
 
   @Override
   protected ConnectorSplitSource createSplitSource(ConnectorSplitSource splits) {
-    return new GravitinoSplitSource481(splits);
+    return new GravitinoSplitSource480(splits);
   }
 
-  static class GravitinoSplitSource481 extends GravitinoSplitSource {
+  static class GravitinoSplitSource480 extends GravitinoSplitSource {
 
-    GravitinoSplitSource481(ConnectorSplitSource connectorSplitSource) {
+    GravitinoSplitSource480(ConnectorSplitSource connectorSplitSource) {
       super(connectorSplitSource);
     }
 
     @Override
     protected ConnectorSplit createSplit(ConnectorSplit split) {
-      return new GravitinoSplit481(split);
+      return new GravitinoSplit480(split);
     }
   }
 
-  /** A Gravitino split wrapper for Trino 481. */
-  public static class GravitinoSplit481 extends GravitinoSplit {
+  public static class GravitinoSplit480 extends GravitinoSplit {
 
-    /**
-     * Constructs a new GravitinoSplit481 from a serialized handle string.
-     *
-     * <p>handleString the serialized handle string
-     */
     @JsonCreator
-    public GravitinoSplit481(@JsonProperty(HANDLE_STRING) String handleString) {
+    public GravitinoSplit480(@JsonProperty(HANDLE_STRING) String handleString) {
       super(handleString);
     }
 
-    /**
-     * Constructs a new GravitinoSplit481 from a ConnectorSplit.
-     *
-     * <p>split the internal connector split
-     */
-    public GravitinoSplit481(ConnectorSplit split) {
+    public GravitinoSplit480(ConnectorSplit split) {
       super(split);
     }
   }

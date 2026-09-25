@@ -45,19 +45,19 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
 /**
- * The Trino 481+ metadata adapter; carries the table-execute overrides whose SPI signatures differ
+ * The Trino 480+ metadata adapter; carries the table-execute overrides whose SPI signatures differ
  * across versions.
  */
-public class GravitinoMetadata481 extends GravitinoMetadata {
+public class GravitinoMetadata480 extends GravitinoMetadata {
 
   /**
-   * Constructs a new GravitinoMetadata481.
+   * Constructs a new GravitinoMetadata480.
    *
    * @param catalogConnectorMetadata the catalog connector metadata
    * @param metadataAdapter the catalog connector metadata adapter
    * @param internalMetadata the internal connector metadata
    */
-  public GravitinoMetadata481(
+  public GravitinoMetadata480(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
@@ -101,15 +101,19 @@ public class GravitinoMetadata481 extends GravitinoMetadata {
   }
 
   @Override
-  public Map<String, Long> finishTableExecute(
+  public void finishTableExecute(
       ConnectorSession session,
       ConnectorTableExecuteHandle tableExecuteHandle,
       Collection<Slice> fragments,
       List<Object> tableExecuteState) {
-    return internalMetadata.finishTableExecute(
+    internalMetadata.finishTableExecute(
         session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
   }
 
+  // Known inherited limitation: ConnectorMetadata.executeTableExecute changed from void to
+  // Map<String,Long> in Trino 478, and the two descriptors cannot coexist in one class, so on Trino
+  // 473-477 runtimes engine dispatch resolves to the SPI default no-op and table-execute
+  // (procedures) are silently skipped. Same behavior as the previous 473-478 segment module.
   @Override
   public Map<String, Long> executeTableExecute(
       ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {

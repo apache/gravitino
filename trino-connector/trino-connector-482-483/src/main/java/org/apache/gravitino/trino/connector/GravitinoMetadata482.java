@@ -25,6 +25,7 @@ import io.trino.spi.connector.ColumnPosition;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
+import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
@@ -43,12 +44,23 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
+/**
+ * The Trino 482+ metadata adapter; carries the table-execute overrides whose SPI signatures differ
+ * across versions.
+ */
 public class GravitinoMetadata482 extends GravitinoMetadata {
 
+  /**
+   * Constructs a new GravitinoMetadata482.
+   *
+   * @param catalogConnectorMetadata the catalog connector metadata
+   * @param metadataAdapter the catalog connector metadata adapter
+   * @param internalMetadata the internal connector metadata
+   */
   public GravitinoMetadata482(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
-      io.trino.spi.connector.ConnectorMetadata internalMetadata) {
+      ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 

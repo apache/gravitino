@@ -34,7 +34,7 @@ import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 /**
  * This class provides a ConnectorPageSink for Trino to write data to internal connector.
  *
- * <p>This shared provider backs every supported Trino version. Trino 435-479 use the non-credential
+ * <p>This shared provider backs every supported Trino version. Trino 440-479 use the non-credential
  * createPageSink/createMergeSink variants; Trino 480 added {@code
  * Optional<ConnectorTableCredentials>} variants and Trino 482 removed the non-credential ones and
  * made the credential variants abstract. To keep the shared source compiling against every
@@ -45,6 +45,51 @@ import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
  */
 @SuppressWarnings({"removal", "rawtypes", "unchecked"})
 public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
+
+  private static final Class<?>[] CREATE_PAGE_SINK = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorTableExecuteHandle.class,
+    ConnectorPageSinkId.class
+  };
+
+  private static final Class<?>[] CREATE_MERGE_SINK = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorMergeTableHandle.class,
+    ConnectorPageSinkId.class
+  };
+
+  private static final Class<?>[] CREATE_PAGE_SINK_WITH_CREDENTIALS = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorTableExecuteHandle.class,
+    Optional.class,
+    ConnectorPageSinkId.class
+  };
+
+  private static final Class<?>[] CREATE_MERGE_SINK_WITH_CREDENTIALS = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorMergeTableHandle.class,
+    Optional.class,
+    ConnectorPageSinkId.class
+  };
+
+  private static final Class<?>[] CREATE_INSERT_PAGE_SINK = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorInsertTableHandle.class,
+    ConnectorPageSinkId.class
+  };
+
+  private static final Class<?>[] CREATE_INSERT_PAGE_SINK_WITH_CREDENTIALS = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorInsertTableHandle.class,
+    Optional.class,
+    ConnectorPageSinkId.class
+  };
 
   ConnectorPageSinkProvider pageSinkProvider;
 
@@ -58,7 +103,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
   }
 
   // Not annotated @Override: this non-credential variant is the SPI method up to Trino 481 but was
-  // removed in Trino 482. Kept so Trino 435-480 keep writing tables; dead on Trino 482.
+  // removed in Trino 482. Kept so Trino 440-480 keep writing tables; dead on Trino 482.
   public ConnectorPageSink createPageSink(
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
@@ -91,12 +136,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createPageSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorTableExecuteHandle.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_PAGE_SINK,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             GravitinoHandle.unWrap(tableExecuteHandle),
@@ -113,12 +153,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createMergeSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorMergeTableHandle.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_MERGE_SINK,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             GravitinoHandle.unWrap(mergeHandle),
@@ -129,7 +164,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
   // implemented for the shared source to compile against that SPI. They use raw Optional to avoid
   // naming ConnectorTableCredentials (absent before Trino 480) and delegate to the internal
   // connector's credential-aware overload, which is how Trino 481+ writes data (the non-credential
-  // overloads above are only used on Trino 435-479). The reflective dispatch keeps this shared
+  // overloads above are only used on Trino 440-479). The reflective dispatch keeps this shared
   // source usable on every supported Trino version.
   public ConnectorPageSink createPageSink(
       ConnectorTransactionHandle transactionHandle,
@@ -169,13 +204,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createPageSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorTableExecuteHandle.class,
-              Optional.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_PAGE_SINK_WITH_CREDENTIALS,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             GravitinoHandle.unWrap(tableExecuteHandle),
@@ -193,13 +222,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createMergeSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorMergeTableHandle.class,
-              Optional.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_MERGE_SINK_WITH_CREDENTIALS,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             GravitinoHandle.unWrap(mergeHandle),
@@ -216,12 +239,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createPageSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorInsertTableHandle.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_INSERT_PAGE_SINK,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             insertTableHandle,
@@ -238,13 +256,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         SpiVersionCompat.invoke(
             pageSinkProvider,
             "createPageSink",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorInsertTableHandle.class,
-              Optional.class,
-              ConnectorPageSinkId.class
-            },
+            CREATE_INSERT_PAGE_SINK_WITH_CREDENTIALS,
             GravitinoHandle.unWrap(transactionHandle),
             session,
             insertTableHandle,

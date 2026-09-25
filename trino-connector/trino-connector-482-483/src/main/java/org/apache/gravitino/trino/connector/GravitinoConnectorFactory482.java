@@ -22,9 +22,19 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
+/**
+ * The Trino 482+ connector factory that validates the runtime SPI version and creates
+ * GravitinoConnectorFactory482 instances.
+ */
 public class GravitinoConnectorFactory482 extends GravitinoConnectorFactory {
 
+  /**
+   * Constructs a new GravitinoConnectorFactory482.
+   *
+   * @param client the Gravitino admin client
+   */
   public GravitinoConnectorFactory482(GravitinoAdminClient client) {
     super(client);
   }
@@ -46,7 +56,8 @@ public class GravitinoConnectorFactory482 extends GravitinoConnectorFactory {
 
   @Override
   protected GravitinoSystemConnector createSystemConnector(
-      GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector482(storedProcedureFactory);
+      GravitinoStoredProcedureFactory storedProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    return new GravitinoSystemConnector482(storedProcedureFactory, systemTableFactory);
   }
 }

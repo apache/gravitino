@@ -27,8 +27,14 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
+/** The Trino 481+ variant of the Gravitino connector, wiring the 481 adapter classes. */
 public class GravitinoConnector481 extends GravitinoConnector {
 
+  /**
+   * Constructs a new GravitinoConnector481.
+   *
+   * @param connectorContext the catalog connector context
+   */
   public GravitinoConnector481(CatalogConnectorContext connectorContext) {
     super(connectorContext);
   }

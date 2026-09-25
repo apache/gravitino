@@ -24,6 +24,7 @@ import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorSplitSource;
 import io.trino.spi.connector.DynamicFilterSnapshot;
+import io.trino.spi.metrics.Metrics;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -87,6 +88,16 @@ public class GravitinoSplitManager482 extends GravitinoSplitManager {
     @Override
     public Optional<List<Object>> getTableExecuteSplitsInfo() {
       return connectorSplitSource.getTableExecuteSplitsInfo();
+    }
+
+    @Override
+    public long getRequestedDynamicFilterWaitTimeoutMillis() {
+      return connectorSplitSource.getRequestedDynamicFilterWaitTimeoutMillis();
+    }
+
+    @Override
+    public Metrics getMetrics() {
+      return connectorSplitSource.getMetrics();
     }
   }
 

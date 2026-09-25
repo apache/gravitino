@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.trino.spi.HostAddress;
 import io.trino.spi.Page;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorPageSource;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
 /** The Trino 482+ variant of the Gravitino system connector. */
 public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
@@ -46,10 +48,12 @@ public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
    * Constructs a new GravitinoSystemConnector482.
    *
    * @param gravitinoStoredProcedureFactory the factory for creating stored procedures
+   * @param systemTableFactory the registry of system tables to expose
    */
   public GravitinoSystemConnector482(
-      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
-    super(gravitinoStoredProcedureFactory);
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    super(gravitinoStoredProcedureFactory, systemTableFactory);
   }
 
   @Override
@@ -59,10 +63,14 @@ public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
 
   @Override
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider482();
+    return new DatasourceProvider482(getSystemTableFactory());
   }
 
   static class DatasourceProvider482 extends DatasourceProvider {
+
+    DatasourceProvider482(GravitinoSystemTableFactory systemTableFactory) {
+      super(systemTableFactory);
+    }
 
     // Trino 482 reworked createPageSource; delegate to the shared table-handle helper so system
     // tables keep loading.
@@ -76,7 +84,7 @@ public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
         List<ColumnHandle> columns,
         DynamicFilter dynamicFilter,
         MemoryContext memoryContext) {
-      return createPageSource(table);
+      return createPageSource(table, columns);
     }
 
     @Override
@@ -89,7 +97,7 @@ public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
 
     @Override
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split482(tableName);
+      return new Split482(tableName, Split.getCurrentCoordinatorAddress());
     }
   }
 
@@ -108,13 +116,16 @@ public class GravitinoSystemConnector482 extends GravitinoSystemConnector {
   public static class Split482 extends Split {
 
     /**
-     * Constructs a new Split482 with the specified table name.
+     * Constructs a new Split482 with the specified table name and coordinator address.
      *
      * @param tableName the table name
+     * @param coordinatorAddress the host and port of the Trino coordinator, null if unknown
      */
     @JsonCreator
-    public Split482(@JsonProperty("tableName") SchemaTableName tableName) {
-      super(tableName);
+    public Split482(
+        @JsonProperty("tableName") SchemaTableName tableName,
+        @JsonProperty("coordinatorAddress") HostAddress coordinatorAddress) {
+      super(tableName, coordinatorAddress);
     }
   }
 }

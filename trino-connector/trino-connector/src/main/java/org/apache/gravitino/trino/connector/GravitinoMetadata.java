@@ -855,18 +855,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (!catalogConnectorMetadata.supportsFunctions()) {
       return List.of();
     }
+    String schemaName = SpiVersionCompat.schemaName(name);
+    String functionName = SpiVersionCompat.functionName(name);
     try {
-      Function function =
-          catalogConnectorMetadata.getFunction(
-              SpiVersionCompat.schemaName(name), SpiVersionCompat.functionName(name));
+      Function function = catalogConnectorMetadata.getFunction(schemaName, functionName);
       if (function == null) {
         return List.of();
       }
       return toLanguageFunctions(function);
     } catch (NoSuchFunctionException e) {
-      LOG.debug(
-          "Function %s not found in schema %s",
-          SpiVersionCompat.functionName(name), SpiVersionCompat.schemaName(name));
+      LOG.debug("Function %s not found in schema %s", functionName, schemaName);
       return List.of();
     }
   }

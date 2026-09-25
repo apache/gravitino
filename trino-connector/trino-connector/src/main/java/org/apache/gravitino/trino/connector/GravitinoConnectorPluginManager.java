@@ -205,7 +205,7 @@ public class GravitinoConnectorPluginManager {
   }
 
   /**
-   * Instantiates a Trino {@code PluginClassLoader} across supported Trino versions. Trino 435-481
+   * Instantiates a Trino {@code PluginClassLoader} across supported Trino versions. Trino 440-481
    * expose {@code PluginClassLoader(String, List<URL>, ClassLoader, List<String> spiPackages)};
    * Trino 482 added a second package-category list, {@code PluginClassLoader(String, List<URL>,
    * ClassLoader, List<String> spiPackages, List<String> spiModules)}. The two constructors are

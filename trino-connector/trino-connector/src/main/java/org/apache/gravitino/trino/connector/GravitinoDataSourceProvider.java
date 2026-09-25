@@ -31,9 +31,18 @@ import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /** This class provides a ConnectorPageSource for Trino read data from internal connector. */
 // Trino 481 deprecates the split-based createPageSource for removal; it is still the only variant
-// available on 435-481. Trino 482 removes it and is handled by a separate version-segment module.
+// available on 440-481. Trino 482 removes it and is handled by a separate version-segment module.
 @SuppressWarnings("removal")
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
+
+  private static final Class<?>[] CREATE_PAGE_SOURCE = {
+    ConnectorTransactionHandle.class,
+    ConnectorSession.class,
+    ConnectorSplit.class,
+    ConnectorTableHandle.class,
+    List.class,
+    DynamicFilter.class
+  };
 
   ConnectorPageSourceProvider internalPageSourceProvider;
 
@@ -48,7 +57,7 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
 
   // Not annotated @Override: this split-based createPageSource is the SPI method up to Trino 481.
   // Trino 482 removed it; the 482-483 module supplies the credential/MemoryContext variant instead.
-  // Kept so Trino 435-480 keep reading tables. The outbound call is dispatched reflectively so this
+  // Kept so Trino 440-480 keep reading tables. The outbound call is dispatched reflectively so this
   // shared source still compiles against the Trino 482 SPI, where the method is never invoked.
   public ConnectorPageSource createPageSource(
       ConnectorTransactionHandle transaction,
@@ -61,14 +70,7 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
         SpiVersionCompat.invoke(
             internalPageSourceProvider,
             "createPageSource",
-            new Class<?>[] {
-              ConnectorTransactionHandle.class,
-              ConnectorSession.class,
-              ConnectorSplit.class,
-              ConnectorTableHandle.class,
-              List.class,
-              DynamicFilter.class
-            },
+            CREATE_PAGE_SOURCE,
             GravitinoHandle.unWrap(transaction),
             session,
             GravitinoHandle.unWrap(split),

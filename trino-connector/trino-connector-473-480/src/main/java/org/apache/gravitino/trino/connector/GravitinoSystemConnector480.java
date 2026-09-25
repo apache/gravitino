@@ -32,16 +32,16 @@ import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
-/** The Trino 481 variant of the Gravitino system connector. */
-public class GravitinoSystemConnector481 extends GravitinoSystemConnector {
+/** The Trino 480+ variant of the Gravitino system connector. */
+public class GravitinoSystemConnector480 extends GravitinoSystemConnector {
 
   /**
-   * Constructs a new GravitinoSystemConnector481.
+   * Constructs a new GravitinoSystemConnector480.
    *
-   * <p>gravitinoStoredProcedureFactory the factory for creating stored procedures
-   * systemTableFactory the registry of system tables to expose
+   * @param gravitinoStoredProcedureFactory the factory for creating stored procedures
+   * @param systemTableFactory the registry of system tables to expose
    */
-  public GravitinoSystemConnector481(
+  public GravitinoSystemConnector480(
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
       GravitinoSystemTableFactory systemTableFactory) {
     super(gravitinoStoredProcedureFactory, systemTableFactory);
@@ -49,36 +49,36 @@ public class GravitinoSystemConnector481 extends GravitinoSystemConnector {
 
   @Override
   protected ConnectorSplitManager createSplitManager() {
-    return new SystemSplitManager481();
+    return new GravitinoSplitManager480();
   }
 
   @Override
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider481(getSystemTableFactory());
+    return new DatasourceProvider480(getSystemTableFactory());
   }
 
-  static class DatasourceProvider481 extends DatasourceProvider {
+  static class DatasourceProvider480 extends DatasourceProvider {
 
-    DatasourceProvider481(GravitinoSystemTableFactory systemTableFactory) {
+    DatasourceProvider480(GravitinoSystemTableFactory systemTableFactory) {
       super(systemTableFactory);
     }
 
     @Override
     protected ConnectorPageSource createPageSource(Page page) {
-      return new SystemTablePageSource481(page);
+      return new SystemTablePageSource480(page);
     }
   }
 
-  static class SystemSplitManager481 extends SplitManager {
+  static class GravitinoSplitManager480 extends SplitManager {
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split481(tableName, Split.getCurrentCoordinatorAddress());
+      return new Split480(tableName, Split.getCurrentCoordinatorAddress());
     }
   }
 
-  static class SystemTablePageSource481 extends SystemTablePageSource {
+  static class SystemTablePageSource480 extends SystemTablePageSource {
 
-    public SystemTablePageSource481(Page page) {
+    public SystemTablePageSource480(Page page) {
       super(page);
     }
 
@@ -87,17 +87,10 @@ public class GravitinoSystemConnector481 extends GravitinoSystemConnector {
     }
   }
 
-  /** A Gravitino system-table split for Trino 481. */
-  public static class Split481 extends Split {
+  public static class Split480 extends Split {
 
-    /**
-     * Constructs a new Split481 with the specified table name and coordinator address.
-     *
-     * <p>tableName the system table this split reads coordinatorAddress the address of the Trino
-     * coordinator
-     */
     @JsonCreator
-    public Split481(
+    public Split480(
         @JsonProperty("tableName") SchemaTableName tableName,
         @JsonProperty("coordinatorAddress") HostAddress coordinatorAddress) {
       super(tableName, coordinatorAddress);

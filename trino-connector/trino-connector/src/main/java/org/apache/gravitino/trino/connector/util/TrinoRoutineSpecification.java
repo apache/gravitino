@@ -112,7 +112,7 @@ public final class TrinoRoutineSpecification {
 
   // Unlike Type#getDisplayName(), the type signature quotes row field names.
   private static String formatType(Type type) {
-    return type.getTypeSignature().toString();
+    return SpiVersionCompat.typeSignature(type);
   }
 
   /** Removes leading whitespace and SQL comments so the first token can be inspected. */

@@ -42,6 +42,11 @@ jobs:
       - name: Free up disk space
         run: dev/ci/util_free_space.sh
 
+      - name: Unit test SPI seam against range-min Trino 482
+        run: |
+          ./gradlew :trino-connector:trino-connector-482-483:test -PskipITs \
+            -PtrinoVersion=482 --configure-on-demand
+
       - name: Test Trino 483
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
@@ -64,25 +69,25 @@ jobs:
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=480 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-480-480/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 479
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=479 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-479-479/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 478
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=478 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 473
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=473 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 469
         run: |
