@@ -26,6 +26,12 @@ description: Use when writing or reviewing a design document PR for the Apache G
 
 All Gravitino design documents must cover the problem, scope, and solution in a consistent structure so reviewers can evaluate them efficiently.
 
+This skill owns **section structure**. Markdown formatting is
+[`design-docs/markdown-formatting.md`](../../../design-docs/markdown-formatting.md).
+Run `./gradlew markdownlint` before opening a design-doc PR. Do not invent extra
+house style. The human and agent entry point is
+[`design-docs/README.md`](../../../design-docs/README.md).
+
 ## Required Sections (in order)
 
 ### 1. Apache License Header
@@ -200,6 +206,7 @@ Before submitting a design doc PR, verify:
 - [ ] Task Breakdown has one task per GitHub issue/PR, ordered by dependency
 - [ ] Complex structures use tables, code blocks, or diagrams — no wall-of-text paragraphs
 - [ ] Section separators (`---`) between major sections for readability
+- [ ] Markdown follows `design-docs/markdown-formatting.md`; `./gradlew markdownlint` is clean for new or edited files
 
 ## Common Mistakes
 
