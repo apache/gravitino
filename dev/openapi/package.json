@@ -1,0 +1,19 @@
+{
+  "name": "gravitino-openapi-tooling",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lint and bundle tooling for the Gravitino OpenAPI spec under docs/open-api. Versions here are tracked by Dependabot/Renovate; the CI workflow (.github/workflows/openapi.yml) is the source of truth for spec validation.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "lint": "npm run lint:redocly && npm run lint:spectral",
+    "lint:redocly": "redocly lint --extends=recommended-strict",
+    "lint:spectral": "spectral lint ../../docs/open-api/openapi.yaml --ruleset .spectral.yaml",
+    "bundle": "redocly bundle gravitino -o build/openapi.json && redocly bundle gravitino -o build/openapi.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.38.0",
+    "@stoplight/spectral-cli": "^6.16.1",
+    "@stoplight/spectral-documentation": "^1.3.1",
+    "@stoplight/spectral-owasp-ruleset": "^2.0.1"
+  }
+}
