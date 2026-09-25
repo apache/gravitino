@@ -93,4 +93,38 @@ public class TestJdbcCatalogOperations {
 
     Assertions.assertDoesNotThrow(catalogOperations::close);
   }
+
+  @Test
+  public void testResolveTableNameDelegatesToTableOperationAndPreservesNamespace() {
+    // A backend TableOperation that maps the normalized name to a differently-cased stored name.
+    SqliteTableOperations resolvingTableOps =
+        new SqliteTableOperations() {
+          @Override
+          public String resolveTableName(
+              String databaseName, String requestedName, String normalizedName) {
+            Assertions.assertEquals("db", databaseName);
+            return "PHYSICAL_NAME".equals(normalizedName) ? "physical_Name" : normalizedName;
+          }
+        };
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/illegal/path"),
+            resolvingTableOps,
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "db", "PHYSICAL_NAME");
+      NameIdentifier requested = NameIdentifier.of("metalake", "catalog", "db", "physical_name");
+
+      NameIdentifier resolved = catalogOperations.resolveTableName(requested, normalized);
+
+      // Delegates the leaf name to TableOperation and keeps the original namespace.
+      Assertions.assertEquals("physical_Name", resolved.name());
+      Assertions.assertEquals(normalized.namespace(), resolved.namespace());
+
+      // When the backend returns the name unchanged, the same normalized identifier is returned.
+      NameIdentifier unchanged = NameIdentifier.of("metalake", "catalog", "db", "ALREADY_PHYSICAL");
+      Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged, unchanged));
+    }
+  }
 }

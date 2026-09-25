@@ -29,6 +29,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -294,5 +297,180 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         table.sortOrder()[0].expression().references()[0].fieldName()[0]);
     Assertions.assertEquals(
         expectedColumns[0].name().toLowerCase(), table.index()[0].fieldNames()[0][0].toLowerCase());
+  }
+
+  @Test
+  public void testPhysicalNameResolutionDrivesDownstreamIdentifier() throws Exception {
+    // When the catalog ops implements SupportsTableNameResolution and maps a normalized name to a
+    // differently-stored physical name, TableNormalizeDispatcher must hand that resolved name to
+    // the downstream dispatcher for load/alter/drop/purge/exists. Resolving above the hook and
+    // operation layers means the same resolved identifier drives the authorization hooks, the
+    // catalog call and the entity store key.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    // An unquoted request folds to uppercase PHYSICAL_NAME; the resolver maps it to the stored
+    // case-sensitive "physical_Name".
+    NameIdentifier requested = NameIdentifier.of(tableNs, "physical_name");
+    NameIdentifier resolved = NameIdentifier.of(tableNs, "physical_Name");
+
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(mockDispatcher.loadTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
+    Mockito.when(mockDispatcher.alterTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
+    Mockito.when(mockDispatcher.dropTable(Mockito.any())).thenReturn(true);
+    Mockito.when(mockDispatcher.purgeTable(Mockito.any())).thenReturn(true);
+    Mockito.when(mockDispatcher.tableExists(Mockito.any())).thenReturn(true);
+
+    // Resolver maps normalized "PHYSICAL_NAME" -> stored "physical_Name"; identity otherwise.
+    SupportsTableNameResolution resolver =
+        (requestedIdent, normalizedIdent) ->
+            "PHYSICAL_NAME".equals(normalizedIdent.name()) ? resolved : normalizedIdent;
+    TableNormalizeDispatcher dispatcher =
+        newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
+
+    dispatcher.loadTable(requested);
+    dispatcher.alterTable(requested, TableChange.rename("x"));
+    dispatcher.dropTable(requested);
+    dispatcher.purgeTable(requested);
+    dispatcher.tableExists(requested);
+
+    assertDispatchedName(mockDispatcher, "physical_Name");
+  }
+
+  @Test
+  public void testPhysicalNameResolutionReceivesRequestedAndNormalizedNames() throws Exception {
+    // The resolver sees both the original requested name and the normalized one, so it can honor a
+    // case-sensitive name supplied verbatim.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    NameIdentifier requested = NameIdentifier.of(tableNs, "\"MixedCase\"");
+
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(mockDispatcher.loadTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
+
+    SupportsTableNameResolution resolver =
+        (requestedIdent, normalizedIdent) -> {
+          // requested is the raw caller input (still quoted); normalized is the unquoted form.
+          Assertions.assertEquals("\"MixedCase\"", requestedIdent.name());
+          Assertions.assertEquals("MixedCase", normalizedIdent.name());
+          return normalizedIdent;
+        };
+    TableNormalizeDispatcher dispatcher =
+        newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
+
+    dispatcher.loadTable(requested);
+    ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).loadTable(captor.capture());
+    Assertions.assertEquals("MixedCase", captor.getValue().name());
+  }
+
+  @Test
+  public void testPhysicalNameResolutionAmbiguousKeepsNormalized() throws Exception {
+    // A resolver that cannot disambiguate returns the normalized name; the dispatcher passes it
+    // through unchanged so the usual not-found behavior surfaces.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    NameIdentifier requested = NameIdentifier.of(tableNs, "\"ambiguous\"");
+
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(mockDispatcher.dropTable(Mockito.any())).thenReturn(false);
+    Mockito.when(mockDispatcher.tableExists(Mockito.any())).thenReturn(false);
+
+    SupportsTableNameResolution resolver =
+        (requestedIdent, normalizedIdent) -> normalizedIdent; // keep normalized (ambiguous/absent)
+    TableNormalizeDispatcher dispatcher =
+        newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
+
+    // Not-found keeps boolean semantics (never throws from resolution).
+    Assertions.assertFalse(dispatcher.dropTable(requested));
+    Assertions.assertFalse(dispatcher.tableExists(requested));
+    ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).dropTable(captor.capture());
+    Assertions.assertEquals("ambiguous", captor.getValue().name());
+  }
+
+  @Test
+  public void testPhysicalNameResolutionNoCapabilityIsIdentity() throws Exception {
+    // A catalog whose ops does not implement SupportsTableNameResolution leaves the normalized
+    // identifier unchanged -- no behavior change for the vast majority of catalogs.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    NameIdentifier requested = NameIdentifier.of(tableNs, "\"MixedCase\"");
+
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(mockDispatcher.loadTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
+
+    // ops() returns a plain CatalogOperations that is NOT a SupportsTableNameResolution.
+    TableNormalizeDispatcher dispatcher =
+        newResolvingDispatcher(mockDispatcher, Mockito.mock(CatalogOperations.class));
+
+    dispatcher.loadTable(requested);
+    ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).loadTable(captor.capture());
+    // Quote-aware capability unquotes to the preserved "MixedCase"; resolution is a no-op.
+    Assertions.assertEquals("MixedCase", captor.getValue().name());
+  }
+
+  @Test
+  public void testPhysicalNameResolutionPropagatesNoSuchCatalog() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    NameIdentifier requested = NameIdentifier.of(tableNs, "t");
+
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(mockCatalogManager.doWithCatalog(Mockito.any(), Mockito.any()))
+        .thenThrow(new NoSuchCatalogException("no catalog"));
+
+    TableNormalizeDispatcher dispatcher =
+        new TableNormalizeDispatcher(mockDispatcher, mockCatalogManager);
+
+    Assertions.assertThrows(NoSuchCatalogException.class, () -> dispatcher.loadTable(requested));
+  }
+
+  private void assertDispatchedName(TableDispatcher mockDispatcher, String expected)
+      throws Exception {
+    ArgumentCaptor<NameIdentifier> loadCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).loadTable(loadCaptor.capture());
+    Assertions.assertEquals(expected, loadCaptor.getValue().name());
+
+    ArgumentCaptor<NameIdentifier> alterCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).alterTable(alterCaptor.capture(), Mockito.any());
+    Assertions.assertEquals(expected, alterCaptor.getValue().name());
+
+    ArgumentCaptor<NameIdentifier> dropCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).dropTable(dropCaptor.capture());
+    Assertions.assertEquals(expected, dropCaptor.getValue().name());
+
+    ArgumentCaptor<NameIdentifier> purgeCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).purgeTable(purgeCaptor.capture());
+    Assertions.assertEquals(expected, purgeCaptor.getValue().name());
+
+    ArgumentCaptor<NameIdentifier> existsCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).tableExists(existsCaptor.capture());
+    Assertions.assertEquals(expected, existsCaptor.getValue().name());
+  }
+
+  /**
+   * Builds a TableNormalizeDispatcher whose (mocked) catalog uses a quote-aware capability and
+   * whose ops is the given CatalogOperations.
+   */
+  private TableNormalizeDispatcher newResolvingDispatcher(
+      TableDispatcher downstream, CatalogOperations ops) {
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(mockCatalog.capability()).thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(mockCatalog.ops()).thenReturn(ops);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    return new TableNormalizeDispatcher(downstream, mockCatalogManager);
+  }
+
+  /**
+   * A CatalogOperations that also implements SupportsTableNameResolution with the given resolver.
+   */
+  private CatalogOperations resolvingCatalogOps(SupportsTableNameResolution resolver) {
+    CatalogOperations ops =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    Mockito.when(((SupportsTableNameResolution) ops).resolveTableName(Mockito.any(), Mockito.any()))
+        .thenAnswer(
+            invocation ->
+                resolver.resolveTableName(invocation.getArgument(0), invocation.getArgument(1)));
+    return ops;
   }
 }

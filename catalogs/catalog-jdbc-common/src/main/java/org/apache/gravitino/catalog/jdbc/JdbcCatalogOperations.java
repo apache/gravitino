@@ -57,6 +57,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -82,7 +83,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with the Jdbc catalog in Apache Gravitino. */
-public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class JdbcCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, SupportsTableNameResolution {
 
   private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
       "The Gravitino id attribute does not exist in properties";
@@ -397,6 +399,25 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withDatabaseName(databaseName)
         .withTableOperation(tableOperation)
         .build();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to {@link TableOperation#resolveTableName(String, String, String)}; the default
+   * backend implementation returns the normalized name unchanged, so this is a no-op unless a
+   * backend overrides it.
+   */
+  @Override
+  public NameIdentifier resolveTableName(
+      NameIdentifier requestedIdent, NameIdentifier normalizedIdent) {
+    String databaseName = NameIdentifier.of(normalizedIdent.namespace().levels()).name();
+    String resolved =
+        tableOperation.resolveTableName(
+            databaseName, requestedIdent.name(), normalizedIdent.name());
+    return resolved.equals(normalizedIdent.name())
+        ? normalizedIdent
+        : NameIdentifier.of(normalizedIdent.namespace(), resolved);
   }
 
   /**
