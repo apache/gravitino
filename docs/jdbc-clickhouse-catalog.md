@@ -177,6 +177,17 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
 
+Projection definitions on MergeTree-family engines supported by the ClickHouse catalog are
+preserved through table load and recreate when the ClickHouse server provides `system.projections`
+(24.9 or later). The current catalog supports `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`,
+`AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, and
+`GraphiteMergeTree`; replicated MergeTree engines are not currently supported for projection
+round-trips. ClickHouse 24.9 does not expose the system table's optional `settings` column; when a
+newer server exposes it, safely reconstructable projection settings are preserved too. ClickHouse
+24.8 projection round-trip is deferred, while ordinary catalog metadata loading remains supported.
+Projection data is not copied or materialized, and Gravitino does not manage projection
+`ALTER TABLE` operations.
+
 ### Table Column Types
 
 | Gravitino Type      | ClickHouse Type                        |
@@ -213,6 +224,9 @@ Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
   contain multiple setting operations of the same form, but cannot mix set and remove operations
   or combine settings with schema, comment, or index changes.
 - The `engine` value is immutable after creation.
+- `clickhouse.projections` is an immutable structured property for preserving projection names,
+  types, queries, and safely reconstructable settings during CREATE TABLE. The `settings` object is
+  empty on ClickHouse 24.9, whose `system.projections` table has no `settings` column.
 :::
 
 :::warning
@@ -242,6 +256,21 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 | `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral)                                                      | (none)        | No\*\*   | No       | No        |
 | `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<scalar-literal>`; supports settings-only set or remove requests after creation                       | (none)        | No       | No       | No        |
 | `partition-key`           | ClickHouse's canonical native partition expression (from `system.tables.partition_key`). Read-only; always present on load, empty string means unpartitioned. | `""`          | No       | Yes      | Yes       |
+| `clickhouse.projections`  | Structured projection definitions read from `system.projections`; used to recreate definitions during CREATE TABLE. Read-only after creation.                 | (none)        | No       | No       | Yes       |
+
+The `clickhouse.projections` value is a JSON array. Projection setting values are strings containing
+supported ClickHouse scalar literals.
+
+```json
+[
+  {
+    "name": "by_event_date",
+    "type": "Normal",
+    "query": "SELECT event_date, id ORDER BY event_date, id",
+    "settings": {}
+  }
+]
+```
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
