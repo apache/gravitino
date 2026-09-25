@@ -48,6 +48,8 @@ import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
+import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
 import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
@@ -66,6 +68,7 @@ import org.apache.gravitino.listener.FunctionEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -140,7 +143,10 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.internalModelDispatcher());
       assertNotNull(env.internalFunctionDispatcher());
       assertNotNull(env.internalViewDispatcher());
-      assertNotNull(env.semanticModelDispatcher());
+      assertDispatcherChain(
+          env.semanticModelDispatcher(),
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
       assertNotNull(env.credentialOperationDispatcher());
       assertNotNull(env.secretPropertyOperationDispatcher());
       assertNotNull(env.internalTagDispatcher());
@@ -226,6 +232,12 @@ class TestGravitinoEnvMetadataComponents {
           .thenReturn(entityStore);
 
       env.initializeFullComponents(config);
+
+      assertDispatcherChain(
+          env.semanticModelDispatcher(),
+          SemanticModelEventDispatcher.class,
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
 
       assertDispatcherChain(
           env.filesetDispatcher(),
