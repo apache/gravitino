@@ -141,3 +141,114 @@ def load_view_tools(mcp: FastMCP):
         return await client.as_view_operation().load_view(
             catalog_name, schema_name, view_name
         )
+
+    @mcp.tool(tags={"view"})
+    # pylint: disable=too-many-positional-arguments
+    async def create_view(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        representations: list,
+        properties: dict,
+        default_catalog: str = None,
+        default_schema: str = None,
+    ) -> str:
+        """
+        Create a new view within a schema.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            name (str): Name of the view to create.
+            comment (str): Human-readable description.
+            columns (list): Output column definitions. Each column is a dict:
+                {
+                  "name": "dt",
+                  "type": "date",
+                  "comment": "partition date",
+                  "nullable": true
+                }
+            representations (list): Engine-specific definitions. At least one
+                is required, and SQL dialects must not repeat. Each
+                representation is a dict:
+                {"type": "sql", "dialect": "spark", "sql": "SELECT ..."}
+            properties (dict): View properties.
+            default_catalog (str): Optional catalog used to resolve
+                unqualified identifiers in the representations.
+            default_schema (str): Optional schema used to resolve unqualified
+                identifiers in the representations.
+
+        Returns:
+            str: JSON-formatted string containing the created view.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_view_operation().create_view(
+            catalog_name,
+            schema_name,
+            name,
+            comment,
+            columns,
+            representations,
+            properties,
+            default_catalog,
+            default_schema,
+        )
+
+    @mcp.tool(tags={"view"})
+    async def alter_view(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        view_name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing view.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            view_name (str): Name of the view to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "renamed"},
+                  {"@type": "setProperty", "property": "k", "value": "v"},
+                  {"@type": "removeProperty", "property": "k"},
+                  {"@type": "replaceView", "comment": "rewritten",
+                   "columns": [], "representations": []}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered view.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_view_operation().alter_view(
+            catalog_name, schema_name, view_name, updates
+        )
+
+    @mcp.tool(tags={"view"})
+    async def drop_view(
+        ctx: Context, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        """
+        Drop a view by its name.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            view_name (str): Name of the view to drop.
+
+        Returns:
+            str: JSON-formatted string indicating whether the view was
+                dropped.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_view_operation().drop_view(
+            catalog_name, schema_name, view_name
+        )
