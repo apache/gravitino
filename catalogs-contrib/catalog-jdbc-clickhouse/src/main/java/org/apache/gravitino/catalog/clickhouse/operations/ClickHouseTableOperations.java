@@ -112,6 +112,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       "[%s, %s]".formatted(MIN_SET_MAX_VALUES, MAX_SET_MAX_VALUES);
   private static final Pattern SET_MAX_VALUES_PATTERN = Pattern.compile("[+-]?[0-9]+");
 
+  /** Cached connected server version, resolved on first use for version-aware text index DDL. */
+  @Nullable private volatile ClickHouseTextIndexDialect.ServerVersion serverVersion;
+
   private static final Set<ENGINE> GENERIC_ENGINE_PARAMETER_ENGINES =
       Collections.unmodifiableSet(
           EnumSet.of(
@@ -650,6 +653,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return;
     }
 
+    // The server version is only needed for the text index DDL grammar. Resolve it lazily so that
+    // index types with version-independent DDL (including their property validation) never require
+    // a live connection, and so a table with several text indexes resolves it only once.
+    ClickHouseTextIndexDialect.ServerVersion[] resolvedVersion =
+        new ClickHouseTextIndexDialect.ServerVersion[1];
+
     for (Index index : indexes) {
       String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",\n");
@@ -663,6 +672,20 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           }
           // fieldStr already quoted in getIndexFieldStr
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case DATA_SKIPPING_TEXT:
+          if (resolvedVersion[0] == null) {
+            resolvedVersion[0] = cachedServerVersion();
+          }
+          sqlBuilder
+              .append(" ")
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      index.type(),
+                      index.properties(),
+                      resolvedVersion[0]));
           break;
         case DATA_SKIPPING_MINMAX:
         case DATA_SKIPPING_BLOOM_FILTER:
@@ -679,6 +702,30 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException(
               "Gravitino Clickhouse doesn't support index : " + index.type());
       }
+    }
+  }
+
+  /**
+   * Returns the connected ClickHouse server version, caching it for the lifetime of this operations
+   * instance. Fails clearly when the version cannot be determined rather than guessing a DDL
+   * grammar.
+   */
+  private ClickHouseTextIndexDialect.ServerVersion cachedServerVersion() {
+    ClickHouseTextIndexDialect.ServerVersion cached = serverVersion;
+    if (cached != null) {
+      return cached;
+    }
+    try (Connection connection = getConnection(null)) {
+      cached =
+          ClickHouseTextIndexDialect.parseServerVersion(
+              connection.getMetaData().getDatabaseProductVersion());
+      serverVersion = cached;
+      return cached;
+    } catch (SQLException e) {
+      throw new IllegalArgumentException(
+          "Cannot determine the connected ClickHouse server version, which is required to generate "
+              + "text data skipping index DDL",
+          e);
     }
   }
 
@@ -1210,6 +1257,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return "ADD "
             + buildDataSkippingIndexDdl(
                 addIndex.getName(), fieldStr, addIndex.getType(), properties);
+
+      case DATA_SKIPPING_TEXT:
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                addIndex.getType(),
+                properties,
+                cachedServerVersion());
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -2234,8 +2290,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
           return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
         }
+        // The text index keyword changed across releases: inverted, full_text, gin and text.
+        if (isTextIndexType(rawType)) {
+          return Index.IndexType.DATA_SKIPPING_TEXT;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  /** Recognizes the text index type keyword used by any supported ClickHouse release. */
+  private static boolean isTextIndexType(String rawType) {
+    String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(rawType));
+    return normalized.startsWith("text")
+        || normalized.startsWith("inverted")
+        || normalized.startsWith("full_text")
+        || normalized.startsWith("gin");
   }
 
   /**
@@ -2339,6 +2408,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         resolveGranularity(properties, 1));
   }
 
+  /**
+   * Builds the data skipping index DDL for a text index, whose type keyword, grammar and default
+   * granularity depend on the connected server version.
+   */
+  private String buildDataSkippingIndexDdl(
+      String indexName,
+      String fieldStr,
+      Index.IndexType indexType,
+      Map<String, String> properties,
+      ClickHouseTextIndexDialect.ServerVersion serverVersion) {
+    ClickHouseTextIndexDialect.Grammar grammar =
+        ClickHouseTextIndexDialect.grammarFor(serverVersion);
+    return buildDataSkippingIndexDdl(
+        indexName,
+        fieldStr,
+        resolveDataSkippingIndexTypeClause(indexType, properties, indexName, serverVersion),
+        resolveGranularity(properties, ClickHouseTextIndexDialect.defaultGranularity(grammar)));
+  }
+
   private String resolveDataSkippingIndexTypeClause(
       Index.IndexType indexType, Map<String, String> properties, String indexName) {
     switch (indexType) {
@@ -2357,6 +2445,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException(
             "Gravitino ClickHouse doesn't support index : " + indexType);
     }
+  }
+
+  private String resolveDataSkippingIndexTypeClause(
+      Index.IndexType indexType,
+      Map<String, String> properties,
+      String indexName,
+      ClickHouseTextIndexDialect.ServerVersion serverVersion) {
+    if (indexType == Index.IndexType.DATA_SKIPPING_TEXT) {
+      return ClickHouseTextIndexDialect.buildTypeClause(
+          serverVersion, properties == null ? Collections.emptyMap() : properties, indexName);
+    }
+    return resolveDataSkippingIndexTypeClause(indexType, properties, indexName);
   }
 
   private String buildDataSkippingIndexDdl(

@@ -144,5 +144,12 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /**
+     * Text data skipping index. ClickHouse's server-wide full-text index, whose type keyword and
+     * DDL grammar changed across releases ({@code inverted}, {@code full_text}, {@code gin}, and
+     * finally {@code text}). The catalog selects the grammar matching the connected server version.
+     */
+    DATA_SKIPPING_TEXT,
   }
 }
