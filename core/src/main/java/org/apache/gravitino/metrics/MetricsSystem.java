@@ -19,9 +19,15 @@
 
 package org.apache.gravitino.metrics;
 
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricFilter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.MetricRegistryListener;
 import com.codahale.metrics.Reporter;
+import com.codahale.metrics.Timer;
 import com.codahale.metrics.jmx.JmxReporter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -50,6 +56,7 @@ public class MetricsSystem implements Closeable {
   private final String name;
   private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
+  private HashMap<String, MetricRegistryListener> sourceListeners = new HashMap<>();
   private List<Reporter> metricsReporters = new ArrayList<>();
   private CollectorRegistry prometheusRegistry;
 
@@ -89,8 +96,16 @@ public class MetricsSystem implements Closeable {
       unregister(originalMetricsSource);
     }
     this.metricSources.put(metricsSource.getMetricsSourceName(), metricsSource);
-    metricRegistry.register(
-        metricsSource.getMetricsSourceName(), metricsSource.getMetricRegistry());
+    // Attach an own listener instead of metricRegistry.register(name, sourceRegistry):
+    // Dropwizard's registry-registration attaches an internal listener to the source's
+    // registry that cannot be removed afterwards, so an unregistered source kept
+    // re-injecting lazily created metrics into the shared registry. With our own
+    // listener the link is severed on unregister. addListener replays existing
+    // metrics, matching the old registration behavior.
+    SourceMetricsListener listener =
+        new SourceMetricsListener(metricsSource.getMetricsSourceName());
+    metricsSource.getMetricRegistry().addListener(listener);
+    sourceListeners.put(metricsSource.getMetricsSourceName(), listener);
   }
 
   /**
@@ -114,6 +129,12 @@ public class MetricsSystem implements Closeable {
       return;
     }
     this.metricSources.remove(metricsSource.getMetricsSourceName());
+    MetricRegistryListener listener = sourceListeners.remove(metricsSource.getMetricsSourceName());
+    if (listener != null) {
+      // Sever the live link so a stale source cannot re-inject lazily created
+      // metrics into the shared registry after being unregistered.
+      metricsSource.getMetricRegistry().removeListener(listener);
+    }
     metricRegistry.removeMatching(
         MetricFilter.startsWith(metricsSource.getMetricsSourceName() + "."));
     LOG.info("Unregistered {} from metrics system {}", metricsSource.getMetricsSourceName(), name);
@@ -222,5 +243,72 @@ public class MetricsSystem implements Closeable {
 
   public MetricsServlet getPrometheusServlet() {
     return new MetricsServlet(prometheusRegistry);
+  }
+
+  /**
+   * Forwards metrics added to or removed from a source's registry to the shared registry under
+   * {@code "{metricsSourceName}.{metricName}"} while the source is registered. Held by {@link
+   * MetricsSystem} so the link can be severed on unregister.
+   */
+  private class SourceMetricsListener extends MetricRegistryListener.Base {
+    private final String prefix;
+
+    SourceMetricsListener(String metricsSourceName) {
+      this.prefix = metricsSourceName + ".";
+    }
+
+    private String prefixed(String name) {
+      return prefix + name;
+    }
+
+    @Override
+    public void onGaugeAdded(String name, Gauge<?> gauge) {
+      metricRegistry.register(prefixed(name), gauge);
+    }
+
+    @Override
+    public void onGaugeRemoved(String name) {
+      metricRegistry.remove(prefixed(name));
+    }
+
+    @Override
+    public void onCounterAdded(String name, Counter counter) {
+      metricRegistry.register(prefixed(name), counter);
+    }
+
+    @Override
+    public void onCounterRemoved(String name) {
+      metricRegistry.remove(prefixed(name));
+    }
+
+    @Override
+    public void onHistogramAdded(String name, Histogram histogram) {
+      metricRegistry.register(prefixed(name), histogram);
+    }
+
+    @Override
+    public void onHistogramRemoved(String name) {
+      metricRegistry.remove(prefixed(name));
+    }
+
+    @Override
+    public void onMeterAdded(String name, Meter meter) {
+      metricRegistry.register(prefixed(name), meter);
+    }
+
+    @Override
+    public void onMeterRemoved(String name) {
+      metricRegistry.remove(prefixed(name));
+    }
+
+    @Override
+    public void onTimerAdded(String name, Timer timer) {
+      metricRegistry.register(prefixed(name), timer);
+    }
+
+    @Override
+    public void onTimerRemoved(String name) {
+      metricRegistry.remove(prefixed(name));
+    }
   }
 }
