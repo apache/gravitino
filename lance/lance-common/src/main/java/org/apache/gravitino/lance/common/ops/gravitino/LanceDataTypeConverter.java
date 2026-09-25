@@ -47,6 +47,32 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
   public static final LanceDataTypeConverter CONVERTER = new LanceDataTypeConverter();
   private static final ObjectMapper mapper = new ObjectMapper();
 
+  /**
+   * Returns the Lance file format version that a new dataset with these fields must use, so that
+   * its blob columns can be written: 2.2 for {@code lance.blob} and 2.1 for {@code
+   * lance.blob.legacy}.
+   *
+   * @param fields The top-level Arrow fields of the dataset.
+   * @return The required file format version, or empty if the fields have no blob column.
+   * @throws IllegalArgumentException If the fields mix {@code lance.blob} and {@code
+   *     lance.blob.legacy} columns.
+   */
+  public static Optional<String> requiredFileFormatVersion(List<Field> fields) {
+    return LanceBlobTypes.requiredFileFormatVersion(fields);
+  }
+
+  /**
+   * Checks that a field can be added to a dataset with the given Lance file format version.
+   *
+   * @param field The Arrow field to add.
+   * @param fileFormatVersion The dataset's Lance file format version, such as {@code 2.1}.
+   * @throws IllegalArgumentException If the field contains a blob column the version does not
+   *     support.
+   */
+  public static void checkFileFormatVersion(Field field, String fileFormatVersion) {
+    LanceBlobTypes.checkFileFormatVersion(field, fileFormatVersion);
+  }
+
   public Field toArrowField(String name, Type type, boolean nullable) {
     switch (type.name()) {
       case LIST:

@@ -75,8 +75,8 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
-| `External("lance.blob.v1")`      | Lance legacy blob                       |
-| `External("lance.blob.v2(...)")` | Lance blob v2                           |
+| `External("lance.blob")`         | Lance blob                              |
+| `External("lance.blob.legacy")`  | Lance legacy blob                       |
 
 ### External Types
 
@@ -102,34 +102,38 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 Gravitino types cannot carry Arrow field metadata. When loading a Lance table, only Lance blob metadata
 is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. Blob fields nested in a
 `Struct`, `List`, `Map` or `Union` keep the container as a native Gravitino type, for example
-`List(External("lance.blob.v2"))`. As with other list columns, the list child is written back as
+`List(External("lance.blob"))`. As with other list columns, the list child is written back as
 `element`, whatever name it had in the Lance dataset (Lance and pyarrow use `item`).
 
 ### Blob Types
 
 Lance blob columns use a readable external type instead of Arrow JSON:
 
-| External Type Definition                     | Arrow Field                                                                                             |
-|----------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `External("lance.blob.v1")`                  | `LargeBinary` with metadata `lance-encoding:blob=true`                                                  |
-| `External("lance.blob.v2")`                  | `Struct<data: LargeBinary, uri: Utf8>` with metadata `ARROW:extension:name=lance.blob.v2`               |
-| `External("lance.blob.v2(with_range=true)")` | `Struct<data: LargeBinary, uri: Utf8, position: UInt64, size: UInt64>` with the same extension metadata |
+| External Type Definition          | Arrow Field                                                                               | Lance File Format Version |
+|-----------------------------------|-------------------------------------------------------------------------------------------|---------------------------|
+| `External("lance.blob")`          | `Struct<data: LargeBinary, uri: Utf8>` with metadata `ARROW:extension:name=lance.blob.v2` | 2.2 or later              |
+| `External("lance.blob.legacy")`   | `LargeBinary` with metadata `lance-encoding:blob=true`                                    | 2.1 or earlier            |
 
-`lance.blob.v2` accepts these optional parameters, written as `lance.blob.v2(key=value, ...)`:
+Use `lance.blob` for new tables. `lance.blob.legacy` is only for datasets that already use Lance's
+legacy blob encoding.
 
-| Parameter                  | Arrow Field Metadata                           | Value                                                       |
-|----------------------------|------------------------------------------------|-------------------------------------------------------------|
-| `with_range`               | -                                              | `true` or `false` (default), adds `position` and `size`     |
-| `inline_size_threshold`    | `lance-encoding:blob-inline-size-threshold`    | Integer >= 0                                                |
-| `dedicated_size_threshold` | `lance-encoding:blob-dedicated-size-threshold` | Integer > 0                                                 |
-| `pack_file_size_threshold` | `lance-encoding:blob-pack-file-size-threshold` | Integer > 0                                                 |
+When Gravitino creates a Lance dataset with blob columns, it picks the Lance file format version for
+them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have both. Adding a blob
+column to an existing dataset fails with a clear error if the dataset's file format version does not
+support it.
 
-For example, `External("lance.blob.v2(inline_size_threshold=4096, dedicated_size_threshold=1048576)")`.
+Only the blob marker is recognized. Other blob metadata, such as
+`lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
+through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct
+with the optional `position` and `size` fields or a legacy blob stored as `Binary`, is returned as
+`External(arrow_field_json_str)` so that it keeps its exact definition.
 
-Legacy blob columns are rejected by Lance for file version 2.2 and later; use blob v2 for new tables.
-Metadata other than the blob keys above is not kept. A blob field that does not exactly match these
-layouts, for example a legacy blob stored as `Binary` or a threshold out of the accepted range, is
-returned as `External(arrow_field_json_str)`.
+:::note
+Gravitino refreshes stored column types from the Lance dataset only when the dataset changes. Until
+then, blob v2 columns loaded by an earlier Gravitino version still appear as a plain `Struct`, and
+legacy blob columns stored as `External(arrow_field_json_str)` switch to `External("lance.blob.legacy")`
+on the next refresh.
+:::
 
 ### Table Properties
 

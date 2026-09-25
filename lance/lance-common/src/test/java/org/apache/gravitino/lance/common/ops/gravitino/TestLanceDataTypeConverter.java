@@ -24,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -260,7 +261,8 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
-  void testBlobV2ConvertsToReadableExternalTypeAndRoundTrips() {
+  void testBlobConvertsToReadableExternalTypeAndRoundTrips() {
+    // Storage thresholds and other non-layout metadata are not part of the Gravitino type.
     Field blobField =
         new Field(
             "blob",
@@ -270,27 +272,36 @@ public class TestLanceDataTypeConverter {
                 null,
                 Map.of(
                     "ARROW:extension:name", "lance.blob.v2",
-                    "lance-encoding:blob-inline-size-threshold", "4096",
                     "lance-encoding:blob-dedicated-size-threshold", "1048576")),
             Arrays.asList(
                 new Field("data", new FieldType(true, ArrowType.LargeBinary.INSTANCE, null), null),
-                new Field("uri", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null),
-                new Field(
-                    "position", new FieldType(true, new ArrowType.Int(64, false), null), null),
-                new Field("size", new FieldType(true, new ArrowType.Int(64, false), null), null)));
+                new Field("uri", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null)));
 
     Type type = CONVERTER.toGravitino(blobField);
 
-    assertInstanceOf(Types.ExternalType.class, type);
+    assertEquals(Types.ExternalType.of("lance.blob"), type);
     assertEquals(
-        "lance.blob.v2(with_range=true, inline_size_threshold=4096, "
-            + "dedicated_size_threshold=1048576)",
-        ((Types.ExternalType) type).catalogString());
-    assertEquals(blobField, CONVERTER.toArrowField("blob", type, true));
+        LanceBlobTypes.toArrowField("blob", true, LanceBlobTypes.BLOB),
+        CONVERTER.toArrowField("blob", type, true));
   }
 
   @Test
-  void testNonCanonicalBlobConvertsToJsonExternalTypeAndRoundTrips() {
+  void testLegacyBlobConvertsToReadableExternalTypeAndRoundTrips() {
+    Field legacyField =
+        new Field(
+            "image",
+            new FieldType(
+                false, ArrowType.LargeBinary.INSTANCE, null, Map.of("lance-encoding:blob", "true")),
+            null);
+
+    Type type = CONVERTER.toGravitino(legacyField);
+
+    assertEquals(Types.ExternalType.of("lance.blob.legacy"), type);
+    assertEquals(legacyField, CONVERTER.toArrowField("image", type, false));
+  }
+
+  @Test
+  void testNonStandardBlobConvertsToJsonExternalTypeAndRoundTrips() {
     // A legacy blob stored as Binary instead of LargeBinary.
     assertJsonExternalTypeRoundTrips(
         new Field(
@@ -299,16 +310,22 @@ public class TestLanceDataTypeConverter {
                 true, ArrowType.Binary.INSTANCE, null, Map.of("lance-encoding:blob", "true")),
             null));
 
-    // A blob v2 struct whose threshold is out of range for the readable form.
-    Field blobV2 =
-        LanceBlobTypes.toArrowField("blob", true, LanceBlobTypes.V2 + "(with_range=true)");
-    Map<String, String> metadata = new HashMap<>(blobV2.getMetadata());
-    metadata.put(LanceBlobTypes.DEDICATED_SIZE_THRESHOLD_META_KEY, "0");
+    // A legacy blob marker whose value is not "true"; Lance still treats it as a blob.
     assertJsonExternalTypeRoundTrips(
         new Field(
-            "blob",
-            new FieldType(true, ArrowType.Struct.INSTANCE, null, metadata),
-            blobV2.getChildren()));
+            "image",
+            new FieldType(
+                true, ArrowType.LargeBinary.INSTANCE, null, Map.of("lance-encoding:blob", "false")),
+            null));
+
+    // A blob v2 struct with the optional external range fields.
+    Field blob = LanceBlobTypes.toArrowField("blob", true, LanceBlobTypes.BLOB);
+    List<Field> fullChildren = new ArrayList<>(blob.getChildren());
+    fullChildren.add(
+        new Field("position", new FieldType(true, new ArrowType.Int(64, false), null), null));
+    fullChildren.add(
+        new Field("size", new FieldType(true, new ArrowType.Int(64, false), null), null));
+    assertJsonExternalTypeRoundTrips(new Field("blob", blob.getFieldType(), fullChildren));
   }
 
   @Test
@@ -342,8 +359,7 @@ public class TestLanceDataTypeConverter {
 
   @Test
   void testStructWithBlobChildRoundTrips() {
-    Field blobChild =
-        LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.V2 + "(inline_size_threshold=1)");
+    Field blobChild = LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.BLOB);
     Field structField =
         new Field(
             "record",
@@ -356,15 +372,13 @@ public class TestLanceDataTypeConverter {
 
     Types.StructType structType = assertInstanceOf(Types.StructType.class, type);
     assertEquals(Types.LongType.get(), structType.fields()[0].type());
-    assertEquals(
-        Types.ExternalType.of("lance.blob.v2(inline_size_threshold=1)"),
-        structType.fields()[1].type());
+    assertEquals(Types.ExternalType.of(LanceBlobTypes.BLOB), structType.fields()[1].type());
     assertEquals(structField, CONVERTER.toArrowField("record", type, true));
   }
 
   @Test
   void testListWithBlobChildConvertsToNativeList() {
-    String blobType = "lance.blob.v2(inline_size_threshold=16)";
+    String blobType = LanceBlobTypes.BLOB;
     // Lance and pyarrow name list children "item"; Gravitino writes them back as "element".
     Field listField =
         new Field(
@@ -416,7 +430,7 @@ public class TestLanceDataTypeConverter {
 
   @Test
   void testLargeAndFixedSizeListWithBlobChildRoundTrip() {
-    Field blobChild = LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.V2);
+    Field blobChild = LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.BLOB);
     assertJsonExternalTypeRoundTrips(
         new Field(
             "images",
@@ -440,7 +454,7 @@ public class TestLanceDataTypeConverter {
                     "images",
                     new FieldType(true, ArrowType.List.INSTANCE, null),
                     Collections.singletonList(
-                        LanceBlobTypes.toArrowField("element", true, LanceBlobTypes.V2)))));
+                        LanceBlobTypes.toArrowField("element", true, LanceBlobTypes.BLOB)))));
 
     Type type = CONVERTER.toGravitino(structField);
 
@@ -448,7 +462,7 @@ public class TestLanceDataTypeConverter {
         Types.StructType.of(
             Types.StructType.Field.of(
                 "images",
-                Types.ListType.of(Types.ExternalType.of(LanceBlobTypes.V2), true),
+                Types.ListType.of(Types.ExternalType.of(LanceBlobTypes.BLOB), true),
                 true,
                 null)),
         type);
@@ -471,12 +485,13 @@ public class TestLanceDataTypeConverter {
                             new FieldType(false, ArrowType.Utf8.INSTANCE, null),
                             null),
                         LanceBlobTypes.toArrowField(
-                            MapVector.VALUE_NAME, true, LanceBlobTypes.V1)))));
+                            MapVector.VALUE_NAME, true, LanceBlobTypes.LEGACY_BLOB)))));
 
     Type type = CONVERTER.toGravitino(mapField);
 
     assertEquals(
-        Types.MapType.of(Types.StringType.get(), Types.ExternalType.of(LanceBlobTypes.V1), true),
+        Types.MapType.of(
+            Types.StringType.get(), Types.ExternalType.of(LanceBlobTypes.LEGACY_BLOB), true),
         type);
     assertEquals(mapField, CONVERTER.toArrowField("images", type, true));
   }
@@ -496,13 +511,14 @@ public class TestLanceDataTypeConverter {
                     }),
                 null),
             Arrays.asList(
-                LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.V1),
+                LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.LEGACY_BLOB),
                 new Field("number", new FieldType(true, new ArrowType.Int(32, true), null), null)));
 
     Type type = CONVERTER.toGravitino(unionField);
 
     assertEquals(
-        Types.UnionType.of(Types.ExternalType.of(LanceBlobTypes.V1), Types.IntegerType.get()),
+        Types.UnionType.of(
+            Types.ExternalType.of(LanceBlobTypes.LEGACY_BLOB), Types.IntegerType.get()),
         type);
     Field blobChild = CONVERTER.toArrowField("value", type, true).getChildren().get(0);
     assertEquals(ArrowType.LargeBinary.INSTANCE, blobChild.getType());

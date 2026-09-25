@@ -19,11 +19,8 @@
 
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,118 +29,87 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 
 /**
- * Converts Lance blob columns between their Arrow field form and a readable catalog string used by
+ * Converts Lance blob columns between their Arrow field form and the catalog strings used by
  * Gravitino external types.
  *
- * <p>Supported catalog strings:
- *
  * <ul>
- *   <li>{@code lance.blob.v1}: an Arrow {@code LargeBinary} field with metadata {@code
- *       lance-encoding:blob=true}.
- *   <li>{@code lance.blob.v2(with_range=true, inline_size_threshold=N, dedicated_size_threshold=N,
- *       pack_file_size_threshold=N)}: an Arrow struct tagged with {@code
- *       ARROW:extension:name=lance.blob.v2}. All parameters are optional; without parameters the
- *       parentheses are omitted.
+ *   <li>{@code lance.blob}: a Lance blob v2 column, an Arrow {@code Struct<data: LargeBinary, uri:
+ *       Utf8>} tagged with {@code ARROW:extension:name=lance.blob.v2}. It requires Lance file
+ *       format version 2.2 or later.
+ *   <li>{@code lance.blob.legacy}: a Lance legacy blob column, an Arrow {@code LargeBinary} field
+ *       with metadata {@code lance-encoding:blob=true}. Lance rejects it from file format version
+ *       2.2 on.
  * </ul>
  *
- * <p>Only Lance blob metadata is recognized; other field metadata is not represented. A blob field
- * that does not exactly match the canonical Lance layout is left to the Arrow JSON representation.
+ * <p>Only the blob marker is recognized; other field metadata, such as storage thresholds, is not
+ * represented. A blob field in any other layout is left to the Arrow JSON representation so that it
+ * round-trips unchanged.
  */
 final class LanceBlobTypes {
+
+  static final String BLOB = "lance.blob";
+  static final String LEGACY_BLOB = "lance.blob.legacy";
 
   static final String BLOB_META_KEY = "lance-encoding:blob";
   static final String ARROW_EXT_NAME_KEY = "ARROW:extension:name";
   static final String BLOB_V2_EXT_NAME = "lance.blob.v2";
-  static final String INLINE_SIZE_THRESHOLD_META_KEY = "lance-encoding:blob-inline-size-threshold";
-  static final String DEDICATED_SIZE_THRESHOLD_META_KEY =
-      "lance-encoding:blob-dedicated-size-threshold";
-  static final String PACK_FILE_SIZE_THRESHOLD_META_KEY =
-      "lance-encoding:blob-pack-file-size-threshold";
 
-  static final String V1 = "lance.blob.v1";
-  static final String V2 = "lance.blob.v2";
+  /** The Lance file format version from which blob v2 is supported and legacy blob is rejected. */
+  static final String BLOB_FILE_FORMAT_VERSION = "2.2";
 
-  private static final String PREFIX = "lance.blob.";
-  private static final String WITH_RANGE = "with_range";
+  /** The Lance file format version used for datasets with legacy blob columns. */
+  static final String LEGACY_BLOB_FILE_FORMAT_VERSION = "2.1";
 
-  // Catalog string parameter name -> Arrow metadata key, in canonical output order.
-  private static final Map<String, String> THRESHOLD_PARAMS =
-      ImmutableMap.of(
-          "inline_size_threshold", INLINE_SIZE_THRESHOLD_META_KEY,
-          "dedicated_size_threshold", DEDICATED_SIZE_THRESHOLD_META_KEY,
-          "pack_file_size_threshold", PACK_FILE_SIZE_THRESHOLD_META_KEY);
-
-  // Catalog string parameter name -> minimum accepted value, matching Lance's validation.
-  private static final Map<String, Long> THRESHOLD_MINIMUMS =
-      ImmutableMap.of(
-          "inline_size_threshold", 0L,
-          "dedicated_size_threshold", 1L,
-          "pack_file_size_threshold", 1L);
-
-  private static final ArrowType UINT64 = new ArrowType.Int(64, false);
-
-  private static final List<Field> V2_MINIMAL_CHILDREN =
+  private static final List<Field> BLOB_CHILDREN =
       ImmutableList.of(
-          nullableChild("data", ArrowType.LargeBinary.INSTANCE),
-          nullableChild("uri", ArrowType.Utf8.INSTANCE));
-
-  private static final List<Field> V2_FULL_CHILDREN =
-      ImmutableList.<Field>builder()
-          .addAll(V2_MINIMAL_CHILDREN)
-          .add(nullableChild("position", UINT64))
-          .add(nullableChild("size", UINT64))
-          .build();
-
-  private static final String SUPPORTED_FORMATS =
-      V1
-          + ", "
-          + V2
-          + "("
-          + WITH_RANGE
-          + "=true, "
-          + String.join("=N, ", THRESHOLD_PARAMS.keySet())
-          + "=N)";
+          new Field("data", new FieldType(true, ArrowType.LargeBinary.INSTANCE, null), null),
+          new Field("uri", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null));
 
   private LanceBlobTypes() {}
 
   /**
-   * Returns whether the field carries Lance blob metadata, either legacy blob or blob v2.
+   * Returns whether the field carries a Lance blob marker, either legacy blob or blob v2. This
+   * matches Lance's own check, which only looks at whether the legacy key is present.
    *
    * @param field The Arrow field.
    * @return true if the field is a Lance blob field.
    */
   static boolean isBlob(Field field) {
-    Map<String, String> metadata = field.getMetadata();
-    return metadata != null
-        && (metadata.containsKey(BLOB_META_KEY)
-            || BLOB_V2_EXT_NAME.equals(metadata.get(ARROW_EXT_NAME_KEY)));
+    return isBlobV2(field) || isLegacyBlob(field);
   }
 
   /**
-   * Returns the catalog string of a canonical Lance blob field.
+   * Returns the catalog string of a Lance blob field in its standard layout.
    *
    * @param field The Arrow field.
-   * @return The catalog string, or empty if the field is not a canonical Lance blob.
+   * @return The catalog string, or empty if the field is not a Lance blob in its standard layout.
    */
   static Optional<String> toCatalogString(Field field) {
-    Map<String, String> metadata = field.getMetadata();
-    if (metadata == null || metadata.isEmpty()) {
+    if (field.getDictionary() != null) {
       return Optional.empty();
     }
-    if (isCanonicalV1(field, metadata)) {
-      return Optional.of(V1);
+    if (isBlobV2(field)
+        && field.getType() instanceof ArrowType.Struct
+        && childrenMatch(field.getChildren(), BLOB_CHILDREN)) {
+      return Optional.of(BLOB);
     }
-    return toV2CatalogString(field, metadata);
+    if (isLegacyBlob(field)
+        && field.getType() instanceof ArrowType.LargeBinary
+        && field.getChildren().isEmpty()
+        && "true".equals(field.getMetadata().get(BLOB_META_KEY))) {
+      return Optional.of(LEGACY_BLOB);
+    }
+    return Optional.empty();
   }
 
   /**
-   * Returns whether the catalog string uses the Lance blob format.
+   * Returns whether the catalog string names a Lance blob type.
    *
    * @param catalogString The external type catalog string.
-   * @return true if the string starts with {@code lance.blob.}.
+   * @return true if the string starts with {@code lance.blob}.
    */
   static boolean isBlobCatalogString(String catalogString) {
-    return catalogString != null && catalogString.trim().startsWith(PREFIX);
+    return catalogString != null && catalogString.trim().startsWith(BLOB);
   }
 
   /**
@@ -153,160 +119,122 @@ final class LanceBlobTypes {
    * @param nullable Whether the field is nullable.
    * @param catalogString The Lance blob catalog string.
    * @return The Arrow field.
-   * @throws IllegalArgumentException If the catalog string is not a valid Lance blob type.
+   * @throws IllegalArgumentException If the catalog string is not a Lance blob type.
    */
   static Field toArrowField(String name, boolean nullable, String catalogString) {
-    String trimmed = catalogString.trim();
-    if (trimmed.equals(V1)) {
-      return new Field(
-          name,
-          new FieldType(
-              nullable,
-              ArrowType.LargeBinary.INSTANCE,
-              null,
-              ImmutableMap.of(BLOB_META_KEY, "true")),
-          null);
-    }
-
-    Preconditions.checkArgument(
-        trimmed.startsWith(V2),
-        "Unsupported Lance blob type %s, expected one of: %s",
-        trimmed,
-        SUPPORTED_FORMATS);
-    String rest = trimmed.substring(V2.length()).trim();
-    Map<String, String> params = parseParams(rest, trimmed);
-
-    boolean withRange = false;
-    Map<String, String> metadata = new LinkedHashMap<>();
-    metadata.put(ARROW_EXT_NAME_KEY, BLOB_V2_EXT_NAME);
-    for (Map.Entry<String, String> param : params.entrySet()) {
-      String key = param.getKey();
-      String value = param.getValue();
-      if (key.equals(WITH_RANGE)) {
-        Preconditions.checkArgument(
-            value.equals("true") || value.equals("false"),
-            "Invalid value %s for %s in Lance blob type %s, expected true or false",
-            value,
-            WITH_RANGE,
-            trimmed);
-        withRange = Boolean.parseBoolean(value);
-      } else if (THRESHOLD_PARAMS.containsKey(key)) {
-        metadata.put(THRESHOLD_PARAMS.get(key), parseThreshold(key, value, trimmed));
-      } else {
+    switch (catalogString.trim()) {
+      case BLOB:
+        return new Field(
+            name,
+            new FieldType(
+                nullable,
+                ArrowType.Struct.INSTANCE,
+                null,
+                ImmutableMap.of(ARROW_EXT_NAME_KEY, BLOB_V2_EXT_NAME)),
+            BLOB_CHILDREN);
+      case LEGACY_BLOB:
+        return new Field(
+            name,
+            new FieldType(
+                nullable,
+                ArrowType.LargeBinary.INSTANCE,
+                null,
+                ImmutableMap.of(BLOB_META_KEY, "true")),
+            null);
+      default:
         throw new IllegalArgumentException(
             String.format(
-                "Unknown parameter %s in Lance blob type %s, expected one of: %s",
-                key, trimmed, SUPPORTED_FORMATS));
-      }
+                "Unsupported Lance blob type %s, expected %s or %s",
+                catalogString.trim(), BLOB, LEGACY_BLOB));
     }
-
-    return new Field(
-        name,
-        new FieldType(nullable, ArrowType.Struct.INSTANCE, null, metadata),
-        withRange ? V2_FULL_CHILDREN : V2_MINIMAL_CHILDREN);
   }
 
-  private static boolean isCanonicalV1(Field field, Map<String, String> metadata) {
-    return field.getType() instanceof ArrowType.LargeBinary
-        && field.getDictionary() == null
-        && field.getChildren().isEmpty()
-        && "true".equals(metadata.get(BLOB_META_KEY));
-  }
-
-  private static Optional<String> toV2CatalogString(Field field, Map<String, String> metadata) {
-    if (!(field.getType() instanceof ArrowType.Struct)
-        || field.getDictionary() != null
-        || !BLOB_V2_EXT_NAME.equals(metadata.get(ARROW_EXT_NAME_KEY))) {
-      return Optional.empty();
-    }
-
-    List<Field> children = field.getChildren();
-    boolean withRange;
-    if (childrenMatch(children, V2_MINIMAL_CHILDREN)) {
-      withRange = false;
-    } else if (childrenMatch(children, V2_FULL_CHILDREN)) {
-      withRange = true;
-    } else {
-      return Optional.empty();
-    }
-
-    List<String> params = new ArrayList<>();
-    if (withRange) {
-      params.add(WITH_RANGE + "=true");
-    }
-    for (Map.Entry<String, String> param : THRESHOLD_PARAMS.entrySet()) {
-      String value = metadata.get(param.getValue());
-      if (value == null) {
-        continue;
-      }
-      if (!isCanonicalThreshold(param.getKey(), value)) {
-        return Optional.empty();
-      }
-      params.add(param.getKey() + "=" + value);
-    }
-
-    return Optional.of(params.isEmpty() ? V2 : V2 + "(" + String.join(", ", params) + ")");
-  }
-
-  private static Map<String, String> parseParams(String rest, String catalogString) {
-    Map<String, String> params = new LinkedHashMap<>();
-    if (rest.isEmpty()) {
-      return params;
-    }
-    Preconditions.checkArgument(
-        rest.startsWith("(") && rest.endsWith(")"),
-        "Unsupported Lance blob type %s, expected one of: %s",
-        catalogString,
-        SUPPORTED_FORMATS);
-    String body = rest.substring(1, rest.length() - 1).trim();
-    if (body.isEmpty()) {
-      return params;
-    }
-    for (String part : body.split(",", -1)) {
-      String[] kv = part.split("=", -1);
-      Preconditions.checkArgument(
-          kv.length == 2 && !kv[0].trim().isEmpty() && !kv[1].trim().isEmpty(),
-          "Invalid parameter '%s' in Lance blob type %s, expected key=value",
-          part.trim(),
-          catalogString);
-      String key = kv[0].trim();
-      Preconditions.checkArgument(
-          params.put(key, kv[1].trim()) == null,
-          "Duplicate parameter %s in Lance blob type %s",
-          key,
-          catalogString);
-    }
-    return params;
-  }
-
-  private static String parseThreshold(String key, String value, String catalogString) {
-    long threshold;
-    try {
-      threshold = Long.parseLong(value);
-    } catch (NumberFormatException e) {
+  /**
+   * Returns the Lance file format version that a new dataset with these fields must use.
+   *
+   * @param fields The top-level Arrow fields of the dataset.
+   * @return {@value #BLOB_FILE_FORMAT_VERSION} if any field contains a blob v2 column, {@value
+   *     #LEGACY_BLOB_FILE_FORMAT_VERSION} if any field contains a legacy blob column, or empty if
+   *     there is no blob column.
+   * @throws IllegalArgumentException If the fields contain both blob v2 and legacy blob columns.
+   */
+  static Optional<String> requiredFileFormatVersion(List<Field> fields) {
+    boolean hasBlobV2 = fields.stream().anyMatch(field -> contains(field, true));
+    boolean hasLegacyBlob = fields.stream().anyMatch(field -> contains(field, false));
+    if (hasBlobV2 && hasLegacyBlob) {
       throw new IllegalArgumentException(
           String.format(
-              "Invalid value %s for %s in Lance blob type %s, expected an integer",
-              value, key, catalogString),
-          e);
+              "A Lance table cannot mix %s and %s columns: %s requires file format version %s or"
+                  + " later, which does not support %s",
+              BLOB, LEGACY_BLOB, BLOB, BLOB_FILE_FORMAT_VERSION, LEGACY_BLOB));
     }
-    long min = THRESHOLD_MINIMUMS.get(key);
-    Preconditions.checkArgument(
-        threshold >= min,
-        "Invalid value %s for %s in Lance blob type %s, expected an integer >= %s",
-        value,
-        key,
-        catalogString,
-        min);
-    return Long.toString(threshold);
+    if (hasBlobV2) {
+      return Optional.of(BLOB_FILE_FORMAT_VERSION);
+    }
+    return hasLegacyBlob ? Optional.of(LEGACY_BLOB_FILE_FORMAT_VERSION) : Optional.empty();
   }
 
-  private static boolean isCanonicalThreshold(String key, String value) {
+  /**
+   * Checks that a field can be added to a dataset with the given Lance file format version.
+   *
+   * @param field The Arrow field to add.
+   * @param fileFormatVersion The dataset's Lance file format version, such as {@code 2.1}.
+   * @throws IllegalArgumentException If the field contains a blob column the version does not
+   *     support.
+   */
+  static void checkFileFormatVersion(Field field, String fileFormatVersion) {
+    Optional<Boolean> supportsBlobV2 = supportsBlobV2(fileFormatVersion);
+    if (supportsBlobV2.isEmpty()) {
+      // Leave unknown versions to Lance.
+      return;
+    }
+    if (!supportsBlobV2.get() && contains(field, true)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Column %s of type %s requires Lance file format version %s or later, but the"
+                  + " dataset uses %s",
+              field.getName(), BLOB, BLOB_FILE_FORMAT_VERSION, fileFormatVersion));
+    }
+    if (supportsBlobV2.get() && contains(field, false)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Column %s of type %s is not supported by Lance file format version %s or later,"
+                  + " but the dataset uses %s; use %s instead",
+              field.getName(), LEGACY_BLOB, BLOB_FILE_FORMAT_VERSION, fileFormatVersion, BLOB));
+    }
+  }
+
+  private static boolean isBlobV2(Field field) {
+    Map<String, String> metadata = field.getMetadata();
+    return metadata != null && BLOB_V2_EXT_NAME.equals(metadata.get(ARROW_EXT_NAME_KEY));
+  }
+
+  private static boolean isLegacyBlob(Field field) {
+    Map<String, String> metadata = field.getMetadata();
+    return metadata != null && metadata.containsKey(BLOB_META_KEY) && !isBlobV2(field);
+  }
+
+  private static boolean contains(Field field, boolean blobV2) {
+    if (blobV2 ? isBlobV2(field) : isLegacyBlob(field)) {
+      return true;
+    }
+    return field.getChildren().stream().anyMatch(child -> contains(child, blobV2));
+  }
+
+  private static Optional<Boolean> supportsBlobV2(String fileFormatVersion) {
+    if (fileFormatVersion == null) {
+      return Optional.empty();
+    }
+    String[] parts = fileFormatVersion.trim().split("\\.");
+    if (parts.length != 2) {
+      return Optional.empty();
+    }
     try {
-      long threshold = Long.parseLong(value);
-      return Long.toString(threshold).equals(value) && threshold >= THRESHOLD_MINIMUMS.get(key);
+      int major = Integer.parseInt(parts[0]);
+      int minor = Integer.parseInt(parts[1]);
+      return Optional.of(major > 2 || (major == 2 && minor >= 2));
     } catch (NumberFormatException e) {
-      return false;
+      return Optional.empty();
     }
   }
 
@@ -328,9 +256,5 @@ final class LanceBlobTypes {
       }
     }
     return true;
-  }
-
-  private static Field nullableChild(String name, ArrowType type) {
-    return new Field(name, new FieldType(true, type, null), null);
   }
 }
