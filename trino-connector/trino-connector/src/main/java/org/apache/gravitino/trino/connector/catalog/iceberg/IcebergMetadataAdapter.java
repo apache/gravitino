@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /** Transforming Apache Gravitino Iceberg metadata to Trino. */
 public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -133,7 +134,7 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
-              column.getComment(),
+              SpiVersionCompat.columnComment(column),
               column.isNullable(),
               false,
               column.getProperties()));

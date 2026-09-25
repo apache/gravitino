@@ -23,7 +23,7 @@
 #
 # Environment variables:
 #   TRINO_VERSION   - Specific Trino version number (default: 478), or an exact
-#                     range directory name such as "473-478".
+#                     range directory name such as "473-480".
 #   LIST_VERSIONS   - When "true", only list the available version ranges and
 #                     exit. Useful for `docker run --rm <image>`.
 #
@@ -52,7 +52,7 @@ resolve_version_range() {
   local version="$1"
   local dir range lo hi
 
-  # Exact range directory name passed directly, e.g. "473-478".
+  # Exact range directory name passed directly, e.g. "473-480".
   if [ -d "/connectors/trino-${version}" ]; then
     echo "${version}"
     return 0

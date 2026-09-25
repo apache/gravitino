@@ -42,17 +42,52 @@ jobs:
       - name: Free up disk space
         run: dev/ci/util_free_space.sh
 
+      - name: Unit test SPI seam against range-min Trino 482
+        run: |
+          ./gradlew :trino-connector:trino-connector-482-483:test -PskipITs \
+            -PtrinoVersion=482 --configure-on-demand
+
+      - name: Test Trino 483
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=483 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-482-483/build/libs
+
+      - name: Test Trino 482
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=482 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-482-483/build/libs
+
+      - name: Test Trino 481
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=481 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-481-481/build/libs
+
+      - name: Test Trino 480
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=480 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
+
+      - name: Test Trino 479
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=479 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
+
       - name: Test Trino 478
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=478 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 473
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=473 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-480/build/libs
 
       - name: Test Trino 469
         run: |
@@ -77,12 +112,6 @@ jobs:
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
             --auto=all --auto_patch --trino_version=440 \
             --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-440-445/build/libs
-
-      - name: Test Trino 435
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=435 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7

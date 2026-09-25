@@ -25,7 +25,6 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
@@ -91,6 +90,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 import org.apache.gravitino.trino.connector.util.TrinoRoutineSpecification;
 
 /**
@@ -818,16 +818,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
             tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
   }
 
-  @Override
-  public void finishTableExecute(
-      ConnectorSession session,
-      ConnectorTableExecuteHandle tableExecuteHandle,
-      Collection<Slice> fragments,
-      List<Object> tableExecuteState) {
-    internalMetadata.finishTableExecute(
-        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
-  }
-
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
     return ((GravitinoTableHandle) tableHandle).toSchemaTableName();
   }
@@ -865,15 +855,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (!catalogConnectorMetadata.supportsFunctions()) {
       return List.of();
     }
+    String schemaName = SpiVersionCompat.schemaName(name);
+    String functionName = SpiVersionCompat.functionName(name);
     try {
-      Function function =
-          catalogConnectorMetadata.getFunction(name.getSchemaName(), name.getFunctionName());
+      Function function = catalogConnectorMetadata.getFunction(schemaName, functionName);
       if (function == null) {
         return List.of();
       }
       return toLanguageFunctions(function);
     } catch (NoSuchFunctionException e) {
-      LOG.debug("Function %s not found in schema %s", name.getFunctionName(), name.getSchemaName());
+      LOG.debug("Function %s not found in schema %s", functionName, schemaName);
       return List.of();
     }
   }

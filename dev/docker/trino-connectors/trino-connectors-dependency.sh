@@ -23,7 +23,7 @@
 #
 # The set of version-range modules is DISCOVERED from the Gradle project, so
 # this script does not hard-code which ranges exist. Whatever the checked-out
-# branch supports (for example 440-478 on main, or 435-478 on branch-1.3) is
+# branch supports (for example 440-483 on main, or 435-478 on branch-1.3) is
 # built automatically.
 #
 # Output layout:
