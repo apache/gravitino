@@ -41,6 +41,7 @@ env_map = {
     "GRAVITINO_ICEBERG_REST_S3_ENDPOINT": "s3-endpoint",
     "GRAVITINO_ICEBERG_REST_S3_REGION": "s3-region",
     "GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS": "s3-path-style-access",
+    "GRAVITINO_ICEBERG_REST_S3_PROXY_ENDPOINT": "s3-proxy-endpoint",
     "GRAVITINO_ICEBERG_REST_S3_ROLE_ARN": "s3-role-arn",
     "GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID": "s3-external-id",
     "GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT": "s3-token-service-endpoint",
