@@ -149,9 +149,11 @@ public class TestGravitinoDriverPlugin {
     assertEquals(PAIMON_CATALOG, classFor(plugin, "lakehouse-paimon"));
     assertEquals(GLUE_CATALOG, classFor(plugin, "glue"));
     assertEquals(POSTGRESQL_CATALOG, classFor(plugin, "jdbc-postgresql"));
-    // Every other JDBC backend shares one catalog.
+    // Supported generic JDBC backends share one catalog.
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-mysql"));
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-doris"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-starrocks"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-oceanbase"));
   }
 
   @Test
@@ -231,12 +233,14 @@ public class TestGravitinoDriverPlugin {
                 .put("my_hive", catalogWithProvider("hive"))
                 .put("my_mysql", catalogWithProvider("jdbc-mysql"))
                 .put("my_postgresql", catalogWithProvider("jdbc-postgresql"))
-                // Three shapes that must all be skipped. null and "" stop at the blank-provider
+                // Four shapes that must all be skipped. null and "" stop at the blank-provider
                 // guard, null being the one that pins it since fromProvider rejects null; kafka is
-                // the other shape, a non-blank provider this connector maps to no kind.
+                // a non-blank provider this connector maps to no kind, and jdbc-clickhouse is an
+                // unsupported jdbc provider with no extension.
                 .put("no_provider", catalogWithProvider(null))
                 .put("blank_provider", catalogWithProvider(""))
                 .put("my_kafka", catalogWithProvider("kafka"))
+                .put("my_clickhouse", catalogWithProvider("jdbc-clickhouse"))
                 .build());
         plugin.registerSqlExtensions(sparkConf);
 
@@ -259,6 +263,7 @@ public class TestGravitinoDriverPlugin {
         assertFalse(sparkConf.contains("spark.sql.catalog.no_provider"), flags);
         assertFalse(sparkConf.contains("spark.sql.catalog.blank_provider"), flags);
         assertFalse(sparkConf.contains("spark.sql.catalog.my_kafka"), flags);
+        assertFalse(sparkConf.contains("spark.sql.catalog.my_clickhouse"), flags);
 
         String extensions = sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
         assertEquals(
