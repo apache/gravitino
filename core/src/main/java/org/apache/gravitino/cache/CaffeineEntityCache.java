@@ -255,6 +255,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
    * entry expires, it will call this method.
    *
+   * <p>The removal callback may run after the same key has already been reinserted (for example, an
+   * entry expires and its entity is re-fetched before the asynchronous listener executes). In that
+   * case the index entry belongs to the new entry and must be kept, otherwise a later parent-level
+   * invalidation can no longer discover the reinserted child. The index entry is therefore removed
+   * only when the key is no longer present in {@code cacheData}.
+   *
    * @param key The key of the expired entity
    */
   @Override
@@ -262,7 +268,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         key,
         () -> {
-          cacheIndex.remove(key.toString());
+          if (cacheData.getIfPresent(key) == null) {
+            cacheIndex.remove(key.toString());
+          }
         });
   }
 
