@@ -161,6 +161,141 @@ class TestGlueCatalogOperationsForIceberg {
     verify(mockBuilder).create();
   }
 
+  @Test
+  void testCreateTable_icebergRejectsNanosecondTimestampBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "timestamp_ns");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("event_time")
+          .withType(Types.TimestampType.withTimeZone(9))
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testCreateTable_icebergRejectsVariantBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "variant");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("payload")
+          .withType(Types.VariantType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testCreateTable_icebergRejectsUnknownBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "unknown");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("unknown_value")
+          .withType(Types.NullType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testCreateTable_icebergRejectsGeometryBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "geometry");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("shape")
+          .withType(Types.GeometryType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testCreateTable_icebergRejectsGeographyBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "geography");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("region")
+          .withType(Types.GeographyType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
   // ---------------------------------------------------------------------------
   // alterTable Iceberg routing
   // ---------------------------------------------------------------------------

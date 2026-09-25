@@ -254,6 +254,141 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateTableRejectsNanosecondTimestampBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "timestamp_ns");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("event_time")
+          .withType(Types.TimestampType.withoutTimeZone(9))
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testCreateTableRejectsVariantBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "variant");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("payload")
+          .withType(Types.VariantType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testCreateTableRejectsUnknownBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "unknown");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("unknown_value")
+          .withType(Types.NullType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testCreateTableRejectsGeometryBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "geometry");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("shape")
+          .withType(Types.GeometryType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testCreateTableRejectsGeographyBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "geography");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("region")
+          .withType(Types.GeographyType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
   void testCreateTableStorageDescriptorProperties() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Map<String, String> props =
