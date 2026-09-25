@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
@@ -194,6 +195,7 @@ public class SemanticModelMetaService {
    * @param <E> The internal entity type accepted by the updater.
    * @return The updated Semantic Model entity.
    * @throws IOException If persistence fails.
+   * @throws NoSuchEntityException If the Semantic Model is deleted or renamed during the update.
    * @throws OptimisticLockException If the internal transaction loses a concurrent update race.
    */
   @Monitored(
@@ -223,9 +225,12 @@ public class SemanticModelMetaService {
       String catalogName = identifier.namespace().level(1);
       String schemaName = identifier.namespace().level(2);
       String oldFullName =
-          NameIdentifierUtil.ofSemanticModel(
-                  metalakeName, catalogName, schemaName, oldSemanticModelPO.getSemanticModelName())
-              .toString();
+          EntityChangeLogNameIdentifierCodec.encode(
+              NameIdentifierUtil.ofSemanticModel(
+                  metalakeName,
+                  catalogName,
+                  schemaName,
+                  oldSemanticModelPO.getSemanticModelName()));
       boolean isRenamed =
           !Objects.equals(
               oldSemanticModelPO.getSemanticModelName(), newSemanticModelPO.getSemanticModelName());
@@ -247,8 +252,7 @@ public class SemanticModelMetaService {
                     SemanticModelMetaMapper.class,
                     mapper -> ops.updatePO(mapper, newSemanticModelPO, oldSemanticModelPO)));
             if (updateResult.get() == 0) {
-              throw new OptimisticLockException(
-                  "Semantic Model %s changed during the internal update transaction", identifier);
+              throw semanticModelWriteFailure(identifier, oldSemanticModelPO);
             }
           },
           () ->
@@ -284,6 +288,7 @@ public class SemanticModelMetaService {
    *
    * @param identifier The Semantic Model identifier.
    * @return {@code true} when an active identity was deleted.
+   * @throws NoSuchEntityException If the Semantic Model is already deleted or renamed.
    * @throws OptimisticLockException If the internal transaction loses a concurrent update race.
    */
   @Monitored(
@@ -291,19 +296,8 @@ public class SemanticModelMetaService {
       baseMetricName = "deleteSemanticModel")
   public boolean deleteSemanticModel(NameIdentifier identifier) {
     SemanticModelPO semanticModelPO = getSemanticModelPOByIdentifier(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String fullName =
-        NameIdentifierUtil.ofSemanticModel(
-                metalakeName,
-                identifier.namespace().level(1),
-                identifier.namespace().level(2),
-                semanticModelPO.getSemanticModelName())
-            .toString();
-    return deleteSemanticModel(
-        semanticModelPO.getSemanticModelId(),
-        semanticModelPO.getCurrentVersion(),
-        metalakeName,
-        fullName);
+    deleteSemanticModelWithVersion(identifier, semanticModelPO);
+    return true;
   }
 
   /**
@@ -370,35 +364,40 @@ public class SemanticModelMetaService {
     return ops;
   }
 
-  boolean deleteSemanticModel(
-      Long semanticModelId,
-      Integer expectedCurrentVersion,
-      String metalakeName,
-      String semanticModelFullName) {
-    AtomicInteger deleteResult = new AtomicInteger();
+  /**
+   * Deletes the observed Semantic Model and its snapshots in one transaction.
+   *
+   * <p>Package-private access lets concurrency tests submit a stale snapshot through the same
+   * compare-and-set path as public deletion.
+   */
+  void deleteSemanticModelWithVersion(
+      NameIdentifier identifier, SemanticModelPO observedSemanticModelPO) {
+    Long semanticModelId = observedSemanticModelPO.getSemanticModelId();
+    String metalakeName = identifier.namespace().level(0);
+    String semanticModelFullName =
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofSemanticModel(
+                metalakeName,
+                identifier.namespace().level(1),
+                identifier.namespace().level(2),
+                observedSemanticModelPO.getSemanticModelName()));
+    // TODO: Soft-delete Semantic Model owner, tag, and securable-object relations in this
+    // transaction and in the metalake/catalog/schema cascade delete paths.
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          deleteResult.set(
-              SessionUtils.getWithoutCommit(
-                  SemanticModelMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteSemanticModelMetasBySemanticModelId(
-                          semanticModelId, expectedCurrentVersion)));
-          if (deleteResult.get() == 0) {
-            throw new OptimisticLockException(
-                "Semantic Model %s changed during the internal drop transaction",
-                semanticModelFullName);
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        SemanticModelMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteSemanticModelMetasBySemanticModelId(
+                                semanticModelId, observedSemanticModelPO.getCurrentVersion())),
+                () -> semanticModelWriteFailure(identifier, observedSemanticModelPO)),
+        () ->
             SessionUtils.doWithoutCommit(
                 SemanticModelVersionInfoMapper.class,
-                mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
+                mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId)),
+        () ->
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -406,10 +405,7 @@ public class SemanticModelMetaService {
                         metalakeName,
                         Entity.EntityType.SEMANTIC_MODEL.name(),
                         semanticModelFullName,
-                        OperateType.DROP));
-          }
-        });
-    return deleteResult.get() > 0;
+                        OperateType.DROP)));
   }
 
   private SemanticModelPO updateSemanticModelPO(
@@ -472,7 +468,7 @@ public class SemanticModelMetaService {
         .build();
   }
 
-  private SemanticModelPO getSemanticModelPOByIdentifier(NameIdentifier identifier) {
+  SemanticModelPO getSemanticModelPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSemanticModel(identifier);
     SemanticModelPO semanticModelPO =
         SessionUtils.getWithoutCommit(
