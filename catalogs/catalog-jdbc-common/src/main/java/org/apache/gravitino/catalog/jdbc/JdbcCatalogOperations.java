@@ -302,7 +302,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
-      LOG.warn("The comment {} does not contain Gravitino id attribute", comment);
+      LOG.debug("The schema {} does not contain Gravitino id attribute in the comment", ident);
       return load;
     }
     Map<String, String> properties =
