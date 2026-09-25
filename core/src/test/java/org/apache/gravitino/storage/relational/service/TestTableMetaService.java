@@ -37,6 +37,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -46,6 +47,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -66,6 +68,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -74,7 +77,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
 
@@ -268,43 +270,53 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testNaturalKeyOverwriteUsesPersistedTableId() throws IOException {
-    // PostgreSQL's upsert targets table_id and rejects a different ID on the natural key before
-    // readback. This regression covers MySQL/H2 ON DUPLICATE KEY, which can choose either key.
-    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+  public void testOverwriteWithDifferentIdRetiresStaleTable() throws IOException {
+    // A row stored under the same name but with another ID is a stale registration, e.g. the table
+    // was dropped outside Gravitino and then recreated. The new table must not take over the old
+    // row's ID, or it would inherit the old table's tags, policies, owner and privileges.
     createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
     Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
-    TableEntity original =
+    TableEntity stale =
         TableEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("table_natural_key_overwrite")
+            .withName("table_stale_registration")
             .withNamespace(tableNamespace)
-            .withColumns(List.of(column("original_column", Types.IntegerType.get())))
-            .withComment("original")
+            .withColumns(List.of(column("stale_column", Types.IntegerType.get())))
+            .withComment("stale")
             .withAuditInfo(AUDIT_INFO)
             .build();
-    TableMetaService.getInstance().insertTable(original, false);
-    TablePO beforeOverwrite = getTablePO(original.id());
-    TableEntity replacement =
-        TableEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(original.name())
-            .withNamespace(tableNamespace)
-            .withColumns(List.of(column("replacement_column", Types.StringType.get())))
-            .withComment("replacement")
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    TableMetaService.getInstance().insertTable(stale, false);
+    TagEntity tag = createAndInsertTagEntity("tag_on_stale_table", "comment", metalakeName);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            stale.nameIdentifier(),
+            Entity.EntityType.TABLE,
+            new NameIdentifier[] {tag.nameIdentifier()},
+            new NameIdentifier[0]);
+    Assertions.assertEquals(1, countActiveTagRels(stale.id()));
 
-    TableMetaService.getInstance().insertTable(replacement, true);
+    TableEntity recreated =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(stale.name())
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(column("recreated_column", Types.StringType.get())))
+            .withComment("recreated")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(recreated, true);
 
     TableEntity stored =
-        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
-    TablePO afterOverwrite = getTablePO(original.id());
-    Assertions.assertEquals(original.id(), stored.id());
-    Assertions.assertEquals("replacement", stored.comment());
-    Assertions.assertEquals("replacement_column", stored.columns().get(0).name());
-    Assertions.assertEquals(
-        beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion());
+        TableMetaService.getInstance().getTableByIdentifier(recreated.nameIdentifier());
+    Assertions.assertEquals(recreated.id(), stored.id());
+    Assertions.assertEquals("recreated", stored.comment());
+    Assertions.assertEquals("recreated_column", stored.columns().get(0).name());
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(List.of(stale.id())))
+            .isEmpty());
+    Assertions.assertEquals(0, countActiveTagRels(stale.id()));
+    Assertions.assertEquals(0, countActiveTagRels(recreated.id()));
   }
 
   @TestTemplate
@@ -898,6 +910,16 @@ public class TestTableMetaService extends TestJDBCBackend {
           Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
           Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
         });
+  }
+
+  private int countActiveTagRels(long metadataObjectId) {
+    return SessionUtils.getWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper
+                .listTagPOsByMetadataObjectIdAndType(
+                    metadataObjectId, MetadataObject.Type.TABLE.name())
+                .size());
   }
 
   private TablePO getTablePO(long tableId) {
