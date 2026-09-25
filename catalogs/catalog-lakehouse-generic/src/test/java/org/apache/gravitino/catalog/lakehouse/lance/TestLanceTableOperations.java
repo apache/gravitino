@@ -19,9 +19,9 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +49,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -216,6 +217,36 @@ public class TestLanceTableOperations {
 
     Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.dropTable(ident));
     verify(store, never()).delete(any(), any());
+  }
+
+  @Test
+  public void testDropExternalTableReadsMetadataLight() throws Exception {
+    // Dropping reads the location, format and external flag, none of which needs a verified
+    // schema. Opening the dataset for it would also make the drop fail while the storage is down.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("drop-light").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                Table.PROPERTY_TABLE_FORMAT,
+                LANCE_TABLE_FORMAT,
+                Table.PROPERTY_EXTERNAL,
+                "true",
+                LANCE_TABLE_VERSION,
+                "1"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(store.delete(eq(ident), eq(Entity.EntityType.TABLE))).thenReturn(true);
+    Mockito.doThrow(new RuntimeException("storage unavailable"))
+        .when(lanceTableOps)
+        .openDataset(anyString(), any());
+
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
   }
 
   @Test
@@ -404,10 +435,14 @@ public class TestLanceTableOperations {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  //  Light load: stored metadata only, never the dataset
+  // ---------------------------------------------------------------------------
+
   @Test
-  public void testLoadTableWithStoredColumnsDoesNotReadLocation() throws Exception {
+  public void testLightLoadReturnsStoredMetadataWithoutOpeningDataset() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("normal-table").toString();
+    String location = tempDir.resolve("light-load-table").toString();
     TableEntity tableEntity =
         tableEntity(
             ident,
@@ -419,20 +454,107 @@ public class TestLanceTableOperations {
                     .withPosition(0)
                     .withAuditInfo(AuditInfo.EMPTY)
                     .build()),
-            Map.of(Table.PROPERTY_LOCATION, location));
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "4"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
 
-    Table loadedTable = lanceTableOps.loadTable(ident);
+    Table loadedTable = lanceTableOps.loadTableLight(ident);
 
     Assertions.assertEquals(1, loadedTable.columns().length);
     Assertions.assertEquals("id", loadedTable.columns()[0].name());
     verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   @Test
-  public void testVersionCheckRefreshesSchemaFromLocation() throws Exception {
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testLightLoadReturnsStoredColumnsEvenWhenDatasetHasMovedOn() throws Exception {
+    // The stored version is behind the dataset, which a full load would repair. A light load is
+    // allowed to be stale and must not notice, let alone write.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("light-load-stale").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("old_col")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Table loadedTable = lanceTableOps.loadTableLight(ident);
+
+    Assertions.assertEquals(1, loadedTable.columns().length);
+    Assertions.assertEquals("old_col", loadedTable.columns()[0].name());
+    Assertions.assertEquals("8", loadedTable.properties().get(LANCE_TABLE_VERSION));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testLightLoadStaysAvailableWhenDatasetCannotBeOpened() throws Exception {
+    // The point of the light load: it keeps answering while the storage does not.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("light-load-storage-down").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "2"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    Mockito.doThrow(new RuntimeException("storage unavailable"))
+        .when(lanceTableOps)
+        .openDataset(eq(location), any());
+
+    Table loadedTable = lanceTableOps.loadTableLight(ident);
+
+    Assertions.assertEquals(0, loadedTable.columns().length);
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+  }
+
+  @Test
+  public void testFullLoadChecksVersionEvenWhenColumnsAreStored() throws Exception {
+    // The counterpart of the light tests above: a full load never trusts stored columns without
+    // checking the dataset version first, whatever the stored metadata looks like.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("full-load-checks-version").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "4"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(4L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loadedTable = lanceTableOps.loadTable(ident);
+
+    Assertions.assertEquals(1, loadedTable.columns().length);
+    verify(lanceTableOps).openDataset(location, Map.of());
+    // Version matched, so the schema itself did not have to be read back.
+    verify(dataset, never()).getSchema();
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testLoadRefreshesSchemaFromLocation() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("version-check-table").toString();
     TableEntity tableEntity =
@@ -478,8 +600,7 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckRefreshKeepsExistingColumnIdsAndComments() throws Exception {
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testRefreshKeepsExistingColumnIdsAndComments() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("version-check-keep-ids").toString();
     AuditInfo columnAudit =
@@ -550,8 +671,7 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckSkipsRefreshWhenVersionIsCurrent() throws Exception {
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testSkipsRefreshWhenVersionIsCurrent() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("current-version-table").toString();
     TableEntity tableEntity =
@@ -583,9 +703,7 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckRefreshIsIdempotentWhenCurrentEntityWasAlreadyRepaired()
-      throws Exception {
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testRefreshIsIdempotentWhenCurrentEntityWasAlreadyRepaired() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("concurrent-version-check-table").toString();
     TableEntity staleTableEntity =
@@ -681,6 +799,9 @@ public class TestLanceTableOperations {
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(9L);
+    // alterTable full-loads first, so the dataset is also asked for the version it is at before
+    // the change. It matches what is stored, so that load returns without reading the schema.
+    when(dataset.version()).thenReturn(8L);
     Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
 
     Table alteredTable =
@@ -780,9 +901,11 @@ public class TestLanceTableOperations {
         .when(lanceTableOps)
         .openDataset(location, Map.of());
 
-    IllegalStateException failure =
+    // Altering full-loads first, and a full load that cannot reach the dataset fails rather than
+    // handing back an unverified schema to alter against.
+    ConnectionFailedException failure =
         Assertions.assertThrows(
-            IllegalStateException.class,
+            ConnectionFailedException.class,
             () ->
                 lanceTableOps.alterTable(
                     ident,
@@ -899,8 +1022,7 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckSkipsSchemaReadForEmptySchemaWhenVersionUnchanged() throws Exception {
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testSkipsSchemaReadForEmptySchemaWhenVersionUnchanged() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-version-check").toString();
     // Table has empty columns but a known stored version (confirmed-empty state)
@@ -953,7 +1075,7 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testEmptyDatasetSkipsOpenWhenVersionAlreadyRecorded() throws Exception {
+  public void testEmptyDatasetSkipsSchemaReadWhenVersionAlreadyRecorded() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-dataset-second").toString();
     // Simulate the table after first-load recorded lance.version=3 but columns still empty
@@ -963,24 +1085,30 @@ public class TestLanceTableOperations {
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
 
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(3L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
-    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    // The dataset is opened to compare versions -- that is what makes the load a full one -- but
+    // the matching version means the schema does not have to be read back or rewritten.
+    verify(lanceTableOps).openDataset(location, Map.of());
+    verify(dataset, never()).getSchema();
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   // ---------------------------------------------------------------------------
-  //  VERSION_CHECK: dataset becomes empty while stored columns are non-empty
+  //  Dataset becomes empty while stored columns are non-empty
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testVersionCheckClearsStaleColumnsWhenDatasetBecomesEmpty() throws Exception {
-    // Regression test for: VERSION_CHECK + stored columns non-empty + dataset schema becomes empty.
+  public void testClearsStaleColumnsWhenDatasetBecomesEmpty() throws Exception {
+    // Regression test for: stored columns non-empty + dataset schema becomes empty.
     // recordCheckedEmptyVersion must clear the stale stored columns (not preserve them via
     // current.columns()), otherwise the version sentinel locks in permanently stale metadata.
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("stale-columns-empty-dataset").toString();
     TableEntity tableEntity =
@@ -1022,15 +1150,14 @@ public class TestLanceTableOperations {
 
     // Stale columns must be cleared; storing [id, name] here would permanently lock them in.
     Assertions.assertEquals(0, loaded.columns().length);
-    // The new dataset version must be persisted so future VERSION_CHECK loads see the match.
+    // The new dataset version must be persisted so future loads see the match.
     Assertions.assertEquals("9", loaded.properties().get(LANCE_TABLE_VERSION));
   }
 
   @Test
-  public void testVersionCheckStaleColumnsAreNotReturnedOnSubsequentLoad() throws Exception {
+  public void testStaleColumnsAreNotReturnedOnSubsequentLoad() throws Exception {
     // After the fix: once stale columns are cleared and version=9 is recorded, the next loadTable
     // must early-return with empty columns (not re-open the dataset and not return stale data).
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("subsequent-empty-load").toString();
     // Simulate the store state after the first load cleared stale columns.
@@ -1054,14 +1181,13 @@ public class TestLanceTableOperations {
   }
 
   // ---------------------------------------------------------------------------
-  //  VERSION_CHECK: empty stored columns
+  //  Empty stored columns
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testVersionCheckFirstLoadEmptyStoredColumnsEmptyDataset() throws Exception {
-    // VERSION_CHECK + no stored version + empty stored columns + dataset is also empty.
+  public void testFirstLoadEmptyStoredColumnsEmptyDataset() throws Exception {
+    // No stored version + empty stored columns + dataset is also empty.
     // Should open dataset, read schema (empty), and record version without creating any columns.
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("vc-empty-first-load").toString();
     TableEntity tableEntity =
@@ -1090,10 +1216,9 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testVersionCheckEmptyStoredColumnsVersionBumpedDatasetStillEmpty() throws Exception {
-    // VERSION_CHECK + stored empty columns with version=5 + dataset bumped to version=6 (still
+  public void testEmptyStoredColumnsVersionBumpedDatasetStillEmpty() throws Exception {
+    // Stored empty columns with version=5 + dataset bumped to version=6 (still
     // empty). Should detect version change, read schema (empty), and update version to 6.
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("vc-empty-version-bump").toString();
     TableEntity tableEntity =
@@ -1122,14 +1247,13 @@ public class TestLanceTableOperations {
   }
 
   // ---------------------------------------------------------------------------
-  //  DECLARED_AND_EMPTY: non-declared empty stored columns with real dataset schema
+  //  Non-declared empty stored columns with a real dataset schema
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testDeclaredAndEmptyRepairsNonDeclaredEmptyStoredColumnsFromRealDataset()
-      throws Exception {
-    // DECLARED_AND_EMPTY + non-declared table + empty stored columns (no version) + dataset has a
-    // real schema. loadTable should open the dataset, read the schema, and persist the columns.
+  public void testRepairsNonDeclaredEmptyStoredColumnsFromRealDataset() throws Exception {
+    // Non-declared table + empty stored columns (no version) + dataset has a real schema.
+    // loadTable opens the dataset, reads the schema, and persists the columns.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("dae-empty-stored-real-schema").toString();
     TableEntity tableEntity =
@@ -1169,12 +1293,10 @@ public class TestLanceTableOperations {
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testLoadTableWithNoLocationReturnsStoredMetadata() throws Exception {
-    // A table without a PROPERTY_LOCATION must return stored metadata immediately without
-    // attempting to open any dataset, even in VERSION_CHECK mode.
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testDeclaredTableWithNoLocationReturnsStoredMetadata() throws Exception {
+    // A declared table has no dataset yet, so there is nothing to verify its schema against and
+    // its stored metadata is returned as-is.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
-    // Declared table with empty columns and no location triggers the schema-refresh branch.
     TableEntity tableEntity = tableEntity(ident, List.of(), Map.of(LANCE_TABLE_DECLARED, "true"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
@@ -1188,22 +1310,70 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testLoadTableFallsBackToStoredMetadataWhenDatasetOpenFails() throws Exception {
-    // If the Lance dataset cannot be opened (e.g. storage not accessible), loadTable must return
-    // the stored metadata rather than propagating the exception.
+  public void testFullLoadFailsWhenNonDeclaredTableHasNoLocation() throws Exception {
+    // Without a location there is no dataset to check the stored schema against, so a load that
+    // promises freshness cannot answer.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    TableEntity tableEntity = tableEntity(ident, List.of(), Map.of());
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    ConnectionFailedException e =
+        Assertions.assertThrows(
+            ConnectionFailedException.class, () -> lanceTableOps.loadTable(ident));
+    Assertions.assertTrue(
+        e.getMessage().contains(Table.PROPERTY_LOCATION), "message should name the property");
+
+    // The same table still loads light, which is what the message points the caller at.
+    Assertions.assertEquals(0, lanceTableOps.loadTableLight(ident).columns().length);
+  }
+
+  @Test
+  public void testFullLoadFailsWhenDatasetCannotBeOpened() throws Exception {
+    // Returning the stored metadata here would be returning a schema nothing verified, from a
+    // load whose whole contract is that its schema is verified.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("broken-dataset").toString();
     TableEntity tableEntity =
         tableEntity(ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
-    Mockito.doThrow(new RuntimeException("storage unavailable"))
+    RuntimeException cause = new RuntimeException("storage unavailable");
+    Mockito.doThrow(cause).when(lanceTableOps).openDataset(eq(location), any());
+
+    ConnectionFailedException e =
+        Assertions.assertThrows(
+            ConnectionFailedException.class, () -> lanceTableOps.loadTable(ident));
+    Assertions.assertSame(cause, e.getCause());
+    Assertions.assertTrue(e.getMessage().contains(location), "message should name the location");
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+
+    // The light load is the documented way out, and it still works.
+    Assertions.assertEquals(0, lanceTableOps.loadTableLight(ident).columns().length);
+  }
+
+  @Test
+  public void testDeclaredTableSurvivesUnreadableDataset() throws Exception {
+    // A declared table's dataset is not expected to exist yet, so failing to open it is its
+    // normal state rather than a reason to fail the load.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("declared-unreadable").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_DECLARED, "true"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    Mockito.doThrow(new RuntimeException("dataset not created yet"))
         .when(lanceTableOps)
         .openDataset(eq(location), any());
 
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
+    Assertions.assertTrue(Boolean.parseBoolean(loaded.properties().get(LANCE_TABLE_DECLARED)));
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
@@ -1246,14 +1416,13 @@ public class TestLanceTableOperations {
   }
 
   // ---------------------------------------------------------------------------
-  //  VERSION_CHECK: declared table always refreshes even when version matches
+  //  Declared table always refreshes even when the version matches
   // ---------------------------------------------------------------------------
 
   @Test
-  public void testVersionCheckDeclaredTableAlwaysRefreshesDespiteVersionMatch() throws Exception {
-    // In VERSION_CHECK mode the early-return is gated on !declaredOnly, so declared tables must
-    // always open the dataset and repair their schema regardless of the stored lance.version.
-    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+  public void testDeclaredTableAlwaysRefreshesDespiteVersionMatch() throws Exception {
+    // The version early-return is gated on !declaredOnly, so a declared table always opens the
+    // dataset and repairs its schema regardless of the stored lance.version.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("vc-declared-version-match").toString();
     // Stored version already matches the dataset version.

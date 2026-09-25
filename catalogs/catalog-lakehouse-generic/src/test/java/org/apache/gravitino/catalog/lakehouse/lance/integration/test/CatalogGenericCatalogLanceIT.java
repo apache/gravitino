@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
@@ -499,15 +498,11 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
-  void testVersionCheckRefreshKeepsColumnTagsAndComments() {
+  void testSchemaRefreshKeepsColumnTagsAndComments() {
     String refreshCatalogName = GravitinoITUtils.genRandomName("lance_version_check_catalog");
     Catalog refreshCatalog =
         metalake.createCatalog(
-            refreshCatalogName,
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            ImmutableMap.of(LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK"));
+            refreshCatalogName, Catalog.Type.RELATIONAL, provider, "comment", ImmutableMap.of());
     String refreshSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tagName = GravitinoITUtils.genRandomName("lance_version_check_tag");
     try {

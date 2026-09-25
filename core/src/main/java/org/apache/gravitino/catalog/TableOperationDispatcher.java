@@ -54,6 +54,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
+import org.apache.gravitino.connector.SupportsLightTableLoad;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -160,7 +161,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident, false));
 
     if (!entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
@@ -178,7 +179,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LOG.info(
             "Table {} was concurrently imported by another node; reloading from store.", ident);
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+            TreeLockUtils.doWithTreeLock(
+                ident, LockType.READ, () -> internalLoadTable(ident, false));
         if (!entityCombinedTable.imported()) {
           throw new UnsupportedOperationException(
               "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
@@ -194,6 +196,30 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
         .withImported(entityCombinedTable.imported());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This runs the same dispatch as {@link #loadTable} -- the same tree lock, the same connector
+   * snapshot and the same hidden-property masking -- and differs only in asking the connector for
+   * its light load and in not syncing columns back to the store afterwards. Keeping the two on one
+   * path is deliberate: they answer the same REST endpoints, so letting them diverge would mean a
+   * table resolvable through one and not the other.
+   */
+  @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    EntityCombinedTable entityCombinedTable =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident, true));
+
+    if (!entityCombinedTable.imported()) {
+      // Importing a table means reconciling it with the external system that owns it, which is the
+      // full load's job. Only a catalog whose tables Gravitino manages can serve a light load, and
+      // those are always imported, so this is a fallback rather than a path taken in practice.
+      return loadTable(ident);
+    }
+
+    return entityCombinedTable;
   }
 
   /**
@@ -527,7 +553,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
-    EntityCombinedTable table = internalLoadTable(identifier);
+    // Importing reconciles Gravitino with the external system that owns the table, so it needs the
+    // table as that system has it, not a light read of what Gravitino stored.
+    EntityCombinedTable table = internalLoadTable(identifier, false);
 
     if (table.imported()) {
       return table;
@@ -594,13 +622,27 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return schemaDispatcher;
   }
 
-  private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
+  /**
+   * Loads the table from its catalog and pairs it with the stored entity.
+   *
+   * @param ident the identifier of the table to load.
+   * @param light whether to ask the connector for a light load, which skips the round trip to the
+   *     storage system at the cost of a possibly stale schema. Connectors that do not implement
+   *     {@link SupportsLightTableLoad} ignore this and are loaded fully.
+   * @return the table as held by the catalog, combined with the stored entity.
+   */
+  private EntityCombinedTable internalLoadTable(NameIdentifier ident, boolean light) {
     NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     TableCatalogResult catalogResult =
         doWithCatalog(
             catalogIdentifier,
             catalog -> {
-              Table table = catalog.doWithTableOps(tableOps -> tableOps.loadTable(ident));
+              Table table =
+                  catalog.doWithTableOps(
+                      tableOps ->
+                          light && tableOps instanceof SupportsLightTableLoad
+                              ? ((SupportsLightTableLoad) tableOps).loadTableLight(ident)
+                              : tableOps.loadTable(ident));
               return snapshotTable(catalog, table);
             },
             NoSuchTableException.class);

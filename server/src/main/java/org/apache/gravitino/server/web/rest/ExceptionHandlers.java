@@ -295,6 +295,11 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
+      } else if (e instanceof ConnectionFailedException) {
+        // A load that could not reach the system holding the table, rather than an internal
+        // failure: the caller can retry, or ask for the stored metadata without verifying it.
+        return Utils.connectionFailed(errorMsg, e);
+
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
