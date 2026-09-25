@@ -38,12 +38,18 @@ export function SiteHeader() {
 
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
+  const auth = useAppSelector(state => state.auth)
+  const isAuthReady = !!auth.authType && (auth.authType !== 'oauth' || !!auth.authToken)
 
   useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
     if (pathname && !['/', '/ui', '/login', '/ui/login', '/oauth/callback', '/ui/oauth/callback'].includes(pathname)) {
       dispatch(fetchMetalakes())
     }
-  }, [dispatch, pathname])
+  }, [dispatch, pathname, isAuthReady])
 
   // Ensure URL has sensible defaults when missing:
   // - When not on `/metalakes` and `metalake` query is missing/empty/"undefined",
