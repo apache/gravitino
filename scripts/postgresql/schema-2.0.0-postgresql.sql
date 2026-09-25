@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS fileset_meta (
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
+    occ_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (fileset_id),
     UNIQUE (schema_id, fileset_name, deleted_at)
@@ -212,6 +213,7 @@ COMMENT ON COLUMN fileset_meta.type IS 'fileset type';
 COMMENT ON COLUMN fileset_meta.audit_info IS 'fileset audit info';
 COMMENT ON COLUMN fileset_meta.current_version IS 'fileset current version';
 COMMENT ON COLUMN fileset_meta.last_version IS 'fileset last version';
+COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency version';
 COMMENT ON COLUMN fileset_meta.deleted_at IS 'fileset deleted at';
 
 
@@ -688,6 +690,7 @@ CREATE TABLE IF NOT EXISTS policy_meta (
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
+    occ_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (policy_id),
     UNIQUE (metalake_id, policy_name, deleted_at)
@@ -701,6 +704,7 @@ COMMENT ON COLUMN policy_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN policy_meta.audit_info IS 'policy audit info';
 COMMENT ON COLUMN policy_meta.current_version IS 'policy current version';
 COMMENT ON COLUMN policy_meta.last_version IS 'policy last version';
+COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';
 COMMENT ON COLUMN policy_meta.deleted_at IS 'policy deleted at';
 
 

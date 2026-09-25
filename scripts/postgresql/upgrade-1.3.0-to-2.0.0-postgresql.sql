@@ -163,3 +163,15 @@ UPDATE owner_meta
           AND d.metadata_object_id = owner_meta.metadata_object_id
           AND d.metadata_object_type = owner_meta.metadata_object_type
       );
+
+-- Separate the optimistic-concurrency token from the history version for fileset and policy.
+-- Until now current_version served as both: it is the join key into *_version_info and the value
+-- the CAS compares, so every alter had to advance it and write a snapshot even when nothing in
+-- that snapshot changed. occ_version takes over the CAS; current_version again advances only when
+-- the stored snapshot changes. The default is the whole backfill, because occ_version is only ever
+-- compared against itself on the same row.
+ALTER TABLE fileset_meta ADD COLUMN occ_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency version';
+
+ALTER TABLE policy_meta ADD COLUMN occ_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';

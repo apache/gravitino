@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -433,7 +434,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testMetadataOnlyPolicyAlterCreatesCompleteSnapshot() throws IOException {
+  public void testMetadataOnlyPolicyAlterAdvancesOnlyTheOccVersion() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -452,14 +453,20 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataOnlyUpdate);
 
     PolicyPO updatedPO = getPolicyPO(policy.nameIdentifier());
-    assertEquals(initialPO.getCurrentVersion() + 1, updatedPO.getCurrentVersion().longValue());
-    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getLastVersion());
+    // The audit info is the only thing that changed, and policy_version_info does not store it, so
+    // the alter advances the OCC token alone and writes no snapshot.
+    assertEquals(initialPO.getOccVersion() + 1, updatedPO.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), updatedPO.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), updatedPO.getLastVersion());
+    assertNotEquals(initialPO.getAuditInfo(), updatedPO.getAuditInfo());
+
+    // The row still points at the snapshot it already had, and reads still resolve it.
     assertEquals(updatedPO.getCurrentVersion(), updatedPO.getPolicyVersionPO().getVersion());
     assertEquals(policy.comment(), updatedPO.getPolicyVersionPO().getPolicyComment());
     assertEquals(policy.enabled(), updatedPO.getPolicyVersionPO().isEnabled());
     assertEquals(
         initialPO.getPolicyVersionPO().getContent(), updatedPO.getPolicyVersionPO().getContent());
-    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
@@ -475,12 +482,29 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(policy, false);
     PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
 
+    PolicyEntity metadataUpdate =
+        copyPolicy(
+            policy,
+            policy.name(),
+            policy.comment(),
+            AuditInfo.builder()
+                .withCreator("updated-creator")
+                .withCreateTime(Instant.now())
+                .build());
+    policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataUpdate);
+    PolicyPO afterMetadataUpdate = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion(), afterMetadataUpdate.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterMetadataUpdate.getLastVersion());
+    assertEquals(initialPO.getOccVersion() + 1, afterMetadataUpdate.getOccVersion().longValue());
+
     PolicyEntity replacement = copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement");
     policyMetaService.insertPolicy(replacement, true);
 
     PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    assertEquals(
+        afterMetadataUpdate.getOccVersion() + 1, overwrittenPO.getOccVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
     assertEquals(
         replacement, policyMetaService.getPolicyByIdentifier(replacement.nameIdentifier()));
@@ -558,6 +582,43 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(
         0,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+  }
+
+  @TestTemplate
+  public void testStalePolicyDeleteAfterMetadataOnlyAlter() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_delete_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(
+        policy.content(),
+        policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).content());
+
+    AuditInfo updatedAudit =
+        AuditInfo.builder().withCreator("updated-creator").withCreateTime(Instant.now()).build();
+    policyMetaService.updatePolicy(
+        policy.nameIdentifier(),
+        entity ->
+            copyPolicy(
+                (PolicyEntity) entity,
+                ((PolicyEntity) entity).name(),
+                ((PolicyEntity) entity).comment(),
+                updatedAudit));
+
+    PolicyPO afterAlter = getPolicyPO(policy.nameIdentifier());
+    assertEquals(stalePO.getCurrentVersion(), afterAlter.getCurrentVersion());
+    assertEquals(stalePO.getOccVersion() + 1, afterAlter.getOccVersion().longValue());
+    assertThrows(
+        OptimisticLockException.class,
+        () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate

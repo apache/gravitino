@@ -48,6 +48,7 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -209,11 +210,16 @@ public class FilesetMetaService {
                             po.getSchemaId());
                         persistedPO.set(replacementPO);
                       }),
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FilesetVersionMapper.class,
-                      mapper ->
-                          mapper.insertFilesetVersions(persistedPO.get().getFilesetVersionPOs())));
+              () -> {
+                // An overwrite that replaces a row with identical stored content allocates no
+                // snapshot, and an empty batch insert is not valid SQL.
+                List<FilesetVersionPO> versionPOs = persistedPO.get().getFilesetVersionPOs();
+                if (versionPOs.isEmpty()) {
+                  return;
+                }
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class, mapper -> mapper.insertFilesetVersions(versionPOs));
+              });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
@@ -452,7 +458,7 @@ public class FilesetMetaService {
                 FilesetMetaMapper.class,
                 mapper ->
                     mapper.softDeleteFilesetMetasByFilesetId(
-                        observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion())),
+                        observedFilesetPO.getFilesetId(), observedFilesetPO.getOccVersion())),
         () -> filesetWriteFailure(identifier, observedFilesetPO));
   }
 
@@ -461,6 +467,13 @@ public class FilesetMetaService {
     FilesetPO newFilesetPO = POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, null);
     if (tryUpdateFileset(newFilesetPO, oldFilesetPO)) {
       return;
+    }
+
+    // The snapshot check is in the statement only when the alter allocates a version, so an alter
+    // that allocates none can have failed for one reason: it lost the OCC race. Its observed
+    // version is fixed, so retrying would repeat the same comparison and fail again.
+    if (newFilesetPO.getCurrentVersion().equals(oldFilesetPO.getCurrentVersion())) {
+      throw filesetWriteFailure(identifier, oldFilesetPO);
     }
 
     // The metadata CAS also rejects a version that already has an active stored snapshot. Only
@@ -486,9 +499,12 @@ public class FilesetMetaService {
             FilesetMetaMapper.class,
             mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
     boolean updated = updateCount != null && updateCount > 0;
-    if (updated) {
+    if (updated && !newFilesetPO.getFilesetVersionPOs().isEmpty()) {
       // The metadata row now points to this complete snapshot. The caller's schema transaction
       // ensures a failed version insert also restores the metadata version.
+      //
+      // An alter that changed nothing the version table stores allocates no snapshot and leaves
+      // current_version alone, so the row keeps pointing at the snapshot it already had.
       SessionUtils.doWithoutCommit(
           FilesetVersionMapper.class,
           mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs()));

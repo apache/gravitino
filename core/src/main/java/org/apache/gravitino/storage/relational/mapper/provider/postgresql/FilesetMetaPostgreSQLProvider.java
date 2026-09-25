@@ -61,13 +61,13 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteFilesetMetasByFilesetId(Long filesetId, Long currentVersion) {
+  public String softDeleteFilesetMetasByFilesetId(Long filesetId, Long occVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE fileset_id = #{filesetId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+        + " AND occ_version = #{occVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -86,7 +86,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + META_TABLE_NAME
         + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, occ_version, deleted_at)"
         + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
@@ -97,6 +97,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " #{filesetMeta.auditInfo},"
         + " #{filesetMeta.currentVersion},"
         + " #{filesetMeta.lastVersion},"
+        + " #{filesetMeta.occVersion},"
         + " #{filesetMeta.deletedAt}"
         + " )"
         // Overwrite is selected by name, and a create request normally carries a newly generated
@@ -109,13 +110,15 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " schema_id = #{filesetMeta.schemaId},"
         + " type = #{filesetMeta.type},"
         + " audit_info = #{filesetMeta.auditInfo},"
+        // An overwrite is a write observed by OCC, so it advances the OCC token from the stored
+        // value instead of resetting the row to the initial version the create request carries.
+        // The history version is left alone: it is the join key into fileset_version_info, and
+        // this statement writes no snapshot to move it to.
+        //
         // PostgreSQL requires the stored row to be qualified on the update side of ON CONFLICT.
-        + " current_version = "
+        + " occ_version = "
         + META_TABLE_NAME
-        + ".current_version + 1,"
-        + " last_version = "
-        + META_TABLE_NAME
-        + ".current_version + 1,"
+        + ".occ_version + 1,"
         + " deleted_at = #{filesetMeta.deletedAt}";
   }
 }

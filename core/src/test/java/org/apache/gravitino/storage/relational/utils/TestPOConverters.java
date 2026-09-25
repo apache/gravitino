@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.utils;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
@@ -844,32 +845,29 @@ public class TestPOConverters {
     assertEquals(updatedFileset.storageLocations(), storageLocations);
     assertEquals(2, updatePO1.getCurrentVersion());
     assertEquals(2, updatePO1.getLastVersion());
+    assertEquals(2, updatePO1.getOccVersion());
     assertEquals(2, updatePO1.getFilesetVersionPOs().get(0).getVersion());
     Map<String, String> updatedProperties =
         JsonUtils.anyFieldMapper()
             .readValue(updatePO1.getFilesetVersionPOs().get(0).getProperties(), Map.class);
     assertEquals("value1", updatedProperties.get("key"));
 
-    // Metadata-only changes must also advance the OCC token. Reads join the version table through
-    // current_version, so the converter writes the unchanged content as a new complete snapshot.
+    // A rename changes nothing that fileset_version_info stores, so it advances the OCC token
+    // alone. The history version stays where it is and no snapshot is written, which leaves the
+    // metadata row still pointing at the snapshot reads join through current_version.
     FilesetPO updatePO2 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, null);
-    Map<String, String> storageLocations2 =
-        updatePO2.getFilesetVersionPOs().stream()
-            .collect(
-                Collectors.toMap(
-                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
-    assertEquals(filesetEntity.storageLocation(), storageLocations2.get(LOCATION_NAME_UNKNOWN));
-    assertEquals(filesetEntity.storageLocations(), storageLocations2);
-    assertEquals(2, updatePO2.getCurrentVersion());
-    assertEquals(2, updatePO2.getLastVersion());
-    assertEquals(2, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+    assertEquals(2, updatePO2.getOccVersion());
+    assertEquals(1, updatePO2.getCurrentVersion());
+    assertEquals(1, updatePO2.getLastVersion());
+    assertTrue(updatePO2.getFilesetVersionPOs().isEmpty());
 
     // A snapshot stored above the version the metadata row records must not be rebuilt: the next
     // version starts above every snapshot the fileset still owns.
     FilesetPO updatePO3 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, 7L);
     assertEquals(8, updatePO3.getCurrentVersion());
     assertEquals(8, updatePO3.getLastVersion());
+    assertEquals(2, updatePO3.getOccVersion());
     assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
   }
 
@@ -1771,6 +1769,7 @@ public class TestPOConverters {
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
+        .withOccVersion(1L)
         .withDeletedAt(0L)
         .withFilesetVersionPOs(ImmutableList.of(filesetVersionPO))
         .build();
@@ -1836,6 +1835,7 @@ public class TestPOConverters {
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
+        .withOccVersion(1L)
         .withDeletedAt(0L)
         .withPolicyVersionPO(policyVersionPO)
         .build();
