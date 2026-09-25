@@ -20,15 +20,23 @@
 name: "ASF Allowlist Check"
 
 on:
-  workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/**"
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
     paths:
       - ".github/**"
+  workflow_dispatch:
+
+concurrency:
+  group: required-asf-allowlist-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
