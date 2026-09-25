@@ -1298,6 +1298,102 @@ public class Types {
     }
   }
 
+  /** The vector type in Gravitino. */
+  public static class VectorType extends Type.ComplexType {
+
+    /** The dimension value used when the underlying system does not specify a dimension. */
+    public static final int DIMENSION_NOT_SET = -1;
+
+    /**
+     * Creates a vector type with an unspecified dimension.
+     *
+     * @param elementType the numeric or vector element type
+     * @return a vector type with an unspecified dimension
+     */
+    public static VectorType of(Type elementType) {
+      return of(elementType, DIMENSION_NOT_SET);
+    }
+
+    /**
+     * Creates a vector type with the given element type and dimension.
+     *
+     * @param elementType the numeric or vector element type
+     * @param dimension the number of elements, or {@link #DIMENSION_NOT_SET}
+     * @return a vector type
+     */
+    public static VectorType of(Type elementType, int dimension) {
+      return new VectorType(elementType, dimension);
+    }
+
+    private final Type elementType;
+    private final int dimension;
+
+    private VectorType(Type elementType, int dimension) {
+      Preconditions.checkArgument(elementType != null, "elementType cannot be null");
+      Preconditions.checkArgument(
+          elementType instanceof Type.NumericType || elementType instanceof VectorType,
+          "Vector elementType must be numeric or vector, but got: %s",
+          elementType.simpleString());
+      Preconditions.checkArgument(
+          dimension > 0 || dimension == DIMENSION_NOT_SET,
+          "Vector dimension must be positive or %s, but got: %s",
+          DIMENSION_NOT_SET,
+          dimension);
+      this.elementType = elementType;
+      this.dimension = dimension;
+    }
+
+    /**
+     * @return the numeric or vector element type
+     */
+    public Type elementType() {
+      return elementType;
+    }
+
+    /**
+     * @return the number of elements, or {@link #DIMENSION_NOT_SET}
+     */
+    public int dimension() {
+      return dimension;
+    }
+
+    /**
+     * @return whether the dimension is specified
+     */
+    public boolean hasDimensionSet() {
+      return dimension != DIMENSION_NOT_SET;
+    }
+
+    @Override
+    public Name name() {
+      return Name.VECTOR;
+    }
+
+    @Override
+    public String simpleString() {
+      return hasDimensionSet()
+          ? String.format("vector(%s,%d)", elementType.simpleString(), dimension)
+          : String.format("vector(%s)", elementType.simpleString());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof VectorType)) {
+        return false;
+      }
+      VectorType that = (VectorType) o;
+      return dimension == that.dimension && Objects.equals(elementType, that.elementType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(elementType, dimension);
+    }
+  }
+
   /** The map type in Gravitino. */
   public static class MapType extends Type.ComplexType {
 

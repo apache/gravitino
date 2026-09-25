@@ -108,6 +108,9 @@ public interface Type {
     /** The union type. A union type is a complex type that contains a set of types. */
     UNION,
 
+    /** The vector type. A vector contains a fixed number of numeric values or vectors. */
+    VECTOR,
+
     /** The null type. A null type represents a value that is null. */
     NULL,
 
