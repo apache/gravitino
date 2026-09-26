@@ -511,6 +511,17 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expected, IndexDTO.class),
         objectMapper.readValue(jsonValue, IndexDTO.class));
+
+    Index textIndex =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.DATA_SKIPPING_TEXT)
+            .withName("idx_text")
+            .withFieldNames(new String[][] {{"body"}})
+            .withProperties(Map.of("tokenizer", "ngrams", "ngram_size", "3"))
+            .build();
+    String textJson = JsonUtils.objectMapper().writeValueAsString(textIndex);
+    Assertions.assertTrue(textJson.contains("\"indexType\":\"DATA_SKIPPING_TEXT\""));
+    Assertions.assertEquals(textIndex, objectMapper.readValue(textJson, IndexDTO.class));
   }
 
   @Test

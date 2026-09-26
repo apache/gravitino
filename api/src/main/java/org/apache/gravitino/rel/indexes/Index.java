@@ -144,5 +144,8 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /** Full-text data skipping index in ClickHouse. */
+    DATA_SKIPPING_TEXT,
   }
 }

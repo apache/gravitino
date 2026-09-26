@@ -258,6 +258,7 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
   - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
   - `DATA_SKIPPING_NGRAMBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `ngram_size`, `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
   - `DATA_SKIPPING_TOKENBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
+  - `DATA_SKIPPING_TEXT` (native ClickHouse text indexes are recognized when loading a table; `tokenizer` is exposed as `tokens` or `ngrams`, with `ngram_size` from 1 to 8 for `ngrams`; creating or altering text indexes through Gravitino is not supported yet)
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 

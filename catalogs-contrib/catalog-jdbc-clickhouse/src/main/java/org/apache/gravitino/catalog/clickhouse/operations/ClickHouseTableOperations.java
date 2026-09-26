@@ -20,15 +20,22 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.BLOOM_FILTER_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_FULL_TEXT;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_GIN;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_INVERTED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TEXT;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HASH_FUNCTIONS;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TEXT_INDEX_NGRAMS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TEXT_INDEX_TOKENS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TOKENIZER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -1933,7 +1940,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           }
 
           if (indexType == Index.IndexType.DATA_SKIPPING_SET
-              || isParameterizedBloomFilterIndex(indexType)) {
+              || isParameterizedBloomFilterIndex(indexType)
+              || indexType == Index.IndexType.DATA_SKIPPING_TEXT) {
             try {
               parameterProperties =
                   parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
@@ -1979,6 +1987,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 name,
                 databaseName,
                 tableName);
+          }
+          if (indexType == Index.IndexType.DATA_SKIPPING_TEXT) {
+            if (parameterProperties.isEmpty()) {
+              LOG.warn(
+                  "ClickHouse text index '{}' on {}.{} has no supported tokenizer metadata in "
+                      + "{} '{}'; loaded Index.properties() is incomplete",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource);
+            } else if (TEXT_INDEX_NGRAMS.equals(parameterProperties.get(TOKENIZER))
+                && !parameterProperties.containsKey(NGRAM_SIZE)) {
+              LOG.warn(
+                  "ClickHouse text index '{}' on {}.{} uses ngrams but {} '{}' does not expose "
+                      + "ngram_size; loaded Index.properties() is incomplete",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource);
+            }
           }
           properties.putAll(parameterProperties);
           secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
@@ -2090,6 +2120,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_TOKENBFV1:
         return parseBloomFilterPropertiesForQuery(
             indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_TEXT:
+        return parseTextIndexPropertiesForQuery(parameterSource, indexName);
       default:
         return Collections.emptyMap();
     }
@@ -2193,14 +2225,279 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         || indexType == Index.IndexType.DATA_SKIPPING_TOKENBFV1;
   }
 
+  @VisibleForTesting
+  static Map<String, String> parseTextIndexPropertiesForQuery(String typeFull, String indexName) {
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    if (paramsStart < 0) {
+      return Collections.emptyMap();
+    }
+    Preconditions.checkArgument(
+        normalizedTypeFull.endsWith(")"),
+        "Invalid text-index metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+
+    String clickHouseType = normalizedTypeFull.substring(0, paramsStart).trim();
+    Preconditions.checkArgument(
+        isClickHouseTextIndexTypeName(clickHouseType),
+        "Text-index metadata '%s' has an unsupported type for index '%s'",
+        typeFull,
+        indexName);
+
+    String rawParameters =
+        normalizedTypeFull.substring(paramsStart + 1, normalizedTypeFull.length() - 1);
+    if (isLegacyTextIndexTypeName(clickHouseType)) {
+      List<String> parameters = splitTextIndexParameters(rawParameters, typeFull, indexName);
+      Preconditions.checkArgument(
+          parameters.size() == 1,
+          "Invalid %s metadata '%s' for index '%s': expected one tokenizer parameter",
+          clickHouseType,
+          typeFull,
+          indexName);
+      return parseLegacyTextTokenizer(parameters.get(0), typeFull, clickHouseType, indexName);
+    }
+
+    Map<String, String> namedParameters = new HashMap<>();
+    List<String> unsupportedParameters = new ArrayList<>();
+    for (String parameter : splitTextIndexParameters(rawParameters, typeFull, indexName)) {
+      int assignmentIndex = parameter.indexOf('=');
+      if (assignmentIndex <= 0) {
+        unsupportedParameters.add(parameter.trim());
+        continue;
+      }
+      String key = StringUtils.lowerCase(parameter.substring(0, assignmentIndex).trim());
+      String value = parameter.substring(assignmentIndex + 1).trim();
+      if (!TOKENIZER.equals(key) && !NGRAM_SIZE.equals(key)) {
+        unsupportedParameters.add(key);
+        continue;
+      }
+      Preconditions.checkArgument(
+          !namedParameters.containsKey(key),
+          "Duplicate text-index parameter '%s' in '%s' for index '%s'",
+          key,
+          typeFull,
+          indexName);
+      namedParameters.put(key, value);
+    }
+    if (!unsupportedParameters.isEmpty()) {
+      LOG.warn(
+          "ClickHouse text index '{}' contains unsupported metadata parameters {}; "
+              + "loaded Index.properties() is incomplete",
+          indexName,
+          unsupportedParameters);
+    }
+
+    String tokenizer = stripTextParameterQuotes(namedParameters.get(TOKENIZER));
+    if (StringUtils.isBlank(tokenizer)) {
+      return Collections.emptyMap();
+    }
+    if (StringUtils.equalsAnyIgnoreCase(tokenizer, "default", "tokens", "splitByNonAlpha")) {
+      Preconditions.checkArgument(
+          !namedParameters.containsKey(NGRAM_SIZE),
+          "ngram_size is only valid for ngrams tokenizer in text-index metadata '%s' for index '%s'",
+          typeFull,
+          indexName);
+      return Map.of(TOKENIZER, TEXT_INDEX_TOKENS);
+    }
+
+    String embeddedNgramSize = null;
+    String normalizedTokenizer = tokenizer;
+    int tokenizerParamsStart = tokenizer.indexOf('(');
+    if (tokenizerParamsStart >= 0 && tokenizer.endsWith(")")) {
+      normalizedTokenizer = tokenizer.substring(0, tokenizerParamsStart).trim();
+      embeddedNgramSize =
+          tokenizer.substring(tokenizerParamsStart + 1, tokenizer.length() - 1).trim();
+    }
+    if (StringUtils.equalsAnyIgnoreCase(normalizedTokenizer, "ngram", "ngrams")) {
+      String configuredNgramSize = namedParameters.get(NGRAM_SIZE);
+      Preconditions.checkArgument(
+          embeddedNgramSize == null || configuredNgramSize == null,
+          "ngram_size is specified twice in text-index metadata '%s' for index '%s'",
+          typeFull,
+          indexName);
+      String ngramSize = embeddedNgramSize == null ? configuredNgramSize : embeddedNgramSize;
+      Map<String, String> properties = new HashMap<>();
+      properties.put(TOKENIZER, TEXT_INDEX_NGRAMS);
+      if (StringUtils.isNotBlank(ngramSize)) {
+        properties.put(NGRAM_SIZE, requireTextNgramSize(ngramSize, typeFull, indexName));
+      }
+      return Map.copyOf(properties);
+    }
+
+    return Collections.emptyMap();
+  }
+
+  private static Map<String, String> parseLegacyTextTokenizer(
+      String rawParameter, String typeFull, String clickHouseType, String indexName) {
+    String parameter = stripTextParameterQuotes(rawParameter);
+    Preconditions.checkArgument(
+        StringUtils.isNumeric(parameter),
+        "Invalid %s metadata '%s' for index '%s': tokenizer parameter '%s' must be an integer",
+        clickHouseType,
+        typeFull,
+        indexName,
+        parameter);
+    int value;
+    try {
+      value = Integer.parseInt(parameter);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid text-index metadata '%s' for index '%s': tokenizer parameter '%s' is outside the supported integer range"
+              .formatted(typeFull, indexName, parameter),
+          e);
+    }
+
+    if (value == 0) {
+      return Map.of(TOKENIZER, TEXT_INDEX_TOKENS);
+    }
+    Preconditions.checkArgument(
+        value >= 1 && value <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
+        typeFull,
+        indexName,
+        value);
+    return Map.of(TOKENIZER, TEXT_INDEX_NGRAMS, NGRAM_SIZE, String.valueOf(value));
+  }
+
+  private static String requireTextNgramSize(String value, String typeFull, String indexName) {
+    String normalizedValue = stripTextParameterQuotes(value);
+    Preconditions.checkArgument(
+        StringUtils.isNumeric(normalizedValue),
+        "Invalid text-index metadata '%s' for index '%s': ngram_size '%s' must be an integer",
+        typeFull,
+        indexName,
+        normalizedValue);
+    int ngramSize;
+    try {
+      ngramSize = Integer.parseInt(normalizedValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid text-index metadata '%s' for index '%s': ngram_size '%s' is outside the supported integer range"
+              .formatted(typeFull, indexName, normalizedValue),
+          e);
+    }
+    Preconditions.checkArgument(
+        ngramSize >= 1 && ngramSize <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
+        typeFull,
+        indexName,
+        ngramSize);
+    return String.valueOf(ngramSize);
+  }
+
+  private static List<String> splitTextIndexParameters(
+      String rawParameters, String typeFull, String indexName) {
+    List<String> parameters = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int parenthesesDepth = 0;
+    int bracketsDepth = 0;
+    char quote = 0;
+    boolean escaped = false;
+    for (int i = 0; i < rawParameters.length(); i++) {
+      char character = rawParameters.charAt(i);
+      if (quote != 0) {
+        current.append(character);
+        if (escaped) {
+          escaped = false;
+        } else if (character == '\\') {
+          escaped = true;
+        } else if (character == quote) {
+          if (i + 1 < rawParameters.length() && rawParameters.charAt(i + 1) == quote) {
+            current.append(rawParameters.charAt(++i));
+          } else {
+            quote = 0;
+          }
+        }
+        continue;
+      }
+      if (character == '\'' || character == '"') {
+        quote = character;
+        current.append(character);
+      } else if (character == '(') {
+        parenthesesDepth++;
+        current.append(character);
+      } else if (character == ')') {
+        parenthesesDepth--;
+        Preconditions.checkArgument(
+            parenthesesDepth >= 0,
+            "Invalid text-index metadata '%s' for index '%s'",
+            typeFull,
+            indexName);
+        current.append(character);
+      } else if (character == '[') {
+        bracketsDepth++;
+        current.append(character);
+      } else if (character == ']') {
+        bracketsDepth--;
+        Preconditions.checkArgument(
+            bracketsDepth >= 0,
+            "Invalid text-index metadata '%s' for index '%s'",
+            typeFull,
+            indexName);
+        current.append(character);
+      } else if (character == ',' && parenthesesDepth == 0 && bracketsDepth == 0) {
+        parameters.add(current.toString().trim());
+        current.setLength(0);
+      } else {
+        current.append(character);
+      }
+    }
+    Preconditions.checkArgument(
+        quote == 0 && parenthesesDepth == 0 && bracketsDepth == 0 && !escaped,
+        "Invalid text-index metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+    if (current.length() > 0 || !rawParameters.isEmpty()) {
+      parameters.add(current.toString().trim());
+    }
+    return parameters;
+  }
+
+  private static String stripTextParameterQuotes(String value) {
+    String normalizedValue = StringUtils.trimToEmpty(value);
+    if (normalizedValue.length() >= 2
+        && ((normalizedValue.startsWith("'") && normalizedValue.endsWith("'"))
+            || (normalizedValue.startsWith("\"") && normalizedValue.endsWith("\"")))) {
+      normalizedValue = normalizedValue.substring(1, normalizedValue.length() - 1);
+    }
+    return normalizedValue.replace("\\'", "'").replace("''", "'");
+  }
+
+  private static boolean isClickHouseTextIndexTypeName(String typeName) {
+    return StringUtils.equalsAnyIgnoreCase(
+        StringUtils.trimToEmpty(typeName),
+        DATA_SKIPPING_TEXT,
+        DATA_SKIPPING_GIN,
+        DATA_SKIPPING_FULL_TEXT,
+        DATA_SKIPPING_INVERTED);
+  }
+
+  private static boolean isLegacyTextIndexTypeName(String typeName) {
+    return StringUtils.equalsAnyIgnoreCase(
+        StringUtils.trimToEmpty(typeName),
+        DATA_SKIPPING_GIN,
+        DATA_SKIPPING_FULL_TEXT,
+        DATA_SKIPPING_INVERTED);
+  }
+
+  private static boolean isClickHouseTextIndexType(String rawType) {
+    if (StringUtils.isBlank(rawType)) {
+      return false;
+    }
+    int paramsStart = rawType.indexOf('(');
+    String typeName = paramsStart < 0 ? rawType.trim() : rawType.substring(0, paramsStart).trim();
+    return isClickHouseTextIndexTypeName(typeName);
+  }
+
   /**
    * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
    * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
-   * default). Also handles the {@code set(N)} parameterized format that some ClickHouse versions
-   * may return from {@code system.data_skipping_indices}.
+   * default). Also handles parameterized index formats that some ClickHouse versions may return
+   * from {@code system.data_skipping_indices}.
    *
-   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
-   *     "set", "set(0)")
+   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "set(0)",
+   *     "inverted(0)", or "text(tokenizer = ngrams(3))")
    * @return the corresponding Gravitino IndexType
    * @throws IllegalArgumentException if the type is not supported
    */
@@ -2221,10 +2518,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
       case DATA_SKIPPING_TOKENBFV1:
         return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+      case DATA_SKIPPING_TEXT:
+      case DATA_SKIPPING_GIN:
+      case DATA_SKIPPING_FULL_TEXT:
+      case DATA_SKIPPING_INVERTED:
+        return Index.IndexType.DATA_SKIPPING_TEXT;
       default:
-        // ClickHouse may return type with parameters in some versions (e.g. "set(0)",
-        // "ngrambf_v1(3, 512, 3, 0)"). Match on prefix to handle both bare and
-        // parameterized formats.
+        // ClickHouse may return types with parameters in some versions. Match the parameterized
+        // format for data skipping indexes whose raw type is not covered by an exact case above.
         if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
           return Index.IndexType.DATA_SKIPPING_SET;
         }
@@ -2233,6 +2534,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
         if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
           return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+        }
+        if (isClickHouseTextIndexType(rawType)) {
+          return Index.IndexType.DATA_SKIPPING_TEXT;
         }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }

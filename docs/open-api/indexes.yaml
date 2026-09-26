@@ -40,6 +40,7 @@ components:
             - "data_skipping_set"
             - "data_skipping_ngrambfv1"
             - "data_skipping_tokenbfv1"
+            - "data_skipping_text"
         name:
           type: string
           description: The name of the index
