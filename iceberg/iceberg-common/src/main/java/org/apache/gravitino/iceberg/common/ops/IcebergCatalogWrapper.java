@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -328,6 +329,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Builds an {@link IcebergTableChange} and commits it within a single proxied call. When this
+   * wrapper is behind the {@link KerberosAwareIcebergCatalogProxy}, the entire operation —
+   * including the metadata.json read triggered by {@code loadTable()} inside the builder — runs
+   * under the impersonated user's UGI context.
+   *
+   * @param builder a function that uses the underlying catalog to build an {@link
+   *     IcebergTableChange}
+   * @return the response after committing the table change
+   */
+  public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
+    IcebergTableChange change = builder.apply(getCatalog());
+    Transaction transaction = change.getTransaction();
+    transaction.commitTransaction();
+    return loadTable(change.getTableIdentifier());
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
