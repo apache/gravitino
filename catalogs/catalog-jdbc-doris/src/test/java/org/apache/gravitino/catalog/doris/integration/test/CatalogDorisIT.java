@@ -1197,6 +1197,34 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testAutoRangeRejectedByDoris12() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("test_auto_range_unsupported");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column dateColumn = Column.of("dt", Types.DateType.get(), "date", false, false, null);
+    Distribution distribution = Distributions.hash(1, NamedReference.field("dt"));
+    Transform autoRange =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {dateColumn},
+                    table_comment,
+                    Collections.emptyMap(),
+                    new Transform[] {autoRange},
+                    distribution,
+                    null,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(exception.getMessage().contains("Encountered: AUTO"), exception.getMessage());
+  }
+
+  @Test
   void testTableWithTimeStampColumn() {
     String tableName = GravitinoITUtils.genRandomName("test_table_with_timestamp_column");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
