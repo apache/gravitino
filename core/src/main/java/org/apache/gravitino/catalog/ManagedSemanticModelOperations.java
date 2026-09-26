@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
@@ -71,9 +73,17 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
 
   @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
-    // TODO: Implement in the Semantic Model list/alter/drop capability.
-    throw new UnsupportedOperationException(
-        "listSemanticModels: list/alter/drop capability is not implemented");
+    try {
+      List<SemanticModelEntity> models =
+          store.list(namespace, SemanticModelEntity.class, Entity.EntityType.SEMANTIC_MODEL);
+      return models.stream()
+          .map(model -> NameIdentifier.of(namespace, model.name()))
+          .toArray(NameIdentifier[]::new);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list Semantic Models in namespace " + namespace, e);
+    }
   }
 
   @Override
@@ -131,15 +141,106 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    // TODO: Implement in the Semantic Model list/alter/drop capability.
-    throw new UnsupportedOperationException(
-        "alterSemanticModel: list/alter/drop capability is not implemented");
+    boolean validateForWrite = requiresWriteValidation(changes);
+
+    try {
+      return store.update(
+          ident,
+          SemanticModelEntity.class,
+          Entity.EntityType.SEMANTIC_MODEL,
+          oldEntity -> {
+            SemanticModelEntity candidate = applyChanges(oldEntity, changes);
+            if (validateForWrite) {
+              writeValidator.accept(
+                  NameIdentifier.of(candidate.namespace(), candidate.name()),
+                  candidate.definition());
+            }
+            return candidate;
+          });
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSemanticModelException(e, "Semantic Model %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new SemanticModelAlreadyExistsException(
+          e, "A Semantic Model with the requested name already exists while altering %s", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to alter Semantic Model " + ident, e);
+    }
   }
 
   @Override
   public boolean dropSemanticModel(NameIdentifier ident) {
-    // TODO: Implement in the Semantic Model list/alter/drop capability.
-    throw new UnsupportedOperationException(
-        "dropSemanticModel: list/alter/drop capability is not implemented");
+    try {
+      return store.delete(ident, Entity.EntityType.SEMANTIC_MODEL);
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to drop Semantic Model " + ident, e);
+    }
+  }
+
+  private boolean requiresWriteValidation(SemanticModelChange[] changes) {
+    if (changes == null || changes.length == 0) {
+      throw new IllegalSemanticModelException("At least one Semantic Model change is required");
+    }
+
+    boolean requiresWriteValidation = false;
+    for (SemanticModelChange change : changes) {
+      if (change == null) {
+        throw new IllegalSemanticModelException("Semantic Model change must not be null");
+      }
+
+      if (change instanceof SemanticModelChange.ReplaceDefinition) {
+        requiresWriteValidation = true;
+      } else if (change instanceof SemanticModelChange.RenameSemanticModel
+          || change instanceof SemanticModelChange.UpdateComment
+          || change instanceof SemanticModelChange.SetProperty
+          || change instanceof SemanticModelChange.RemoveProperty) {
+        // These changes do not modify the definition and must not revisit its sources.
+      } else {
+        throw new IllegalSemanticModelException(
+            "Unsupported Semantic Model change: %s", change.getClass().getName());
+      }
+    }
+    return requiresWriteValidation;
+  }
+
+  private static SemanticModelEntity applyChanges(
+      SemanticModelEntity oldEntity, SemanticModelChange[] changes) {
+    String newName = oldEntity.name();
+    String newComment = oldEntity.comment();
+    Map<String, String> newProperties = new HashMap<>(oldEntity.properties());
+    SemanticModelDefinition newDefinition = oldEntity.definition();
+
+    for (SemanticModelChange change : changes) {
+      if (change instanceof SemanticModelChange.RenameSemanticModel) {
+        newName = ((SemanticModelChange.RenameSemanticModel) change).getNewName();
+      } else if (change instanceof SemanticModelChange.UpdateComment) {
+        newComment = ((SemanticModelChange.UpdateComment) change).getNewComment();
+      } else if (change instanceof SemanticModelChange.SetProperty) {
+        SemanticModelChange.SetProperty setProperty = (SemanticModelChange.SetProperty) change;
+        newProperties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (change instanceof SemanticModelChange.RemoveProperty) {
+        newProperties.remove(((SemanticModelChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof SemanticModelChange.ReplaceDefinition) {
+        newDefinition = ((SemanticModelChange.ReplaceDefinition) change).getDefinition();
+      }
+    }
+
+    AuditInfo oldAudit = oldEntity.auditInfo();
+    return SemanticModelEntity.builder()
+        .withId(oldEntity.id())
+        .withName(newName)
+        .withNamespace(oldEntity.namespace())
+        .withComment(newComment)
+        .withDefinition(newDefinition)
+        .withProperties(newProperties)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(oldAudit.creator())
+                .withCreateTime(oldAudit.createTime())
+                .withLastModifier(PrincipalUtils.getCurrentUserName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
   }
 }
