@@ -144,5 +144,11 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /** Legacy Annoy data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_ANNOY,
+
+    /** Legacy USearch data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_USEARCH,
   }
 }

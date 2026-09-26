@@ -116,3 +116,37 @@ class TestIndexSerdes(unittest.TestCase):
         json_dict = json.loads(json_string)
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
+
+    def test_index_serdes_legacy_clickhouse_metadata(self):
+        annoy_properties = {
+            "annoy_trees": "100",
+            "clickhouse_type_full": "annoy(100)",
+            "granularity": "1",
+        }
+        usearch_properties = {
+            "clickhouse_type_full": "usearch('cosineDistance')",
+            "granularity": "1",
+            "usearch_distance_function": "cosineDistance",
+        }
+
+        annoy = IndexSerdes.deserialize(
+            {
+                "indexType": "data_skipping_annoy",
+                "name": "idx_annoy",
+                "fieldNames": [["embedding"]],
+                "properties": annoy_properties,
+            }
+        )
+        usearch = IndexSerdes.deserialize(
+            {
+                "indexType": "data_skipping_usearch",
+                "name": "idx_usearch",
+                "fieldNames": [["embedding"]],
+                "properties": usearch_properties,
+            }
+        )
+
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_ANNOY, annoy.type())
+        self.assertEqual(annoy_properties, annoy.properties())
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, usearch.type())
+        self.assertEqual(usearch_properties, usearch.properties())

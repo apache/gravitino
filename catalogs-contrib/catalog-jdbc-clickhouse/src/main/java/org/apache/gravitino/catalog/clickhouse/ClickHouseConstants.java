@@ -84,6 +84,21 @@ public class ClickHouseConstants {
     /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
     public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
 
+    /** The name of the legacy Annoy data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_ANNOY = "annoy";
+
+    /** The name of the legacy USearch data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_USEARCH = "usearch";
+
+    /** Property key for the number of trees in a legacy Annoy index. */
+    public static final String ANNOY_TREES = "annoy_trees";
+
+    /** Property key for the distance function in a legacy USearch index. */
+    public static final String USEARCH_DISTANCE_FUNCTION = "usearch_distance_function";
+
+    /** Property key for ClickHouse's complete index type expression. */
+    public static final String CLICKHOUSE_TYPE_FULL = "clickhouse_type_full";
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
