@@ -313,6 +313,23 @@ grep -E "Rewritten data files|Added data files|completed successfully" "${log_di
 
 REST job status is polled rather than pushed, so it lags the real Spark process by up to one poll interval. That is why the prerequisites lower it to ten seconds.
 
+## Rewriting Iceberg Manifests
+
+`builtin-iceberg-rewrite-manifests` consolidates manifest metadata for one existing partition
+spec to improve scan planning. It leaves data files and other specs' manifests unchanged.
+Submit it directly with `POST /api/metalakes/{metalake}/jobs/runs`, setting
+`jobTemplateName` to `builtin-iceberg-rewrite-manifests` and providing `catalog_name`,
+`table_identifier`, and the Spark/catalog settings in `jobConf`.
+
+Omit `spec_id` to maintain the current partition spec, or supply an existing spec ID to
+maintain that spec. Optional `use_caching` controls Spark caching during the rewrite.
+See [Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests) for the complete
+submission example and result checks, and [configuration](./optimizer-configuration.md#rewrite-manifests-job)
+for the job keys. Results appear in the job's `output.log`.
+
+Policy-driven manifest maintenance through Policy -> Strategy -> Adapter is a follow-up;
+`submit-strategy-jobs` does not yet select this job automatically.
+
 ## Related
 
 - [Configuration](./optimizer-configuration.md) for the three configuration layers
