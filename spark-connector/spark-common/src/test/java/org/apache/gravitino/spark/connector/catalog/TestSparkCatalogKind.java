@@ -35,9 +35,10 @@ public class TestSparkCatalogKind {
   }
 
   @Test
-  void testEveryJdbcBackendSharesOneCatalogExceptPostgreSql() {
+  void testJdbcBackendsWithDedicatedCatalogKinds() {
     Assertions.assertEquals(SparkCatalogKind.JDBC, SparkCatalogKind.fromProvider("jdbc-mysql"));
-    Assertions.assertEquals(SparkCatalogKind.JDBC, SparkCatalogKind.fromProvider("jdbc-doris"));
+    Assertions.assertEquals(
+        SparkCatalogKind.JDBC_DORIS, SparkCatalogKind.fromProvider("jdbc-doris"));
     Assertions.assertEquals(SparkCatalogKind.JDBC, SparkCatalogKind.fromProvider("jdbc-starrocks"));
     Assertions.assertEquals(
         SparkCatalogKind.JDBC_POSTGRESQL, SparkCatalogKind.fromProvider("jdbc-postgresql"));
@@ -46,6 +47,8 @@ public class TestSparkCatalogKind {
   @Test
   void testProviderIsMatchedCaseInsensitively() {
     Assertions.assertEquals(SparkCatalogKind.HIVE, SparkCatalogKind.fromProvider("HIVE"));
+    Assertions.assertEquals(
+        SparkCatalogKind.JDBC_DORIS, SparkCatalogKind.fromProvider("JDBC-Doris"));
     Assertions.assertEquals(
         SparkCatalogKind.JDBC_POSTGRESQL, SparkCatalogKind.fromProvider("JDBC-PostgreSQL"));
   }

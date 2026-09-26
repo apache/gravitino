@@ -38,6 +38,10 @@ import org.apache.gravitino.connector.capability.Capability;
 /** Implementation of an Apache Doris catalog in Apache Gravitino. */
 public class DorisCatalog extends JdbcCatalog {
 
+  /** Catalog property metadata containing the JDBC and Doris Spark read properties. */
+  public static final DorisCatalogPropertiesMetadata DORIS_CATALOG_PROPERTIES_META =
+      new DorisCatalogPropertiesMetadata();
+
   public static final DorisTablePropertiesMetadata DORIS_TABLE_PROPERTIES_META =
       new DorisTablePropertiesMetadata();
 
@@ -60,6 +64,16 @@ public class DorisCatalog extends JdbcCatalog {
   @Override
   public Capability newCapability() {
     return new DorisCatalogCapability();
+  }
+
+  /**
+   * Returns the catalog metadata for JDBC and Doris Spark read properties.
+   *
+   * @return Doris catalog property metadata
+   */
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return DORIS_CATALOG_PROPERTIES_META;
   }
 
   @Override

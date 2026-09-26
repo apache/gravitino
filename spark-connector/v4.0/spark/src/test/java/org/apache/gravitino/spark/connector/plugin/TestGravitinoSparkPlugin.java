@@ -19,8 +19,14 @@
 
 package org.apache.gravitino.spark.connector.plugin;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark40;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests that this module's bindings are complete. Constructing the driver plugin runs {@code
@@ -32,5 +38,27 @@ public class TestGravitinoSparkPlugin {
   @Test
   void testTheBindingsThisModuleDeclaresAreComplete() {
     Assertions.assertNotNull(new GravitinoSparkPlugin().driverPlugin());
+  }
+
+  @Test
+  void testDorisFallsBackByDefaultAndRejectsSpecializedMode() {
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.when(catalog.provider()).thenReturn("jdbc-doris");
+    GravitinoDriverPlugin plugin =
+        (GravitinoDriverPlugin) new GravitinoSparkPlugin().driverPlugin();
+    SparkConf genericConf = new SparkConf(false);
+    plugin.registerOptInExtensions(genericConf);
+
+    plugin.registerGravitinoCatalogs(genericConf, ImmutableMap.of("doris", catalog));
+
+    Assertions.assertEquals(
+        GravitinoJdbcCatalogSpark40.class.getName(), genericConf.get("spark.sql.catalog.doris"));
+
+    SparkConf specializedConf = new SparkConf(false);
+    specializedConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, "true");
+    plugin.registerOptInExtensions(specializedConf);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> plugin.registerGravitinoCatalogs(specializedConf, ImmutableMap.of("doris", catalog)));
   }
 }

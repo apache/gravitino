@@ -25,7 +25,9 @@ plugins {
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark35.get()
+// Keep patch-version compatibility checks module-local; do not change the shared version catalog.
+val sparkVersion: String =
+  project.properties["sparkVersionOverride"] as? String ?: libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val baseName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion"
 
