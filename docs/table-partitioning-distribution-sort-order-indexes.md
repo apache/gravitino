@@ -253,6 +253,7 @@ To define an indexed table, you should utilize the following four components to 
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|
 | PRIMARY_KEY   | The PRIMARY KEY is a column or set of columns that uniquely identifies each row in a table. It enforces uniqueness and ensures that no two rows have the same values in the specified columns. Additionally, the PRIMARY KEY constraint automatically creates a unique index on the specified columns. | `PRIMARY_KEY`   | `IndexType.PRIMARY_KEY`   |
 | UNIQUE_KEY    | The UNIQUE KEY constraint ensures that all values in a specified column or set of columns are unique across the entire table. Unlike the PRIMARY KEY constraint, a table can have multiple UNIQUE KEY constraints, allowing for unique values in multiple columns or sets of columns.                  | `UNIQUE_KEY`    | `IndexType.UNIQUE_KEY`    |
+| DATA_SKIPPING_VECTOR_SIMILARITY | ClickHouse HNSW index for approximate nearest-neighbor search. See the [ClickHouse catalog guide](./jdbc-clickhouse-catalog.md#table-indexes) for its properties and server-version requirement. | `DATA_SKIPPING_VECTOR_SIMILARITY` | `IndexType.DATA_SKIPPING_VECTOR_SIMILARITY` |
 
 - Name. It defines the name of the index.
 

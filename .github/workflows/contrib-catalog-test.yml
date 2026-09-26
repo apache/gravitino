@@ -100,6 +100,8 @@ jobs:
 
       - name: Run contrib catalog tests
         id: contribCatalogTest
+        env:
+          GRAVITINO_CLICKHOUSE_TEST_IMAGE: clickhouse:25.8.14.17
         run: |
           CHANGED_CONTRIB_MODULES="${{ needs.changes.outputs.changed_catalogs_contrib_modules }}"
 

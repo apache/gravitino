@@ -636,6 +636,91 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         TableChange.deleteIndex("idx_token_alter", false));
   }
 
+  @Test
+  public void testVectorSimilarityIndexOnCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_vector_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    String vectorColumn = "embedding";
+    String customVectorColumn = "embedding_custom";
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              vectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              customVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "custom embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        },
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+              "idx_vector_default",
+              new String[][] {{vectorColumn}},
+              defaultProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index defaultIndex =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_default"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{vectorColumn}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(defaultProperties, defaultIndex.properties());
+
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "f16",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "idx_vector_custom",
+            new String[][] {{customVectorColumn}},
+            customProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index customIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_custom"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, customIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{customVectorColumn}}, customIndex.fieldNames());
+    Assertions.assertEquals(customProperties, customIndex.properties());
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_vector_default", false),
+        TableChange.deleteIndex("idx_vector_custom", false));
+  }
+
   private void assertIndexMetadata(
       Index[] indexes, String name, Index.IndexType type, Map<String, String> properties) {
     Index index =

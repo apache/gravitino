@@ -87,6 +87,11 @@ public class TestClickHouseTableOperationsUnit {
     }
 
     String callGenerateCreateTableSql(JdbcColumn[] columns, Map<String, String> properties) {
+      return callGenerateCreateTableSql(columns, properties, Indexes.EMPTY_INDEXES);
+    }
+
+    String callGenerateCreateTableSql(
+        JdbcColumn[] columns, Map<String, String> properties, Index[] indexes) {
       return generateCreateTableSql(
           "test_table",
           columns,
@@ -94,7 +99,7 @@ public class TestClickHouseTableOperationsUnit {
           properties,
           Transforms.EMPTY_TRANSFORM,
           Distributions.NONE,
-          Indexes.EMPTY_INDEXES,
+          indexes,
           getSortOrders("id"));
     }
 
@@ -977,6 +982,85 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testParseVectorSimilarityPropertiesAndNormalizesDefaults() {
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            " vector_similarity ( 'hnsw' , 'L2Distance' , 003 ) ", "idx_vector"));
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "768",
+            "quantization", "i8"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'cosineDistance', 768, 'i8')", "idx_vector"));
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "16"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 16)", "idx_vector"));
+    for (String quantization : List.of("f64", "f32", "f16", "i8", "b1")) {
+      Assertions.assertEquals(
+          quantization,
+          ClickHouseTableOperations.parseVectorSimilarityProperties(
+                  "vector_similarity('hnsw', 'L2Distance', 3, '" + quantization + "')",
+                  "idx_vector")
+              .get("quantization"));
+    }
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 0, 0)", "idx_vector"));
+    ExposedClickHouseTableOperations ops = newOps();
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.getClickHouseIndexType("vector_similarity"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.getClickHouseIndexType("vector_similarity('hnsw', 'L2Distance', 3)"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("annoy"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("usearch"));
+  }
+
+  @Test
+  void testParseVectorSimilarityPropertiesRejectsMalformedAndUnsupportedParameters() {
+    List<String> invalidTypeFullValues =
+        List.of(
+            "vector_similarity",
+            "wrong_type('hnsw', 'L2Distance', 3)",
+            "vector_similarity('ivf', 'L2Distance', 3)",
+            "vector_similarity('hnsw', 'euclidean', 3)",
+            "vector_similarity('hnsw', 'dotProduct', 384, 'bf16', 16, 64)",
+            "vector_similarity('hnsw', , 3)",
+            "vector_similarity('hnsw', 'L2Distance', 0)",
+            "vector_similarity('hnsw', 'L2Distance', not_an_integer)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'float8')",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', -1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, -1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 128, 1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 2147483648)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 128) trailing");
+
+    for (String typeFull : invalidTypeFullValues) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseVectorSimilarityProperties(
+                      typeFull, "idx_vector_bad"),
+              typeFull);
+      Assertions.assertTrue(exception.getMessage().contains("idx_vector_bad"), typeFull);
+    }
+  }
+
+  @Test
   void testParseSetPropertiesAcceptsIntegerMaxValue() {
     Assertions.assertEquals(
         Map.of("set_max_values", String.valueOf(Integer.MAX_VALUE)),
@@ -1250,6 +1334,305 @@ public class TestClickHouseTableOperationsUnit {
     Assertions.assertEquals("idx_legacy_bare", bare.name());
     Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, bare.type());
     Assertions.assertTrue(bare.properties().isEmpty());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndReadsLegacyVectorSimilarityParameters() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_vector", "idx_legacy_vector_custom", "idx_legacy_vector_bare");
+    Mockito.when(legacySecondaryRs.getString("type"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 16, 64)",
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "vector_similarity");
+    Mockito.when(legacySecondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding_custom", "embedding_bare");
+    Mockito.when(legacySecondaryRs.getLong("granularity"))
+        .thenReturn(100_000_000L, 7L, 100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index legacyIndex =
+        indexes.stream()
+            .filter(index -> "idx_legacy_vector".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, legacyIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, legacyIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64"),
+        legacyIndex.properties());
+
+    Index customGranularityIndex =
+        indexes.stream()
+            .filter(index -> "idx_legacy_vector_custom".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "granularity", "7"),
+        customGranularityIndex.properties());
+  }
+
+  @Test
+  void testGetIndexesReadsVectorSimilarityTypeFullAndUsesItsDefaultGranularity() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn("idx_vector_default", "idx_vector_custom", "idx_vector_expression");
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("vector_similarity", "vector_similarity", "vector_similarity");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 16, 64)",
+            "vector_similarity('hnsw', 'L2Distance', 3)");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding_custom", "lower(embedding)");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L, 7L, 100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index defaultIndex =
+        indexes.stream()
+            .filter(index -> "idx_vector_default".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        defaultIndex.properties());
+
+    Index customIndex =
+        indexes.stream()
+            .filter(index -> "idx_vector_custom".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7"),
+        customIndex.properties());
+    Assertions.assertFalse(
+        indexes.stream().anyMatch(index -> "idx_vector_expression".equals(index.name())));
+  }
+
+  @Test
+  void testVectorSimilarityCreateAndAlterDdlUseTheSameTypeClause() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("embedding")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    Map<String, String> zeroHnswProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "0",
+            "hnsw_candidate_list_size_for_construction", "0");
+
+    String createSql =
+        newOps()
+            .callGenerateCreateTableSql(
+                columns,
+                Map.of(),
+                new Index[] {
+                  Indexes.of(
+                      Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                      "idx_vector_default",
+                      new String[][] {{"embedding"}},
+                      defaultProperties),
+                  Indexes.of(
+                      Index.IndexType.DATA_SKIPPING_MINMAX, "idx_minmax", new String[][] {{"id"}})
+                });
+    ExposedClickHouseTableOperations alterOps = newAlterOps(Map.of());
+    String alterSql =
+        alterOps.callGenerateAlterTableSql(
+            TableChange.addIndex(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_custom",
+                new String[][] {{"embedding"}},
+                customProperties));
+    String zeroHnswAlterSql =
+        alterOps.callGenerateAlterTableSql(
+            TableChange.addIndex(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_zero_hnsw",
+                new String[][] {{"embedding"}},
+                zeroHnswProperties));
+
+    Assertions.assertTrue(
+        createSql.contains(
+            "INDEX `idx_vector_default` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000"),
+        createSql);
+    Assertions.assertTrue(
+        createSql.contains("INDEX `idx_minmax` `id` TYPE minmax GRANULARITY 1"), createSql);
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD INDEX `idx_vector_custom` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 32, 64) GRANULARITY 7"),
+        alterSql);
+    Assertions.assertTrue(
+        zeroHnswAlterSql.contains(
+            "ADD INDEX `idx_vector_zero_hnsw` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000"),
+        zeroHnswAlterSql);
+  }
+
+  @Test
+  void testVectorSimilarityInvalidPropertiesFailBeforeCreateOrAlterDdl() {
+    Map<String, String> missingRequiredProperty = Map.of("type", "hnsw", "dimensions", "3");
+    Map<String, String> unsupportedDistance =
+        Map.of("type", "hnsw", "distance_function", "dotProduct", "dimensions", "3");
+    Map<String, String> unsupportedQuantization =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "quantization", "float8");
+    Map<String, String> negativeHnswValue =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "-1");
+    Map<String, String> zeroGranularity =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "granularity", "0");
+    Map<String, String> unknownProperty =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "unexpected_property", "value");
+
+    List<Map.Entry<String, Map<String, String>>> invalidCases =
+        List.of(
+            Map.entry("distance_function", missingRequiredProperty),
+            Map.entry("distance_function", unsupportedDistance),
+            Map.entry("quantization", unsupportedQuantization),
+            Map.entry("hnsw_max_connections_per_layer", negativeHnswValue),
+            Map.entry("granularity", zeroGranularity),
+            Map.entry("unexpected_property", unknownProperty));
+    for (Map.Entry<String, Map<String, String>> invalid : invalidCases) {
+      Map<String, String> properties = invalid.getValue();
+      Index[] indexes =
+          new Index[] {
+            Indexes.of(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_invalid",
+                new String[][] {{"embedding"}},
+                properties)
+          };
+      IllegalArgumentException createException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newOps()
+                      .callGenerateCreateTableSql(
+                          new JdbcColumn[] {
+                            JdbcColumn.builder()
+                                .withName("id")
+                                .withType(Types.IntegerType.get())
+                                .withNullable(false)
+                                .build(),
+                            JdbcColumn.builder()
+                                .withName("embedding")
+                                .withType(Types.StringType.get())
+                                .withNullable(true)
+                                .build(),
+                          },
+                          Map.of(),
+                          indexes));
+      Assertions.assertTrue(createException.getMessage().contains("idx_vector_invalid"));
+      Assertions.assertTrue(createException.getMessage().contains(invalid.getKey()));
+
+      IllegalArgumentException alterException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newAlterOps(Map.of())
+                      .callGenerateAlterTableSql(
+                          TableChange.addIndex(
+                              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                              "idx_vector_invalid",
+                              new String[][] {{"embedding"}},
+                              properties)));
+      Assertions.assertTrue(alterException.getMessage().contains("idx_vector_invalid"));
+      Assertions.assertTrue(alterException.getMessage().contains(invalid.getKey()));
+    }
   }
 
   @Test

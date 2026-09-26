@@ -1688,7 +1688,11 @@ public class CatalogClickHouseIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.LongType.get(), column.dataType());
+          Assertions.assertEquals(
+              StringUtils.isBlank(System.getenv("GRAVITINO_CLICKHOUSE_TEST_IMAGE"))
+                  ? Types.LongType.get()
+                  : Types.ExternalType.of("Time"),
+              column.dataType());
           break;
         case "timestamp_col":
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
@@ -3890,5 +3894,130 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertTrue(
         normalizedCreateSql.contains("tokenbf_v1(256,2,0)"),
         "SHOW CREATE TABLE should retain tokenbf_v1 parameters: " + createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testVectorSimilarityIndex() {
+    String tableName = GravitinoITUtils.genRandomName("ch_vector_similarity_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    String vectorColumn = "embedding";
+    String customVectorColumn = "embedding_custom";
+    String zeroVectorColumn = "embedding_zero";
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              CLICKHOUSE_COL_NAME1,
+              Types.IntegerType.get(),
+              "id",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              vectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              customVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "custom embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              zeroVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "zero parameter embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        };
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders(CLICKHOUSE_COL_NAME1),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+              "idx_vector_default",
+              new String[][] {{vectorColumn}},
+              defaultProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index defaultIndex =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_default"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{vectorColumn}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(defaultProperties, defaultIndex.properties());
+
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "idx_vector_custom",
+            new String[][] {{customVectorColumn}},
+            customProperties));
+
+    clickhouseService.executeQuery(
+        "ALTER TABLE `%s`.`%s` ADD INDEX `idx_vector_zero` `%s` TYPE "
+                .formatted(schemaName, tableName, zeroVectorColumn)
+            + "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 0, 0) "
+            + "GRANULARITY 100000000");
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index customIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_custom"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, customIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{customVectorColumn}}, customIndex.fieldNames());
+    Assertions.assertEquals(customProperties, customIndex.properties());
+
+    Index zeroValueIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_zero"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertArrayEquals(new String[][] {{zeroVectorColumn}}, zeroValueIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        zeroValueIndex.properties());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("vector_similarity('hnsw','L2Distance',3)"), createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("vector_similarity('hnsw','cosineDistance',3,'i8',16,64)"),
+        createSql);
+    Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY100000000"), createSql);
+    Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY7"), createSql);
   }
 }
