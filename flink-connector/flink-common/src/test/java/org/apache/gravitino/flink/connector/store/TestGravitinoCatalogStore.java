@@ -20,6 +20,7 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
@@ -267,6 +268,20 @@ public class TestGravitinoCatalogStore {
       assertTrue(descriptor.isPresent());
       assertEquals("mem-pwd", descriptor.get().getConfiguration().toMap().get("jdbc-password"));
     }
+  }
+
+  @Test
+  public void testCatalogFactoryForUnknownProviderThrowsException() {
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> gravitinoCatalogStore.catalogFactoryForProvider("jdbc-clickhouse"));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Failed to correctly match the Flink catalog factory for provider jdbc-clickhouse."));
+    assertTrue(exception.getMessage().contains("It may be served by a separate extension jar."));
   }
 
   private static SecretManager memorySecretManager() {

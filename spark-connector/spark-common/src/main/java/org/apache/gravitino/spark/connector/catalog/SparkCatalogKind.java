@@ -41,24 +41,26 @@ public enum SparkCatalogKind {
   LAKEHOUSE_PAIMON,
   /** AWS Glue catalogs, provider {@code glue}. */
   GLUE,
-  /** Every {@code jdbc-*} catalog except PostgreSQL, which has its own kind. */
+  /**
+   * Generic JDBC catalogs, providers {@code jdbc-mysql}, {@code jdbc-doris}, {@code
+   * jdbc-starrocks}, and {@code jdbc-oceanbase}.
+   */
   JDBC,
   /** PostgreSQL catalogs, provider {@code jdbc-postgresql}. */
   JDBC_POSTGRESQL;
 
-  private static final String JDBC_PROVIDER_PREFIX = "jdbc";
-  private static final String POSTGRESQL_PROVIDER_PREFIX = "jdbc-postgresql";
-
   private static final Map<String, SparkCatalogKind> KINDS_BY_PROVIDER =
-      ImmutableMap.of(
-          "hive",
-          HIVE,
-          "lakehouse-iceberg",
-          LAKEHOUSE_ICEBERG,
-          "lakehouse-paimon",
-          LAKEHOUSE_PAIMON,
-          "glue",
-          GLUE);
+      ImmutableMap.<String, SparkCatalogKind>builder()
+          .put("hive", HIVE)
+          .put("lakehouse-iceberg", LAKEHOUSE_ICEBERG)
+          .put("lakehouse-paimon", LAKEHOUSE_PAIMON)
+          .put("glue", GLUE)
+          .put("jdbc-mysql", JDBC)
+          .put("jdbc-doris", JDBC)
+          .put("jdbc-starrocks", JDBC)
+          .put("jdbc-oceanbase", JDBC)
+          .put("jdbc-postgresql", JDBC_POSTGRESQL)
+          .build();
 
   /**
    * Returns the kind of Spark catalog a Gravitino catalog provider needs.
@@ -72,12 +74,6 @@ public enum SparkCatalogKind {
   @Nullable
   public static SparkCatalogKind fromProvider(String provider) {
     Objects.requireNonNull(provider, "Catalog provider must not be null");
-    String normalized = provider.toLowerCase(Locale.ROOT);
-    // All JDBC backends share one Spark catalog, apart from PostgreSQL, whose type and property
-    // conversions differ.
-    if (normalized.startsWith(JDBC_PROVIDER_PREFIX)) {
-      return normalized.startsWith(POSTGRESQL_PROVIDER_PREFIX) ? JDBC_POSTGRESQL : JDBC;
-    }
-    return KINDS_BY_PROVIDER.get(normalized);
+    return KINDS_BY_PROVIDER.get(provider.toLowerCase(Locale.ROOT));
   }
 }
