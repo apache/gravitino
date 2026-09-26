@@ -69,7 +69,19 @@ gravitino.entity.store.relational.jdbcDriver = org.h2.Driver
 # The JDBC user name
 gravitino.entity.store.relational.jdbcUser = gravitino
 # The JDBC password
-gravitino.entity.store.relational.jdbcPassword = gravitino
+# This value can be plain text or encrypted (ENC(...) format). The default value below is
+# the encrypted form of "gravitino" using the default master key "gravitino".
+# To use your own encrypted password:
+# 1. Encrypt your password using the provided tool:
+#    python3 scripts/encrypt_password.py encrypt "your-password" --key "your-master-key"
+#    or:
+#    java -cp libs/gravitino-common-*.jar org.apache.gravitino.utils.PasswordEncryptorCLI \
+#      encrypt "your-password" --key "your-master-key"
+# 2. Set the master encryption key as an environment variable:
+#    export GRAVITINO_PASSWORD_ENCRYPTION_KEY="your-master-key"
+# 3. Replace the password value below with the ENC(...) output from step 1:
+#    gravitino.entity.store.relational.jdbcPassword = ENC(base64data)
+gravitino.entity.store.relational.jdbcPassword = ENC(KuC3/zFBSkbDUC8T/YyzQuAccmSBzB4jH14wC7ueIH0WoIiFOteLS3OgyP20ll3F3+81aSs=)
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache

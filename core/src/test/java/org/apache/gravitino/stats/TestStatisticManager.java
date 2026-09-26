@@ -41,7 +41,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,6 +72,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.PasswordEncryptor;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -409,5 +412,64 @@ public class TestStatisticManager {
     Assertions.assertDoesNotThrow(() -> stat.value());
     Assertions.assertEquals(Optional.empty(), stat.value());
     Assertions.assertEquals(audit, stat.auditInfo());
+  }
+
+  @Test
+  public void testBuildStorageOptionsPartitionEncryptedPasswordOverrides() throws Exception {
+    String testKey = "test-partition-enc-key";
+    String plainPassword = "myPartitionPassword";
+    String encryptedPassword = PasswordEncryptor.encrypt(plainPassword, testKey);
+
+    // Explicitly set the master key to avoid environment-dependent failures
+    String prevKey = System.getProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+    System.setProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY, testKey);
+
+    try {
+      Config partitionConfig = Mockito.mock(Config.class);
+      // Entity store password (plain text)
+      Mockito.when(partitionConfig.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+      Mockito.when(partitionConfig.get(ENTITY_RELATIONAL_STORE))
+          .thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+      Mockito.when(partitionConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+          .thenReturn("jdbc:h2:file:/tmp/test_enc_partition;DB_CLOSE_DELAY=-1;MODE=MYSQL");
+      Mockito.when(partitionConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+          .thenReturn("org.h2.Driver");
+      Mockito.when(partitionConfig.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+          .thenReturn("root");
+      Mockito.when(partitionConfig.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+          .thenReturn("plaintext-entity-password");
+      Mockito.when(partitionConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS))
+          .thenReturn(100);
+      Mockito.when(partitionConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
+          .thenReturn(1000L);
+      // Partition-specific encrypted password overrides entity store password
+      Mockito.when(partitionConfig.getConfigsWithPrefix("gravitino.stats.partition.storageOption."))
+          .thenReturn(Collections.singletonMap("jdbcPassword", encryptedPassword));
+
+      // Use the existing manager instance (created with the global config) and call
+      // buildStorageOptions via reflection with the partition-specific config
+      StatisticManager manager = new StatisticManager(entityStore, idGenerator, config);
+
+      try {
+        Method method =
+            StatisticManager.class.getDeclaredMethod("buildStorageOptions", Config.class);
+        method.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> options = (Map<String, String>) method.invoke(manager, partitionConfig);
+
+        // The partition ENC password should have been decrypted and override the plain text one
+        Assertions.assertEquals(plainPassword, options.get("jdbcPassword"));
+      } finally {
+        manager.close();
+      }
+    } finally {
+      // Restore
+      if (prevKey != null) {
+        System.setProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY, prevKey);
+      } else {
+        System.clearProperty(PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+      }
+    }
   }
 }
