@@ -26,6 +26,8 @@ import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.DropTableResponse;
 import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.RenameTableRequest;
+import org.lance.namespace.model.RenameTableResponse;
 
 public interface LanceTableOperations {
 
@@ -126,4 +128,14 @@ public interface LanceTableOperations {
    * @return the response of the alter table operation.
    */
   Object alterTable(String tableId, String delimiter, Object request);
+
+  /**
+   * Rename a table registration without changing the underlying Lance dataset.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing the new table name and optional namespace
+   * @return the response of the rename table operation
+   */
+  RenameTableResponse renameTable(String tableId, String delimiter, RenameTableRequest request);
 }
