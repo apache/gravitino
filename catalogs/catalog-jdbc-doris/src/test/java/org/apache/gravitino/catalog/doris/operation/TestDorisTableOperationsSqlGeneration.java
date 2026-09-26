@@ -42,6 +42,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -49,6 +50,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -100,6 +102,23 @@ public class TestDorisTableOperationsSqlGeneration {
       return generateAlterTableSql("database", tableName, changes);
     }
 
+    /**
+     * Generates SQL for updating the given column type.
+     *
+     * @param column the current JDBC column
+     * @param newType the requested Gravitino type
+     * @return the generated ALTER TABLE SQL
+     */
+    public String updateColumnTypeSql(JdbcColumn column, Type newType) {
+      setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+      return alterTableSql(
+          "test_table", TableChange.updateColumnType(new String[] {column.name()}, newType));
+    }
+
     void setTableForAlter(JdbcTable table) {
       this.tableForAlter = table;
     }
@@ -126,6 +145,196 @@ public class TestDorisTableOperationsSqlGeneration {
         throws SQLException {
       return getIndexes(connection, databaseName, tableName);
     }
+  }
+
+  /** Verifies string defaults and unchanged column attributes are preserved. */
+  @Test
+  public void testUpdateColumnTypePreservesStringDefaultAndColumnAttributes() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.VarCharType.of(10))
+            .withComment("comment")
+            .withNullable(true)
+            .withDefaultValue(Literals.of("seed", Types.VarCharType.of(10)))
+            .build();
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "MODIFY COLUMN `col1` varchar(20) NULL DEFAULT 'seed' COMMENT 'comment' ;",
+        ops.updateColumnTypeSql(column, Types.VarCharType.of(20)));
+  }
+
+  /** Verifies numeric and current-timestamp defaults are preserved. */
+  @Test
+  public void testUpdateColumnTypePreservesNumericAndCurrentTimestampDefaults() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn numericColumn =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .withDefaultValue(Literals.integerLiteral(7))
+            .build();
+    JdbcColumn timestampColumn =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .withNullable(false)
+            .withDefaultValue(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+            .build();
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nMODIFY COLUMN `col1` bigint NOT NULL DEFAULT 7 ;",
+        ops.updateColumnTypeSql(numericColumn, Types.LongType.get()));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "MODIFY COLUMN `col1` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP ;",
+        ops.updateColumnTypeSql(timestampColumn, Types.TimestampType.withoutTimeZone(6)));
+  }
+
+  /** Verifies quoted string defaults use Doris MODIFY COLUMN escaping. */
+  @Test
+  public void testUpdateColumnTypeUsesDorisModifyEscapingForQuotedDefaults() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    Literal<?> defaultValue = Literals.of("owner's \"value\"\\path", Types.VarCharType.of(32));
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.VarCharType.of(32))
+            .withNullable(false)
+            .withDefaultValue(defaultValue)
+            .build();
+
+    String sql = ops.updateColumnTypeSql(column, Types.VarCharType.of(64));
+
+    Assertions.assertTrue(
+        sql.contains(
+            "DEFAULT "
+                + new DorisColumnDefaultValueConverter()
+                    .fromGravitinoForModifyColumn(defaultValue, true, true)),
+        sql);
+  }
+
+  /** Verifies native unparsed defaults pass through without interpretation. */
+  @Test
+  public void testUpdateColumnTypePassesThroughUnparsedDefault() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .withDefaultValue(UnparsedExpression.of("CURRENT_DATE"))
+            .build();
+
+    Assertions.assertTrue(
+        ops.updateColumnTypeSql(column, Types.DateType.get()).contains("DEFAULT CURRENT_DATE"),
+        "Native default expression should pass through unchanged");
+  }
+
+  /** Verifies explicit NULL and an unset default remain distinct in generated SQL. */
+  @Test
+  public void testUpdateColumnTypePreservesNullAndUnsetDefaultDistinction() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn nullDefault =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    JdbcColumn unsetDefault =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .build();
+
+    Assertions.assertTrue(
+        ops.updateColumnTypeSql(nullDefault, Types.LongType.get()).contains("NULL DEFAULT NULL ;"));
+    Assertions.assertTrue(
+        ops.updateColumnTypeSql(unsetDefault, Types.LongType.get()).contains("bigint NULL ;"));
+  }
+
+  /** Verifies nested column names remain unsupported for type changes. */
+  @Test
+  public void testUpdateColumnTypeRejectsNestedColumnName() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.updateColumnType(
+                        new String[] {"parent", "child"}, Types.LongType.get())));
+
+    Assertions.assertEquals("Doris does not support nested column names.", exception.getMessage());
+  }
+
+  /** Verifies version lookup is cached across type changes in one ALTER request. */
+  @Test
+  public void testUpdateColumnTypeQueriesVersionOnceForAlterRequest() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = mockVersionDataSource("doris-3.0.6.2-rc01-910c4249c5");
+    ops.setDataSource(versionDataSource);
+    JdbcColumn firstColumn =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.VarCharType.of(32))
+            .withDefaultValue(Literals.of("first\\value", Types.VarCharType.of(32)))
+            .build();
+    JdbcColumn secondColumn =
+        JdbcColumn.builder()
+            .withName("col2")
+            .withType(Types.VarCharType.of(32))
+            .withDefaultValue(Literals.of("second\"value", Types.VarCharType.of(32)))
+            .build();
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {firstColumn, secondColumn})
+            .build());
+
+    ops.alterTableSql(
+        "test_table",
+        TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(64)),
+        TableChange.updateColumnType(new String[] {"col2"}, Types.VarCharType.of(64)));
+
+    Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+  }
+
+  /** Verifies ADD and MODIFY changes share one version lookup in an ALTER request. */
+  @Test
+  public void testAddAndUpdateColumnTypeShareVersionLookup() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = mockVersionDataSource("doris-3.0.6.2-rc01-910c4249c5");
+    ops.setDataSource(versionDataSource);
+    JdbcColumn existingColumn =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.VarCharType.of(32))
+            .withDefaultValue(Literals.of("existing\\value", Types.VarCharType.of(32)))
+            .build();
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {existingColumn})
+            .build());
+
+    ops.alterTableSql(
+        "test_table",
+        TableChange.addColumn(
+            new String[] {"col2"},
+            Types.VarCharType.of(32),
+            Literals.of("added\\value", Types.VarCharType.of(32))),
+        TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(64)));
+
+    Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
   }
 
   @Test
