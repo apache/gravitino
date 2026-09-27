@@ -111,6 +111,16 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
             new NameIdentifier[] {NameIdentifier.of(METALAKE_NAME, "cascade_tag")},
             new NameIdentifier[0]);
 
+    // Both relations exist and are live before the drop, so the assertions after the drop prove
+    // the cascade actually exercised both cleanup statements.
+    Assertions.assertEquals(
+        1, liveRows("role_meta_securable_object", "role_id IN (SELECT role_id FROM role_meta)"));
+    Assertions.assertEquals(
+        1,
+        liveRows(
+            "tag_relation_meta",
+            "tag_id IN (SELECT tag_id FROM tag_meta WHERE metalake_id = " + metalakeId + ")"));
+
     // The metalake cascade tombstones roles and tags BEFORE the relation cleanups in
     // one transaction; the relation cleanups must not filter on the parents' live rows.
     Assertions.assertTrue(
@@ -126,17 +136,14 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
   }
 
   private long liveRows(String table, String scope) throws Exception {
-    try (java.sql.Connection connection =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .openSession(true)
-            .getConnection()) {
-      try (java.sql.Statement st = connection.createStatement()) {
-        java.sql.ResultSet rs =
-            st.executeQuery("SELECT COUNT(*) FROM " + table + " WHERE deleted_at = 0 AND " + scope);
-        Assertions.assertTrue(rs.next());
-        return rs.getLong(1);
-      }
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT COUNT(*) FROM " + table + " WHERE deleted_at = 0 AND " + scope)) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
     }
   }
 
