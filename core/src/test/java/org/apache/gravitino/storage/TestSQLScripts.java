@@ -38,6 +38,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.gravitino.storage.relational.DatabaseFixture;
+import org.apache.gravitino.storage.relational.DatabaseIsolation;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.opentest4j.AssertionFailedError;
 
+@DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
 public class TestSQLScripts extends TestJDBCBackend {
 
   @TestTemplate
