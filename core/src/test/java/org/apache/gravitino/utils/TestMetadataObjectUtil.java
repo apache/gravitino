@@ -240,8 +240,11 @@ public class TestMetadataObjectUtil {
         describe(MetadataObjectUtil.getParentMetadataObjects(column, ":")));
   }
 
+  // checkMetadataObject resolves each object type through its dispatcher's existence check. Every
+  // type uses its internal dispatcher except SEMANTIC_MODEL, which has no internal variant and so
+  // goes through the public semanticModelDispatcher().
   @Test
-  public void testCheckMetadataObjectUsesInternalDispatchers() {
+  public void testCheckMetadataObjectConsultsDispatchers() {
     GravitinoEnv env = mock(GravitinoEnv.class);
     MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
     CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
