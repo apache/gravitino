@@ -679,6 +679,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
+    private final AtomicBoolean physicallyClosed = new AtomicBoolean(false);
+
     DatasetHolder(Dataset dataset) {
       this.dataset = dataset;
     }
@@ -701,7 +703,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     /** Releases a reader; closes the dataset when the cache already evicted it and none remain. */
     void readerDone() {
       if (activeReaders.decrementAndGet() == 0 && closed.get()) {
-        closeDataset();
+        closeOnce();
       }
     }
 
@@ -709,9 +711,20 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     public void close() throws IOException {
       if (closed.compareAndSet(false, true)) {
         if (activeReaders.get() == 0) {
-          closeDataset();
+          closeOnce();
         }
         // Readers still scanning close it in readerDone() when the last one leaves.
+      }
+    }
+
+    /**
+     * Closes the underlying dataset exactly once. close() (eviction) and readerDone() (the last
+     * reader leaving) can both observe the evicted-and-idle state and race into the physical close,
+     * so gate it: a native dataset must not be closed twice.
+     */
+    private void closeOnce() {
+      if (physicallyClosed.compareAndSet(false, true)) {
+        closeDataset();
       }
     }
 
