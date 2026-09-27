@@ -682,6 +682,51 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testCancelledJobExitingZeroReportsCancelled() throws Exception {
+    // A cancelled job whose TERM handler exits 0 must report CANCELLED, not SUCCEEDED: the user
+    // asked for it to stop, so a clean exit taken in response to the cancel is still a
+    // cancellation.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(withStagingDir(Collections.emptyMap()));
+    try {
+      JobTemplateEntity.TemplateContent content =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(
+                  Lists.newArrayList("-c", "trap 'exit 0' TERM; while :; do sleep 1; done"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity templateEntity =
+          JobTemplateEntity.builder()
+              .withId(3L)
+              .withName("term-exit-zero-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(content)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template =
+          JobManager.createRuntimeJobTemplate(templateEntity, ImmutableMap.of(), workingDir);
+
+      String jobId = executor.submitJob(template);
+      Thread.sleep(1000);
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, executor.getJobStatus(jobId));
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
   public void testCancelSucceededJob() {
     // Cancelling a job that is already succeeded.
     Map<String, String> successJobConf =

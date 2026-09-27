@@ -472,21 +472,19 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.info("Starting job: {}", jobId);
 
       int exitCode = process.waitFor();
-      if (exitCode == 0) {
-        LOG.info("Job {} completed successfully", jobId);
-        synchronized (lock) {
+      synchronized (lock) {
+        JobHandle.Status oldStatus = jobInfos.get(jobId).status();
+        if (oldStatus == JobHandle.Status.CANCELLING) {
+          // A cancelled job whose process traps SIGTERM and still exits 0 was cancelled, not
+          // successful; consult the cancel state before the exit code.
+          LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.CANCELLED);
+        } else if (exitCode == 0) {
+          LOG.info("Job {} completed successfully", jobId);
           finishJob(jobId, JobHandle.Status.SUCCEEDED);
-        }
-      } else {
-        synchronized (lock) {
-          JobHandle.Status oldStatus = jobInfos.get(jobId).status();
-          if (oldStatus == JobHandle.Status.CANCELLING) {
-            LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
-            finishJob(jobId, JobHandle.Status.CANCELLED);
-          } else if (oldStatus == JobHandle.Status.STARTED) {
-            LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
-            finishJob(jobId, JobHandle.Status.FAILED);
-          }
+        } else if (oldStatus == JobHandle.Status.STARTED) {
+          LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.FAILED);
         }
       }
 
