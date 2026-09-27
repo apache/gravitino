@@ -374,7 +374,8 @@ public class OptimizerCmd {
     out.println(
         "  - --identifiers supports catalog.schema.table or schema.table "
             + "(uses gravitino.optimizer.gravitinoDefaultCatalog).");
-    out.println("  - --update-mode default is all. Supported values: stats | metrics | all.");
+    out.println(
+        "  - --update-mode default is all. Supported values: stats | manifests | metrics | all.");
     out.println(
         "  - --updater-options and --spark-conf must be flat JSON maps; CLI overrides config file.");
     out.println("  - stats/all mode requires updater option keys: gravitino_uri and metalake.");
@@ -515,7 +516,7 @@ public class OptimizerCmd {
         "update-mode",
         CliOptionArgType.SINGLE,
         null,
-        "Update mode for submit-update-stats-job: stats|metrics|all (default: all)"),
+        "Update mode for submit-update-stats-job: stats|manifests|metrics|all (default: all)"),
     UPDATER_OPTIONS(
         "updater-options",
         CliOptionArgType.SINGLE,

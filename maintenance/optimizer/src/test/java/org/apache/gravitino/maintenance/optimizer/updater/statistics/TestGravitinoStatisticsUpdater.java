@@ -26,6 +26,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
@@ -38,6 +39,30 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 class TestGravitinoStatisticsUpdater {
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testManifestMeasurementsUseOneMergeRequest() {
+    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
+    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
+    updater.setGravitinoClientForTest(client);
+    updater.mergeTableStatistics(
+        NameIdentifier.of("catalog", "db", "table"),
+        new IcebergManifestStatistics(3, 12L, 1024D).statistics());
+    ArgumentCaptor<Map<String, StatisticValue<?>>> captor = ArgumentCaptor.forClass(Map.class);
+    Mockito.verify(
+            client
+                .loadCatalog("catalog")
+                .asTableCatalog()
+                .loadTable(NameIdentifier.of("db", "table"))
+                .supportsStatistics())
+        .mergeStatistics(captor.capture());
+    Assertions.assertEquals(2, captor.getValue().size());
+    IcebergManifestStatistics measured =
+        IcebergManifestStatistics.fromStatistics(captor.getValue(), 3).get();
+    Assertions.assertEquals(12L, measured.count());
+    Assertions.assertEquals(1024D, measured.averageSize());
+  }
 
   @Test
   void testUpdateTableStatisticsWithoutInitializeFails() {

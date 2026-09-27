@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -39,6 +40,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
+import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
@@ -46,6 +48,10 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructField;
@@ -89,6 +95,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     String catalogName = argMap.get("catalog");
     String tableIdentifier = argMap.get("table");
     UpdateMode updateMode = parseUpdateMode(argMap.get("update-mode"));
+    Integer specId = parseSpecId(argMap.get("spec-id"));
 
     if (catalogName == null || tableIdentifier == null) {
       System.err.println("Error: --catalog and --table are required arguments");
@@ -128,7 +135,13 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       }
 
       updateStatistics(
-          spark, statisticsUpdater, metricsUpdater, updateMode, catalogName, tableIdentifier);
+          spark,
+          statisticsUpdater,
+          metricsUpdater,
+          updateMode,
+          catalogName,
+          tableIdentifier,
+          specId);
     } catch (Exception e) {
       LOG.error("Failed to update Iceberg statistics/metrics", e);
       System.exit(1);
@@ -149,6 +162,47 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       }
       spark.stop();
     }
+  }
+
+  /**
+   * Collects a complete manifest measurement from one snapshot for one resolved partition spec.
+   *
+   * @param spark Spark session with the Iceberg catalog configured
+   * @param catalogName Spark catalog name
+   * @param tableIdentifier schema.table identifier
+   * @param requestedSpecId requested spec, or null to resolve the current default once
+   * @return measurements carrying the resolved spec ID for evaluation and submission
+   */
+  public static IcebergManifestStatistics collectManifestStatistics(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable Integer requestedSpecId) {
+    String identifier = buildTableIdentifier(catalogName, tableIdentifier);
+    final Table table;
+    try {
+      table = Spark3Util.loadIcebergTable(spark, identifier);
+      table.refresh();
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Cannot load Iceberg table " + identifier, e);
+    }
+    int specId = requestedSpecId == null ? table.spec().specId() : requestedSpecId;
+    if (specId < 0 || !table.specs().containsKey(specId)) {
+      throw new IllegalArgumentException("Unknown partition spec ID: " + specId);
+    }
+    // Pin one snapshot and the resolved spec even if the table evolves during collection.
+    Snapshot snapshot = table.currentSnapshot();
+    long count = 0;
+    double totalBytes = 0;
+    if (snapshot != null) {
+      for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        if (manifest.partitionSpecId() == specId) {
+          count++;
+          totalBytes += manifest.length();
+        }
+      }
+    }
+    return new IcebergManifestStatistics(specId, count, count == 0 ? 0D : totalBytes / count);
   }
 
   @VisibleForTesting
@@ -180,11 +234,24 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       UpdateMode updateMode,
       String catalogName,
       String tableIdentifier) {
+    updateStatistics(
+        spark, statisticsUpdater, metricsUpdater, updateMode, catalogName, tableIdentifier, null);
+  }
+
+  @VisibleForTesting
+  static void updateStatistics(
+      SparkSession spark,
+      StatisticsUpdater statisticsUpdater,
+      MetricsUpdater metricsUpdater,
+      UpdateMode updateMode,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable Integer requestedSpecId) {
     Objects.requireNonNull(updateMode, "updateMode must not be null");
 
     if (updateMode.updateStats && statisticsUpdater == null) {
       throw new IllegalArgumentException(
-          "Statistics updater must be configured when update_mode is stats or all");
+          "Statistics updater must be configured when update_mode is stats, manifests or all");
     }
 
     if (updateMode.updateMetrics && metricsUpdater == null) {
@@ -194,6 +261,14 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     NameIdentifier gravitinoTableIdentifier =
         toGravitinoTableIdentifier(catalogName, tableIdentifier);
+    if (updateMode.updateStats) {
+      IcebergManifestStatistics manifests =
+          collectManifestStatistics(spark, catalogName, tableIdentifier, requestedSpecId);
+      statisticsUpdater.mergeTableStatistics(gravitinoTableIdentifier, manifests.statistics());
+      if (updateMode == UpdateMode.MANIFESTS) {
+        return;
+      }
+    }
     long metricTimestamp = System.currentTimeMillis() / 1000L;
     boolean partitioned = isPartitionedTable(spark, catalogName, tableIdentifier);
     if (partitioned) {
@@ -248,6 +323,18 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
           tableStatistics.size(),
           gravitinoTableIdentifier);
     }
+  }
+
+  @VisibleForTesting
+  @Nullable
+  static Integer parseSpecId(@Nullable String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return null;
+    }
+    if (!value.matches("[0-9]+")) {
+      throw new IllegalArgumentException("spec_id must be a non-negative 32-bit integer");
+    }
+    return Integer.valueOf(value);
   }
 
   @VisibleForTesting
@@ -435,12 +522,12 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     if (gravitinoUri == null || gravitinoUri.trim().isEmpty()) {
       throw new IllegalArgumentException(
-          "updater_options must contain 'gravitino_uri' when update_mode is stats or all");
+          "updater_options must contain 'gravitino_uri' when update_mode is stats, manifests or all");
     }
 
     if (metalake == null || metalake.trim().isEmpty()) {
       throw new IllegalArgumentException(
-          "updater_options must contain 'metalake' when update_mode is stats or all");
+          "updater_options must contain 'metalake' when update_mode is stats, manifests or all");
     }
 
     return optimizerProperties;
@@ -503,6 +590,10 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   private static String buildFilesTableIdentifier(String catalogName, String tableIdentifier) {
+    return buildTableIdentifier(catalogName, tableIdentifier) + ".`files`";
+  }
+
+  private static String buildTableIdentifier(String catalogName, String tableIdentifier) {
     String[] levels = tableIdentifier.split("\\.");
     if (levels.length != 2) {
       throw new IllegalArgumentException(
@@ -512,8 +603,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + "."
         + escapeSqlIdentifier(levels[0])
         + "."
-        + escapeSqlIdentifier(levels[1])
-        + ".`files`";
+        + escapeSqlIdentifier(levels[1]);
   }
 
   private static String escapeSqlIdentifier(String identifier) {
@@ -546,6 +636,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         "{{catalog_name}}",
         "--table",
         "{{table_identifier}}",
+        "--spec-id",
+        "{{spec_id}}",
         "--update-mode",
         "{{update_mode}}",
         "--updater-options",
@@ -567,7 +659,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "  --table <identifier>               Table name in schema.table format\\n"
             + "\\n"
             + "Optional Options:\\n"
-            + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
+            + "  --spec-id <id>                     Manifest statistics spec, default: current spec\\n"
+            + "  --update-mode <stats|manifests|metrics|all> Update behavior mode, default: all\\n"
             + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
             + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
             + "  --updater-options <json>           JSON map for updater and repository settings\\n"
@@ -584,6 +677,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   enum UpdateMode {
     STATS("stats", true, false),
+    MANIFESTS("manifests", true, false),
     METRICS("metrics", false, true),
     ALL("all", true, true);
 
@@ -605,7 +699,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         }
       }
       throw new IllegalArgumentException(
-          "Invalid update_mode value: " + value + ". Supported values are: stats, metrics, all");
+          "Invalid update_mode value: "
+              + value
+              + ". Supported values are: stats, manifests, metrics, all");
     }
   }
 }

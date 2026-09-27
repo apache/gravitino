@@ -42,10 +42,18 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -200,6 +208,128 @@ public class TestStatisticManager {
     }
 
     FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+  }
+
+  @Test
+  public void testConcurrentObjectMergesAndAtomicReads() throws Exception {
+    MetadataObject object =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    try (StatisticManager manager = new StatisticManager(entityStore, idGenerator, config)) {
+      List<String> names = Lists.newArrayList("custom-merge-count", "custom-merge-size");
+      manager.dropStatistics(METALAKE, object, names);
+      ExecutorService executor = Executors.newFixedThreadPool(5);
+      CountDownLatch start = new CountDownLatch(1);
+      try {
+        List<Future<?>> writers = new ArrayList<>();
+        for (int spec = 0; spec < 4; spec++) {
+          String key = Integer.toString(spec);
+          writers.add(
+              executor.submit(
+                  () -> {
+                    start.await();
+                    for (long value = 1; value <= 20; value++) {
+                      Map<String, StatisticValue<?>> update = new HashMap<>();
+                      update.put(
+                          names.get(0),
+                          StatisticValues.objectValue(
+                              Collections.singletonMap(key, StatisticValues.longValue(value))));
+                      update.put(
+                          names.get(1),
+                          StatisticValues.objectValue(
+                              Collections.singletonMap(
+                                  key, StatisticValues.doubleValue(value * 10D))));
+                      manager.mergeStatistics(METALAKE, object, update);
+                    }
+                    return null;
+                  }));
+        }
+        Future<?> reader =
+            executor.submit(
+                () -> {
+                  start.await();
+                  for (int i = 0; i < 80; i++) {
+                    Map<String, StatisticValue<?>> values = new HashMap<>();
+                    manager
+                        .listStatistics(METALAKE, object)
+                        .forEach(stat -> values.put(stat.name(), stat.value().get()));
+                    if (values.containsKey(names.get(0))) {
+                      Map<String, StatisticValue<?>> counts =
+                          ((StatisticValues.ObjectValue) values.get(names.get(0))).value();
+                      Map<String, StatisticValue<?>> sizes =
+                          ((StatisticValues.ObjectValue) values.get(names.get(1))).value();
+                      Assertions.assertEquals(counts.keySet(), sizes.keySet());
+                      counts.forEach(
+                          (key, count) ->
+                              Assertions.assertEquals(
+                                  ((Long) count.value()) * 10D, sizes.get(key).value()));
+                    }
+                  }
+                  return null;
+                });
+        start.countDown();
+        for (Future<?> writer : writers) {
+          writer.get(30, TimeUnit.SECONDS);
+        }
+        reader.get(30, TimeUnit.SECONDS);
+        Map<String, StatisticValue<?>> values = new HashMap<>();
+        manager
+            .listStatistics(METALAKE, object)
+            .forEach(stat -> values.put(stat.name(), stat.value().get()));
+        Map<String, StatisticValue<?>> counts =
+            ((StatisticValues.ObjectValue) values.get(names.get(0))).value();
+        Assertions.assertEquals(4, counts.size());
+        counts.values().forEach(count -> Assertions.assertEquals(20L, count.value()));
+
+        Map<String, StatisticValue<?>> invalid = new HashMap<>();
+        invalid.put(
+            names.get(0),
+            StatisticValues.objectValue(
+                Collections.singletonMap("0", StatisticValues.longValue(999L))));
+        invalid.put(names.get(1), StatisticValues.longValue(1L));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.mergeStatistics(METALAKE, object, invalid));
+        Map<String, StatisticValue<?>> after = new HashMap<>();
+        manager
+            .listStatistics(METALAKE, object)
+            .forEach(stat -> after.put(stat.name(), stat.value().get()));
+        Assertions.assertEquals(values, after);
+      } finally {
+        executor.shutdownNow();
+        manager.dropStatistics(METALAKE, object, names);
+      }
+    }
+  }
+
+  @Test
+  public void testMergeRejectsExistingScalarWithoutPublishingOtherValues() throws IOException {
+    MetadataObject object =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    List<String> names = Lists.newArrayList("custom-scalar", "custom-new-object");
+    try (StatisticManager manager = new StatisticManager(entityStore, idGenerator, config)) {
+      manager.updateStatistics(
+          METALAKE, object, Collections.singletonMap(names.get(0), StatisticValues.longValue(1L)));
+      try {
+        Map<String, StatisticValue<?>> updates = new HashMap<>();
+        for (String name : names) {
+          updates.put(
+              name,
+              StatisticValues.objectValue(
+                  Collections.singletonMap("0", StatisticValues.longValue(2L))));
+        }
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.mergeStatistics(METALAKE, object, updates));
+        Map<String, StatisticValue<?>> values = new HashMap<>();
+        manager
+            .listStatistics(METALAKE, object)
+            .forEach(stat -> values.put(stat.name(), stat.value().get()));
+        Assertions.assertEquals(StatisticValues.longValue(1L), values.get(names.get(0)));
+        Assertions.assertFalse(values.containsKey(names.get(1)));
+      } finally {
+        manager.dropStatistics(METALAKE, object, names);
+      }
+    }
   }
 
   @Test

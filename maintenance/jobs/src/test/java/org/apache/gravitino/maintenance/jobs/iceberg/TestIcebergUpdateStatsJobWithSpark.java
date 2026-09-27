@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -56,6 +57,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
+import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -63,7 +65,9 @@ import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetri
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
@@ -100,6 +104,81 @@ public class TestIcebergUpdateStatsJobWithSpark {
 
   private static SparkSession spark;
   private static String catalogName;
+
+  @Test
+  public void testManifestStatisticsAcrossPartitionEvolution() {
+    String name = catalogName + ".db.manifest_evolution";
+    spark.sql("CREATE TABLE " + name + " (id INT, ds STRING) USING iceberg PARTITIONED BY (ds)");
+    try {
+      IcebergManifestStatistics empty =
+          IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+              spark, catalogName, "db.manifest_evolution", null);
+      assertEquals(0L, empty.count());
+      assertEquals(0D, empty.averageSize());
+      int oldSpec = empty.specId();
+      spark.sql("INSERT INTO " + name + " VALUES (1, 'a'), (2, 'b')");
+      spark.sql("ALTER TABLE " + name + " ADD PARTITION FIELD bucket(4, id)");
+      IcebergManifestStatistics newEmpty =
+          IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+              spark, catalogName, "db.manifest_evolution", null);
+      assertTrue(newEmpty.specId() != oldSpec);
+      assertEquals(0L, newEmpty.count());
+      assertEquals(0D, newEmpty.averageSize());
+      spark.sql("INSERT INTO " + name + " VALUES (3, 'c')");
+      for (int spec : new int[] {oldSpec, newEmpty.specId()}) {
+        Row expected =
+            spark
+                .sql(
+                    "SELECT COUNT(*), AVG(length) FROM "
+                        + name
+                        + ".manifests WHERE partition_spec_id = "
+                        + spec)
+                .first();
+        IcebergManifestStatistics actual =
+            IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+                spark, catalogName, "db.manifest_evolution", spec);
+        assertEquals(spec, actual.specId());
+        assertEquals(expected.getLong(0), actual.count());
+        assertEquals(expected.getDouble(1), actual.averageSize());
+      }
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+                  spark, catalogName, "db.manifest_evolution", Integer.MAX_VALUE));
+      RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
+      IcebergUpdateStatsAndMetricsJob.updateStatistics(
+          spark,
+          updater,
+          null,
+          IcebergUpdateStatsAndMetricsJob.UpdateMode.MANIFESTS,
+          catalogName,
+          "db.manifest_evolution",
+          oldSpec);
+      assertEquals(2, updater.manifestStatistics.size());
+      assertTrue(updater.tableStatistics.isEmpty());
+      assertTrue(updater.partitionStatistics.isEmpty());
+      Map<String, StatisticValue<?>> values = new HashMap<>();
+      updater.manifestStatistics.forEach(stat -> values.put(stat.name(), stat.value()));
+      assertEquals(
+          oldSpec, IcebergManifestStatistics.fromStatistics(values, oldSpec).get().specId());
+      assertFalse(IcebergManifestStatistics.fromStatistics(values, newEmpty.specId()).isPresent());
+    } finally {
+      spark.sql("DROP TABLE " + name);
+    }
+  }
+
+  @Test
+  public void testManifestSpecArgument() {
+    assertEquals(null, IcebergUpdateStatsAndMetricsJob.parseSpecId(null));
+    assertEquals(null, IcebergUpdateStatsAndMetricsJob.parseSpecId(""));
+    assertEquals(0, IcebergUpdateStatsAndMetricsJob.parseSpecId("0"));
+    for (String invalid : Arrays.asList("-1", "1.0", "abc", "2147483648", "1 OR 1=1")) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> IcebergUpdateStatsAndMetricsJob.parseSpecId(invalid));
+    }
+  }
 
   @BeforeAll
   public static void setUp() {
@@ -831,6 +910,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
 
   private static final class RecordingStatisticsUpdater implements StatisticsUpdater {
     private NameIdentifier tableIdentifier;
+    private List<StatisticEntry<?>> manifestStatistics = Collections.emptyList();
     private List<StatisticEntry<?>> tableStatistics = Collections.emptyList();
     private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
         Collections.emptyMap();
@@ -848,6 +928,12 @@ public class TestIcebergUpdateStatsJobWithSpark {
         NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics) {
       this.tableIdentifier = tableIdentifier;
       this.tableStatistics = tableStatistics;
+    }
+
+    @Override
+    public void mergeTableStatistics(
+        NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics) {
+      this.manifestStatistics = tableStatistics;
     }
 
     @Override
