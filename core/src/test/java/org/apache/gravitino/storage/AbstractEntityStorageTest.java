@@ -76,8 +76,8 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -104,13 +104,14 @@ import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionCon
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @CoreBackend.All
+@ExtendWith(CloseContainerExtension.class)
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
 
@@ -132,13 +133,6 @@ abstract class AbstractEntityStorageTest {
     return Arrays.stream(backends)
         .filter(arguments -> BackendTestSelector.isSelected((String) arguments[0]))
         .toArray(Object[][]::new);
-  }
-
-  @AfterEach
-  void closeSuit() throws IOException {
-    // todo: refactor TestEntityStorage to extend TestJDBCBackend, otherwise, each test will start
-    // and stop the container suite.
-    ContainerSuite.getInstance().close();
   }
 
   protected void init(String type, Config config) throws IllegalAccessException {
