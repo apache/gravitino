@@ -237,13 +237,14 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Three job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, and then expires the snapshot history that compaction just created.
+Four job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, and removes old orphan files.
 
 | Job template                          | What it does                             |
 |---------------------------------------|-------------------------------------------|
 | `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
 | `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
 | `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
+| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -347,7 +348,7 @@ CALL `rest_catalog`.system.expire_snapshots(
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
-cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-expire-snapshots/{job_id}/stdout.log
+cat /tmp/gravitino/jobs/staging/job-runs/{job_id}/output.log
 ```
 
 A successful run reports its state as `SUCCEEDED` and logs the counts it removed:
@@ -365,3 +366,66 @@ Expire Snapshots Results:
 - [Configuration](./optimizer-configuration.md) for the three configuration layers
 - [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
 - [Manage Jobs](../manage-jobs-in-gravitino.md) for job status and templates
+
+## Remove Orphan Files
+
+`builtin-iceberg-remove-orphan-files` runs Iceberg's `remove_orphan_files` Spark
+procedure. It removes files in the scan location that are no longer referenced
+by table metadata. This job is available for direct submission; policy-driven
+scheduling is a separate feature.
+
+| Key                | Description                                                                                    | Default                          |
+| ------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                            | Required                         |
+| `table_identifier` | Table identifier within that catalog, such as `db.sample`                                      | Required                         |
+| `older_than`       | Cutoff timestamp in the Spark session time zone; explicit values must be at least 24 hours old | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                                   | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                                  | `false`                          |
+| `spark_conf`       | JSON map of custom Spark configuration                                                         | None                             |
+
+The template uses the same Spark and catalog connection settings as the other
+Iceberg jobs. Supply every template placeholder in `jobConf`: use empty strings
+for `older_than` and `location` to keep their defaults, an explicit boolean string
+for `dry_run`, and `{}` for `spark_conf` when no overrides are needed.
+For example, submit a preview using:
+
+```json
+{
+  "jobTemplateName": "builtin-iceberg-remove-orphan-files",
+  "jobConf": {
+    "catalog_name": "rest_catalog",
+    "table_identifier": "db.t1",
+    "older_than": "",
+    "location": "",
+    "dry_run": "true",
+    "spark_conf": "{}",
+    "spark_master": "local[2]",
+    "spark_executor_instances": "1",
+    "spark_executor_cores": "1",
+    "spark_executor_memory": "1g",
+    "spark_driver_memory": "1g",
+    "catalog_type": "rest",
+    "catalog_uri": "http://localhost:9001/iceberg",
+    "warehouse_location": ""
+  }
+}
+```
+
+POST this body to `/api/metalakes/{metalake}/jobs`. Review the candidate paths in
+the job logs before resubmitting with `dry_run: "false"`. A successful run also
+logs the candidate count. CLI equivalents are `--catalog`, `--table`,
+`--older-than`, `--location`, `--dry-run true|false`, and `--spark-conf`.
+
+The job validates the location before executing the procedure. A custom
+location must be the table's own location or a descendant, on the same storage
+scheme and authority. Relative paths, ambiguous percent-encoded paths, query
+strings, fragments, and symlinks in the scan directory are rejected. Filesystem
+validation errors fail the job before deletion. Keep the scan directory free of
+concurrent location or symlink changes during cleanup.
+
+Retain the three-day default unless a longer interval is needed for your writers.
+Files staged by active writers can appear to be orphaned. Iceberg 1.11's SQL
+procedure rejects explicit cutoffs less than 24 hours old, including a cutoff of
+"now", even for dry runs. This job preserves that safeguard and does not enable
+Iceberg's testing override. Spark's `spark.sql.parser.escapedStringLiterals` must
+remain `false` for procedure arguments to be interpreted correctly.

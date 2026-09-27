@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.job;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -64,8 +67,10 @@ public class JobExecutorFactory {
         Maps.newHashMap(
             config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + "."));
     try {
+      Class<?> jobExecutorClass = Class.forName(clzName);
+      checkJobExecutorClass(jobExecutorClass);
       JobExecutor jobExecutor =
-          (JobExecutor) Class.forName(clzName).getDeclaredConstructor().newInstance();
+          (JobExecutor) jobExecutorClass.getDeclaredConstructor().newInstance();
       if (jobExecutor instanceof LocalJobExecutor) {
         // The local job executor, and any subclass of it, keeps its output index under the job
         // staging directory, so it must resolve paths against exactly the directory JobManager
@@ -78,5 +83,37 @@ public class JobExecutorFactory {
     } catch (Exception e) {
       throw new RuntimeException("Failed to create job executor: " + jobExecutorName, e);
     }
+  }
+
+  /**
+   * Checks that the job executor class implements all the methods Gravitino requires. A class
+   * compiled against an older version of {@link JobExecutor} still loads, but calling a method it
+   * doesn't implement throws {@link AbstractMethodError} later, so it is rejected up front.
+   *
+   * @param jobExecutorClass The job executor class to check.
+   * @throws IllegalArgumentException If the class isn't a job executor, or misses a required
+   *     method.
+   */
+  @VisibleForTesting
+  static void checkJobExecutorClass(Class<?> jobExecutorClass) {
+    Preconditions.checkArgument(
+        JobExecutor.class.isAssignableFrom(jobExecutorClass),
+        "%s doesn't implement %s",
+        jobExecutorClass.getName(),
+        JobExecutor.class.getName());
+
+    Method getJobExecutionInfo;
+    try {
+      getJobExecutionInfo = jobExecutorClass.getMethod("getJobExecutionInfo", String.class);
+    } catch (NoSuchMethodException e) {
+      // Never happens for a JobExecutor, as the interface declares the method.
+      throw new IllegalArgumentException(e);
+    }
+    Preconditions.checkArgument(
+        !Modifier.isAbstract(getJobExecutionInfo.getModifiers()),
+        "Job executor %s doesn't implement JobExecutor#getJobExecutionInfo(String), which "
+            + "Gravitino uses to track the jobs. It was likely built against an older version of "
+            + "Gravitino, rebuild it against this version and implement the method.",
+        jobExecutorClass.getName());
   }
 }
