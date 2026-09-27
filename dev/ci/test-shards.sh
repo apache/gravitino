@@ -27,16 +27,22 @@
 #   build       Unit tests run by .github/workflows/build.yml.
 #   backend-it  Integration tests run by .github/workflows/backend-integration-test.yml.
 #
-# Every suite ends with a catch-all `others` shard that excludes the projects of all named
-# shards, so a new module is always tested by `others` until it is moved to a named shard.
-# To rebalance, move a project between the lists below; the workflows need no change.
+# Every suite ends with a catch-all `others` shard that excludes the test tasks owned by its named
+# shards, so a new module is always tested by `others` until it is moved to a named shard. Build's
+# core lanes map directly to dedicated tasks; project-based shards remain in the lists below.
+# To rebalance, update the task mappings or project lists below; the workflows need no change.
 
 set -euo pipefail
 
 # ---- build suite -------------------------------------------------------------------------------
-# `core` holds the shared test environment lock for its whole run, so it gets its own shard.
-BUILD_CORE=(
-  :core
+# Core separates its unit and database contracts into explicit tasks. Database lanes remain
+# sequential internally; CI gives each lane its own shard so their results and coverage inputs are
+# independently inspectable.
+BUILD_CORE_SHARDS=(
+  core-unit
+  core-h2
+  core-mysql
+  core-postgresql
 )
 
 # Projects with `gravitino-docker-test` tests. Gradle runs them one by one under the shared test
@@ -90,7 +96,7 @@ usage() {
 # Prints the shard names of a suite, in matrix order.
 shards_of() {
   case "$1" in
-    build) echo "core docker others" ;;
+    build) echo "${BUILD_CORE_SHARDS[*]} docker others" ;;
     backend-it) echo "hive lakehouse others" ;;
     *) echo "Unknown suite: $1" >&2; usage ;;
   esac
@@ -99,7 +105,6 @@ shards_of() {
 # Prints the variable name holding the projects of a named shard.
 projects_var() {
   case "$1/$2" in
-    build/core) echo BUILD_CORE ;;
     build/docker) echo BUILD_DOCKER ;;
     backend-it/hive) echo BACKEND_IT_HIVE ;;
     backend-it/lakehouse) echo BACKEND_IT_LAKEHOUSE ;;
@@ -117,6 +122,17 @@ print_test_tasks() {
 print_others() {
   local suite="$1" root_task="$2" shard task
   echo "${root_task}"
+
+  if [ "${suite}" = "build" ]; then
+    # The explicit core shards replace the legacy task. Keep Docker-tagged projects in their own
+    # shard as before so `others` cannot execute either group a second time through root `build`.
+    printf -- '-x\n:core:test\n'
+    for task in $(print_test_tasks BUILD_DOCKER); do
+      printf -- '-x\n%s\n' "${task}"
+    done
+    return
+  fi
+
   for shard in $(shards_of "${suite}"); do
     [ "${shard}" = "others" ] && continue
     for task in $(print_test_tasks "$(projects_var "${suite}" "${shard}")"); do
@@ -148,6 +164,14 @@ if [ "${shard}" = "others" ]; then
     *) echo "Unknown suite: ${suite}" >&2; usage ;;
   esac
 else
-  projects="$(projects_var "${suite}" "${shard}")"
-  print_test_tasks "${projects}"
+  case "${suite}/${shard}" in
+    build/core-unit) echo :core:coreUnitTest ;;
+    build/core-h2) echo :core:coreH2Test ;;
+    build/core-mysql) echo :core:coreMySQLTest ;;
+    build/core-postgresql) echo :core:corePostgreSQLTest ;;
+    *)
+      projects="$(projects_var "${suite}" "${shard}")"
+      print_test_tasks "${projects}"
+      ;;
+  esac
 fi
