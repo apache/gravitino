@@ -124,7 +124,8 @@ public final class SecretAlterChanges {
     holder.setReplacedUrns(
         replacedUrns.stream()
             .filter(urn -> !properties.containsValue(urn.toString()))
-            .collect(Collectors.toList()));
+            .distinct()
+            .collect(Collectors.toUnmodifiableList()));
     return holder;
   }
 
