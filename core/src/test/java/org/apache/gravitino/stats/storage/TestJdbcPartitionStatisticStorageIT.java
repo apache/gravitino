@@ -50,6 +50,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.stats.PartitionRange;
@@ -65,6 +66,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +100,7 @@ public class TestJdbcPartitionStatisticStorageIT {
    * runs in.
    */
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  @ExtendWith(CloseContainerExtension.class)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
 
     protected JdbcPartitionStatisticStorage storage;
