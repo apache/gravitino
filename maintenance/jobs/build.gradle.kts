@@ -53,6 +53,7 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":maintenance:optimizer"))
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(libs.bundles.log4j)
@@ -79,6 +80,12 @@ dependencies {
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:2.7.0")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+// The optimizer packages its runtime dependencies beside its jar in build/libs.
+// Order the integration-test compile after that directory has been populated.
+tasks.compileTestJava {
+  dependsOn(":maintenance:optimizer:copyDepends")
 }
 
 tasks.test {

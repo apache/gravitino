@@ -47,11 +47,13 @@ objects it is attached to directly.
 | Type                        | Rules                                | Consumed by               |
 |-----------------------------|--------------------------------------|---------------------------|
 | `system_iceberg_compaction` | Compaction thresholds and scheduling | Table maintenance service |
+| `system_iceberg_rewrite_manifests` | Manifest count and average-size thresholds | Table maintenance service |
 | `custom`                    | A free-form map you define           | A system you provide      |
 
 A built-in type has a name beginning with `system_` and a content shape Gravitino defines. The
 compaction policy is documented in [Iceberg compaction policy](./iceberg-compaction-policy.md), and
-the service that acts on it in
+manifest rewriting in [Iceberg manifest rewrite policy](./iceberg-rewrite-manifests-policy.md), and
+the service that acts on them in
 [Table maintenance service](./table-maintenance-service/optimizer.md).
 
 A custom policy has type `custom`, and Gravitino makes no attempt to interpret what is inside

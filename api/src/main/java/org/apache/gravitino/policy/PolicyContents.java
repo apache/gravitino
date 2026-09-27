@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
@@ -101,6 +102,39 @@ public class PolicyContents {
         deleteFileNumberWeight,
         maxPartitionNum,
         rewriteOptions);
+  }
+
+  /**
+   * Creates a manifest rewrite policy with default thresholds and cycle target selection.
+   *
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests() {
+    return icebergRewriteManifests(null, null, null, null, null);
+  }
+
+  /**
+   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null for the resolved collection-cycle target
+   * @param useCaching caching option, or null for the Iceberg default
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    return new IcebergRewriteManifestsContent(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching);
   }
 
   private PolicyContents() {}

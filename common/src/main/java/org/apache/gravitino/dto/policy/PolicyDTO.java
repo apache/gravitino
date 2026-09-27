@@ -57,7 +57,10 @@ public class PolicyDTO implements Policy {
     // "system_data_compaction")
     @JsonSubTypes.Type(
         value = PolicyContentDTO.IcebergCompactionContentDTO.class,
-        name = "system_iceberg_compaction")
+        name = "system_iceberg_compaction"),
+    @JsonSubTypes.Type(
+        value = PolicyContentDTO.IcebergRewriteManifestsContentDTO.class,
+        name = "system_iceberg_rewrite_manifests")
   })
   private PolicyContentDTO content;
 

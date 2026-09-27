@@ -23,12 +23,14 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 
@@ -202,6 +204,112 @@ public interface PolicyContentDTO extends PolicyContent {
           deleteFileNumberWeight(),
           maxPartitionNum(),
           rewriteOptions());
+    }
+  }
+
+  /** Typed manifest rewrite policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    @JsonProperty("manifest_count_critical")
+    private Long manifestCountCritical;
+
+    @JsonProperty("manifest_count_warning")
+    private Long manifestCountWarning;
+
+    @JsonProperty("avg_manifest_size_threshold_bytes")
+    private Long avgManifestSizeThresholdBytes;
+
+    @JsonProperty("spec_id")
+    private Integer specId;
+
+    @JsonProperty("use_caching")
+    private Boolean useCaching;
+
+    private IcebergRewriteManifestsContentDTO() {}
+
+    /**
+     * Returns manifest_count_critical.
+     *
+     * @return manifest_count_critical
+     */
+    public Long manifestCountCritical() {
+      return manifestCountCritical == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_CRITICAL
+          : manifestCountCritical;
+    }
+
+    /**
+     * Returns manifest_count_warning.
+     *
+     * @return manifest_count_warning
+     */
+    public Long manifestCountWarning() {
+      return manifestCountWarning == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_WARNING
+          : manifestCountWarning;
+    }
+
+    /**
+     * Returns avg_manifest_size_threshold_bytes.
+     *
+     * @return avg_manifest_size_threshold_bytes
+     */
+    public Long avgManifestSizeThresholdBytes() {
+      return avgManifestSizeThresholdBytes == null
+          ? IcebergRewriteManifestsContent.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
+          : avgManifestSizeThresholdBytes;
+    }
+
+    /**
+     * Returns spec_id.
+     *
+     * @return spec_id or null when omitted
+     */
+    @Nullable
+    public Integer specId() {
+      return specId;
+    }
+
+    /**
+     * Returns use_caching.
+     *
+     * @return use_caching or null when omitted
+     */
+    @Nullable
+    public Boolean useCaching() {
+      return useCaching;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergRewriteManifests(
+          manifestCountCritical(),
+          manifestCountWarning(),
+          avgManifestSizeThresholdBytes(),
+          specId(),
+          useCaching());
     }
   }
 }
