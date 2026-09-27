@@ -727,28 +727,37 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             "/tmp-v1");
     FilesetMetaService.getInstance().insertFileset(original, false);
     FilesetPO initialPO = getFilesetPO(original.id());
-    // fileset_meta carries no comment, so an over-long comment passes the metadata update and only
-    // fails once the version snapshot is written.
-    String tooLongComment = StringUtils.repeat("c", 300);
+    // fileset_meta carries no storage location, so an over-long storage location name passes the
+    // metadata update and only fails once the version snapshot is written. The comment can't be
+    // used for this since the entity validation rejects an over-long comment before any write.
+    String tooLongLocationName = StringUtils.repeat("l", 300);
 
-    // Each backend reports the rejected snapshot differently, so only the rollback below is
-    // asserted on.
-    assertThrows(
-        Exception.class,
-        () ->
-            FilesetMetaService.getInstance()
-                .updateFileset(
-                    original.nameIdentifier(),
-                    entity -> {
-                      FilesetEntity current = (FilesetEntity) entity;
-                      return copyFileset(
-                          current,
-                          current.id(),
-                          current.name(),
-                          tooLongComment,
-                          "/tmp-v2",
-                          current.auditInfo());
-                    }));
+    // The value-too-long error of every backend is converted to an IllegalArgumentException
+    // without the database error as its cause.
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                FilesetMetaService.getInstance()
+                    .updateFileset(
+                        original.nameIdentifier(),
+                        entity -> {
+                          FilesetEntity current = (FilesetEntity) entity;
+                          return FilesetEntity.builder()
+                              .withId(current.id())
+                              .withName(current.name())
+                              .withNamespace(current.namespace())
+                              .withFilesetType(current.filesetType())
+                              .withStorageLocations(ImmutableMap.of(tooLongLocationName, "/tmp-v2"))
+                              .withComment("new comment")
+                              .withProperties(current.properties())
+                              .withAuditInfo(current.auditInfo())
+                              .build();
+                        }));
+    Assertions.assertEquals(
+        "The fileset entity has a value that exceeds the maximum length of its column.",
+        exception.getMessage());
+    Assertions.assertNull(exception.getCause());
 
     FilesetEntity current =
         FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());

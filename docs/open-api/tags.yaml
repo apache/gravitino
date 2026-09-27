@@ -380,6 +380,94 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
+  /metalakes/{metalake}/tags/{tag}/policies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+    get:
+      tags:
+        - tag
+      summary: List policies associated with a tag
+      operationId: listPoliciesForTag
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns policy names or detailed policy-tag associations
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/responses/PolicyForTagAssociationListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or tag does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/tags/{tag}/policies/{policy}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    post:
+      tags:
+        - tag
+      summary: Associate a policy with a tag
+      operationId: addPolicyForTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/PolicyTagAddRequest"
+      responses:
+        "200":
+          description: Returns the created policy-tag association
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/PolicyTagAssociationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake, tag, or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: Conflict - The policy is already associated with the tag
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+    delete:
+      tags:
+        - tag
+      summary: Remove a policy association from a tag
+      operationId: removePolicyFromTag
+      responses:
+        "204":
+          description: The policy-tag association was removed
+        "404":
+          description: Not Found - The specified metalake, tag, or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
 components:
   parameters:
     details:
@@ -466,6 +554,14 @@ components:
 
 
   requests:
+
+    PolicyTagAddRequest:
+      type: object
+      required:
+        - selector
+      properties:
+        selector:
+          $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
 
     TagCreateRequest:
       type: object
@@ -642,6 +738,48 @@ components:
           maxLength: 256
 
   responses:
+    PolicyForTagAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        associations:
+          type: array
+          items:
+            type: object
+            required:
+              - policy
+              - selector
+            properties:
+              policy:
+                $ref: "./policies.yaml#/components/schemas/Policy"
+              selector:
+                $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
+
+    PolicyTagAssociationResponse:
+      type: object
+      required:
+        - code
+        - policy
+        - tag
+        - selector
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        policy:
+          type: string
+        tag:
+          type: string
+        selector:
+          $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
+
     TagListResponse:
       type: object
       properties:

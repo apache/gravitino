@@ -123,10 +123,17 @@ Do not add them to the standalone server configuration.
 | `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                        | `30000`                                                                      | No       |
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                          | `131072`                                                                     | No       |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                         | `131072`                                                                     | No       |
+| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. | `true`                                                                       | No       |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                              | (none)                                                                       | No       |
+| `gravitino.iceberg-rest.advertised-uri`          | The public endpoint reported to clients that discover the service through the Gravitino server. Must be an absolute `http`/`https` URI with a host and no query or fragment.                  | (none)                                                                       | No       |
 
 The filter in `customFilters` should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
+
+Set `gravitino.iceberg-rest.advertised-uri` when clients such as the Trino connector reach the service through a reverse proxy whose scheme, host, port or path differs from the listener's, for example `https://iceberg.example.com/iceberg/`.
+An explicit port must be in the range 1-65535; an invalid value makes discovery requests fail instead of advertising an unreachable endpoint.
+It only affects the advertised endpoint, not the listener; when unset, the endpoint is derived from `host`, `httpPort`/`httpsPort` and `enableHttps`.
+This setting applies only to the auxiliary service.
 
 #### Asynchronous Table Purge
 

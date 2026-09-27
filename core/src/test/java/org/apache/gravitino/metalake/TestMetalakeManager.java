@@ -21,6 +21,7 @@ package org.apache.gravitino.metalake;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.doReturn;
 
 import com.google.common.collect.ImmutableMap;
@@ -30,9 +31,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -50,6 +54,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -263,6 +268,50 @@ public class TestMetalakeManager {
     metalakeManager.dropMetalake(ident1, true);
     metalakeManager.dropMetalake(ident2, true);
     metalakeManager.dropMetalake(ident3, true);
+  }
+
+  @Test
+  public void testForceDropMetalakeClosesCachedCatalogs() throws Exception {
+    // Dropping a metalake must release the resources of its catalogs (for example JDBC
+    // connection pools) exactly as dropping each catalog does, instead of leaving the cached
+    // catalog instances alive until cache expiry.
+    Config catalogConfig = new Config(false) {};
+    catalogConfig.set(Configs.CATALOG_LOAD_ISOLATED, false);
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(catalogConfig);
+    CatalogManager catalogManager =
+        new CatalogManager(
+            catalogConfig, store, new RandomIdGenerator(), new SecretManager(catalogConfig));
+    MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator(), catalogManager);
+
+    NameIdentifier metalakeIdent = NameIdentifier.of("force_drop_closes_catalogs_ml");
+    manager.createMetalake(metalakeIdent, "comment", ImmutableMap.of());
+    NameIdentifier catalogIdent = NameIdentifier.of(metalakeIdent.name(), "cached_catalog");
+    catalogManager.createCatalog(
+        catalogIdent,
+        Catalog.Type.RELATIONAL,
+        "test",
+        "comment",
+        ImmutableMap.of(
+            "provider", "test", "key1", "value1", "key2", "value2", "key5-1", "value3"));
+    // createCatalog caches the wrapper; loadCatalog keeps it warm the same way a schema listing
+    // against the catalog would.
+    catalogManager.loadCatalog(catalogIdent);
+    CatalogManager.CatalogWrapper wrapper =
+        catalogManager.getCatalogCache().getIfPresent(catalogIdent);
+    Assertions.assertNotNull(wrapper);
+    Assertions.assertNotNull(wrapper.catalog());
+
+    Assertions.assertTrue(manager.dropMetalake(metalakeIdent, true));
+
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(catalogIdent));
+    Assertions.assertFalse(store.exists(catalogIdent, Entity.EntityType.CATALOG));
+    // The cache removal listener retires the wrapper asynchronously; once cleaned up, the wrapper
+    // drops its catalog reference.
+    await().atMost(10, TimeUnit.SECONDS).until(() -> wrapper.catalog() == null);
+
+    catalogManager.close();
+    store.close();
   }
 
   @Test

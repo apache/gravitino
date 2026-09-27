@@ -48,6 +48,13 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
+::::caution Topic names containing dots
+When authorization is enabled, topic names containing dots are unsupported, and one such topic can
+cause the entire topic list request to fail. See
+[Names containing dots](./security/access-control.md#names-containing-dots) for details and the
+workaround.
+::::
+
 ### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required |

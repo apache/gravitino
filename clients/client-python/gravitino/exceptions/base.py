@@ -157,6 +157,10 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
+class OptimisticLockException(GravitinoRuntimeException):
+    """Raised when another update changes an entity before a write completes."""
+
+
 class UnauthorizedException(GravitinoRuntimeException):
     """An exception thrown when a user is not authorized to perform an action."""
 

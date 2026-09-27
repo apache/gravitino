@@ -906,13 +906,6 @@ public class TestTagMetaService extends TestJDBCBackend {
                   "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}")
             },
             new RelationEdgeTarget[0]));
-    PolicyMetaService.getInstance()
-        .associatePoliciesWithMetadataObject(
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            new NameIdentifier[] {policy.nameIdentifier()},
-            new NameIdentifier[0]);
-
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -941,7 +934,6 @@ public class TestTagMetaService extends TestJDBCBackend {
         String.format("metadata_object_id = %d AND type = 'TAG'", tag.id());
     assertEquals(1, countActiveTagRel(tag.id()));
     assertEquals(1, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
-    assertEquals(1, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(1, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
 
@@ -949,7 +941,6 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     assertEquals(0, countActiveTagRel(tag.id()));
     assertEquals(0, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
-    assertEquals(0, countActiveRows("policy_relation_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("owner_meta", tagAsMetadataObject));
     assertEquals(0, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
   }
@@ -1927,6 +1918,141 @@ public class TestTagMetaService extends TestJDBCBackend {
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
     Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
     Assertions.assertEquals(21, countAllTagRel(tagEntity1.id()));
+  }
+
+  @TestTemplate
+  public void testTagRelationsFollowColumnDropAndRename() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME),
+            "catalog1",
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, catalog.name()),
+            "schema1",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    ColumnEntity dropped = newColumn("c1", 0);
+    ColumnEntity renamed = newColumn("c2", 1);
+    ColumnEntity kept = newColumn("c3", 2);
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalog.name(), schema.name()))
+            .withColumns(Lists.newArrayList(dropped, renamed, kept))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tag, false);
+    for (ColumnEntity column : Lists.newArrayList(dropped, renamed, kept)) {
+      tagMetaService.associateTagsWithMetadataObject(
+          columnIdent(table, column.name()),
+          Entity.EntityType.COLUMN,
+          new NameIdentifier[] {tag.nameIdentifier()},
+          new NameIdentifier[0]);
+    }
+
+    // Drop c1 and rename c2 to c2_new in one update. A rename keeps the column id.
+    ColumnEntity renamedColumn = copyColumn(renamed, "c2_new", renamed.id());
+    TableMetaService.getInstance()
+        .updateTable(
+            table.nameIdentifier(), (TableEntity old) -> withColumns(old, renamedColumn, kept));
+
+    List<GenericEntity> objects =
+        tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier());
+    Assertions.assertEquals(2, objects.size());
+    Assertions.assertTrue(
+        containsGenericEntity(objects, "catalog1.schema1.table1.c2_new", Entity.EntityType.COLUMN));
+    Assertions.assertTrue(
+        containsGenericEntity(objects, "catalog1.schema1.table1.c3", Entity.EntityType.COLUMN));
+    // The dropped column's relation row is removed, not just hidden.
+    Assertions.assertEquals(2, countActiveTagRel(tag.id()));
+
+    Assertions.assertEquals(
+        1,
+        tagMetaService
+            .listTagsForMetadataObject(columnIdent(table, "c2_new"), Entity.EntityType.COLUMN)
+            .size());
+    // Neither the old name of the renamed column nor the dropped column resolves any more.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            tagMetaService.listTagsForMetadataObject(
+                columnIdent(table, "c2"), Entity.EntityType.COLUMN));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            tagMetaService.listTagsForMetadataObject(
+                columnIdent(table, "c1"), Entity.EntityType.COLUMN));
+
+    // A new column that reuses the dropped column's name does not inherit its tag.
+    ColumnEntity readded = copyColumn(dropped, "c1", RandomIdGenerator.INSTANCE.nextId());
+    TableMetaService.getInstance()
+        .updateTable(
+            table.nameIdentifier(),
+            (TableEntity old) -> withColumns(old, renamedColumn, kept, readded));
+    Assertions.assertTrue(
+        tagMetaService
+            .listTagsForMetadataObject(columnIdent(table, "c1"), Entity.EntityType.COLUMN)
+            .isEmpty());
+    Assertions.assertEquals(
+        2, tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()).size());
+  }
+
+  private static ColumnEntity newColumn(String name, int position) {
+    return ColumnEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withPosition(position)
+        .withAutoIncrement(false)
+        .withNullable(true)
+        .withDataType(Types.IntegerType.get())
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private static ColumnEntity copyColumn(ColumnEntity column, String name, long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withPosition(column.position())
+        .withAutoIncrement(column.autoIncrement())
+        .withNullable(column.nullable())
+        .withDataType(column.dataType())
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private static TableEntity withColumns(TableEntity table, ColumnEntity... columns) {
+    return TableEntity.builder()
+        .withId(table.id())
+        .withName(table.name())
+        .withNamespace(table.namespace())
+        .withColumns(Lists.newArrayList(columns))
+        .withAuditInfo(table.auditInfo())
+        .build();
+  }
+
+  private static NameIdentifier columnIdent(TableEntity table, String columnName) {
+    return NameIdentifier.of(Namespace.fromString(table.nameIdentifier().toString()), columnName);
   }
 
   @TestTemplate

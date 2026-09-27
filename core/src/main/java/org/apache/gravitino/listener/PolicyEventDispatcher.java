@@ -25,9 +25,6 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.AlterPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.CreatePolicyPreEvent;
@@ -42,13 +39,7 @@ import org.apache.gravitino.listener.api.event.policy.EnablePolicyFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.EnablePolicyPreEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.policy.GetPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyPreEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesFailureEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPoliciesPreEvent;
@@ -265,31 +256,6 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
   }
 
   @Override
-  public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
-    eventBus.dispatchEvent(
-        new ListMetadataObjectsForPolicyPreEvent(
-            PrincipalUtils.getCurrentUserName(),
-            NameIdentifierUtil.ofPolicy(metalake, policyName)));
-    try {
-      MetadataObject[] metadataObjects =
-          dispatcher.listMetadataObjectsForPolicy(metalake, policyName);
-      eventBus.dispatchEvent(
-          new ListMetadataObjectsForPolicyEvent(
-              PrincipalUtils.getCurrentUserName(),
-              NameIdentifierUtil.ofPolicy(metalake, policyName),
-              metadataObjects != null ? metadataObjects.length : -1));
-      return metadataObjects;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new ListMetadataObjectsForPolicyFailureEvent(
-              PrincipalUtils.getCurrentUserName(),
-              NameIdentifierUtil.ofPolicy(metalake, policyName),
-              e));
-      throw e;
-    }
-  }
-
-  @Override
   public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
     return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
@@ -314,67 +280,6 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
       eventBus.dispatchEvent(
           new ListPolicyInfosForMetadataObjectFailureEvent(
               PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
-      throw e;
-    }
-  }
-
-  @Override
-  public String[] associatePoliciesForMetadataObject(
-      String metalake,
-      MetadataObject metadataObject,
-      String[] policiesToAdd,
-      String[] policiesToRemove) {
-    eventBus.dispatchEvent(
-        new AssociatePoliciesForMetadataObjectPreEvent(
-            PrincipalUtils.getCurrentUserName(),
-            metalake,
-            metadataObject,
-            policiesToAdd,
-            policiesToRemove));
-
-    try {
-      String[] associatedPolicies =
-          dispatcher.associatePoliciesForMetadataObject(
-              metalake, metadataObject, policiesToAdd, policiesToRemove);
-      eventBus.dispatchEvent(
-          new AssociatePoliciesForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(),
-              metalake,
-              metadataObject,
-              policiesToAdd,
-              policiesToRemove));
-      return associatedPolicies;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new AssociatePoliciesForMetadataObjectFailureEvent(
-              PrincipalUtils.getCurrentUserName(),
-              metalake,
-              metadataObject,
-              policiesToAdd,
-              policiesToRemove,
-              e));
-      throw e;
-    }
-  }
-
-  @Override
-  public PolicyEntity getPolicyForMetadataObject(
-      String metalake, MetadataObject metadataObject, String policyName) {
-    eventBus.dispatchEvent(
-        new GetPolicyForMetadataObjectPreEvent(
-            PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyName));
-    try {
-      PolicyEntity policy =
-          dispatcher.getPolicyForMetadataObject(metalake, metadataObject, policyName);
-      PolicyInfo policyInfo = toPolicyInfo(policy);
-      eventBus.dispatchEvent(
-          new GetPolicyForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyInfo));
-      return policy;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new GetPolicyForMetadataObjectFailureEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyName, e));
       throw e;
     }
   }

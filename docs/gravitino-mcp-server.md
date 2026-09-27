@@ -130,9 +130,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics` |
 | `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`     |
 | `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`     |
-| `list_policies_for_metadata`        | List all policies associated with a specific metadata item.                    | `policy`     |
-| `list_metadata_by_policy`           | List all metadata items associated with a specific policy.                     | `policy`     |
-| `get_policy_for_metadata`           | Get a policy associated with a specific metadata item.                         | `policy`     |
+| `list_policies_for_metadata`        | List all policies derived for a specific metadata item.                    | `policy`     |
 | `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`  |
 | `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`  |
 | `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`       |
@@ -253,6 +251,8 @@ Because each call carries its own metalake, one server instance can serve severa
 Use the `list_metalakes` tool to discover which metalakes a caller may use. It is the one tool that does not need a metalake, so it works on a server started with no `--metalake` at all.
 
 The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) shipped their own `metalake_name` argument before metalake selection was unified. It is still accepted as a deprecated alias for `metalake`, so existing callers keep working; passing both with different values is rejected. New callers should use `metalake`.
+
+These tools use `metadata_full_name` for the metadata object name, consistent with the tag and policy tools. The previous spelling, `metadata_fullname`, is accepted as a deprecated input alias but is not advertised in the tool schema. Supply only one spelling per call; passing both is rejected. New callers should use `metadata_full_name`.
 
 Authorization is unchanged — the caller's identity (see above) determines what it may see in the named metalake exactly as it would through the REST API. Note that a caller can now reach any metalake its credentials permit, so scope the credentials accordingly when that matters.
 

@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -67,10 +68,13 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       Pattern.compile(UNKNOWN_DATABASE_PATTERN_STRING);
 
   private static final String TABLE_NOT_EXIST_PATTERN_STRING =
-      ".*detailMessage = Unknown table '.*' in .*:.*";
+      ".*detailMessage = Unknown table (?:'[^']+'|\\S+) in \\S+.*";
 
   private static final Pattern TABLE_NOT_EXIST_PATTERN =
       Pattern.compile(TABLE_NOT_EXIST_PATTERN_STRING);
+
+  private static final Pattern DUPLICATED_ERROR_PREFIX_PATTERN =
+      Pattern.compile("^(errCode = \\d+, detailMessage = )\\1");
 
   private static final String DELETE_NON_EXISTING_PARTITION_STRING =
       ".*?detailMessage = Error in list of partitions to .*?";
@@ -93,29 +97,30 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
+    String message = removeDuplicatedErrorPrefix(se.getMessage());
     int errorCode = se.getErrorCode();
     if (errorCode == CODE_OTHER) {
-      errorCode = getErrorCodeFromMessage(se.getMessage());
+      errorCode = getErrorCodeFromMessage(message);
     }
 
     switch (errorCode) {
       case CODE_DATABASE_EXISTS:
-        return new SchemaAlreadyExistsException(se, se.getMessage());
+        return new SchemaAlreadyExistsException(se, message);
       case CODE_TABLE_EXISTS:
-        return new TableAlreadyExistsException(se, se.getMessage());
+        return new TableAlreadyExistsException(se, message);
       case CODE_DATABASE_NOT_EXISTS:
       case CODE_UNKNOWN_DATABASE:
-        return new NoSuchSchemaException(se, se.getMessage());
+        return new NoSuchSchemaException(se, message);
       case CODE_NO_SUCH_TABLE:
-        return new NoSuchTableException(se, se.getMessage());
+        return new NoSuchTableException(se, message);
       case CODE_UNAUTHORIZED:
-        return new UnauthorizedException(se, se.getMessage());
+        return new UnauthorizedException(se, message);
       case CODE_NO_SUCH_COLUMN:
-        return new NoSuchColumnException(se, se.getMessage());
+        return new NoSuchColumnException(se, message);
       case CODE_DELETE_NON_EXISTING_PARTITION:
-        return new NoSuchPartitionException(se, se.getMessage());
+        return new NoSuchPartitionException(se, message);
       case CODE_PARTITION_ALREADY_EXISTS:
-        return new PartitionAlreadyExistsException(se, se.getMessage());
+        return new PartitionAlreadyExistsException(se, message);
       case CODE_BUCKETS_AUTO_NOT_SUPPORTED:
         String bucketsAutoMessage =
             String.format(
@@ -123,19 +128,31 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
                     + "BUCKETS AUTO was introduced in Doris 1.2.2. "
                     + "Please either upgrade to Doris 1.2.2+ or specify a specific bucket number instead of AUTO. "
                     + "Original error: %s",
-                se.getMessage());
+                message);
         return new GravitinoRuntimeException(se, bucketsAutoMessage);
       default:
-        if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
-          return new ConnectionFailedException(se, se.getMessage());
+        if (message != null && message.contains("Access denied")) {
+          return new ConnectionFailedException(se, message);
         }
-        return new GravitinoRuntimeException(se, se.getMessage());
+        return new GravitinoRuntimeException(se, message);
     }
+  }
+
+  private static String removeDuplicatedErrorPrefix(String message) {
+    if (message == null) {
+      return null;
+    }
+    Matcher matcher = DUPLICATED_ERROR_PREFIX_PATTERN.matcher(message);
+    while (matcher.find()) {
+      message = matcher.replaceFirst("$1");
+      matcher = DUPLICATED_ERROR_PREFIX_PATTERN.matcher(message);
+    }
+    return message;
   }
 
   @VisibleForTesting
   static int getErrorCodeFromMessage(String message) {
-    if (message.isEmpty()) {
+    if (message == null || message.isEmpty()) {
       return CODE_OTHER;
     }
     if (DATABASE_ALREADY_EXISTS_PATTERN.matcher(message).matches()) {

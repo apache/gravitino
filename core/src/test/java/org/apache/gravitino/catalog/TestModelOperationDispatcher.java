@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
@@ -1294,5 +1295,71 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
       Map<String, String> expectedUserProps, Map<String, String> actual) {
     expectedUserProps.forEach((k, v) -> Assertions.assertEquals(v, actual.get(k)));
     Assertions.assertFalse(actual.containsKey(ID_KEY));
+  }
+
+  @Test
+  public void testRegisterModelRunsConcurrentlyWithRegisterModelOfAnotherModel() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own model node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_model_lock_1", "other_model"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              registerModelForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_model_lock_1", "model1")));
+    }
+  }
+
+  @Test
+  public void testRegisterModelWaitsForRegisterModelOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_model_lock_2", "model1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> registerModelForLockTest(ident));
+  }
+
+  @Test
+  public void testRegisterModelWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            registerModelForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_model_lock_3", "model1")));
+  }
+
+  @Test
+  public void testRegisterModelWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            registerModelForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_model_lock_4", "model1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+  }
+
+  private static Model registerModelForLockTest(NameIdentifier ident) {
+    return modelOperationDispatcher.registerModel(
+        ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
 }

@@ -224,6 +224,54 @@ public class TestBaseGVFSOperationsSecrets {
     assertFalse("******".equals(all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID)));
   }
 
+  @Test
+  public void testKeepsPlaintextAccessKeyIdFromRestProperties() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+
+    when(catalog.properties())
+        .thenReturn(
+            Map.of(
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "AKIATEST",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "******",
+                "s3-endpoint",
+                "http://s3.example.com"));
+    when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
+    when(catalogSecrets.getSecrets())
+        .thenReturn(Map.of(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "secret-from-getSecrets"));
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of());
+    when(schema.supportsSecrets()).thenReturn(null);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of());
+    when(fileset.supportsSecrets()).thenReturn(null);
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    Map<String, String> all =
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+
+    assertEquals("AKIATEST", all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals("secret-from-getSecrets", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertEquals("http://s3.example.com", all.get("s3-endpoint"));
+  }
+
   private static final class TestOps extends BaseGVFSOperations {
     private final GravitinoClient client;
 

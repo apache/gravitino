@@ -23,14 +23,22 @@ import static org.apache.gravitino.catalog.hive.HiveCatalog.SCHEMA_PROPERTIES_ME
 import static org.apache.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -40,6 +48,36 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveCatalog extends MiniHiveMetastoreService {
+
+  /** Catalog operations used to verify the conservative capability fallback for custom ops. */
+  public static class CustomCatalogOperations implements CatalogOperations {
+
+    @Override
+    public void initialize(
+        Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata) {}
+
+    @Override
+    public void close() throws IOException {}
+  }
+
+  /** Hive operations that record the context used to resolve the metastore version. */
+  public static class ClassLoaderCapturingHiveCatalogOperations extends HiveCatalogOperations {
+    private static ClassLoader initializationClassLoader;
+    private static int hiveVersionCalls;
+
+    @Override
+    public void initialize(
+        Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata) {
+      initializationClassLoader = Thread.currentThread().getContextClassLoader();
+    }
+
+    @Override
+    HiveVersion hiveVersion() {
+      hiveVersionCalls++;
+      return HiveVersion.HIVE3;
+    }
+  }
+
   public static final HasPropertyMetadata HIVE_PROPERTIES_METADATA =
       new HasPropertyMetadata() {
         @Override
@@ -105,6 +143,60 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
       Assertions.assertTrue(dbs.contains("default"));
       Assertions.assertTrue(dbs.contains(DB_NAME));
     }
+  }
+
+  @Test
+  void testCapabilityResolvedBeforeOps() {
+    // The capability is preloaded by the catalog manager before the operations are created, so
+    // it must be able to resolve the metastore version on its own.
+    HiveCatalog catalog = TestHiveTable.initHiveCatalog();
+    CapabilityResult notNull = catalog.capability().columnNotNull();
+    Assertions.assertFalse(notNull.supported());
+    Assertions.assertTrue(
+        notNull.unsupportedMessage().contains("HIVE2"), notNull.unsupportedMessage());
+    Assertions.assertFalse(catalog.capability().columnDefaultValue().supported());
+  }
+
+  @Test
+  void testCapabilityWithCustomOperations() {
+    HiveCatalog catalog =
+        TestHiveTable.initHiveCatalog(
+            ImmutableMap.of(
+                BaseCatalog.CATALOG_OPERATION_IMPL, CustomCatalogOperations.class.getName()));
+    CapabilityResult notNull = catalog.capability().columnNotNull();
+    Assertions.assertFalse(notNull.supported());
+    Assertions.assertTrue(
+        notNull.unsupportedMessage().contains("HIVE2"), notNull.unsupportedMessage());
+  }
+
+  @Test
+  void testCapabilityResolvesAndCachesVersionInCreationContext() {
+    ClassLoader original = Thread.currentThread().getContextClassLoader();
+    ClassLoader catalogClassLoader = new ClassLoader(original) {};
+    ClassLoaderCapturingHiveCatalogOperations.initializationClassLoader = null;
+    ClassLoaderCapturingHiveCatalogOperations.hiveVersionCalls = 0;
+
+    HiveCatalog catalog =
+        TestHiveTable.initHiveCatalog(
+            ImmutableMap.of(
+                BaseCatalog.CATALOG_OPERATION_IMPL,
+                ClassLoaderCapturingHiveCatalogOperations.class.getName()));
+    Capability capability;
+    try {
+      Thread.currentThread().setContextClassLoader(catalogClassLoader);
+      capability = catalog.capability();
+    } finally {
+      Thread.currentThread().setContextClassLoader(original);
+    }
+
+    Assertions.assertNull(ClassLoaderCapturingHiveCatalogOperations.initializationClassLoader);
+    Assertions.assertEquals(0, ClassLoaderCapturingHiveCatalogOperations.hiveVersionCalls);
+    Assertions.assertTrue(capability.columnNotNull().supported());
+    Assertions.assertSame(
+        catalogClassLoader, ClassLoaderCapturingHiveCatalogOperations.initializationClassLoader);
+    Assertions.assertEquals(1, ClassLoaderCapturingHiveCatalogOperations.hiveVersionCalls);
+    Assertions.assertTrue(capability.columnDefaultValue().supported());
+    Assertions.assertEquals(1, ClassLoaderCapturingHiveCatalogOperations.hiveVersionCalls);
   }
 
   @Test
