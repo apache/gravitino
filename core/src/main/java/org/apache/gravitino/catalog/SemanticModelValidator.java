@@ -53,8 +53,6 @@ final class SemanticModelValidator {
 
   private SemanticModelValidator() {}
 
-  // TODO(#12594): Validate source existence, columns, and authorization in the caller before
-  // invoking this definition-only validator.
   static void validateDefinition(@Nullable SemanticModelDefinition definition) {
     if (definition == null) {
       throw invalid("$", "definition must not be null");

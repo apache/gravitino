@@ -29,6 +29,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
@@ -36,6 +38,10 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -48,6 +54,7 @@ public class SemanticModelOperations {
   private static final Logger LOG = LoggerFactory.getLogger(SemanticModelOperations.class);
 
   private final SemanticModelDispatcher dispatcher;
+  private final SemanticModelSourceValidator sourceValidator;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -55,10 +62,13 @@ public class SemanticModelOperations {
    * Creates Semantic Model REST operations.
    *
    * @param dispatcher The Semantic Model dispatcher.
+   * @param sourceValidator The caller-facing source validator.
    */
   @Inject
-  public SemanticModelOperations(SemanticModelDispatcher dispatcher) {
+  public SemanticModelOperations(
+      SemanticModelDispatcher dispatcher, SemanticModelSourceValidator sourceValidator) {
     this.dispatcher = dispatcher;
+    this.sourceValidator = sourceValidator;
   }
 
   /**
@@ -74,10 +84,14 @@ public class SemanticModelOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-semantic-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-semantic-model", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.CREATE_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createSemanticModel(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       SemanticModelCreateRequest request) {
     String name = request == null ? "" : request.getName();
     LOG.info(
@@ -92,9 +106,11 @@ public class SemanticModelOperations {
             request.validate();
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, request.getName());
+            SemanticModelDefinition definition = request.toDefinition();
+            sourceValidator.validate(metalake, definition);
             SemanticModel semanticModel =
                 dispatcher.createSemanticModel(
-                    ident, request.getComment(), request.toDefinition(), request.getProperties());
+                    ident, request.getComment(), definition, request.getProperties());
             LOG.info(
                 "Semantic Model created: {}.{}.{}.{}",
                 metalake,
@@ -122,11 +138,16 @@ public class SemanticModelOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-semantic-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-semantic-model", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SEMANTIC_MODEL)
   public Response loadSemanticModel(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("semanticModel") String semanticModel) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("semanticModel") @AuthorizationMetadata(type = Entity.EntityType.SEMANTIC_MODEL)
+          String semanticModel) {
     LOG.info(
         "Received load Semantic Model request: {}.{}.{}.{}",
         metalake,

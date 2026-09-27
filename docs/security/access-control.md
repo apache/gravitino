@@ -307,6 +307,14 @@ authorization behavior.
 The native View rename operation changes only the name within the existing schema and remains
 owner-only; it does not accept a target schema.
 
+Creating a Semantic Model validates every dataset source as a Table or logical View under the
+caller's permissions, including cross-catalog references within the request's metalake. Each lookup
+requires visibility of that source type before loading metadata. Primary-key, unique-key, and
+relationship columns must exist in the resolved source. Source existence and column validation also
+run when authorization is disabled. Access denial returns `403`, missing sources or columns return
+`400`, and source catalog connection failures return `502`. These checks do not authorize queries
+against the referenced data or interpret SQL expressions.
+
 #### Metalake Objects
 
 | Object           | Create                  | Read                                   | Alter or delete | Use                                                |

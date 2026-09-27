@@ -24,6 +24,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -37,7 +38,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -49,9 +53,13 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.CustomExtension;
@@ -64,6 +72,7 @@ import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -87,6 +96,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   private final SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+  private final TableDispatcher tables = mock(TableDispatcher.class);
+  private final ViewDispatcher views = mock(ViewDispatcher.class);
+  private GravitinoAuthorizer sourceAuthorizer = new PassThroughAuthorizer();
   private final String metalake = "semantic_model_metalake";
   private final String catalog = "semantic_model_catalog";
   private final String schema = "semantic_model_schema";
@@ -109,6 +121,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(SemanticModelDispatcher.class).ranked(2);
+            bind(new SemanticModelSourceValidator(tables, views, () -> sourceAuthorizer))
+                .to(SemanticModelSourceValidator.class);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -117,7 +131,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @BeforeEach
   void resetDispatcher() {
-    reset(dispatcher);
+    reset(dispatcher, tables, views);
+    sourceAuthorizer = new PassThroughAuthorizer();
+    Table table = mock(Table.class);
+    Column column = mock(Column.class);
+    when(column.name()).thenReturn("order_id");
+    when(table.columns()).thenReturn(new Column[] {column});
+    when(tables.loadTable(any())).thenReturn(table);
   }
 
   @Test
@@ -133,6 +153,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     body.validate();
     Assertions.assertEquals("sales", body.getSemanticModel().name());
     Assertions.assertEquals("Sales definitions", body.getSemanticModel().comment());
+    verifyNoInteractions(tables, views);
     Assertions.assertEquals(semanticModel.definition(), body.getSemanticModel().definition());
     Assertions.assertEquals("orders", body.getSemanticModel().definition().datasets()[0].name());
     Assertions.assertEquals(
@@ -342,6 +363,57 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.UNSUPPORTED_OPERATION_CODE,
         UnsupportedOperationException.class.getSimpleName(),
         "catalog is not relational");
+  }
+
+  @Test
+  void testSourceValidationRunsWithAuthorizationDisabled() {
+    when(tables.loadTable(any())).thenThrow(new NoSuchTableException("missing table"));
+    when(views.loadView(any())).thenThrow(new NoSuchViewException("missing view"));
+    assertError(
+        post(semanticModelPath(), createRequest("sales", null, semanticModelDefinition())),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "does not exist");
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testMissingColumnWithAuthorizationDisabled() {
+    Table table = mock(Table.class);
+    when(table.columns()).thenReturn(new Column[0]);
+    when(tables.loadTable(any())).thenReturn(table);
+    assertError(
+        post(semanticModelPath(), createRequest("sales", null, semanticModelDefinition())),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "order_id");
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testDeniedSourceIsNotResolvedOrPersisted() {
+    sourceAuthorizer = mock(GravitinoAuthorizer.class);
+    assertError(
+        post(semanticModelPath(), createRequest("sales", null, semanticModelDefinition())),
+        Response.Status.FORBIDDEN,
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class.getSimpleName(),
+        "Not authorized");
+    verifyNoInteractions(tables, views, dispatcher);
+  }
+
+  @Test
+  void testSourceConnectionFailureIsBadGateway() {
+    when(tables.loadTable(any())).thenThrow(new ConnectionFailedException("source unavailable"));
+    assertError(
+        post(semanticModelPath(), createRequest("sales", null, semanticModelDefinition())),
+        Response.Status.BAD_GATEWAY,
+        ErrorConstants.CONNECTION_FAILED_CODE,
+        ConnectionFailedException.class.getSimpleName(),
+        "source unavailable");
+    verifyNoInteractions(views, dispatcher);
   }
 
   private SemanticModelCreateRequest createRequest(
