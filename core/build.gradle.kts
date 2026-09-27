@@ -1,4 +1,7 @@
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -101,6 +104,107 @@ configurations {
 
 artifacts {
   add("testArtifacts", testJar)
+}
+
+val coreDatabaseTestTag = "gravitino-core-database-test"
+val coreH2TestTag = "gravitino-core-h2-test"
+val coreMySQLTestTag = "gravitino-core-mysql-test"
+val corePostgreSQLTestTag = "gravitino-core-postgresql-test"
+val coreTestBackendProperty = "gravitino.core.test.backend"
+
+fun registerCoreTestTask(
+  taskName: String,
+  backend: String? = null
+) = tasks.register<Test>(taskName) {
+  group = "verification"
+  description =
+    if (backend == null) {
+      "Runs core unit tests."
+    } else {
+      "Runs core database tests against $backend."
+    }
+
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+
+  inputs.property("coreTestSuite", backend ?: "unit")
+  inputs.property("coreTestBackend", backend ?: "none")
+  inputs.property("includeDockerTaggedTests", backend != null)
+  reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$taskName"))
+  reports.html.outputLocation.set(
+    rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
+  )
+
+  extensions.configure<JacocoTaskExtension> {
+    destinationFile = layout.buildDirectory.file("jacoco/$taskName.exec").get().asFile
+  }
+
+  useJUnitPlatform {
+    if (backend == null) {
+      excludeTags(coreDatabaseTestTag, "gravitino-docker-test")
+    } else {
+      includeTags(coreDatabaseTestTag)
+      when (backend) {
+        "h2" -> excludeTags(coreMySQLTestTag, corePostgreSQLTestTag)
+        "mysql" -> excludeTags(coreH2TestTag, corePostgreSQLTestTag)
+        "postgresql" -> excludeTags(coreH2TestTag, coreMySQLTestTag)
+        else -> throw GradleException("Unsupported core test backend: $backend")
+      }
+    }
+  }
+
+  if (backend != null) {
+    systemProperty(coreTestBackendProperty, backend)
+    extensions.extraProperties["includeDockerTaggedTests"] = true
+
+    // Database tests mutate process-wide state and must remain sequential within each lane.
+    maxParallelForks = 1
+    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+
+    if (backend != "h2") {
+      doFirst {
+        if (rootProject.extra["dockerTest"] != true) {
+          throw GradleException(
+            "$path requires Docker; use -PskipDockerTests=false with Docker running."
+          )
+        }
+      }
+    }
+  }
+}
+
+registerCoreTestTask("coreUnitTest")
+registerCoreTestTask("coreH2Test", "h2")
+registerCoreTestTask("coreMySQLTest", "mysql")
+registerCoreTestTask("corePostgreSQLTest", "postgresql")
+
+val coreSuiteCoverage =
+  providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
+val coreSuiteTaskNames =
+  listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
+val coreSuiteExecutionData =
+  coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
+val validateCoreSuiteCoverage by tasks.registering {
+  inputs.files(coreSuiteExecutionData)
+
+  doLast {
+    val missingExecutionData =
+      coreSuiteExecutionData
+        .map { it.get().asFile }
+        .filterNot { it.isFile && it.length() > 0L }
+    if (missingExecutionData.isNotEmpty()) {
+      throw GradleException(
+        "Missing core JaCoCo execution data: ${missingExecutionData.joinToString()}"
+      )
+    }
+  }
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+  if (coreSuiteCoverage.get()) {
+    dependsOn(tasks.named("classes"), validateCoreSuiteCoverage)
+    executionData.setFrom(coreSuiteExecutionData)
+  }
 }
 
 tasks.test {

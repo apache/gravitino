@@ -85,6 +85,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Database-specific SQL syntax (MySQL ON DUPLICATE KEY vs PostgreSQL ON CONFLICT)
  * </ul>
  */
+@Tag("gravitino-core-database-test")
 @Tag("gravitino-docker-test")
 public class TestJdbcPartitionStatisticStorageIT {
 
@@ -95,6 +96,7 @@ public class TestJdbcPartitionStatisticStorageIT {
    * Abstract base class containing all test logic. Each database-specific test class extends this
    * and implements the database setup.
    */
+  @Tag("gravitino-core-database-test")
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
 
@@ -585,6 +587,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** MySQL-specific tests using Docker container. */
   @Nested
+  @Tag("gravitino-core-mysql-test")
   @Tag("gravitino-docker-test")
   static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -655,6 +658,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** PostgreSQL-specific tests using Docker container. */
   @Nested
+  @Tag("gravitino-core-postgresql-test")
   @Tag("gravitino-docker-test")
   static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -728,6 +732,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** H2-specific tests using embedded in-memory database. */
   @Nested
+  @Tag("gravitino-core-h2-test")
   static class H2Test extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final String H2_JDBC_URL =
