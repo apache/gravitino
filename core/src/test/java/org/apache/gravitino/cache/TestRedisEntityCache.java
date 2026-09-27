@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -45,8 +46,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
-import redis.clients.jedis.params.ScanParams;
-import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 /**
@@ -397,7 +396,35 @@ public class TestRedisEntityCache {
 
     verify(jedis).close();
     verify(jedis, never()).eval(any(byte[].class), anyList(), anyList());
-    verify(jedis, never()).scan(anyString(), any(ScanParams.class));
+    verify(jedis, never()).smembers(anyString());
+  }
+
+  @Test
+  void testMissRegistersTheMetalakeBeforeTheCallerLoads() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    Assertions.assertEquals(
+        Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
+
+    // Registered on the miss itself, so a clear that runs during the load finds this metalake.
+    verify(jedis).sadd("gravitino:metalakes", "m1");
+  }
+
+  @Test
+  void testRegistrationFailureFailsTheFollowingWriteClosed() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
+    when(jedis.sadd(anyString(), anyString())).thenThrow(new JedisConnectionException("down"));
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    Assertions.assertEquals(
+        Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
+    cache.put(CATALOG);
+
+    // An unregistered metalake could be missed by a clear, so the miss recorded no fences.
+    verify(jedis, times(1)).eval(any(byte[].class), anyList(), anyList());
   }
 
   @Test
@@ -423,14 +450,11 @@ public class TestRedisEntityCache {
 
   @Test
   @SuppressWarnings("unchecked")
-  void testClearRunsTheAtomicScriptOnEveryOwnedIndex() {
+  void testClearRunsTheAtomicScriptOnEveryRegisteredMetalake() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.scan(anyString(), any(ScanParams.class)))
-        .thenReturn(
-            new ScanResult<>(
-                ScanParams.SCAN_POINTER_START,
-                ImmutableList.of(
-                    "gravitino:{m1}:IDX", "gravitino:other:{m1}:IDX", "gravitino:{m2}:IDX")));
+    // The registry, not a keyspace scan, decides what clear touches: a metalake with fills in
+    // flight but no index yet is registered, and another namespace's keys are never seen.
+    when(jedis.smembers("gravitino:metalakes")).thenReturn(ImmutableSet.of("m1", "m2"));
     when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(0L);
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
@@ -439,25 +463,26 @@ public class TestRedisEntityCache {
     ArgumentCaptor<byte[]> scripts = ArgumentCaptor.forClass(byte[].class);
     ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
     ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
-    // The index of the other namespace shares this one as a prefix and is left alone.
     verify(jedis, times(2)).eval(scripts.capture(), keys.capture(), args.capture());
     Assertions.assertEquals(RedisEntityCache.CLEAR_SCRIPT, decode(scripts.getAllValues().get(0)));
     Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:IDX"), decode(keys.getAllValues().get(0)));
+        ImmutableSet.of("gravitino:{m1}:IDX", "gravitino:{m2}:IDX"),
+        ImmutableSet.of(
+            decode(keys.getAllValues().get(0)).get(0), decode(keys.getAllValues().get(1)).get(0)));
+    List<String> firstArgs = decode(args.getAllValues().get(0));
+    String metalake = firstArgs.get(0).equals("gravitino:{m1}:") ? "m1" : "m2";
     Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:", "gravitino:{m1}:F:m1", "7200000"),
-        decode(args.getAllValues().get(0)));
-    Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m2}:IDX"), decode(keys.getAllValues().get(1)));
+        ImmutableList.of(
+            "gravitino:{" + metalake + "}:",
+            "gravitino:{" + metalake + "}:F:" + metalake,
+            "7200000"),
+        firstArgs);
   }
 
   @Test
-  void testSizeReapsOneBatchPerIndex() {
+  void testSizeReapsOneBatchPerRegisteredMetalake() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.scan(anyString(), any(ScanParams.class)))
-        .thenReturn(
-            new ScanResult<>(
-                ScanParams.SCAN_POINTER_START, ImmutableList.of("gravitino:{m1}:IDX")));
+    when(jedis.smembers("gravitino:metalakes")).thenReturn(ImmutableSet.of("m1"));
     when(jedis.eval(any(byte[].class), anyList(), anyList()))
         .thenReturn(ImmutableList.of(2L, 2L, utf8("m1.c1:CATALOG")));
     when(jedis.zcard(eq("gravitino:{m1}:IDX"))).thenReturn(3L);

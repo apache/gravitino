@@ -236,3 +236,11 @@ tasks.clean {
 tasks.named<Jar>("sourcesJar") {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// :core's Redis entity cache brings Kryo 5 (com.esotericsoftware:kryo) onto this test classpath.
+// Flink bundles Kryo 2 under the group com.esotericsoftware.kryo with the same package names, and
+// its serializers break when the Kryo 5 classes win; only this module runs Flink jobs with :core
+// on the classpath, so keep Kryo 5 off it here.
+configurations.testRuntimeClasspath {
+  exclude(group = "com.esotericsoftware")
+}

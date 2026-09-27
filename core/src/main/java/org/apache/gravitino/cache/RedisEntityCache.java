@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -43,17 +42,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.params.ScanParams;
-import redis.clients.jedis.resps.ScanResult;
 
 /**
  * An {@link EntityCache} that keeps one copy of every cached entity in Redis, shared by all nodes
@@ -93,15 +88,21 @@ import redis.clients.jedis.resps.ScanResult;
  * a fill that is too old to be accepted anyway. Together these close both reuse sequences: a fence
  * that expires and is recreated, and a fence that was absent, set, and expired again.
  *
- * <p><b>Clear.</b> {@link #clear()} is atomic per metalake: one script moves the metalake's own
- * fence to a fresh generation, which rejects every fill in flight for that metalake, and deletes
- * the values and the index together, so a concurrent fill can never leave a value without its index
- * member. Fences are left in place and expire on their own.
+ * <p><b>Registry and clear.</b> A read miss registers its metalake in the namespace's registry set
+ * before the caller loads the entity, so every metalake with a fill in flight is registered, even
+ * one with nothing indexed yet. {@link #clear()} walks the registry and runs one script per
+ * metalake that moves the metalake's own fence to a fresh generation, which rejects every fill in
+ * flight for that metalake, and deletes the values and the index together, so a concurrent fill can
+ * never leave a value without its index member. A miss registered after the clear read the registry
+ * begins its load after the clear began, so what it fills is not older than the clear. Fences are
+ * left in place and expire on their own. {@link #size()} walks the registry too; nothing here scans
+ * the keyspace, so no operation depends on cluster topology.
  *
  * <p><b>Index reclamation.</b> Redis expires values on its own and leaves their index members
  * behind. A bounded reaper removes members whose value is gone, one batch per {@value
- * #REAP_EVERY_N_WRITES} writes into a metalake and one batch per index visited by {@link #size()},
- * checking absence and removing inside one script so it can never unindex a concurrent refill.
+ * #REAP_EVERY_N_WRITES} writes into a metalake and one batch per metalake visited by {@link
+ * #size()}, checking absence and removing inside one script so it can never unindex a concurrent
+ * refill.
  *
  * <p><b>Failure policy.</b> Reads and fills are optimizations: a Redis error or timeout makes them
  * a miss or a no-op. An invalidation is a correctness obligation: a failure is propagated as a
@@ -123,7 +124,6 @@ public class RedisEntityCache extends BaseEntityCache {
   @VisibleForTesting static final int REAP_BATCH = 256;
 
   private static final long FAILURE_LOG_INTERVAL_MS = 30_000L;
-  private static final int SCAN_BATCH = 500;
 
   /**
    * Reads a value, or on a miss the fences guarding a later fill. {@code KEYS[1]} is the value key;
@@ -186,11 +186,12 @@ public class RedisEntityCache extends BaseEntityCache {
           + "return removed\n";
 
   /**
-   * Clears one metalake atomically. {@code KEYS[1]} is the index key; {@code ARGV[1]} is the slot
-   * prefix, {@code ARGV[2]} the fence key of the metalake itself, {@code ARGV[3]} the fence TTL in
-   * milliseconds (0 for none). Moves the metalake fence to a fresh generation, so every fill in
-   * flight for the metalake is rejected, then deletes every indexed value and the index in the same
-   * script, so no fill can slip between them. Returns the number of values deleted.
+   * Clears one metalake atomically, whether or not it has an index yet. {@code KEYS[1]} is the
+   * index key; {@code ARGV[1]} is the slot prefix, {@code ARGV[2]} the fence key of the metalake
+   * itself, {@code ARGV[3]} the fence TTL in milliseconds (0 for none). Moves the metalake fence to
+   * a fresh generation, so every fill in flight for the metalake is rejected, then deletes every
+   * indexed value and the index in the same script, so no fill can slip between them. Returns the
+   * number of values deleted.
    */
   @VisibleForTesting
   static final String CLEAR_SCRIPT =
@@ -268,7 +269,9 @@ public class RedisEntityCache extends BaseEntityCache {
    */
   private volatile boolean closed;
 
-  /** Where the reaper resumes in each index, keyed by index key; absent means from the start. */
+  /**
+   * Where the reaper resumes in each metalake's index, keyed by metalake; absent means the start.
+   */
   private final ConcurrentMap<String, String> reapCursors = new ConcurrentHashMap<>();
 
   /**
@@ -341,9 +344,10 @@ public class RedisEntityCache extends BaseEntityCache {
   /**
    * {@inheritDoc}
    *
-   * <p>On a miss, records the fences guarding this key for the calling thread so that the write
-   * which follows can be rejected if a drop commits in between. A Redis failure is a miss that
-   * records nothing, so the write which follows it is not performed.
+   * <p>On a miss, records the fences guarding this key for the calling thread and registers the
+   * key's metalake, so that the write which follows can be rejected if a drop or a clear commits in
+   * between. A Redis failure is a miss that records nothing, so the write which follows it is not
+   * performed.
    */
   @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
@@ -384,6 +388,15 @@ public class RedisEntityCache extends BaseEntityCache {
     List<byte[]> epochs = Lists.newArrayListWithCapacity(fenceKeys.size());
     for (int i = 1; i < reply.size(); i++) {
       epochs.add((byte[]) reply.get(i));
+    }
+    // Registered before the caller loads, so a clear that runs from here on either sees this
+    // metalake and fences it, or read the registry before this load began.
+    try {
+      jedis.sadd(keyspace.registryKey(), RedisKeyspace.hashTag(ident));
+    } catch (JedisException e) {
+      pendingFences.get().remove(member);
+      logFailure("register", key, e);
+      return Optional.empty();
     }
     pendingFences.get().put(member, new FenceSnapshot(fenceKeys, epochs));
     return Optional.empty();
@@ -442,36 +455,29 @@ public class RedisEntityCache extends BaseEntityCache {
   /**
    * {@inheritDoc}
    *
-   * <p>Sums the index of every metalake, scanning each cluster primary, so the result is a
-   * point-in-time estimate. Each index visited also gets one reaper batch, so members left behind
-   * by expired values are reclaimed by repeated calls even on an idle cache.
+   * <p>Sums the index of every registered metalake, so the result is a point-in-time estimate. Each
+   * metalake visited also gets one reaper batch, so members left behind by expired values are
+   * reclaimed by repeated calls even on an idle cache.
    */
   @Override
   public long size() {
     checkOpen();
-    AtomicLong total = new AtomicLong();
-    forEachPrimary(
-        scanner ->
-            scan(
-                scanner,
-                keyspace.allIndexKeysPattern(),
-                indexKey -> {
-                  if (!keyspace.isIndexKey(indexKey)) {
-                    return;
-                  }
-                  reapBatch(indexKey);
-                  total.addAndGet(jedis.zcard(indexKey));
-                }));
-    return total.get();
+    long total = 0;
+    for (String metalake : registeredMetalakes()) {
+      reapBatch(metalake);
+      total += jedis.zcard(keyspace.indexKey(metalake));
+    }
+    return total;
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Clears one metalake at a time, each atomically with respect to the fills of that metalake:
-   * the metalake's own fence moves to a fresh generation, rejecting every fill in flight, and the
-   * values and index are deleted in the same script. Fences are left in place and expire on their
-   * own. Only keys owned by this namespace, matched exactly, are touched.
+   * <p>Clears one registered metalake at a time, each atomically with respect to the fills of that
+   * metalake: the metalake's own fence moves to a fresh generation, rejecting every fill in flight,
+   * and the values and index are deleted in the same script. Metalakes with fills in flight but
+   * nothing indexed yet are registered too, so they are fenced as well. Fences are left in place
+   * and expire on their own.
    */
   @Override
   public void clear() {
@@ -480,22 +486,14 @@ public class RedisEntityCache extends BaseEntityCache {
         () -> {
           pendingFences.get().clear();
           reapCursors.clear();
-          forEachPrimary(
-              scanner ->
-                  scan(
-                      scanner,
-                      keyspace.allIndexKeysPattern(),
-                      indexKey -> {
-                        if (!keyspace.isIndexKey(indexKey)) {
-                          return;
-                        }
-                        List<byte[]> args =
-                            ImmutableList.of(
-                                utf8(keyspace.slotPrefixOf(indexKey)),
-                                utf8(keyspace.metalakeFenceKeyOf(indexKey)),
-                                utf8(Long.toString(fenceTtlMs)));
-                        jedis.eval(clearScript, ImmutableList.of(utf8(indexKey)), args);
-                      }));
+          for (String metalake : registeredMetalakes()) {
+            List<byte[]> args =
+                ImmutableList.of(
+                    utf8(keyspace.slotPrefix(metalake)),
+                    utf8(keyspace.metalakeFenceKey(metalake)),
+                    utf8(Long.toString(fenceTtlMs)));
+            jedis.eval(clearScript, ImmutableList.of(utf8(keyspace.indexKey(metalake))), args);
+          }
         });
   }
 
@@ -553,7 +551,7 @@ public class RedisEntityCache extends BaseEntityCache {
         LOG.debug("Rejected write of {}: the entry was invalidated while it was loading", key);
       }
       if (writes.incrementAndGet() % REAP_EVERY_N_WRITES == 0) {
-        reapBatch(keyspace.indexKey(ident));
+        reapBatch(RedisKeyspace.hashTag(ident));
       }
     } catch (JedisException e) {
       logFailure("write", key, e);
@@ -634,12 +632,12 @@ public class RedisEntityCache extends BaseEntityCache {
    */
   @VisibleForTesting
   long reapIndex(NameIdentifier metalake) {
-    String indexKey = keyspace.indexKey(metalake);
-    reapCursors.remove(indexKey);
+    String name = RedisKeyspace.hashTag(metalake);
+    reapCursors.remove(name);
     long removed = 0;
     do {
-      removed += reapBatch(indexKey);
-    } while (reapCursors.containsKey(indexKey));
+      removed += reapBatch(name);
+    } while (reapCursors.containsKey(name));
     return removed;
   }
 
@@ -698,11 +696,16 @@ public class RedisEntityCache extends BaseEntityCache {
   /** Fails fast if Redis cannot be reached, so a misconfiguration never degrades silently. */
   private void probe(String address) {
     try {
-      jedis.exists(keyspace.allIndexKeysPattern());
+      jedis.exists(keyspace.registryKey());
     } catch (JedisException e) {
       jedis.close();
       throw new IllegalStateException("Cannot reach the Redis entity cache at " + address, e);
     }
+  }
+
+  /** The metalakes this namespace has ever missed on; a Redis failure is propagated. */
+  private Set<String> registeredMetalakes() {
+    return jedis.smembers(keyspace.registryKey());
   }
 
   /** Discards an entry atomically, and only if it still holds the bytes that were read. */
@@ -718,66 +721,35 @@ public class RedisEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Runs one reaper batch over an index, resuming where the previous batch stopped. The cursor is
-   * dropped once the index has been examined end to end, so the next batch starts over.
+   * Runs one reaper batch over a metalake's index, resuming where the previous batch stopped. The
+   * cursor is dropped once the index has been examined end to end, so the next batch starts over.
    *
    * @return the number of index members removed, 0 on a Redis failure
    */
-  private long reapBatch(String indexKey) {
-    String cursor = reapCursors.getOrDefault(indexKey, "");
+  private long reapBatch(String metalake) {
+    String indexKey = keyspace.indexKey(metalake);
+    String cursor = reapCursors.getOrDefault(metalake, "");
     List<byte[]> args =
         ImmutableList.of(
-            utf8(keyspace.slotPrefixOf(indexKey)),
-            utf8(cursor),
-            utf8(Integer.toString(REAP_BATCH)));
+            utf8(keyspace.slotPrefix(metalake)), utf8(cursor), utf8(Integer.toString(REAP_BATCH)));
     try {
       List<?> reply = (List<?>) jedis.eval(reapScript, ImmutableList.of(utf8(indexKey)), args);
       long removed = (Long) reply.get(0);
       long examined = (Long) reply.get(1);
       if (examined < REAP_BATCH) {
-        reapCursors.remove(indexKey);
+        reapCursors.remove(metalake);
       } else {
-        reapCursors.put(indexKey, new String((byte[]) reply.get(2), StandardCharsets.UTF_8));
+        reapCursors.put(metalake, new String((byte[]) reply.get(2), StandardCharsets.UTF_8));
       }
       if (removed > 0) {
         LOG.debug("Reclaimed {} index members of expired values from {}", removed, indexKey);
       }
       return removed;
     } catch (JedisException e) {
-      reapCursors.remove(indexKey);
+      reapCursors.remove(metalake);
       LOG.debug("Index reclamation of {} failed; it resumes on a later write", indexKey, e);
       return 0;
     }
-  }
-
-  /**
-   * Runs an action with a scanner over the standalone server, or over every primary of the cluster.
-   * Replicas are skipped: a key they report would then be operated on through the cluster client,
-   * which routes by slot and follows redirections, so a topology change during the scan costs at
-   * most a retried command.
-   */
-  private void forEachPrimary(Consumer<Scanner> action) {
-    if (!(jedis instanceof JedisCluster)) {
-      action.accept(jedis::scan);
-      return;
-    }
-    for (ConnectionPool pool : ((JedisCluster) jedis).getClusterNodes().values()) {
-      try (Jedis node = new Jedis(pool.getResource())) {
-        if (node.info("replication").contains("role:master")) {
-          action.accept(node::scan);
-        }
-      }
-    }
-  }
-
-  private static void scan(Scanner scanner, String pattern, Consumer<String> onKey) {
-    ScanParams params = new ScanParams().match(pattern).count(SCAN_BATCH);
-    String cursor = ScanParams.SCAN_POINTER_START;
-    do {
-      ScanResult<String> result = scanner.scan(cursor, params);
-      result.getResult().forEach(onKey);
-      cursor = result.getCursor();
-    } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
   }
 
   private void logFailure(String operation, EntityCacheKey key, JedisException e) {
@@ -830,11 +802,5 @@ public class RedisEntityCache extends BaseEntityCache {
     private long ageMs() {
       return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - takenAtNanos);
     }
-  }
-
-  /** A {@code SCAN} over one server: the standalone server or one cluster primary. */
-  @FunctionalInterface
-  private interface Scanner {
-    ScanResult<String> scan(String cursor, ScanParams params);
   }
 }

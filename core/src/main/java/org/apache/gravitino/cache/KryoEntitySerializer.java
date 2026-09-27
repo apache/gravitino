@@ -32,7 +32,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
@@ -64,6 +72,18 @@ import org.objenesis.strategy.StdInstantiatorStrategy;
  * discards the entry.
  */
 class KryoEntitySerializer {
+
+  /**
+   * The JDK's unmodifiable wrappers keep their delegate in a field the java.base module does not
+   * open to reflection, so a field serializer rebuilds them with that field null. They are rebuilt
+   * from their contents instead; the wrapper classes are private, so they are obtained from
+   * instances. Every wrapper extends one of these two.
+   */
+  private static final Class<?> UNMODIFIABLE_MAP_CLASS =
+      Collections.unmodifiableMap(new HashMap<>()).getClass();
+
+  private static final Class<?> UNMODIFIABLE_COLLECTION_CLASS =
+      Collections.unmodifiableCollection(new ArrayList<>()).getClass();
 
   private static final int INITIAL_BUFFER_SIZE = 1024;
   private static final int POOL_SIZE = 32;
@@ -134,6 +154,9 @@ class KryoEntitySerializer {
     kryo.addDefaultSerializer(ImmutableList.class, new ImmutableListSerializer());
     kryo.addDefaultSerializer(ImmutableSet.class, new ImmutableSetSerializer());
     kryo.addDefaultSerializer(ImmutableMap.class, new ImmutableMapSerializer());
+    kryo.addDefaultSerializer(UNMODIFIABLE_MAP_CLASS, new UnmodifiableMapSerializer());
+    kryo.addDefaultSerializer(
+        UNMODIFIABLE_COLLECTION_CLASS, new UnmodifiableCollectionSerializer());
     kryo.register(
         Column.DEFAULT_VALUE_NOT_SET.getClass(),
         new SingletonSerializer<>(Column.DEFAULT_VALUE_NOT_SET),
@@ -258,6 +281,75 @@ class KryoEntitySerializer {
         builder.put(key, value);
       }
       return builder.build();
+    }
+  }
+  /** Rebuilds a {@code Collections.unmodifiableMap} wrapper from its entries. */
+  private static final class UnmodifiableMapSerializer extends Serializer<Map<?, ?>> {
+    UnmodifiableMapSerializer() {
+      super(false, true);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, Map<?, ?> map) {
+      output.writeVarInt(map.size(), true);
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        kryo.writeClassAndObject(output, entry.getKey());
+        kryo.writeClassAndObject(output, entry.getValue());
+      }
+    }
+
+    @Override
+    public Map<?, ?> read(Kryo kryo, Input input, Class<? extends Map<?, ?>> clazz) {
+      int size = input.readVarInt(true);
+      Map<Object, Object> map = new LinkedHashMap<>(Math.max(16, size * 2));
+      for (int i = 0; i < size; i++) {
+        Object key = kryo.readClassAndObject(input);
+        Object value = kryo.readClassAndObject(input);
+        map.put(key, value);
+      }
+      return Collections.unmodifiableMap(map);
+    }
+  }
+
+  /**
+   * Rebuilds a {@code Collections.unmodifiableList}, {@code unmodifiableSet} or {@code
+   * unmodifiableCollection} wrapper from its elements, keeping which of the three it was.
+   */
+  private static final class UnmodifiableCollectionSerializer extends Serializer<Collection<?>> {
+    private static final byte LIST = 0;
+    private static final byte SET = 1;
+    private static final byte COLLECTION = 2;
+
+    UnmodifiableCollectionSerializer() {
+      super(false, true);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, Collection<?> collection) {
+      output.writeByte(
+          collection instanceof List ? LIST : collection instanceof Set ? SET : COLLECTION);
+      output.writeVarInt(collection.size(), true);
+      for (Object element : collection) {
+        kryo.writeClassAndObject(output, element);
+      }
+    }
+
+    @Override
+    public Collection<?> read(Kryo kryo, Input input, Class<? extends Collection<?>> clazz) {
+      byte kind = input.readByte();
+      int size = input.readVarInt(true);
+      Collection<Object> elements =
+          kind == SET ? new LinkedHashSet<>(Math.max(16, size * 2)) : new ArrayList<>(size);
+      for (int i = 0; i < size; i++) {
+        elements.add(kryo.readClassAndObject(input));
+      }
+      if (kind == LIST) {
+        return Collections.unmodifiableList((List<Object>) elements);
+      }
+      if (kind == SET) {
+        return Collections.unmodifiableSet((Set<Object>) elements);
+      }
+      return Collections.unmodifiableCollection(elements);
     }
   }
 }

@@ -121,9 +121,13 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
           .until(
               () -> {
                 try (JedisCluster probe = new JedisCluster(seeds)) {
-                  // Replicas join the slot map a moment after the cluster reports itself ready.
-                  return probe.getClusterNodes().size() >= nodesWanted
-                      && !probe.exists("gravitino:{probe}:F:_");
+                  if (probe.getClusterNodes().size() < nodesWanted
+                      || probe.exists("gravitino:{probe}:F:_")) {
+                    return false;
+                  }
+                  // Replicas join the slot map before they have finished taking the replica role,
+                  // so wait until every expected node reports it.
+                  return container == null || replicaCount(probe) >= MASTERS * REPLICAS_PER_MASTER;
                 }
               });
     } catch (RuntimeException e) {
@@ -159,6 +163,19 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
     return rawClient;
   }
 
+  /** How many nodes of the cluster currently report the replica role. */
+  private static int replicaCount(JedisCluster cluster) {
+    int replicas = 0;
+    for (ConnectionPool pool : cluster.getClusterNodes().values()) {
+      try (Jedis node = new Jedis(pool.getResource())) {
+        if (node.info("replication").contains("role:slave")) {
+          replicas++;
+        }
+      }
+    }
+    return replicas;
+  }
+
   /** Whether a TCP connection to the address succeeds within the timeout, retrying meanwhile. */
   private static boolean reachable(String host, int port, long timeoutMs) {
     long deadline = System.currentTimeMillis() + timeoutMs;
@@ -180,16 +197,9 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
 
   @Test
   void testClusterHasReplicasAndNodeWideOperationsSkipThem() {
-    // With replicas present, a node-wide scan that treated them as primaries would either count
-    // the same index twice or be redirected; size and clear must see each index exactly once.
-    int replicas = 0;
-    for (ConnectionPool pool : rawClient.getClusterNodes().values()) {
-      try (Jedis node = new Jedis(pool.getResource())) {
-        if (node.info("replication").contains("role:slave")) {
-          replicas++;
-        }
-      }
-    }
+    // With replicas present, every node-wide operation must still see each metalake exactly once
+    // and never be redirected, whichever node the client happens to talk to.
+    int replicas = replicaCount(rawClient);
     if (container != null) {
       Assertions.assertEquals(
           MASTERS * REPLICAS_PER_MASTER, replicas, "the container cluster must have replicas");

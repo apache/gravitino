@@ -544,6 +544,29 @@ public abstract class RedisEntityCacheTestBase {
   }
 
   @Test
+  void testClearOnAColdCacheRejectsAnInFlightFillOfAnUnindexedMetalake() {
+    RedisEntityCache nodeA = newNode();
+    RedisEntityCache nodeB = newNode();
+    TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
+    NameIdentifier ident = oldTable.nameIdentifier();
+    Assertions.assertEquals(0, nodeA.size());
+
+    // Nothing of m1 is indexed anywhere. Node B misses and starts loading the old row; node A
+    // clears while there is no index for m1 that a keyspace scan could have found.
+    Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
+    nodeA.clear();
+    nodeB.put(oldTable);
+
+    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
+    Assertions.assertEquals(ImmutableList.of(), valueKeys());
+    // A fresh miss after the clear loads and fills normally.
+    load(nodeB, table("m1", "c1", "s1", "t1", "new"));
+    Assertions.assertEquals(
+        "new",
+        get(nodeA, ident, Entity.EntityType.TABLE).map(TableEntity.class::cast).get().comment());
+  }
+
+  @Test
   void testExpiredIndexMembersAreReclaimedAndRefillsSurvive() {
     RedisEntityCache cache = newNode(200L);
     CatalogEntity c1 = catalog("m1", "c1");

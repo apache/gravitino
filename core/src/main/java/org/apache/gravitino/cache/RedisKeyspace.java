@@ -38,6 +38,7 @@ import org.apache.gravitino.Namespace;
  *   <tr><td>Fence</td><td>{@code <ns>:{<metalake>}:F:<identifier>}</td><td>string (generation)</td></tr>
  *   <tr><td>Generation</td><td>{@code <ns>:{<metalake>}:G}</td><td>string (counter)</td></tr>
  *   <tr><td>Index</td><td>{@code <ns>:{<metalake>}:IDX}</td><td>sorted set, all scores 0</td></tr>
+ *   <tr><td>Registry</td><td>{@code <ns>:metalakes}</td><td>set of metalake names</td></tr>
  * </table>
  *
  * <p>The {@code {<metalake>}} segment is a Redis Cluster hash tag holding the first level of the
@@ -54,10 +55,14 @@ import org.apache.gravitino.Namespace;
  * values it observed before it loaded the entity, so a load that began before a drop anywhere above
  * it cannot refill the key afterwards.
  *
+ * <p>The registry names every metalake a read of this namespace ever missed on, recorded before the
+ * load that follows the miss begins. It is the only key that carries no hash tag, so it lives in a
+ * slot of its own and is touched only by single-key commands. Namespace-wide operations walk it
+ * instead of scanning the keyspace, which is why they see metalakes with fills in flight but
+ * nothing indexed yet, and why one namespace can never touch another's keys.
+ *
  * <p>The namespace is restricted to letters, digits and {@code . _ - :} so that it can never carry
- * a hash tag or a {@code SCAN} glob metacharacter, and every pattern matches the colon and opening
- * brace that always follow it, so the namespace {@code a} never matches keys of the namespace
- * {@code a:b}.
+ * a hash tag.
  */
 final class RedisKeyspace {
 
@@ -74,6 +79,7 @@ final class RedisKeyspace {
   private static final String FENCE_MARKER = "F:";
   private static final String GENERATION_NAME = "G";
   private static final String INDEX_NAME = "IDX";
+  private static final String REGISTRY_NAME = "metalakes";
   private static final String TAG_OPEN = ":{";
   private static final String TAG_CLOSE = "}:";
 
@@ -96,13 +102,27 @@ final class RedisKeyspace {
     return key.toString();
   }
 
+  /** The set of metalake names this namespace has missed on: {@code <ns>:metalakes}. */
+  String registryKey() {
+    return namespace + ":" + REGISTRY_NAME;
+  }
+
   /** Prefix shared by every key of the identifier's metalake: {@code <ns>:{<metalake>}:}. */
   String slotPrefix(NameIdentifier ident) {
-    return namespace + TAG_OPEN + hashTag(ident) + TAG_CLOSE;
+    return slotPrefix(hashTag(ident));
+  }
+
+  /** Prefix shared by every key of the named metalake: {@code <ns>:{<metalake>}:}. */
+  String slotPrefix(String metalake) {
+    return namespace + TAG_OPEN + metalake + TAG_CLOSE;
   }
 
   String indexKey(NameIdentifier ident) {
-    return slotPrefix(ident) + INDEX_NAME;
+    return indexKey(hashTag(ident));
+  }
+
+  String indexKey(String metalake) {
+    return slotPrefix(metalake) + INDEX_NAME;
   }
 
   String valueKey(EntityCacheKey key) {
@@ -124,42 +144,9 @@ final class RedisKeyspace {
     return slotPrefix(ident) + FENCE_MARKER + identifierPath;
   }
 
-  /**
-   * Glob pattern matching every index key this namespace writes, for {@code SCAN}. Anchored on the
-   * colon and opening brace that follow the namespace, so a longer namespace sharing this one as a
-   * prefix does not match.
-   */
-  String allIndexKeysPattern() {
-    return globEscape(namespace) + TAG_OPEN + "*" + TAG_CLOSE + INDEX_NAME;
-  }
-
-  /** Whether a key returned by {@code SCAN} belongs to this namespace, checked exactly. */
-  boolean ownsKey(String key) {
-    return key != null
-        && key.startsWith(namespace + TAG_OPEN)
-        && key.indexOf(TAG_CLOSE, namespace.length() + TAG_OPEN.length()) > 0;
-  }
-
-  /** Whether a key this namespace owns is an index key. */
-  boolean isIndexKey(String key) {
-    return ownsKey(key) && key.endsWith(TAG_CLOSE + INDEX_NAME);
-  }
-
-  /** The slot prefix, {@code <ns>:{<metalake>}:}, of a key this namespace owns. */
-  String slotPrefixOf(String key) {
-    Preconditions.checkArgument(
-        ownsKey(key), "key %s is not owned by namespace %s", key, namespace);
-    int end = key.indexOf(TAG_CLOSE, namespace.length() + TAG_OPEN.length());
-    return key.substring(0, end + TAG_CLOSE.length());
-  }
-
-  /** The fence key of the metalake itself for a key this namespace owns. */
-  String metalakeFenceKeyOf(String key) {
-    String slotPrefix = slotPrefixOf(key);
-    String metalake =
-        slotPrefix.substring(
-            namespace.length() + TAG_OPEN.length(), slotPrefix.length() - TAG_CLOSE.length());
-    return slotPrefix + FENCE_MARKER + metalake;
+  /** The fence key of the named metalake itself, which every fill under it checks. */
+  String metalakeFenceKey(String metalake) {
+    return slotPrefix(metalake) + FENCE_MARKER + metalake;
   }
 
   /**
@@ -213,18 +200,5 @@ final class RedisKeyspace {
       prefixes.add(identifier + schemaSeparator);
     }
     return prefixes;
-  }
-
-  /** Escapes the {@code SCAN} glob metacharacters, a second line of defense behind the pattern. */
-  static String globEscape(String literal) {
-    StringBuilder escaped = new StringBuilder(literal.length());
-    for (int i = 0; i < literal.length(); i++) {
-      char c = literal.charAt(i);
-      if (c == '*' || c == '?' || c == '[' || c == ']' || c == '\\') {
-        escaped.append('\\');
-      }
-      escaped.append(c);
-    }
-    return escaped.toString();
   }
 }
