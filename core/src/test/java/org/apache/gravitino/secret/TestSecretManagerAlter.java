@@ -208,6 +208,19 @@ public class TestSecretManagerAlter {
     }
   }
 
+  @Test
+  void testIsWriteThroughUrnRejectsOutOfRangeEntityId() {
+    // buildWriteThrough stores the entity id as a long, so a three-segment URN whose entity type
+    // is a Gravitino type but whose id is outside the long range is an external reference a
+    // conforming provider may emit, not an owned write-through URN. A digits-only id check would
+    // misclassify it and delete it on drop.
+    String outOfRange = "urn:gravitino-secret:memory:catalog:9223372036854775808:owned-key";
+    Assertions.assertFalse(SecretPropertyUtils.isWriteThroughUrn("owned-key", outOfRange));
+    // The same shape with a long-range id is an owned write-through URN.
+    String inRange = "urn:gravitino-secret:memory:catalog:12:owned-key";
+    Assertions.assertTrue(SecretPropertyUtils.isWriteThroughUrn("owned-key", inRange));
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

@@ -290,9 +290,21 @@ public final class SecretPropertyUtils {
       List<String> segments = urn.identifierSegments();
       return segments.size() == 3
           && WRITE_THROUGH_ENTITY_TYPES.contains(segments.get(0))
-          && segments.get(1).chars().allMatch(Character::isDigit)
+          && isWriteThroughEntityId(segments.get(1))
           && propertyKey.equals(segments.get(2));
     } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  // A write-through URN carries the entity id as a long (SecretUrn.buildWriteThrough formats
+  // String.valueOf(long)), so accept the segment only when it parses as a long. A digits-only
+  // check would also accept out-of-range values a provider's external reference could carry.
+  private static boolean isWriteThroughEntityId(String segment) {
+    try {
+      Long.parseLong(segment);
+      return true;
+    } catch (NumberFormatException e) {
       return false;
     }
   }
