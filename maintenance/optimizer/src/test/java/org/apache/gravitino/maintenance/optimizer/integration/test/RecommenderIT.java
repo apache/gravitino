@@ -37,8 +37,11 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.Recommender;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoOrphanFileRemovalJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -67,6 +70,11 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
             + CompactionStrategyHandler.NAME
             + ".className",
         CompactionStrategyHandler.class.getName(),
+        OptimizerConfig.OPTIMIZER_PREFIX
+            + "strategyHandler."
+            + OrphanFileRemovalStrategyHandler.NAME
+            + ".className",
+        OrphanFileRemovalStrategyHandler.class.getName(),
         OptimizerConfig.JOB_SUBMITTER_CONFIG.getKey(),
         RecordingJobSubmitterForIT.NAME,
         RecordingJobSubmitterForIT.SESSION_ID_KEY,
@@ -83,6 +91,47 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
   void closeResources() throws Exception {
     if (statisticsUpdater != null) {
       statisticsUpdater.close();
+    }
+  }
+
+  @Test
+  void testOrphanCleanupPolicyThroughRestAndTags() throws Exception {
+    String tableName = "orphan_cleanup_partitioned";
+    String policyName = "orphan_cleanup_policy";
+    createPartitionTable(tableName);
+    metalakeClient.createPolicy(
+        policyName,
+        "system_iceberg_orphan_file_removal",
+        "cleanup",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(3, null, true));
+    createTagForPolicy(policyName);
+    associatePolicyTagToTable(policyName, tableName);
+    try (Recommender recommender = new Recommender(optimizerEnv)) {
+      List<JobExecutionContext> jobs =
+          recommendForOneStrategy(recommender, List.of(getTableIdentifier(tableName)), policyName);
+      Assertions.assertEquals(1, jobs.size());
+      Assertions.assertEquals("builtin-iceberg-remove-orphan-files", jobs.get(0).jobTemplateName());
+      Map<String, String> config =
+          new GravitinoOrphanFileRemovalJobAdapter().jobConfig(jobs.get(0));
+      Assertions.assertEquals(TEST_SCHEMA + "." + tableName, config.get("table_identifier"));
+      Assertions.assertEquals("true", config.get("dry_run"));
+      Assertions.assertEquals("", config.get("location"));
+    }
+    metalakeClient.disablePolicy(policyName);
+    RecordingJobSubmitterForIT.reset(SESSION_ID);
+    try (Recommender recommender = new Recommender(optimizerEnv)) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  recommender.submitForStrategyName(
+                      List.of(getTableIdentifier(tableName)), policyName));
+      Assertions.assertTrue(
+          exception.getMessage().contains("No identifiers matched strategy name"));
+      Assertions.assertTrue(RecordingJobSubmitterForIT.submittedContexts(SESSION_ID).isEmpty());
+    } finally {
+      RecordingJobSubmitterForIT.clear(SESSION_ID);
     }
   }
 

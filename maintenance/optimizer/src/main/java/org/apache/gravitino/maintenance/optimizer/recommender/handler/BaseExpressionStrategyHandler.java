@@ -127,7 +127,8 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean isPartitionTable() {
-    return tableMetadata.partitioning().length > 0;
+    return dataRequirements().contains(DataRequirement.PARTITION_STATISTICS)
+        && tableMetadata.partitioning().length > 0;
   }
 
   private boolean shouldTriggerForPartitionTable() {
