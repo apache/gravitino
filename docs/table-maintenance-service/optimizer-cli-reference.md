@@ -41,8 +41,8 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `--action-time` | Action timestamp in epoch seconds used as evaluation anchor. | `monitor-metrics` |
 | `--range-seconds` | Time window (seconds) for monitor evaluation. Default is `86400` (24h). | `monitor-metrics` |
 | `--partition-path` | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier. | `monitor-metrics`, `list-table-metrics` |
-| `--update-mode` | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default). | `submit-update-stats-job` |
-| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
+| `--update-mode` | Controls what built-in update job updates: `stats`, `manifests`, `metrics`, or `all` (default). | `submit-update-stats-job` |
+| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`manifests`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
 | `--spark-conf` | Flat JSON map of Spark and Iceberg catalog configs used by the job. | `submit-update-stats-job` |
 
 Global option:
@@ -270,6 +270,48 @@ ones they intentionally disable or leave at a documented default, rather than om
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
+
+### Manifest statistics by partition spec
+
+In `manifests`, `stats` and `all` modes, `builtin-iceberg-update-stats` also collects two table-level
+statistics, including for partitioned tables:
+
+| Statistic | Object entry for each decimal spec ID |
+| --- | --- |
+| `custom-manifest-number-by-spec` | Long manifest count |
+| `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
+
+Use `--update-mode manifests` for manifest-only collection. This avoids scanning data-file
+statistics and works after partition evolution, where the file-statistics path may reject null
+values for partition fields absent from older specs. `stats` and `all` also collect file statistics.
+
+Set `spec_id` in the job template's `jobConf` (`--spec-id` for the Spark main class) to collect
+an existing non-negative partition spec ID. Omission resolves the table's current default once.
+The collector reads data and delete manifests from one current Iceberg snapshot and filters by
+that resolved spec. A defined spec with no manifests, including a table without a snapshot,
+produces count `0` and average `0.0`. An unknown spec ID fails collection. Metrics-only mode
+does not collect these object-valued statistics.
+
+For example, collecting spec `1` can produce logical object values `{"0": 620, "1": 120}`
+and `{"0": 10485760.0, "1": 4194304.0}`. It replaces only spec `1`; spec `0` remains intact.
+REST requests wrap these objects in the existing `updates` map keyed by statistic name.
+
+Both measurements are sent in one atomic shallow merge through the table-statistics API
+(`PATCH /api/metalakes/{metalake}/objects/table/{fullName}/statistics`). The server reads,
+merges, and writes under the same table lock used by statistics readers, and persists the pair
+in one batch. Concurrent collectors using the same Gravitino server preserve each other's spec
+entries. This coordination uses the server's existing in-process tree lock, not a distributed
+lock across independent server instances. Route these collectors to the same server.
+`PUT` continues to replace complete statistic values. An older server rejects the new PATCH
+operation, and custom statistics updaters must implement `mergeTableStatistics`; there is no
+unsafe fallback to client-side read/modify/write.
+
+Consumers must read both objects from one table-statistics response and use the same resolved
+spec key in each. A missing object or key means collection is required, not zero manifests.
+`IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
+Retain the collector result's `specId()` through evaluation and submission; the two maps do not
+identify a previously resolved default spec. Do not resolve the default again after collection.
+Automatic manifest policy triggering is separate follow-up work.
 
 ## Rewrite Data Files
 

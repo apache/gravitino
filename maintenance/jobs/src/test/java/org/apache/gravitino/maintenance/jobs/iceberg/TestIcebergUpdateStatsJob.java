@@ -50,7 +50,9 @@ public class TestIcebergUpdateStatsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(10, template.arguments().size());
+    assertEquals(12, template.arguments().size());
+    assertTrue(template.arguments().contains("--spec-id"));
+    assertTrue(template.arguments().contains("{{spec_id}}"));
     assertTrue(template.arguments().contains("--catalog"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
     assertTrue(template.arguments().contains("--table"));
@@ -130,6 +132,9 @@ public class TestIcebergUpdateStatsJob {
     assertEquals(
         IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         IcebergUpdateStatsAndMetricsJob.parseUpdateMode(""));
+    assertEquals(
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.MANIFESTS,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode("manifests"));
     assertEquals(
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         IcebergUpdateStatsAndMetricsJob.parseUpdateMode("stats"));
