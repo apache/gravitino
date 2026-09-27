@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
@@ -77,6 +76,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
@@ -121,71 +121,50 @@ public class TestTableMetaService extends TestJDBCBackend {
     // Soft-delete ONE old version with an expired timeline directly, leaving the
     // current live version row (deleted_at = 0) in place.
     long expired = System.currentTimeMillis() - 10_000;
-    try (Connection connection =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .openSession(true)
-            .getConnection()) {
-      try (Statement st = connection.createStatement()) {
-        st.execute(
-            "UPDATE table_version_info SET deleted_at = "
-                + expired
-                + " WHERE table_id = "
-                + tableId
-                + " AND version = 1");
-      }
-    }
+    // Soft-delete ONE old version with an expired timeline, leaving the current live version
+    // row (deleted_at = 0) in place.
+    execSql(
+        "UPDATE table_version_info SET deleted_at = "
+            + expired
+            + " WHERE table_id = "
+            + tableId
+            + " AND version = 1");
+    // Seed a second LIVE version row (deleted_at = 0) for the same table: the legacy cleanup
+    // must remove only the expired tombstone, never live rows.
+    execSql(
+        "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES ("
+            + tableId
+            + ", 2, 0)");
 
-    // Seed a second LIVE version row (deleted_at = 0) for the same table: the
-    // legacy cleanup must remove only the expired tombstone, never live rows.
-    try (Connection c2 =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .openSession(true)
-            .getConnection()) {
-      try (Statement s2 = c2.createStatement()) {
-        s2.execute(
-            "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES ("
-                + tableId
-                + ", 2, 0)");
-      }
-    }
-
-    StringBuilder dumpRows = new StringBuilder();
-    try (Connection c5 =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .openSession(true)
-            .getConnection()) {
-      try (Statement s5 = c5.createStatement()) {
-        ResultSet r5 =
-            s5.executeQuery(
-                "SELECT version, deleted_at FROM table_version_info WHERE table_id = " + tableId);
-        while (r5.next()) {
-          dumpRows.append("v").append(r5.getLong(1)).append("/d").append(r5.getLong(2)).append(";");
-        }
-      }
-    }
     int deleted =
         TableMetaService.getInstance()
             .deleteTableVersionByLegacyTimeline(System.currentTimeMillis(), 100);
 
+    Assertions.assertEquals(1, deleted, "only the expired tombstone row is deleted");
     Assertions.assertEquals(
-        1, deleted, "only the expired tombstone row is deleted; ROWS " + dumpRows);
-    try (Connection c3 =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .openSession(true)
-            .getConnection()) {
-      try (Statement s3 = c3.createStatement()) {
-        ResultSet rs =
-            s3.executeQuery(
-                "SELECT COUNT(*) FROM table_version_info WHERE table_id = "
-                    + tableId
-                    + " AND deleted_at = 0");
-        Assertions.assertTrue(rs.next());
-        Assertions.assertEquals(1, rs.getLong(1), "the live version row must survive");
-      }
+        1,
+        queryCount(
+            "SELECT COUNT(*) FROM table_version_info WHERE table_id = "
+                + tableId
+                + " AND deleted_at = 0"),
+        "the live version row must survive");
+  }
+
+  private static void execSql(String sql) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement()) {
+      st.execute(sql);
+    }
+  }
+
+  private static long queryCount(String sql) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement();
+        ResultSet rs = st.executeQuery(sql)) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
     }
   }
 
