@@ -169,6 +169,24 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
 
+      - name: Test database concurrency build logic
+        id: buildsrc-tests
+        if: >-
+          matrix.shard == 'core-unit' &&
+          needs.changes.outputs.maintenance_module_only_changes != 'true'
+        run: ./gradlew -p buildSrc test
+
+      - name: Upload database concurrency build logic test report
+        if: ${{ failure() && steps.buildsrc-tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-database-buildsrc-test-report
+          path: |
+            buildSrc/build/reports/tests/test
+            buildSrc/build/test-results/test
+          if-no-files-found: warn
+          retention-days: 1
+
       - name: Test publish to local
         if: matrix.shard == 'others'
         run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
@@ -285,6 +303,13 @@ jobs:
           test -s "${junit_xml}"
           test -s "build/reports/tests/core/${CORE_TASK}/index.html"
           test -s "core/build/jacoco/${CORE_TASK}.exec"
+          if [ "${CORE_LANE}" != "unit" ]; then
+            shard_record="$(find \
+              "core/build/test-results/${CORE_TASK}/shard-telemetry" \
+              -type f -name 'worker-*.log' -size +0c -print -quit)"
+            test -n "${shard_record}"
+            test -s "${shard_record}"
+          fi
 
       - name: Upload core test evidence
         if: steps.core-lane.outcome == 'success'

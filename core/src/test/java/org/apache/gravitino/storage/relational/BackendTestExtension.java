@@ -56,6 +56,9 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
+import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 import org.junit.jupiter.api.extension.TestWatcher;
@@ -275,11 +278,13 @@ public class BackendTestExtension
       implements BeforeEachCallback,
           AfterEachCallback,
           LifecycleMethodExecutionExceptionHandler,
+          ParameterResolver,
           TestWatcher {
     private final String backendType;
     private final boolean reuseBackend;
     private final BackendFactory backendFactory;
     private BackendResource backendResource;
+    private DatabaseTestContext databaseTestContext;
     private boolean closeAfterEach;
 
     private BackendSetupCallback(
@@ -304,7 +309,8 @@ public class BackendTestExtension
         }
         backendResource = closeAfterEach ? newBackendResource() : getOrCreateClassBackend(context);
         backendResource.activate();
-        injectBackend(context, backendResource.backend);
+        databaseTestContext =
+            new DatabaseTestContext(backendType, backendResource.backend, isolation);
       } catch (Exception e) {
         cleanupAfterSetupFailure(e);
         throw e;
@@ -312,10 +318,30 @@ public class BackendTestExtension
     }
 
     @Override
+    public boolean supportsParameter(
+        ParameterContext parameterContext, ExtensionContext extensionContext) {
+      return parameterContext.getParameter().getType() == DatabaseTestContext.class;
+    }
+
+    @Override
+    public DatabaseTestContext resolveParameter(
+        ParameterContext parameterContext, ExtensionContext extensionContext) {
+      if (databaseTestContext == null) {
+        throw new ParameterResolutionException(
+            "DatabaseTestContext is unavailable before the database fixture starts");
+      }
+      return databaseTestContext;
+    }
+
+    @Override
     public void afterEach(ExtensionContext context) throws Exception {
-      if (closeAfterEach && backendResource != null) {
-        backendResource.close();
-        backendResource = null;
+      try {
+        if (closeAfterEach && backendResource != null) {
+          backendResource.close();
+          backendResource = null;
+        }
+      } finally {
+        databaseTestContext = null;
       }
     }
 
@@ -341,15 +367,6 @@ public class BackendTestExtension
         ExtensionContext context, Throwable throwable) throws Throwable {
       poisonSharedFixture();
       throw throwable;
-    }
-
-    private void injectBackend(ExtensionContext context, RelationalBackend backend) {
-      Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof TestJDBCBackend) {
-        LOG.info("Injecting {} backend into test instance", backendType);
-        ((TestJDBCBackend) testInstance).setBackend(backend);
-        ((TestJDBCBackend) testInstance).setBackendType(backendType);
-      }
     }
 
     private BackendResource getOrCreateClassBackend(ExtensionContext context) throws Exception {
@@ -403,6 +420,7 @@ public class BackendTestExtension
     }
 
     private void cleanupAfterSetupFailure(Exception failure) {
+      databaseTestContext = null;
       if (backendResource == null) {
         return;
       }

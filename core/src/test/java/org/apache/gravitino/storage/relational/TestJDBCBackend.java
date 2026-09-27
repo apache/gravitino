@@ -98,16 +98,16 @@ public abstract class TestJDBCBackend {
   protected String backendType;
   protected RelationalBackend backend;
 
-  public void setBackend(RelationalBackend backend) {
-    this.backend = backend;
-  }
-
-  public void setBackendType(String backendType) {
-    this.backendType = backendType;
-  }
-
+  /** Activates and resets the database fixture selected for the current test invocation. */
   @BeforeEach
-  public void init() throws SQLException {
+  public void init(DatabaseTestContext context) throws SQLException {
+    backend = context.backend();
+    backendType = context.backendType();
+    resetDatabase();
+  }
+
+  /** Clears data owned by the current database fixture. */
+  protected void resetDatabase() throws SQLException {
     truncateAllTables();
   }
 

@@ -1,7 +1,11 @@
+import com.sun.management.OperatingSystemMXBean
 import net.ltgt.gradle.errorprone.errorprone
+import org.apache.gravitino.testing.CoreDatabaseConcurrency
+import org.apache.gravitino.testing.CoreDatabaseConcurrency.DetectedCapacity
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import java.lang.management.ManagementFactory
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -129,6 +133,53 @@ val coreBackendTestTags =
     "postgresql" to "gravitino-core-postgresql-test"
   )
 val coreTestBackendProperty = "gravitino.core.test.backend"
+val coreDatabaseTaskNames =
+  setOf("coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
+val coreDatabaseActiveLaneCount =
+  gradle.startParameter.taskNames
+    .map { it.substringAfterLast(':') }
+    .distinct()
+    .count { it in coreDatabaseTaskNames }
+    .coerceAtLeast(1)
+val coreDatabaseTotalMemoryBytes =
+  runCatching {
+    (ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean)?.totalMemorySize ?: 0L
+  }.getOrDefault(0L)
+val coreDatabaseMemoryBasis =
+  if (coreDatabaseTotalMemoryBytes > 0) {
+    "jdk-total-memory-minus-configured-build-reserve"
+  } else {
+    "unavailable"
+  }
+val coreDatabaseMemoryConfiguration =
+  CoreDatabaseConcurrency.resolveMemoryConfiguration(
+    providers.gradleProperty(CoreDatabaseConcurrency.BUILD_MEMORY_RESERVE_PROPERTY).orNull,
+    providers
+      .environmentVariable(CoreDatabaseConcurrency.BUILD_MEMORY_RESERVE_ENVIRONMENT_VARIABLE)
+      .orNull,
+    providers.gradleProperty(CoreDatabaseConcurrency.FORK_MEMORY_OVERHEAD_PROPERTY).orNull,
+    providers
+      .environmentVariable(CoreDatabaseConcurrency.FORK_MEMORY_OVERHEAD_ENVIRONMENT_VARIABLE)
+      .orNull
+  )
+val coreDatabaseAvailableMemoryBytes =
+  CoreDatabaseConcurrency.availableMemoryForTestWorkers(
+    coreDatabaseTotalMemoryBytes,
+    coreDatabaseMemoryConfiguration.buildReserveBytes()
+  )
+val coreDatabaseDetectedCapacity =
+  DetectedCapacity(
+    Runtime.getRuntime().availableProcessors(),
+    coreDatabaseTotalMemoryBytes,
+    gradle.startParameter.maxWorkerCount,
+    coreDatabaseActiveLaneCount
+  )
+val coreDatabaseConcurrencyBudget =
+  CoreDatabaseConcurrency.rolloutBudget(coreDatabaseMemoryConfiguration)
+val macDockerConnectorFixedNetwork =
+  rootProject.extra[
+    CoreDatabaseConcurrency.MAC_DOCKER_CONNECTOR_FIXED_NETWORK_EXTRA
+  ] as? Boolean ?: false
 
 fun registerCoreTestTask(
   taskName: String,
@@ -176,12 +227,87 @@ fun registerCoreTestTask(
   }
 
   if (backend != null) {
+    val shardTelemetryDirectory =
+      layout.buildDirectory.dir("test-results/$taskName/shard-telemetry")
+    val laneMaximum =
+      CoreDatabaseConcurrency.laneMaximum(
+        backend != "h2",
+        macDockerConnectorFixedNetwork
+      )
+    val concurrencyResolution =
+      CoreDatabaseConcurrency.resolve(
+        providers.gradleProperty(CoreDatabaseConcurrency.FORKS_PROPERTY).orNull,
+        providers.environmentVariable(CoreDatabaseConcurrency.FORKS_ENVIRONMENT_VARIABLE).orNull,
+        coreDatabaseDetectedCapacity,
+        coreDatabaseConcurrencyBudget,
+        laneMaximum
+      )
+
     systemProperty(coreTestBackendProperty, backend)
     extensions.extraProperties["includeDockerTaggedTests"] = true
 
-    // Database tests mutate process-wide state and must remain sequential within each lane.
-    maxParallelForks = 1
+    // Each Gradle worker owns its database server. JUnit execution remains serial inside it.
+    maxParallelForks = concurrencyResolution.forks()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+    systemProperty(
+      "gravitino.core.database.shard.telemetry.directory",
+      shardTelemetryDirectory.get().asFile.absolutePath
+    )
+    inputs.property("coreDatabaseForks", concurrencyResolution.forks())
+    inputs.property("coreDatabaseActiveLanes", coreDatabaseActiveLaneCount)
+    outputs.dir(shardTelemetryDirectory)
+
+    doFirst {
+      project.delete(shardTelemetryDirectory)
+      logger.lifecycle(
+        "[CORE-DB-CONCURRENCY] task={} forks={} source={} limitingFactor={} " +
+          "safeMaximum={} allowedMaximum={} processors={} totalMemoryBytes={} " +
+          "availableTestMemoryBytes={} memoryBasis={} buildReserveBytes={} " +
+          "buildReserveSource={} memoryBytesPerFork={} testWorkerMaxHeapBytes={} " +
+          "forkOverheadBytes={} forkOverheadSource={} gradleMaxWorkers={} " +
+          "activeDatabaseLanes={} rolloutCap={} laneMaximum={} " +
+          "macDockerConnectorFixedNetwork={} junitParallel=false",
+        path,
+        concurrencyResolution.forks(),
+        concurrencyResolution.source(),
+        concurrencyResolution.limitingFactor(),
+        concurrencyResolution.safeMaximum(),
+        concurrencyResolution.allowedMaximum(),
+        coreDatabaseDetectedCapacity.processors(),
+        coreDatabaseTotalMemoryBytes,
+        coreDatabaseAvailableMemoryBytes,
+        coreDatabaseMemoryBasis,
+        coreDatabaseMemoryConfiguration.buildReserveBytes(),
+        coreDatabaseMemoryConfiguration.buildReserveSource(),
+        coreDatabaseConcurrencyBudget.memoryBytesPerFork(),
+        CoreDatabaseConcurrency.TEST_WORKER_MAX_HEAP_BYTES,
+        coreDatabaseMemoryConfiguration.forkOverheadBytes(),
+        coreDatabaseMemoryConfiguration.forkOverheadSource(),
+        coreDatabaseDetectedCapacity.gradleMaxWorkers(),
+        coreDatabaseDetectedCapacity.activeDatabaseLanes(),
+        coreDatabaseConcurrencyBudget.rolloutCap(),
+        laneMaximum,
+        macDockerConnectorFixedNetwork
+      )
+    }
+
+    doLast {
+      val shardRecords =
+        shardTelemetryDirectory
+          .get()
+          .asFile
+          .walkTopDown()
+          .filter { it.isFile && it.extension == "log" }
+          .flatMap { it.readLines().asSequence() }
+          .filter { it.startsWith("[CORE-DB-SHARD]") }
+          .sorted()
+          .toList()
+      if (shardRecords.isEmpty()) {
+        throw GradleException("The $backend core database lane emitted no shard telemetry.")
+      }
+      shardRecords.forEach { logger.lifecycle(it) }
+    }
 
     if (backend != "h2") {
       doFirst {

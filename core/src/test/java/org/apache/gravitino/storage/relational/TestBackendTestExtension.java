@@ -20,7 +20,10 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -32,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +48,9 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
+import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestWatcher;
 
@@ -56,7 +63,15 @@ class TestBackendTestExtension {
     TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
     extension.beforeAll(contexts.classContext);
 
-    runInvocation(extension, true, contexts.methodContext("first"));
+    ExtensionContext firstContext = contexts.methodContext("first");
+    Extension firstCallback = startInvocation(extension, true, firstContext);
+    DatabaseTestContext databaseContext =
+        (DatabaseTestContext)
+            ((ParameterResolver) firstCallback).resolveParameter(parameterContext(0), firstContext);
+    assertEquals("h2", databaseContext.backendType());
+    assertSame(factory.backends.get(0), databaseContext.backend());
+    assertEquals(DatabaseIsolation.RESETTABLE_NAMESPACE, databaseContext.isolation());
+    ((AfterEachCallback) firstCallback).afterEach(firstContext);
     runInvocation(extension, true, contexts.methodContext("second"));
 
     assertEquals(1, factory.backends.size());
@@ -272,8 +287,14 @@ class TestBackendTestExtension {
             .createInvocationContexts("testMethod", List.of("h2"), true)
             .findFirst()
             .orElseThrow();
+    ParameterResolver resolver = (ParameterResolver) context.getAdditionalExtensions().get(0);
 
     assertEquals("testMethod[H2 Backend]", context.getDisplayName(1));
+    assertTrue(resolver.supportsParameter(parameterContext(0), mock(ExtensionContext.class)));
+    assertFalse(resolver.supportsParameter(parameterContext(1), mock(ExtensionContext.class)));
+    assertThrows(
+        ParameterResolutionException.class,
+        () -> resolver.resolveParameter(parameterContext(0), mock(ExtensionContext.class)));
   }
 
   private static void runInvocation(
@@ -312,6 +333,22 @@ class TestBackendTestExtension {
     Extension callback = invocation.getAdditionalExtensions().get(0);
     ((BeforeEachCallback) callback).beforeEach(context);
     return callback;
+  }
+
+  private static ParameterContext parameterContext(int index) {
+    Parameter parameter;
+    try {
+      parameter =
+          index == 0
+              ? TestJDBCBackend.class.getDeclaredMethod("init", DatabaseTestContext.class)
+                  .getParameters()[0]
+              : Object.class.getDeclaredMethod("equals", Object.class).getParameters()[0];
+    } catch (NoSuchMethodException e) {
+      throw new AssertionError(e);
+    }
+    ParameterContext context = mock(ParameterContext.class);
+    when(context.getParameter()).thenReturn(parameter);
+    return context;
   }
 
   private static class CountingBackendFactory implements BackendTestExtension.BackendFactory {
