@@ -20,12 +20,16 @@ on:
         required: true
         description: 'run on embedded or deploy mode'
         type: string
+      shard:
+        required: true
+        description: 'Test shard defined in dev/ci/test-shards.sh'
+        type: string
 
 jobs:
   start-runner:
-    name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
+    name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}-${{ inputs.shard }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 90
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
@@ -58,7 +62,7 @@ jobs:
           wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
-      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
+      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}-${{ inputs.shard }})
         id: integrationTest
         run: |
           EXCLUDE_CONTRIB_TESTS=""
@@ -66,7 +70,10 @@ jobs:
             EXCLUDE_CONTRIB_TESTS="$EXCLUDE_CONTRIB_TESTS -x :catalogs-contrib:$module:test"
           done
 
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
+          shard_args_text="$(dev/ci/test-shards.sh backend-it "${{ inputs.shard }}")"
+          mapfile -t shard_args <<< "${shard_args_text}"
+
+          ./gradlew "${shard_args[@]}" -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
             -x :flink-connector:flink-common:test \
             -x :flink-connector:flink-1.18:test -x :flink-connector:flink-runtime-1.18:test \
@@ -85,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
+          name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}-${{ inputs.shard }}
           path: |
             build/reports
             iceberg/iceberg-rest-server/build/*.log
