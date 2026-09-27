@@ -36,7 +36,8 @@ class AIContextObject:
     Unknown JSON-compatible properties are exposed through
     :meth:`additional_properties` and are retained losslessly. Finite
     :class:`~decimal.Decimal` values retain their precision without conversion
-    to floating point.
+    to floating point. Equality and hashing treat floats and equivalent Decimals
+    as the same decimal value, distinct from booleans and integers.
     """
 
     def __init__(
@@ -220,4 +221,7 @@ def _freeze_json_value(value: Any) -> tuple:
         )
     if isinstance(value, list):
         return (list, tuple(_freeze_json_value(item) for item in value))
+    if isinstance(value, float):
+        # Use the JSON decimal representation, not the binary floating-point value.
+        return (Decimal, Decimal(str(value)))
     return (type(value), value)

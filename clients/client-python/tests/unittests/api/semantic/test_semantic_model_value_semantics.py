@@ -16,6 +16,7 @@
 # under the License.
 
 
+import json
 import unittest
 from decimal import Decimal, localcontext
 
@@ -182,3 +183,38 @@ class TestSemanticModelValueSemantics(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaisesRegex(IllegalArgumentException, "finite number"):
                     AIContextObject(additional_properties={"nested": [Decimal(value)]})
+
+    def test_float_decimal_json_round_trip_value_semantics(self):
+        for value in (2.5, 0.1, 1.0, -0.0, 1e-100, 1.2345678901234567):
+            with self.subTest(value=value), localcontext() as context:
+                context.prec = 6
+                original = AIContextObject(
+                    additional_properties={"nested": [{"value": value}]}
+                )
+                restored = AIContextObject(
+                    additional_properties=json.loads(
+                        json.dumps(original.additional_properties()),
+                        parse_float=Decimal,
+                    )
+                )
+                self.assertEqual(original, restored)
+                self.assertEqual(hash(original), hash(restored))
+                self.assertEqual("saved", {original: "saved"}[restored])
+                dataset = Dataset(
+                    "orders", NameIdentifier.of("catalog", "schema", "orders")
+                )
+                definition = SemanticModelDefinition(
+                    [dataset], ai_context=AIContext.of(original)
+                )
+                restored_definition = SemanticModelDefinition(
+                    [dataset], ai_context=AIContext.of(restored)
+                )
+                self.assertEqual(definition, restored_definition)
+                self.assertEqual(hash(definition), hash(restored_definition))
+                self.assertEqual("saved", {definition: "saved"}[restored_definition])
+        contexts = [
+            AIContextObject(additional_properties={"value": value})
+            for value in (True, 1, 1.0, Decimal("1.0"))
+        ]
+        self.assertEqual(3, len(set(contexts)))
+        self.assertEqual(contexts[2], contexts[3])
