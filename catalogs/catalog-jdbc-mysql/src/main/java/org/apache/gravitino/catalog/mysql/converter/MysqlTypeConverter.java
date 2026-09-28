@@ -26,6 +26,7 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
+  static final int MAX_DECIMAL_PRECISION = 38;
   static final String BIT = "bit";
   static final String TINYINT = "tinyint";
   static final String TINYINT_UNSIGNED = "tinyint unsigned";
@@ -91,7 +92,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
             .orElseGet(Types.TimestampType::withoutTimeZone);
       case DECIMAL_UNSIGNED:
       case DECIMAL:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        return toGravitinoDecimal(typeBean);
       case VARCHAR:
         return Types.VarCharType.of(typeBean.getColumnSize());
       case CHAR:
@@ -165,5 +166,18 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to MySQL type", type.simpleString()));
+  }
+
+  private static Type toGravitinoDecimal(JdbcTypeBean typeBean) {
+    int precision = typeBean.getColumnSize();
+    int scale = typeBean.getScale();
+    if (precision <= MAX_DECIMAL_PRECISION) {
+      return Types.DecimalType.of(precision, scale);
+    }
+
+    String unsignedSuffix =
+        DECIMAL_UNSIGNED.equalsIgnoreCase(typeBean.getTypeName()) ? " unsigned" : "";
+    return Types.ExternalType.of(
+        String.format("%s(%d,%d)%s", DECIMAL, precision, scale, unsignedSuffix));
   }
 }
