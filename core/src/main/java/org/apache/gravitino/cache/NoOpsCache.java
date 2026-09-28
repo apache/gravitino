@@ -27,7 +27,6 @@ import org.apache.gravitino.NameIdentifier;
 
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
-  private final SegmentedLock opLock = new SegmentedLock(1);
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
@@ -65,14 +64,14 @@ public class NoOpsCache extends BaseEntityCache {
   @Override
   public <E extends Exception> void withCacheLock(EntityCacheKey key, ThrowingRunnable<E> action)
       throws E {
-    opLock.withLockAndThrow(key, action);
+    action.run();
   }
 
   /** {@inheritDoc} */
   @Override
   public <T, E extends Exception> T withCacheLock(EntityCacheKey key, ThrowingSupplier<T, E> action)
       throws E {
-    return opLock.withLockAndThrow(key, action);
+    return action.get();
   }
 
   /** {@inheritDoc} */
