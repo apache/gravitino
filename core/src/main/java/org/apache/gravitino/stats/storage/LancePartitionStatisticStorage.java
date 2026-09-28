@@ -19,17 +19,9 @@
 package org.apache.gravitino.stats.storage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalCause;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -38,12 +30,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -75,13 +61,12 @@ import org.lance.Dataset;
 import org.lance.Fragment;
 import org.lance.FragmentMetadata;
 import org.lance.ReadOptions;
+import org.lance.Session;
 import org.lance.SourcedTransaction;
 import org.lance.WriteParams;
 import org.lance.ipc.LanceScanner;
 import org.lance.ipc.ScanOptions;
 import org.lance.operation.Append;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
@@ -97,8 +82,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final int DEFAULT_MAX_ROWS_PER_GROUP = 1000000; // 1M
   private static final String READ_BATCH_SIZE = "readBatchSize";
   private static final int DEFAULT_READ_BATCH_SIZE = 10000; // 10K
-  private static final String DATASET_CACHE_SIZE = "datasetCacheSize";
-  private static final int DEFAULT_DATASET_CACHE_SIZE = 0;
   private static final String METADATA_FILE_CACHE_SIZE = "metadataFileCacheSizeBytes";
   private static final long DEFAULT_METADATA_FILE_CACHE_SIZE = 100L * 1024; // 100KB
   private static final String INDEX_CACHE_SIZE = "indexCacheSizeBytes";
@@ -112,7 +95,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final String STATISTIC_VALUE_COLUMN = "statistic_value";
   private static final String AUDIT_INFO_COLUMN = "audit_info";
 
-  private final Optional<Cache<Long, DatasetHolder>> datasetCache;
+  private final Session session;
 
   private static final Schema SCHEMA =
       new Schema(
@@ -133,11 +116,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final long metadataFileCacheSize;
   private final long indexCacheSize;
   private final int maxStatisticsPerUpdate;
-  private final ScheduledThreadPoolExecutor scheduler;
 
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-
-  private static final Logger LOG = LoggerFactory.getLogger(LancePartitionStatisticStorage.class);
 
   public LancePartitionStatisticStorage(Map<String, String> properties) {
     this.allocator = new RootAllocator();
@@ -167,13 +147,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             properties.getOrDefault(READ_BATCH_SIZE, String.valueOf(DEFAULT_READ_BATCH_SIZE)));
     Preconditions.checkArgument(
         readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
-    int datasetCacheSize =
-        Integer.parseInt(
-            properties.getOrDefault(
-                DATASET_CACHE_SIZE, String.valueOf(DEFAULT_DATASET_CACHE_SIZE)));
-    Preconditions.checkArgument(
-        datasetCacheSize >= 0,
-        "Lance partition statistics storage datasetCacheSize must be greater than or equal to 0");
     this.metadataFileCacheSize =
         Long.parseLong(
             properties.getOrDefault(
@@ -197,32 +170,15 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         "Lance partition statistics storage maxStatisticsPerUpdate must be positive");
 
     this.properties = properties;
-    if (datasetCacheSize != 0) {
-      this.scheduler =
-          new ScheduledThreadPoolExecutor(
-              1, newDaemonThreadFactory("lance-partition-statistic-storage-cache-cleaner"));
-
-      this.datasetCache =
-          Optional.of(
-              Caffeine.newBuilder()
-                  .maximumSize(datasetCacheSize)
-                  .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .removalListener(
-                      (RemovalListener<Long, DatasetHolder>)
-                          (key, value, cause) -> {
-                            LOG.debug(
-                                "Removed Lance dataset cache entry, tableId={}, cause={}",
-                                key,
-                                cause);
-                            if (value != null && cause != RemovalCause.EXPLICIT) {
-                              closeDatasetHolder(value);
-                            }
-                          })
-                  .build());
-    } else {
-      this.datasetCache = Optional.empty();
-      this.scheduler = null;
-    }
+    // Share Lance's index and metadata caches across per-operation datasets through a single
+    // storage-scoped session. Each operation opens and closes its own short-lived dataset, so
+    // there is no cached dataset that a concurrent eviction could close underneath an in-flight
+    // scan.
+    this.session =
+        Session.builder()
+            .indexCacheSizeBytes(indexCacheSize)
+            .metadataCacheSizeBytes(metadataFileCacheSize)
+            .build();
   }
 
   @Override
@@ -302,7 +258,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     Dataset datasetRead = null;
     Dataset newDataset = null;
     try {
-      datasetRead = getDataset(tableId);
+      datasetRead = open(getFilePath(tableId));
       List<FragmentMetadata> fragmentMetas = createFragmentMetadata(tableId, updates);
 
       SourcedTransaction appendTxn =
@@ -312,23 +268,18 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               .transactionProperties(Collections.emptyMap())
               .build();
       newDataset = appendTxn.commit();
-
-      Dataset finalNewDataset = newDataset;
-      datasetCache.ifPresent(cache -> cache.put(tableId, new DatasetHolder(finalNewDataset)));
     } finally {
-      if (!datasetCache.isPresent()) {
-        if (datasetRead != null) {
-          datasetRead.close();
-        }
-        if (newDataset != null) {
-          newDataset.close();
-        }
+      if (datasetRead != null) {
+        datasetRead.close();
+      }
+      if (newDataset != null) {
+        newDataset.close();
       }
     }
   }
 
   private void dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
-    Dataset dataset = getDataset(tableId);
+    Dataset dataset = open(getFilePath(tableId));
     try {
       List<String> partitionSQLs = Lists.newArrayList();
       for (PartitionStatisticsDrop drop : drops) {
@@ -354,7 +305,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         dataset.delete(filterSQL);
       }
     } finally {
-      if (!datasetCache.isPresent() && dataset != null) {
+      if (dataset != null) {
         dataset.close();
       }
     }
@@ -362,25 +313,10 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   @Override
   public void close() throws IOException {
-    if (datasetCache.isPresent()) {
-      Cache<Long, DatasetHolder> cache = datasetCache.get();
-      cache.asMap().values().forEach(LancePartitionStatisticStorage::closeDatasetHolder);
-      cache.invalidateAll();
-      cache.cleanUp();
-    }
-
+    session.close();
     if (allocator != null) {
       allocator.close();
     }
-
-    if (scheduler != null) {
-      scheduler.shutdown();
-    }
-  }
-
-  @VisibleForTesting
-  Cache<Long, DatasetHolder> getDatasetCache() {
-    return datasetCache.orElse(null);
   }
 
   private String getFilePath(Long tableId) {
@@ -498,8 +434,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   private List<PersistedPartitionStatistics> listStatisticsImpl(
       Long tableId, String partitionFilter) {
-
-    return withDataset(tableId, dataset -> listStatisticsWith(dataset, tableId, partitionFilter));
+    return listStatisticsWith(open(getFilePath(tableId)), tableId, partitionFilter);
   }
 
   private List<PersistedPartitionStatistics> listStatisticsWith(
@@ -558,74 +493,9 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
-      if (!datasetCache.isPresent() && dataset != null) {
+      if (dataset != null) {
         dataset.close();
       }
-    }
-  }
-
-  private Dataset getDataset(Long tableId) {
-    AtomicBoolean newlyCreated = new AtomicBoolean(false);
-    return datasetCache
-        .map(
-            cache -> {
-              DatasetHolder holder =
-                  cache.get(
-                      tableId,
-                      id -> {
-                        newlyCreated.set(true);
-                        return new DatasetHolder(open(getFilePath(id)));
-                      });
-
-              // Ensure dataset uses the latest version
-              if (!newlyCreated.get()) {
-                holder.checkoutLatest();
-              }
-
-              return holder.getDataset();
-            })
-        .orElse(open(getFilePath(tableId)));
-  }
-
-  /**
-   * Runs a read over the cached dataset while pinning its holder against the cache's removal
-   * listener: a concurrent REPLACE/SIZE eviction must not close the dataset underneath an in-flight
-   * scan. The dataset still handed out is the pre-eviction snapshot, which is exactly what the
-   * reader borrowed.
-   */
-  private <R> R withDataset(Long tableId, Function<Dataset, R> reader) {
-    if (!datasetCache.isPresent()) {
-      return reader.apply(open(getFilePath(tableId)));
-    }
-    // Pin atomically with the lookup: compute() holds the entry's per-key lock, so a
-    // concurrent REPLACE eviction cannot run its removal listener between the lookup and
-    // readerBegins — that window would close the dataset underneath the borrow before the
-    // pin lands. The holder stays the pre-eviction snapshot, which is what the reader reads.
-    AtomicBoolean newlyPinned = new AtomicBoolean(false);
-    DatasetHolder holder =
-        datasetCache
-            .get()
-            .asMap()
-            .compute(
-                tableId,
-                (id, existing) -> {
-                  DatasetHolder h = existing;
-                  if (h == null) {
-                    newlyPinned.set(true);
-                    h = new DatasetHolder(open(getFilePath(id)));
-                  }
-                  h.readerBegins();
-                  return h;
-                });
-    try {
-      if (!newlyPinned.get()) {
-        // Mirrors the old getDataset behavior for cached holders: the scan must see the
-        // latest committed version, not the version pinned when the holder was created.
-        holder.checkoutLatest();
-      }
-      return reader.apply(holder.getDataset());
-    } finally {
-      holder.readerDone();
     }
   }
 
@@ -634,11 +504,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       return Dataset.open()
           .allocator(allocator)
           .uri(fileName)
-          .readOptions(
-              new ReadOptions.Builder()
-                  .setMetadataCacheSizeBytes(metadataFileCacheSize)
-                  .setIndexCacheSizeBytes(indexCacheSize)
-                  .build())
+          .readOptions(new ReadOptions.Builder().setSession(session).build())
           .build();
     } catch (IllegalArgumentException illegalArgumentException) {
       if (illegalArgumentException.getMessage().contains("was not found")) {
@@ -651,95 +517,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       } else {
         throw illegalArgumentException;
       }
-    }
-  }
-
-  private ThreadFactory newDaemonThreadFactory(String name) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
-  }
-
-  private static void closeDatasetHolder(DatasetHolder holder) {
-    try {
-      holder.close();
-    } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to close cached Lance dataset", e);
-    }
-  }
-
-  /**
-   * Package-private wrapper around a {@link Dataset} stored in the dataset cache. Exists solely to
-   * allow test code to mock this holder (and thus verify close-ordering) without requiring Mockito
-   * to instrument the JNI-heavy {@link Dataset} class itself.
-   */
-  static class DatasetHolder implements Closeable {
-
-    private final Dataset dataset;
-
-    private final AtomicInteger activeReaders = new AtomicInteger();
-
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
-    private final AtomicBoolean physicallyClosed = new AtomicBoolean(false);
-
-    DatasetHolder(Dataset dataset) {
-      this.dataset = dataset;
-    }
-
-    Dataset getDataset() {
-      return dataset;
-    }
-
-    void checkoutLatest() {
-      dataset.checkoutLatest();
-    }
-
-    /**
-     * Registers an in-flight reader that borrowed the dataset; pairs with {@link #readerDone()}.
-     */
-    void readerBegins() {
-      activeReaders.incrementAndGet();
-    }
-
-    /** Releases a reader; closes the dataset when the cache already evicted it and none remain. */
-    void readerDone() {
-      if (activeReaders.decrementAndGet() == 0 && closed.get()) {
-        closeOnce();
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      if (closed.compareAndSet(false, true)) {
-        if (activeReaders.get() == 0) {
-          closeOnce();
-        }
-        // Readers still scanning close it in readerDone() when the last one leaves.
-      }
-    }
-
-    /**
-     * Closes the underlying dataset exactly once. close() (eviction) and readerDone() (the last
-     * reader leaving) can both observe the evicted-and-idle state and race into the physical close,
-     * so gate it: a native dataset must not be closed twice.
-     */
-    private void closeOnce() {
-      if (physicallyClosed.compareAndSet(false, true)) {
-        closeDataset();
-      }
-    }
-
-    /** Closes the underlying dataset; overridable so tests can observe without JNI. */
-    protected void closeDataset() {
-      try {
-        dataset.close();
-      } catch (RuntimeException e) {
-        LOG.warn("Failed to close Lance dataset", e);
-      }
-    }
-
-    @VisibleForTesting
-    boolean isClosedForTest() {
-      return closed.get();
     }
   }
 }
